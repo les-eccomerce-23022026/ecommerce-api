@@ -1,0 +1,29 @@
+### Login - Administrador Mestre
+POST http://localhost:3000/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@livraria.com.br",
+  "senha": "Admin@123"
+}
+
+###
+### Login - Cliente (após registro)
+POST http://localhost:3000/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "joao.comprador@email.com",
+  "senha": "Password@123"
+}
+
+###
+### Login - Credenciais inválidas
+POST http://localhost:3000/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "email-invalido@exemplo.com",
+  "senha": "SenhaErrada@123"
+}
+

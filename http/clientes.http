@@ -1,0 +1,43 @@
+### Registro de Cliente - Payload mínimo (compatível com protótipo atual)
+POST http://localhost:3000/api/clientes/registro
+Content-Type: application/json
+
+{
+  "nome": "João Silva",
+  "cpf": "123.456.789-00",
+  "email": "joao.comprador@email.com",
+  "senha": "Password@123",
+  "confirmacao_senha": "Password@123"
+}
+
+###
+### Registro de Cliente - Payload completo (futuro)
+POST http://localhost:3000/api/clientes/registro
+Content-Type: application/json
+
+{
+  "nome": "João Silva",
+  "genero": "M",
+  "data_nascimento": "1990-05-15",
+  "cpf": "123.456.789-01",
+  "telefone": {
+    "tipo": "CELULAR",
+    "ddd": "11",
+    "numero": "98888-7777"
+  },
+  "email": "joao.comprador+completo@email.com",
+  "senha": "Password@123",
+  "confirmacao_senha": "Password@123",
+  "endereco_residencial": {
+    "tipo_residencia": "CASA",
+    "tipo_logradouro": "RUA",
+    "logradouro": "Avenida Paulista",
+    "numero": "1000",
+    "bairro": "Bela Vista",
+    "cep": "01310-100",
+    "cidade": "São Paulo",
+    "estado": "SP",
+    "pais": "Brasil"
+  }
+}
+
