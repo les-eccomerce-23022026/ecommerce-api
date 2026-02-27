@@ -77,7 +77,7 @@ export class ServicoClientes {
       nome: usuarioAtualizado.nome,
       email: usuarioAtualizado.email,
       cpf: usuarioAtualizado.cpf,
-      role: usuarioAtualizado.role,
+      role: usuarioAtualizado.role.descricao,
     };
   }
 
@@ -131,7 +131,7 @@ export class ServicoClientes {
       nome: usuario.nome,
       email: usuario.email,
       cpf: usuario.cpf,
-      role: usuario.role,
+      role: usuario.role.descricao,
     };
   }
 }

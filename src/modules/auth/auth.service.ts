@@ -33,7 +33,7 @@ export class ServicoAutenticacao {
       nome: usuario.nome,
       email: usuario.email,
       cpf: usuario.cpf,
-      role: usuario.role,
+      role: usuario.role.descricao,
     };
 
     const segredo = process.env.JWT_SEGREDO;
@@ -44,7 +44,7 @@ export class ServicoAutenticacao {
     const token = jwt.sign(
       {
         sub: usuario.uuid,
-        role: usuario.role,
+        role: usuario.role.descricao,
       },
       segredo,
       {

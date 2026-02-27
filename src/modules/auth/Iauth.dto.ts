@@ -1,5 +1,3 @@
-import { IPapelUsuario } from '@/shared/types/Ipapel-usuario';
-
 /**
  * DTO para requisição de login.
  */
@@ -10,13 +8,14 @@ export interface IDadosLoginDto {
 
 /**
  * Representa o usuário retornado após autenticação.
+ * Expõe somente o uuid e a descrição do papel (sem o id interno do papel).
  */
 export interface IUsuarioAutenticadoDto {
   uuid: string;
   nome: string;
   email: string;
   cpf: string;
-  role: IPapelUsuario;
+  role: string;
 }
 
 /**

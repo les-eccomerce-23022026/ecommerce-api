@@ -51,7 +51,7 @@ export class ServicoAdmin {
       nome: usuario.nome,
       email: usuario.email,
       cpf: usuario.cpf,
-      role: usuario.role,
+      role: usuario.role.descricao,
     };
   }
 }

@@ -36,7 +36,7 @@ export async function autenticacaoMiddleware(
       throw new Error('Configuração de JWT ausente.');
     }
 
-    const decodificado = jwt.verify(token, segredo) as { sub: string; role: 'admin' | 'cliente' };
+    const decodificado = jwt.verify(token, segredo) as { sub: string; role: string };
 
     req.usuario = {
       uuid: decodificado.sub,
