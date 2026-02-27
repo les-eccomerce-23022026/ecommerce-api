@@ -1,6 +1,6 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { DadosLoginDto, RespostaLoginDto, UsuarioAutenticadoDto } from '@/modules/auth/auth.dto';
+import { IDadosLoginDto, IRespostaLoginDto, IUsuarioAutenticadoDto } from '@/modules/auth/Iauth.dto';
 import { RepositorioUsuarios } from '@/modules/usuarios/usuario.repository';
 
 const TEMPO_EXPIRACAO_PADRAO = '1h';
@@ -16,7 +16,7 @@ export class ServicoAutenticacao {
    *
    * @param dadosLogin Dados de login contendo email e senha.
    */
-  public async autenticar(dadosLogin: DadosLoginDto): Promise<RespostaLoginDto> {
+  public async autenticar(dadosLogin: IDadosLoginDto): Promise<IRespostaLoginDto> {
     const usuario = await this.repositorioUsuarios.buscarPorEmail(dadosLogin.email);
 
     if (!usuario || !usuario.ativo) {
@@ -28,7 +28,7 @@ export class ServicoAutenticacao {
       throw new Error('Credenciais inválidas.');
     }
 
-    const usuarioRetorno: UsuarioAutenticadoDto = {
+    const usuarioRetorno: IUsuarioAutenticadoDto = {
       uuid: usuario.uuid,
       nome: usuario.nome,
       email: usuario.email,

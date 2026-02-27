@@ -1,6 +1,8 @@
 import { randomUUID } from 'crypto';
 import bcrypt from 'bcryptjs';
-import { Usuario, PapelUsuario } from '@/modules/usuarios/usuario.entity';
+import { IUsuario } from '@/modules/usuarios/Iusuario.entity';
+import { IPapelUsuario } from '@/shared/types/Ipapel-usuario';
+import { PAPEL_ADMIN, PAPEL_CLIENTE } from '@/shared/types/papeis';
 
 /**
  * Repositório em memória para prototipação.
@@ -9,10 +11,11 @@ import { Usuario, PapelUsuario } from '@/modules/usuarios/usuario.entity';
 export class RepositorioUsuarios {
   private static instancia: RepositorioUsuarios;
 
-  private usuarios: Usuario[] = [];
+  private usuarios: IUsuario[] = [];
+  private idCounter: number = 1;
 
   private constructor() {
-    void this.criarAdministradorInicial();
+    this.criarAdministradorInicial().catch(() => undefined);
   }
 
   public static obterInstancia(): RepositorioUsuarios {
@@ -23,7 +26,7 @@ export class RepositorioUsuarios {
   }
 
   private async criarAdministradorInicial(): Promise<void> {
-    const existeAdmin = this.usuarios.some((usuario) => usuario.role === 'admin');
+    const existeAdmin = this.usuarios.some((usuario) => usuario.role.descricao === 'admin');
     if (existeAdmin) {
       return;
     }
@@ -31,13 +34,14 @@ export class RepositorioUsuarios {
     const senhaPadrao = 'Admin@123';
     const senhaHash = await bcrypt.hash(senhaPadrao, 10);
 
-    const administrador: Usuario = {
+    const administrador: IUsuario = {
+      id: this.idCounter++,
       uuid: randomUUID(),
       nome: 'Administrador Mestre',
       email: 'admin@livraria.com.br',
       cpf: '000.000.000-00',
       senhaHash,
-      role: 'admin',
+      role: PAPEL_ADMIN,
       ativo: true,
     };
 
@@ -45,25 +49,45 @@ export class RepositorioUsuarios {
   }
 
   public async criarUsuario(
-    dados: Omit<Usuario, 'uuid' | 'ativo'> & { role?: PapelUsuario },
-  ): Promise<Usuario> {
-    const usuario: Usuario = {
+    dados: Omit<IUsuario, 'uuid' | 'ativo' | 'id'> & { role?: IPapelUsuario },
+  ): Promise<IUsuario> {
+    const usuario: IUsuario = {
+      id: this.idCounter++,
       uuid: randomUUID(),
       ativo: true,
       ...dados,
-      role: dados.role ?? 'cliente',
+      role: dados.role ?? PAPEL_CLIENTE,
     };
 
     this.usuarios.push(usuario);
     return usuario;
   }
 
-  public async buscarPorEmail(email: string): Promise<Usuario | undefined> {
+  public async buscarPorEmail(email: string): Promise<IUsuario | undefined> {
     return this.usuarios.find((usuario) => usuario.email === email);
   }
 
-  public async buscarPorCpf(cpf: string): Promise<Usuario | undefined> {
+  public async buscarPorCpf(cpf: string): Promise<IUsuario | undefined> {
     return this.usuarios.find((usuario) => usuario.cpf === cpf);
+  }
+
+  public async buscarPorUuid(uuid: string): Promise<IUsuario | undefined> {
+    return this.usuarios.find((usuario) => usuario.uuid === uuid);
+  }
+
+  public async atualizarUsuario(uuid: string, dados: Partial<IUsuario>): Promise<IUsuario | undefined> {
+    const indice = this.usuarios.findIndex((u) => u.uuid === uuid);
+    if (indice === -1) {
+      return undefined;
+    }
+
+    this.usuarios[indice] = {
+      ...this.usuarios[indice],
+      ...dados,
+      uuid, // garante que o uuid não muda
+    };
+
+    return this.usuarios[indice];
   }
 }
 

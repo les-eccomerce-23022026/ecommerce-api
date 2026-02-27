@@ -75,6 +75,12 @@ Este documento estabelece as diretrizes obrigatórias para o desenvolvimento do 
 - **Formato:** Cada tarefa deve ser **enumerada em sequência** (1, 2, 3, …), com descrição resumida e, quando aplicável, indicação de tipo (alteração, inclusão, exclusão).
 - **Uso:** Consultar `TASKS.md` ao planejar e ao commitar; manter a lista atualizada (marcar concluídas ou mover para histórico conforme o fluxo do projeto).
 
+### 3.6 Integração com GitHub Projects
+
+- **Fonte de cards:** Os cartões de tarefas (cards) que representam o trabalho a ser executado devem ser obtidos diretamente do GitHub Projects utilizando a interface de linha de comando (por exemplo, a CLI `gh`) ou por chamadas à API via terminal. Não se deve depender apenas da interface web; o fluxo deve suportar extração via terminal para automação e integração com processos locais.
+- **Fluxo recomendado:** Utilizar a CLI `gh` (comandos de `projects`) ou scripts que consultem a API do GitHub a partir do terminal para listar, filtrar e exportar os cards, integrando-os com o `TASKS.md` ou outro sistema de planejamento local quando necessário.
+- **Motivação:** Garante rastreabilidade, possibilita automações (CI/CD, sincronização) e mantém consistência entre o board remoto e o planejamento local.
+
 
 ## 4. Segurança e Infraestrutura
 ### 4.1 Ambiente de Execução

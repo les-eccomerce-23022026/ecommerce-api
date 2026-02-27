@@ -1,7 +1,9 @@
+import { IPapelUsuario } from '@/shared/types/Ipapel-usuario';
+
 /**
  * DTO para requisição de login.
  */
-export interface DadosLoginDto {
+export interface IDadosLoginDto {
   email: string;
   senha: string;
 }
@@ -9,19 +11,19 @@ export interface DadosLoginDto {
 /**
  * Representa o usuário retornado após autenticação.
  */
-export interface UsuarioAutenticadoDto {
+export interface IUsuarioAutenticadoDto {
   uuid: string;
   nome: string;
   email: string;
   cpf: string;
-  role: 'cliente' | 'admin';
+  role: IPapelUsuario;
 }
 
 /**
  * Resposta de login contendo token e dados do usuário.
  */
-export interface RespostaLoginDto {
+export interface IRespostaLoginDto {
   token: string;
-  user: UsuarioAutenticadoDto;
+  user: IUsuarioAutenticadoDto;
 }
 

@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { ServicoAutenticacao } from '@/modules/auth/auth.service';
-import { RespostaPadrao } from '@/shared/errors/resposta-padrao';
+import { RespostaPadrao } from '@/shared/errors/Iresposta-padrao';
 
 const servicoAutenticacao = new ServicoAutenticacao();
 

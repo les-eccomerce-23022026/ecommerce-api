@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { RespostaPadrao } from '@/shared/errors/resposta-padrao';
+import { RespostaPadrao } from '@/shared/errors/Iresposta-padrao';
 
 const MENSAGEM_ERRO_INESPERADO = 'Erro interno do servidor.';
 

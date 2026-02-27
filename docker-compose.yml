@@ -3,12 +3,12 @@ version: "3.9"
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: les_postgres
+    container_name: ecm_postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: les_livraria
-      POSTGRES_USER: les_user
-      POSTGRES_PASSWORD: les_senha
+      POSTGRES_DB: ecm_livraria
+      POSTGRES_USER: ecm_user
+      POSTGRES_PASSWORD: ecm_senha
     ports:
       - "5432:5432"
     volumes:
@@ -16,7 +16,7 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: les_redis
+    container_name: ecm_redis
     restart: unless-stopped
     command: ["redis-server", "--appendonly", "yes"]
     ports:

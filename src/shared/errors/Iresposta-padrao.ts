@@ -1,19 +1,19 @@
 import { Response } from 'express';
 
 /** Estrutura de resposta de sucesso na API. */
-export interface RespostaSucessoJson<T = unknown> {
+export interface IRespostaSucessoJson<T = unknown> {
   sucesso: true;
   dados: T;
 }
 
 /** Estrutura de resposta de erro na API. */
-export interface RespostaErroJson {
+export interface IRespostaErroJson {
   sucesso: false;
   mensagem: string;
 }
 
 /** Tipo união das respostas padronizadas. */
-export type RespostaPadraoJson<T = unknown> = RespostaSucessoJson<T> | RespostaErroJson;
+export type RespostaPadraoJson<T = unknown> = IRespostaSucessoJson<T> | IRespostaErroJson;
 
 /**
  * Classe utilitária para enviar respostas HTTP em JSON padronizado.
@@ -28,7 +28,7 @@ export class RespostaPadrao {
    * @param dados Payload a ser retornado em `dados`.
    */
   public static enviarSucesso<T>(resposta: Response, statusCode: number, dados: T): Response {
-    const corpo: RespostaSucessoJson<T> = { sucesso: true, dados };
+    const corpo: IRespostaSucessoJson<T> = { sucesso: true, dados };
     return resposta.status(statusCode).json(corpo);
   }
 
@@ -40,7 +40,7 @@ export class RespostaPadrao {
    * @param mensagem Mensagem de erro a ser retornada em `mensagem`.
    */
   public static enviarErro(resposta: Response, statusCode: number, mensagem: string): Response {
-    const corpo: RespostaErroJson = { sucesso: false, mensagem };
+    const corpo: IRespostaErroJson = { sucesso: false, mensagem };
     return resposta.status(statusCode).json(corpo);
   }
 
