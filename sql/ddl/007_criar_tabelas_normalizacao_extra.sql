@@ -62,5 +62,4 @@ COMMENT ON TABLE  ecm_logradouro                     IS 'Logradouros normalizado
 COMMENT ON COLUMN ecm_logradouro.id_logradouro       IS 'Identificador interno do logradouro.';
 COMMENT ON COLUMN ecm_logradouro.id_tipo_logradouro  IS 'FK para ecm_tipo_logradouro (Rua, Avenida…).';
 COMMENT ON COLUMN ecm_logradouro.dsc_logradouro      IS 'Nome do logradouro sem o tipo.';
-COMMENT ON COLUMN ecm_logradouro.num_logradouro      IS 'Número do imóvel.';</content>
-<parameter name="filePath">/home/vinicius/Downloads/estudo/fatec/lab-eng-segunda-noite/backend/sql/ddl/007_criar_tabelas_normalizacao_extra.sql
+COMMENT ON COLUMN ecm_logradouro.num_logradouro      IS 'Número do imóvel.';
