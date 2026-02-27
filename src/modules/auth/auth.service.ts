@@ -1,7 +1,7 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { IDadosLoginDto, IRespostaLoginDto, IUsuarioAutenticadoDto } from '@/modules/auth/Iauth.dto';
-import { RepositorioUsuarios } from '@/modules/usuarios/usuario.repository';
+import { IRepositorioUsuarios } from '@/modules/usuarios/IRepositorioUsuarios';
 
 const TEMPO_EXPIRACAO_PADRAO = '1h';
 
@@ -9,7 +9,11 @@ const TEMPO_EXPIRACAO_PADRAO = '1h';
  * Serviço responsável pela autenticação de usuários.
  */
 export class ServicoAutenticacao {
-  private readonly repositorioUsuarios = RepositorioUsuarios.obterInstancia();
+  private readonly repositorioUsuarios: IRepositorioUsuarios;
+
+  constructor(repositorioUsuarios: IRepositorioUsuarios) {
+    this.repositorioUsuarios = repositorioUsuarios;
+  }
 
   /**
    * Autentica um usuário a partir do email e senha fornecidos.

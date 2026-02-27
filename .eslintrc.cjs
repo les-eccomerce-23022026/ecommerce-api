@@ -54,5 +54,12 @@ module.exports = {
         'no-undef': 'off',
       },
     },
+    {
+      // Arquivos de teste podem importar dependências de dev (ex: supertest, jest)
+      files: ['src/tests/**/*.{ts,tsx}'],
+      rules: {
+        'import/no-extraneous-dependencies': 'off',
+      },
+    },
   ],
 };

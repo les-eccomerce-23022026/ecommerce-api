@@ -1,5 +1,5 @@
 import bcrypt from 'bcryptjs';
-import { RepositorioUsuarios } from '@/modules/usuarios/usuario.repository';
+import { IRepositorioUsuarios } from '@/modules/usuarios/IRepositorioUsuarios';
 import { ICriarAdminDto, IRespostaAdminCriadoDto } from '@/modules/admin/Iadmin.dto';
 import { verificarForcaSenha } from '@/shared/utils/senha.util';
 import { PAPEL_ADMIN } from '@/shared/types/papeis';
@@ -8,7 +8,11 @@ import { PAPEL_ADMIN } from '@/shared/types/papeis';
  * Serviço responsável por tarefas de administração do sistema.
  */
 export class ServicoAdmin {
-  private readonly repositorioUsuarios = RepositorioUsuarios.obterInstancia();
+  private readonly repositorioUsuarios: IRepositorioUsuarios;
+
+  constructor(repositorioUsuarios: IRepositorioUsuarios) {
+    this.repositorioUsuarios = repositorioUsuarios;
+  }
 
   /**
    * Registra um novo administrador. Requer validação de permissões prévia.

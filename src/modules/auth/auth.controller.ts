@@ -1,8 +1,8 @@
 import { Request, Response } from 'express';
-import { ServicoAutenticacao } from '@/modules/auth/auth.service';
+import { di } from '@/shared/infrastructure/di.container';
 import { RespostaPadrao } from '@/shared/errors/Iresposta-padrao';
 
-const servicoAutenticacao = new ServicoAutenticacao();
+const { servicoAutenticacao } = di;
 
 /**
  * Controller responsável pelo login de usuários.

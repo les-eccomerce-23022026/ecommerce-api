@@ -1,5 +1,5 @@
 import bcrypt from 'bcryptjs';
-import { RepositorioUsuarios } from '@/modules/usuarios/usuario.repository';
+import { IRepositorioUsuarios } from '@/modules/usuarios/IRepositorioUsuarios';
 import {
   ICriarClienteDto,
   ICriarClienteMinimoDto,
@@ -13,7 +13,14 @@ import { PAPEL_CLIENTE } from '@/shared/types/papeis';
  * Serviço responsável pelo fluxo de cadastro público de clientes.
  */
 export class ServicoClientes {
-  private readonly repositorioUsuarios = RepositorioUsuarios.obterInstancia();
+  private readonly repositorioUsuarios: IRepositorioUsuarios;
+
+  /**
+   * Construtor injetado com o repositório — sem saber a implementação (Inversão de Dependência)
+   */
+  constructor(repositorioUsuarios: IRepositorioUsuarios) {
+    this.repositorioUsuarios = repositorioUsuarios;
+  }
 
   /**
    * Altera a senha de um cliente existente. (RF0028)

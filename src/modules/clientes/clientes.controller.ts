@@ -1,8 +1,8 @@
 import { Request, Response } from 'express';
-import { ServicoClientes } from '@/modules/clientes/clientes.service';
+import { di } from '@/shared/infrastructure/di.container';
 import { RespostaPadrao } from '@/shared/errors/Iresposta-padrao';
 
-const servicoClientes = new ServicoClientes();
+const { servicoClientes } = di;
 
 /**
  * Controller responsável pelo cadastro público de clientes.
@@ -47,7 +47,7 @@ export class ControladorClientes {
   public static async atualizarCliente(requisicao: Request, resposta: Response): Promise<Response> {
     try {
       // Obter o UUID do cliente. Pode vir dos parâmetros ou do objeto 'usuario' (token)
-      const uuid = requisicao.params.uuid || (requisicao as any).usuario?.uuid;
+      const uuid = requisicao.params.uuid || requisicao.usuario?.uuid;
       const dados = requisicao.body ?? {};
 
       if (!uuid) {
@@ -71,17 +71,17 @@ export class ControladorClientes {
    */
   public static async alterarSenha(requisicao: Request, resposta: Response): Promise<Response> {
     try {
-      const uuid = (requisicao as any).usuario?.uuid;
-      const { senha_atual, nova_senha, confirmacao_senha } = requisicao.body;
+      const uuid = requisicao.usuario?.uuid;
+      const { senha_atual: senhaAtual, nova_senha: novaSenha, confirmacao_senha: confirmacaoSenha } = requisicao.body;
 
       if (!uuid) {
         return RespostaPadrao.enviarErro(resposta, 401, 'Usuário não autenticado.');
       }
 
       await servicoClientes.alterarSenha(uuid, {
-        senha_atual,
-        nova_senha,
-        confirmacao_senha,
+        senha_atual: senhaAtual,
+        nova_senha: novaSenha,
+        confirmacao_senha: confirmacaoSenha,
       });
 
       return RespostaPadrao.enviarSucesso(resposta, 200, {
@@ -101,7 +101,7 @@ export class ControladorClientes {
    */
   public static async inativarCliente(requisicao: Request, resposta: Response): Promise<Response> {
     try {
-      const uuid = requisicao.params.uuid || (requisicao as any).usuario?.uuid;
+      const uuid = requisicao.params.uuid || requisicao.usuario?.uuid;
 
       if (!uuid) {
         return RespostaPadrao.enviarErro(resposta, 401, 'Usuário não autenticado.');

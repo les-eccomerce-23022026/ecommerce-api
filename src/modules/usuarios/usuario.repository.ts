@@ -1,93 +1,142 @@
-import { randomUUID } from 'crypto';
-import bcrypt from 'bcryptjs';
 import { IUsuario } from '@/modules/usuarios/Iusuario.entity';
-import { IPapelUsuario } from '@/shared/types/Ipapel-usuario';
-import { PAPEL_ADMIN, PAPEL_CLIENTE } from '@/shared/types/papeis';
+import { PAPEL_CLIENTE, PAPEL_ADMIN } from '@/shared/types/papeis';
+import { IConexaoBanco } from '@/shared/infrastructure/database/IConexaoBanco';
+import { IRepositorioUsuarios, IDadosCriarUsuario } from './IRepositorioUsuarios';
+
+/** Tipo que representa uma linha bruta retornada pelo banco de dados */
+type LinhaResultado = Record<string, unknown>;
 
 /**
- * Repositório em memória para prototipação.
- * Em fases futuras, este repositório deve ser substituído por uma implementação com banco de dados.
+ * Repositório para usuários.
+ * Implementa persistência real seguindo a modelagem ecm_usuario.
+ * Recebe a conexão com o banco via construtor (Inversão de Dependência).
  */
-export class RepositorioUsuarios {
-  private static instancia: RepositorioUsuarios;
+export class RepositorioUsuarios implements IRepositorioUsuarios {
+  private db: IConexaoBanco;
 
-  private usuarios: IUsuario[] = [];
-  private idCounter: number = 1;
-
-  private constructor() {
-    this.criarAdministradorInicial().catch(() => undefined);
+  /**
+   * Construtor injetado com a abstração do banco de dados.
+   * Não sabe se é Postgres, MySQL ou outro.
+   */
+  constructor(db: IConexaoBanco) {
+    this.db = db;
   }
 
-  public static obterInstancia(): RepositorioUsuarios {
-    if (!RepositorioUsuarios.instancia) {
-      RepositorioUsuarios.instancia = new RepositorioUsuarios();
-    }
-    return RepositorioUsuarios.instancia;
-  }
-
-  private async criarAdministradorInicial(): Promise<void> {
-    const existeAdmin = this.usuarios.some((usuario) => usuario.role.descricao === 'admin');
-    if (existeAdmin) {
-      return;
-    }
-
-    const senhaPadrao = 'Admin@123';
-    const senhaHash = await bcrypt.hash(senhaPadrao, 10);
-
-    const administrador: IUsuario = {
-      id: this.idCounter++,
-      uuid: randomUUID(),
-      nome: 'Administrador Mestre',
-      email: 'admin@livraria.com.br',
-      cpf: '000.000.000-00',
-      senhaHash,
-      role: PAPEL_ADMIN,
-      ativo: true,
+  /**
+   * Mapeia linha do banco para a entidade IUsuario.
+   * Método estático pois não depende de estado da instância.
+   */
+  private static mapearParaEntidade(row: LinhaResultado): IUsuario {
+    return {
+      id: Number(row.id_usuario),
+      uuid: row.uuid_usuario as string,
+      nome: row.nom_usuario as string,
+      email: row.dsc_email as string,
+      cpf: row.dsc_cpf as string,
+      senhaHash: row.dsc_senha_hash as string,
+      role: {
+        id: Number(row.id_papel),
+        descricao: Number(row.id_papel) === PAPEL_ADMIN.id ? PAPEL_ADMIN.descricao : PAPEL_CLIENTE.descricao,
+      },
+      ativo: row.flg_ativo as boolean,
     };
-
-    this.usuarios.push(administrador);
   }
 
-  public async criarUsuario(
-    dados: Omit<IUsuario, 'uuid' | 'ativo' | 'id'> & { role?: IPapelUsuario },
-  ): Promise<IUsuario> {
-    const usuario: IUsuario = {
-      id: this.idCounter++,
-      uuid: randomUUID(),
-      ativo: true,
-      ...dados,
-      role: dados.role ?? PAPEL_CLIENTE,
-    };
+  public async criarUsuario(dados: IDadosCriarUsuario): Promise<IUsuario> {
+    const { nome, email, cpf, senhaHash, role } = dados;
+    const idPapel = role?.id ?? PAPEL_CLIENTE.id;
 
-    this.usuarios.push(usuario);
-    return usuario;
+    const query = `
+      INSERT INTO ecm_usuario (nom_usuario, dsc_email, dsc_cpf, dsc_senha_hash, id_papel)
+      VALUES ($1, $2, $3, $4, $5)
+      RETURNING *
+    `;
+
+    const values = [nome, email, cpf, senhaHash, idPapel];
+    const rows = await this.db.executar(query, values);
+
+    return RepositorioUsuarios.mapearParaEntidade(rows[0] as LinhaResultado);
   }
 
   public async buscarPorEmail(email: string): Promise<IUsuario | undefined> {
-    return this.usuarios.find((usuario) => usuario.email === email);
+    const query = 'SELECT * FROM ecm_usuario WHERE dsc_email = $1';
+    const rows = await this.db.executar(query, [email]);
+
+    if (rows.length === 0) return undefined;
+    return RepositorioUsuarios.mapearParaEntidade(rows[0] as LinhaResultado);
   }
 
   public async buscarPorCpf(cpf: string): Promise<IUsuario | undefined> {
-    return this.usuarios.find((usuario) => usuario.cpf === cpf);
+    const query = 'SELECT * FROM ecm_usuario WHERE dsc_cpf = $1';
+    const rows = await this.db.executar(query, [cpf]);
+
+    if (rows.length === 0) return undefined;
+    return RepositorioUsuarios.mapearParaEntidade(rows[0] as LinhaResultado);
   }
 
   public async buscarPorUuid(uuid: string): Promise<IUsuario | undefined> {
-    return this.usuarios.find((usuario) => usuario.uuid === uuid);
+    const query = 'SELECT * FROM ecm_usuario WHERE uuid_usuario = $1';
+    const rows = await this.db.executar(query, [uuid]);
+
+    if (rows.length === 0) return undefined;
+    return RepositorioUsuarios.mapearParaEntidade(rows[0] as LinhaResultado);
   }
 
   public async atualizarUsuario(uuid: string, dados: Partial<IUsuario>): Promise<IUsuario | undefined> {
-    const indice = this.usuarios.findIndex((u) => u.uuid === uuid);
-    if (indice === -1) {
-      return undefined;
+    const campos: string[] = [];
+    const valores: unknown[] = [];
+    let contador = 1;
+
+    if (dados.nome) {
+      campos.push(`nom_usuario = $${contador}`);
+      contador += 1;
+      valores.push(dados.nome);
+    }
+    if (dados.email) {
+      campos.push(`dsc_email = $${contador}`);
+      contador += 1;
+      valores.push(dados.email);
+    }
+    if (dados.cpf) {
+      campos.push(`dsc_cpf = $${contador}`);
+      contador += 1;
+      valores.push(dados.cpf);
+    }
+    if (dados.senhaHash) {
+      campos.push(`dsc_senha_hash = $${contador}`);
+      contador += 1;
+      valores.push(dados.senhaHash);
+    }
+    if (dados.role) {
+      campos.push(`id_papel = $${contador}`);
+      contador += 1;
+      valores.push(dados.role.id);
+    }
+    if (dados.ativo !== undefined) {
+      campos.push(`flg_ativo = $${contador}`);
+      contador += 1;
+      valores.push(dados.ativo);
     }
 
-    this.usuarios[indice] = {
-      ...this.usuarios[indice],
-      ...dados,
-      uuid, // garante que o uuid não muda
-    };
+    if (campos.length === 0) return this.buscarPorUuid(uuid);
 
-    return this.usuarios[indice];
+    valores.push(uuid);
+    const query = `
+      UPDATE ecm_usuario 
+      SET ${campos.join(', ')} 
+      WHERE uuid_usuario = $${contador}
+      RETURNING *
+    `;
+
+    const rows = await this.db.executar(query, valores);
+
+    if (rows.length === 0) return undefined;
+    return RepositorioUsuarios.mapearParaEntidade(rows[0] as LinhaResultado);
+  }
+
+  public async deletarPorEmail(email: string): Promise<void> {
+    const query = 'DELETE FROM ecm_usuario WHERE dsc_email = $1';
+    await this.db.executar(query, [email]);
   }
 }
 

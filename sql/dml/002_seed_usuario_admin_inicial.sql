@@ -10,7 +10,7 @@
 --   PATCH /api/clientes/senha ou equivalente administrativo.
 --
 --   Hash gerado com: bcrypt.hashSync('Admin@123', 10)
---   Valor:          $2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lHuu
+--   Valor:          $2a$10$C0kM1fJ942MS.BnEkxtZauPsu7PTQn8uR9FgeEdhhN9lXfiQ9F1hW
 --
 -- O INSERT é idempotente (ON CONFLICT DO NOTHING) e pode ser re-executado
 -- em ambientes de desenvolvimento sem efeito colateral.
@@ -46,7 +46,7 @@ BEGIN
         'Administrador Mestre',
         'admin@livraria.com.br',
         '000.000.000-00',
-        '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lHuu',
+        '$2a$10$C0kM1fJ942MS.BnEkxtZauPsu7PTQn8uR9FgeEdhhN9lXfiQ9F1hW',
         v_id_papel_admin,
         TRUE
     )

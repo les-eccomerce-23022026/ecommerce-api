@@ -1,8 +1,8 @@
 import { Request, Response } from 'express';
-import { ServicoAdmin } from '@/modules/admin/admin.service';
+import { di } from '@/shared/infrastructure/di.container';
 import { RespostaPadrao } from '@/shared/errors/Iresposta-padrao';
 
-const servicoAdmin = new ServicoAdmin();
+const { servicoAdmin } = di;
 
 /**
  * Controller responsável pelas operações administrativas restritas.

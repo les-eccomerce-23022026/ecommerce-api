@@ -19,3 +19,14 @@ export function obterClienteRedis(): Redis {
   return clienteRedis;
 }
 
+/**
+ * Fecha a conexão com Redis, se existir.
+ * Deve ser chamado no teardown global dos testes.
+ */
+export async function fecharClienteRedis(): Promise<void> {
+  if (clienteRedis) {
+    await clienteRedis.quit();
+    clienteRedis = null;
+  }
+}
+
