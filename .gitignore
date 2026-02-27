@@ -25,3 +25,5 @@ Thumbs.db
 *.tsbuildinfo
 tmp
 .cache
+AGENTS.md
+TASKS.md

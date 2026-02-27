@@ -2,6 +2,13 @@
 
 Este documento descreve os fluxos e a estrutura de dados (JSON) esperados para a etapa de autenticação (Login), controle de permissões (RBAC) e de registro (Create Account), servindo como guia de implementação para a equipe de Engenharia de Software Backend.
 
+### Formato padronizado das respostas da API
+
+Todas as respostas da API utilizam um envelope JSON padronizado:
+
+- **Sucesso:** `{ "sucesso": true, "dados": <payload> }` — o conteúdo exibido neste documento (ex.: `token`, `user`) refere-se ao **conteúdo de `dados`** quando `sucesso` é `true`.
+- **Erro:** `{ "sucesso": false, "mensagem": "<texto>" }` — em falhas de validação ou autenticação, o corpo traz `sucesso: false` e a chave `mensagem` com a descrição do erro.
+
 ---
 
 ## 1. Fluxo e Dados de Autenticação (Login)

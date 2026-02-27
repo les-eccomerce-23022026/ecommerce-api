@@ -58,6 +58,24 @@ Este documento estabelece as diretrizes obrigatórias para o desenvolvimento do 
     - `refactor: simplificar validação de CPF`
 - **Boa prática:** Cada commit deve representar uma unidade lógica de mudança, pequena e coesa, facilitando a leitura do histórico e a revisão de código.
 
+### 3.4 Registro de mudanças (CHANGES.md)
+
+- **Obrigatoriedade:** Toda alteração, inclusão ou exclusão feita no projeto deve ser listada no arquivo **`CHANGES.md`** na raiz do repositório.
+- **Conteúdo de cada entrada:** Mensagem resumida do que foi (ou será) feito.
+- **Identificação:** Cada entrada deve ser **enumerada** e identificada por **data, hora, minutos e segundos** no formato `[AAAAMMDD-HHMMSS]` (ex.: `[20250226-143045]`).
+- **Ordem:** As entradas devem ser ordenadas da mais recente para a mais antiga (a mais nova no topo do arquivo).
+- **Exemplo de formato:**
+  - `[20250226-143045] 1. Resumo da alteração feita no módulo X.`
+  - `[20250226-120000] 2. Inclusão do arquivo Y para Z.`
+
+### 3.5 Planejamento de tarefas (TASKS.md)
+
+- **Obrigatoriedade:** Toda alteração, inclusão ou exclusão deve ser **planejada** em tarefas relevantes no arquivo **`TASKS.md`** na raiz do repositório, antes da implementação e dos commits.
+- **Objetivo:** Servir como referência para sequenciar o trabalho e para associar cada commit a uma tarefa enumerada.
+- **Formato:** Cada tarefa deve ser **enumerada em sequência** (1, 2, 3, …), com descrição resumida e, quando aplicável, indicação de tipo (alteração, inclusão, exclusão).
+- **Uso:** Consultar `TASKS.md` ao planejar e ao commitar; manter a lista atualizada (marcar concluídas ou mover para histórico conforme o fluxo do projeto).
+
+
 ## 4. Segurança e Infraestrutura
 ### 4.1 Ambiente de Execução
 - **Segurança:** Todas as operações devem ser validadas e protegidas contra falhas comuns de segurança.
