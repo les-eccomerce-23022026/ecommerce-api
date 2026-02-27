@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { ServicoClientes } from '@/modules/clientes/clientes.service';
+import { RespostaPadrao } from '@/shared/errors/resposta-padrao';
 
 const servicoClientes = new ServicoClientes();
 
@@ -21,18 +22,19 @@ export class ControladorClientes {
       const faltando = camposObrigatorios.filter((campo) => !dados[campo]);
 
       if (faltando.length > 0) {
-        return resposta.status(400).json({
-          mensagem: `Campos obrigatórios ausentes: ${faltando.join(', ')}`,
-        });
+        return RespostaPadrao.enviarErro(
+          resposta,
+          400,
+          `Campos obrigatórios ausentes: ${faltando.join(', ')}`,
+        );
       }
 
       const clienteCriado = await servicoClientes.registrarCliente(dados);
 
-      return resposta.status(201).json(clienteCriado);
+      return RespostaPadrao.enviarSucesso(resposta, 201, clienteCriado);
     } catch (erro) {
-      return resposta.status(400).json({
-        mensagem: erro instanceof Error ? erro.message : 'Erro ao registrar cliente.',
-      });
+      const mensagem = RespostaPadrao.obterMensagemErro(erro, 'Erro ao registrar cliente.');
+      return RespostaPadrao.enviarErro(resposta, 400, mensagem);
     }
   }
 }

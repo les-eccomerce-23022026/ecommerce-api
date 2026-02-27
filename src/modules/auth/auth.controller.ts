@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { ServicoAutenticacao } from '@/modules/auth/auth.service';
+import { RespostaPadrao } from '@/shared/errors/resposta-padrao';
 
 const servicoAutenticacao = new ServicoAutenticacao();
 
@@ -18,16 +19,15 @@ export class ControladorAutenticacao {
       const { email, senha } = requisicao.body ?? {};
 
       if (!email || !senha) {
-        return resposta.status(400).json({ mensagem: 'Email e senha são obrigatórios.' });
+        return RespostaPadrao.enviarErro(resposta, 400, 'Email e senha são obrigatórios.');
       }
 
       const resultado = await servicoAutenticacao.autenticar({ email, senha });
 
-      return resposta.status(200).json(resultado);
+      return RespostaPadrao.enviarSucesso(resposta, 200, resultado);
     } catch (erro) {
-      return resposta.status(401).json({
-        mensagem: erro instanceof Error ? erro.message : 'Erro ao autenticar usuário.',
-      });
+      const mensagem = RespostaPadrao.obterMensagemErro(erro, 'Erro ao autenticar usuário.');
+      return RespostaPadrao.enviarErro(resposta, 401, mensagem);
     }
   }
 }

@@ -2,6 +2,7 @@ import express, { Application } from 'express';
 import cors from 'cors';
 import { registrarRotasAutenticacao } from '@/modules/auth/auth.routes';
 import { registrarRotasClientes } from '@/modules/clientes/clientes.routes';
+import { middlewareErro } from '@/shared/middlewares/erro.middleware';
 
 /**
  * Cria e configura a aplicação Express principal.
@@ -14,6 +15,8 @@ export function criarAplicacao(): Application {
 
   registrarRotasAutenticacao(app);
   registrarRotasClientes(app);
+
+  app.use(middlewareErro);
 
   return app;
 }
