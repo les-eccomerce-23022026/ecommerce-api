@@ -26,5 +26,6 @@ Thumbs.db
 tmp
 .cache
 AGENTS.md
+.agents
 TASKS.md
 CHANGES.md
