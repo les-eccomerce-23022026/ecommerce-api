@@ -1,5 +1,4 @@
 import { IPapelUsuario } from '../../shared/types/Ipapel-usuario';
-import { ITelefoneDto } from '../clientes/Iclientes.dto';
 
 export interface IUsuario {
   id: number;
@@ -12,6 +11,7 @@ export interface IUsuario {
   ativo: boolean;
   genero?: string;
   dataNascimento?: string;
-  telefone?: ITelefoneDto;
+  telefone?: string;
+  dataCriacao?: Date;
 }
 

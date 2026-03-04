@@ -14,8 +14,7 @@ const variaveisObrigatorias = [
   'POSTGRES_DB',
 ];
 
-for (const variavel of variaveisObrigatorias) {
-  if (!process.env[variavel]) {
-    throw new Error(`Variável de ambiente obrigatória não definida: ${variavel}`);
-  }
+const variavelFaltando = variaveisObrigatorias.find((variavel) => !process.env[variavel]);
+if (variavelFaltando) {
+  throw new Error(`Variável de ambiente obrigatória não definida: ${variavelFaltando}`);
 }

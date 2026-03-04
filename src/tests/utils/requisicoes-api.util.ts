@@ -10,6 +10,9 @@ type DadosCadastroCliente = {
   email?: string;
   senha?: string;
   confirmacao_senha?: string;
+  genero?: string;
+  data_nascimento?: string;
+  telefone?: unknown;
 };
 
 export async function registrarCliente(

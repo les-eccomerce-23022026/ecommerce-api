@@ -1,7 +1,9 @@
 import express, { Application } from 'express';
 import cors from 'cors';
+import cookieParser from 'cookie-parser';
 import { registrarRotasAutenticacao } from '@/modules/auth/auth.routes';
 import { registrarRotasClientes } from '@/modules/clientes/clientes.routes';
+import { registrarRotasCartoes } from '@/modules/cartoes/cartoes.routes';
 import { registrarRotasAdmin } from '@/modules/admin/admin.routes';
 import { middlewareErro } from '@/shared/middlewares/erro.middleware';
 
@@ -12,10 +14,12 @@ export function criarAplicacao(): Application {
   const app = express();
 
   app.use(cors());
+  app.use(cookieParser());
   app.use(express.json());
 
   registrarRotasAutenticacao(app);
   registrarRotasClientes(app);
+  registrarRotasCartoes(app);
   registrarRotasAdmin(app);
 
   app.use(middlewareErro);

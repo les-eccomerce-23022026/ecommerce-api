@@ -14,7 +14,6 @@ export interface IUsuarioAutenticadoDto {
   uuid: string;
   nome: string;
   email: string;
-  cpf: string;
   role: string;
 }
 

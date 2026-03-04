@@ -14,6 +14,7 @@ export default async function globalTeardown(): Promise<void> {
     const conexao = ConexaoPostgres.obterInstancia();
     await conexao.finalizar();
   } catch (erro) {
+    // eslint-disable-next-line no-console
     console.warn('Erro no globalTeardown:', erro);
   } finally {
     // Força a saída do processo para garantir que o Jest termine

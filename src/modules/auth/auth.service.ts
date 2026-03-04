@@ -36,7 +36,6 @@ export class ServicoAutenticacao {
       uuid: usuario.uuid,
       nome: usuario.nome,
       email: usuario.email,
-      cpf: usuario.cpf,
       role: usuario.role.descricao,
     };
 

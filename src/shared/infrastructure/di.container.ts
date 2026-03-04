@@ -1,6 +1,9 @@
 import { FabricaConexaoBanco } from '@/shared/infrastructure/database/FabricaConexaoBanco';
 import { RepositorioUsuarios } from '@/modules/usuarios/usuario.repository';
 import { ServicoClientes } from '@/modules/clientes/clientes.service';
+import { ServicoConsultaClientes } from '@/modules/clientes/consulta-clientes.service';
+import { ServicoCartoes } from '@/modules/cartoes/cartoes.service';
+import { RepositorioCartaoUsuario } from '@/modules/cartoes/IRepositorioCartaoUsuario';
 import { ServicoAdmin } from '@/modules/admin/admin.service';
 import { ServicoAutenticacao } from '@/modules/auth/auth.service';
 import { RepositorioEnderecoUsuarioPostgres } from '@/shared/infrastructure/database/RepositorioEnderecoUsuarioPostgres';
@@ -23,8 +26,14 @@ class ContainerDI {
 
   public static readonly repoTelefone = new RepositorioTelefoneUsuarioPostgres(ContainerDI.db);
 
+  public static readonly repoCartoes = new RepositorioCartaoUsuario(ContainerDI.db);
+
   // Serviços
   public static readonly servicoClientes = new ServicoClientes(ContainerDI.repoUsuarios, ContainerDI.repoPerfil, ContainerDI.repoTelefone);
+
+  public static readonly servicoConsultaClientes = new ServicoConsultaClientes(ContainerDI.repoUsuarios);
+
+  public static readonly servicoCartoes = new ServicoCartoes(ContainerDI.repoCartoes);
 
   public static readonly servicoAdmin = new ServicoAdmin(ContainerDI.repoUsuarios);
 

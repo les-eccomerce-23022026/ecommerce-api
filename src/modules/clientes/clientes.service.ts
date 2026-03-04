@@ -16,7 +16,9 @@ import { PAPEL_CLIENTE } from '@/shared/types/papeis';
  */
 export class ServicoClientes {
   private readonly repositorioUsuarios: IRepositorioUsuarios;
+
   private readonly repositorioPerfil: IRepositorioPerfilCliente;
+
   private readonly repositorioTelefone: IRepositorioTelefoneUsuario;
 
   /**
@@ -32,17 +34,14 @@ export class ServicoClientes {
     this.repositorioTelefone = repositorioTelefone;
   }
 
-  private mapearTipoTelefone(tipo: string): number {
-    switch (tipo.toLowerCase()) {
-      case 'celular':
-        return 1;
-      case 'residencial':
-        return 2;
-      case 'comercial':
-        return 3;
-      default:
-        return 1; // default celular
-    }
+  private static mapearTipoTelefone(tipo: string): number {
+    const mapeamentoTipos: Record<string, number> = {
+      celular: 1,
+      residencial: 2,
+      comercial: 3,
+    };
+
+    return mapeamentoTipos[tipo.toLowerCase()] ?? 1; // default celular
   }
 
   /**
@@ -115,15 +114,15 @@ export class ServicoClientes {
     // Atualizar telefone se houver
     if (dados.telefone !== undefined) {
       // Assumir único telefone, deletar existentes e criar novo
-      for (const tel of telefonesExistentes) {
-        if (tel.uuid) {
-          await this.repositorioTelefone.deletar(usuarioNoBanco.id, tel.uuid);
-        }
-      }
+      await Promise.all(
+        telefonesExistentes
+          .filter((tel) => tel.uuid)
+          .map((tel) => this.repositorioTelefone.deletar(usuarioNoBanco.id, tel.uuid!)),
+      );
       if (dados.telefone) {
         await this.repositorioTelefone.criar({
           idUsuario: usuarioNoBanco.id,
-          idTipoTelefone: this.mapearTipoTelefone(dados.telefone.tipo),
+          idTipoTelefone: ServicoClientes.mapearTipoTelefone(dados.telefone.tipo),
           ddd: dados.telefone.ddd,
           numero: dados.telefone.numero,
           principal: true, // assumir principal
@@ -139,7 +138,6 @@ export class ServicoClientes {
       uuid: usuarioAtualizado.uuid,
       nome: usuarioAtualizado.nome,
       email: usuarioAtualizado.email,
-      cpf: usuarioAtualizado.cpf,
       role: usuarioAtualizado.role.descricao,
     };
   }
@@ -217,7 +215,6 @@ export class ServicoClientes {
       uuid: usuario.uuid,
       nome: usuario.nome,
       email: usuario.email,
-      cpf: usuario.cpf,
       role: usuario.role.descricao,
     };
   }

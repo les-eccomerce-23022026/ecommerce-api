@@ -8,6 +8,7 @@ declare global {
        */
       usuario?: {
         uuid: string;
+        id: number;
         role: string;
       };
     }

@@ -26,6 +26,7 @@ Thumbs.db
 tmp
 .cache
 AGENTS.md
+.github
 .agents
 TASKS.md
 CHANGES.md

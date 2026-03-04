@@ -1,7 +1,7 @@
 import { IUsuario } from '@/modules/usuarios/Iusuario.entity';
 import { PAPEL_CLIENTE, PAPEL_ADMIN } from '@/shared/types/papeis';
 import { IConexaoBanco } from '@/shared/infrastructure/database/IConexaoBanco';
-import { IRepositorioUsuarios, IDadosCriarUsuario } from './IRepositorioUsuarios';
+import { IRepositorioUsuarios, IDadosCriarUsuario, IFiltrosConsultaClientes } from './IRepositorioUsuarios';
 
 /** Tipo que representa uma linha bruta retornada pelo banco de dados */
 type LinhaResultado = Record<string, unknown>;
@@ -39,6 +39,10 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
         descricao: Number(row.id_papel) === PAPEL_ADMIN.id ? PAPEL_ADMIN.descricao : PAPEL_CLIENTE.descricao,
       },
       ativo: row.flg_ativo as boolean,
+      genero: row.dsc_genero as string | undefined,
+      dataNascimento: row.dat_nascimento as string | undefined,
+      telefone: row.dsc_telefone as string | undefined,
+      dataCriacao: row.dat_criacao ? new Date(row.dat_criacao as string) : undefined,
     };
   }
 
@@ -117,6 +121,21 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
       contador += 1;
       valores.push(dados.ativo);
     }
+    if (dados.genero !== undefined) {
+      campos.push(`dsc_genero = $${contador}`);
+      contador += 1;
+      valores.push(dados.genero);
+    }
+    if (dados.dataNascimento !== undefined) {
+      campos.push(`dat_nascimento = $${contador}`);
+      contador += 1;
+      valores.push(dados.dataNascimento);
+    }
+    if (dados.telefone !== undefined) {
+      campos.push(`dsc_telefone = $${contador}`);
+      contador += 1;
+      valores.push(dados.telefone);
+    }
 
     if (campos.length === 0) return this.buscarPorUuid(uuid);
 
@@ -137,6 +156,74 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
   public async deletarPorEmail(email: string): Promise<void> {
     const query = 'DELETE FROM ecm_usuario WHERE dsc_email = $1';
     await this.db.executar(query, [email]);
+  }
+
+  public async buscarClientesComFiltros(filtros: IFiltrosConsultaClientes): Promise<IUsuario[]> {
+    const { nome, cpf, email, offset, limite } = filtros;
+
+    let query = `
+      SELECT id_usuario, uuid_usuario, nom_usuario, dsc_email, dsc_cpf,
+             dsc_senha_hash, id_papel, flg_ativo, dsc_genero, dat_nascimento,
+             dsc_telefone, dat_criacao
+      FROM ecm_usuario
+      WHERE id_papel = $1
+    `;
+
+    const valores: unknown[] = [PAPEL_CLIENTE.id];
+    let contador = 2;
+
+    if (nome) {
+      query += ` AND nom_usuario ILIKE $${contador}`;
+      valores.push(`%${nome}%`);
+      contador += 1;
+    }
+
+    if (cpf) {
+      query += ` AND dsc_cpf ILIKE $${contador}`;
+      valores.push(`%${cpf}%`);
+      contador += 1;
+    }
+
+    if (email) {
+      query += ` AND dsc_email ILIKE $${contador}`;
+      valores.push(`%${email}%`);
+      contador += 1;
+    }
+
+    query += ` ORDER BY dat_criacao DESC LIMIT $${contador} OFFSET $${contador + 1}`;
+    valores.push(limite, offset);
+
+    const rows = await this.db.executar(query, valores);
+    return rows.map(row => RepositorioUsuarios.mapearParaEntidade(row as LinhaResultado));
+  }
+
+  public async contarClientesComFiltros(filtros: Omit<IFiltrosConsultaClientes, 'offset' | 'limite'>): Promise<number> {
+    const { nome, cpf, email } = filtros;
+
+    let query = 'SELECT COUNT(*) as total FROM ecm_usuario WHERE id_papel = $1';
+    const valores: unknown[] = [PAPEL_CLIENTE.id];
+    let contador = 2;
+
+    if (nome) {
+      query += ` AND nom_usuario ILIKE $${contador}`;
+      valores.push(`%${nome}%`);
+      contador += 1;
+    }
+
+    if (cpf) {
+      query += ` AND dsc_cpf ILIKE $${contador}`;
+      valores.push(`%${cpf}%`);
+      contador += 1;
+    }
+
+    if (email) {
+      query += ` AND dsc_email ILIKE $${contador}`;
+      valores.push(`%${email}%`);
+      contador += 1;
+    }
+
+    const rows = await this.db.executar(query, valores);
+    return Number((rows[0] as { total?: number })?.total || 0);
   }
 }
 

@@ -11,20 +11,27 @@ export async function autenticacaoMiddleware(
   next: NextFunction,
 ): Promise<void> {
   const { authorization } = req.headers;
+  const tokenCookie = req.cookies?.token;
 
-  if (!authorization) {
-    res.status(401).json({
-      mensagem: 'Token não fornecido.',
-      sucesso: false,
-    });
-    return;
+  let token: string | undefined;
+
+  // Verificar primeiro no header Authorization Bearer
+  if (authorization) {
+    const [schema, tokenFromHeader] = authorization.split(' ');
+
+    if (tokenFromHeader && schema === 'Bearer') {
+      token = tokenFromHeader;
+    }
   }
 
-  const [schema, token] = authorization.split(' ');
+  // Se não encontrou no header, verificar no cookie
+  if (!token && tokenCookie) {
+    token = tokenCookie;
+  }
 
-  if (!token || schema !== 'Bearer') {
+  if (!token) {
     res.status(401).json({
-      mensagem: 'Token mal formatado.',
+      mensagem: 'Token não fornecido.',
       sucesso: false,
     });
     return;

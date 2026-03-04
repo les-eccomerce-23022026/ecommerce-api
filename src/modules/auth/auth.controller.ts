@@ -24,7 +24,16 @@ export class ControladorAutenticacao {
 
       const resultado = await servicoAutenticacao.autenticar({ email, senha });
 
-      return RespostaPadrao.enviarSucesso(resposta, 200, resultado);
+      // Definir cookie HttpOnly com JWT
+      resposta.cookie('token', resultado.token, {
+        httpOnly: true,
+        secure: true,
+        sameSite: 'strict',
+        maxAge: 24 * 60 * 60 * 1000, // 24h
+      });
+
+      // Retornar apenas dados do usuário (sem token)
+      return RespostaPadrao.enviarSucesso(resposta, 200, { user: resultado.user });
     } catch (erro) {
       const mensagem = RespostaPadrao.obterMensagemErro(erro, 'Erro ao autenticar usuário.');
       return RespostaPadrao.enviarErro(resposta, 401, mensagem);

@@ -7,18 +7,20 @@
 
 ## Board Kanban
 
-| 📋 Todo (6)                                 | 🔄 In Progress (1)              | ✅ Done (10)                                          |
+| 📋 Todo (3)                                 | 🔄 In Progress (1)              | ✅ Done (14)                                          |
 | ------------------------------------------- | ------------------------------- | ----------------------------------------------------- |
 | B12 · [BACKEND] Implementar API de Livros   | B11 · [BACKEND] Gestão de Board | B1 · [BACKEND] Setup Inicial e Arquitetura            |
 | B13 · [BACKEND] Módulo de Carrinho          |                                 | B2 · [BACKEND] Dockerização e Ambiente Dev            |
 | B14 · [BACKEND] Integração com Meio de Pgto |                                 | B3 · [BACKEND] Modelagem SQL e Normalização (14 tabs) |
-| B15 · [BACKEND] Refino do CRUD de Clientes  |                                 | B4 · [BACKEND] Infraestrutura de Repositórios PG      |
-| B16 · [BACKEND] CRUD de Endereços/Cartões   |                                 | B5 · [BACKEND] Auth com JWT e Cookies HttpOnly        |
-| B17 · [BACKEND] Consulta Administrativa     |                                 | B6 · [BACKEND] Módulo de Usuários e Perfis            |
 |                                             |                                 | B7 · [BACKEND] Testes de Integração e Fluxo           |
 |                                             |                                 | B8 · [BACKEND] Governança de Código e Linter          |
 |                                             |                                 | B9 · [BACKEND] Isolamento de Testes e Teardown        |
 |                                             |                                 | B10 · [BACKEND] Segurança de Identificadores (UUIDs)  |
+|                                             |                                 | B15 · [BACKEND] Refino do CRUD de Clientes           |
+|                                             |                                 | B16 · [BACKEND] CRUD de Endereços/Cartões            |
+|                                             |                                 | B17 · [BACKEND] Consulta Administrativa              |
+|                                             |                                 | B18 · [BACKEND] Testes Manuais CRUD Clientes         |
+|                                             |                                 | B19 · [BACKEND] Correção Violações Segurança         |
 
 ---
 
@@ -40,9 +42,11 @@
 | B12  | BACKEND | Implementar API de Livros            | Criar rota GET /livros; busca por parâmetros; filtros avançados; ordenação; paginação robusta via banco.            |
 | B13  | BACKEND | Módulo de Carrinho de Compras        | Manter estado do carrinho no Redis; sincronizar com banco se usuário logado; regras de estoque.                     |
 | B14  | BACKEND | Integração com Meio de Pagamento     | Simular ou integrar gateway; validação de dados de cartão (sem salvar no BD); webhook de confirmação.               |
-| B15  | BACKEND | Refino do CRUD de Clientes          | Corrigir gaps: BCrypt custo 12; validar Gênero/Data/Tel; travar E-mail no perfil; check de role Admin/Cliente.      |
-| B16  | BACKEND | CRUD de Endereços e Cartões         | Implementar gestão de múltiplos endereços de entrega (RF0026) e cartões tokenizados (RF0027) associados ao cliente. |
-| B17  | BACKEND | Consulta Administrativa de Clientes | Implementar RF0024: Listagem para administradores com filtros de nome, CPF, e-mail e suporte a paginação.           |
+| B15  | BACKEND | Refino do CRUD de Clientes          | **Implementado:** Corrigidos gaps de validação (BCrypt custo 12, campos obrigatórios de perfil, restrição de alteração de e-mail), middlewares de autorização e verificações de segurança. |
+| B16  | BACKEND | CRUD de Endereços e Cartões         | **Implementado:** CRUD completo de cartões tokenizados com tabelas normalizadas, validações de segurança e único cartão principal por usuário. |
+| B17  | BACKEND | Consulta Administrativa de Clientes | **Implementado:** Rota GET /api/clientes com filtros administrativos (nome, CPF, e-mail), paginação e listagem completa de clientes. |
+| B18  | BACKEND | Testes Manuais CRUD Clientes        | **Implementado:** Testes completos via curl das rotas CRUD: registro com validação CPF único; login JWT; atualização perfil; alteração senha com validações; inativação impedindo login. |
+| B19  | BACKEND | Correção Violações Segurança        | **Implementado:** Correção crítica de 4 violações: JWT via HttpOnly cookie (não mais no body); remoção de IDs internos do payload JWT; substituição de switch/case por Record<string, fn>; remoção de dados sensíveis (CPF) das respostas públicas. Configuração de cookie-parser e atualização do middleware de autenticação. |
 
 ---
 

@@ -1,7 +1,8 @@
 import { Application } from 'express';
 import { ControladorClientes } from '@/modules/clientes/clientes.controller';
+import { ControladorConsultaClientes } from '@/modules/clientes/consulta-clientes.controller';
 import { autenticacaoMiddleware } from '@/shared/middlewares/autenticacao.middleware';
-import { clienteOnlyMiddleware } from '@/shared/middlewares/autorizacao.middleware';
+import { adminOnlyMiddleware, clienteOnlyMiddleware } from '@/shared/middlewares/autorizacao.middleware';
 
 /**
  * Registra as rotas relacionadas a clientes.
@@ -27,13 +28,9 @@ export function registrarRotasClientes(app: Application): void {
     ControladorClientes.inativarCliente(req, res),
   );
 
-  // Rota protegida por admin (exemplo para RFvários)
-  app.put('/api/clientes/:uuid', autenticacaoMiddleware, (requisicao, resposta) =>
-    ControladorClientes.atualizarCliente(requisicao, resposta),
-  );
-
-  app.delete('/api/clientes/:uuid', autenticacaoMiddleware, (req, res) =>
-    ControladorClientes.inativarCliente(req, res),
+  // Rota de consulta administrativa de clientes (RF0024)
+  app.get('/api/clientes', autenticacaoMiddleware, adminOnlyMiddleware, (requisicao, resposta) =>
+    ControladorConsultaClientes.consultarClientes(requisicao, resposta),
   );
 }
 
