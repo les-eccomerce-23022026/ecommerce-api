@@ -9,6 +9,29 @@ const { servicoClientes } = di;
  */
 export class ControladorClientes {
   /**
+   * Obtém o perfil do cliente logado.
+   *
+   * @param requisicao Objeto da requisição HTTP.
+   * @param resposta Objeto da resposta HTTP.
+   */
+  public static async obterPerfil(requisicao: Request, resposta: Response): Promise<Response> {
+    try {
+      const uuid = requisicao.usuario?.uuid;
+
+      if (!uuid) {
+        return RespostaPadrao.enviarErro(resposta, 401, 'Usuário não autenticado.');
+      }
+
+      const perfil = await servicoClientes.obterPerfil(uuid);
+
+      return RespostaPadrao.enviarSucesso(resposta, 200, perfil);
+    } catch (erro) {
+      const mensagem = RespostaPadrao.obterMensagemErro(erro, 'Erro ao obter perfil do cliente.');
+      return RespostaPadrao.enviarErro(resposta, 400, mensagem);
+    }
+  }
+
+  /**
    * Realiza o registro de um novo cliente na rota pública.
    *
    * @param requisicao Objeto da requisição HTTP.
@@ -18,7 +41,7 @@ export class ControladorClientes {
     try {
       const dados = requisicao.body ?? {};
 
-      const camposObrigatorios = ['nome', 'cpf', 'email', 'senha', 'confirmacao_senha', 'enderecoCobranca', 'enderecoEntregaIgualCobranca'];
+      const camposObrigatorios = ['nome', 'cpf', 'email', 'senha', 'confirmacao_senha'];
       const faltando = camposObrigatorios.filter((campo) => !dados[campo]);
 
       if (faltando.length > 0) {
@@ -29,37 +52,38 @@ export class ControladorClientes {
         );
       }
 
-      // Validar campos obrigatórios do endereço de cobrança
-      const enderecoCobranca = dados.enderecoCobranca;
-      const camposEnderecoObrigatorios = ['logradouro', 'numero', 'bairro', 'cep', 'cidade', 'estado'];
-      const enderecoFaltando = camposEnderecoObrigatorios.filter((campo) => !enderecoCobranca[campo]);
+      // Validar campos obrigatórios do endereço de cobrança (apenas se fornecido)
+      if (dados.enderecoCobranca) {
+        const camposEnderecoObrigatorios = ['logradouro', 'numero', 'bairro', 'cep', 'cidade', 'estado'];
+        const enderecoFaltando = camposEnderecoObrigatorios.filter((campo) => !dados.enderecoCobranca[campo]);
 
-      if (enderecoFaltando.length > 0) {
-        return RespostaPadrao.enviarErro(
-          resposta,
-          400,
-          `Campos obrigatórios do endereço de cobrança ausentes: ${enderecoFaltando.join(', ')}`,
-        );
-      }
-
-      // Se enderecoEntregaIgualCobranca for false, validar enderecoEntrega
-      if (!dados.enderecoEntregaIgualCobranca) {
-        if (!dados.enderecoEntrega) {
+        if (enderecoFaltando.length > 0) {
           return RespostaPadrao.enviarErro(
             resposta,
             400,
-            'enderecoEntrega é obrigatório quando enderecoEntregaIgualCobranca é false',
+            `Campos obrigatórios do endereço de cobrança ausentes: ${enderecoFaltando.join(', ')}`,
           );
         }
-        const enderecoEntrega = dados.enderecoEntrega;
-        const enderecoEntregaFaltando = camposEnderecoObrigatorios.filter((campo) => !enderecoEntrega[campo]);
 
-        if (enderecoEntregaFaltando.length > 0) {
-          return RespostaPadrao.enviarErro(
-            resposta,
-            400,
-            `Campos obrigatórios do endereço de entrega ausentes: ${enderecoEntregaFaltando.join(', ')}`,
-          );
+        // Se enderecoEntregaIgualCobranca for false, validar enderecoEntrega
+        if (dados.enderecoEntregaIgualCobranca === false) {
+          if (!dados.enderecoEntrega) {
+            return RespostaPadrao.enviarErro(
+              resposta,
+              400,
+              'enderecoEntrega é obrigatório quando enderecoEntregaIgualCobranca é false',
+            );
+          }
+          const camposEnderecoObrigatorios2 = ['logradouro', 'numero', 'bairro', 'cep', 'cidade', 'estado'];
+          const enderecoEntregaFaltando = camposEnderecoObrigatorios2.filter((campo) => !dados.enderecoEntrega[campo]);
+
+          if (enderecoEntregaFaltando.length > 0) {
+            return RespostaPadrao.enviarErro(
+              resposta,
+              400,
+              `Campos obrigatórios do endereço de entrega ausentes: ${enderecoEntregaFaltando.join(', ')}`,
+            );
+          }
         }
       }
 

@@ -5,10 +5,10 @@ import { IRepositorioTelefoneUsuario } from '@/shared/types/IRepositorioTelefone
 import { IRepositorioEnderecoUsuario } from '@/shared/types/IRepositorioEnderecoUsuario';
 import {
   ICriarClienteDto,
-  ICriarClienteMinimoDto,
   IAtualizarClienteDto,
   IAlterarSenhaDto,
   IEnderecoDto,
+  IPerfilClienteDto,
 } from '@/modules/clientes/Iclientes.dto';
 import { IPerfilCliente } from '@/shared/types/IPerfilCliente';
 import { verificarForcaSenha } from '@/shared/utils/senha.util';
@@ -289,7 +289,36 @@ export class ServicoClientes {
     await this.repositorioUsuarios.atualizarUsuario(uuid, { ativo: false });
   }
 
-  public async registrarCliente(dados: ICriarClienteDto | ICriarClienteMinimoDto) {
+  /**
+   * Obtém o perfil completo do cliente.
+   *
+   * @param uuid UUID do cliente.
+   * @returns Dados do perfil do cliente.
+   */
+  public async obterPerfil(uuid: string): Promise<IPerfilClienteDto> {
+    const usuario = await this.repositorioUsuarios.buscarPorUuid(uuid);
+    if (!usuario) {
+      throw new Error('Usuário não encontrado.');
+    }
+
+    const perfil = await this.repositorioPerfil.buscarPorIdUsuario(usuario.id);
+
+    // Por enquanto, retornar apenas dados básicos
+    // TODO: implementar busca completa de telefone e endereços com joins
+
+    return {
+      uuid: usuario.uuid,
+      nome: usuario.nome,
+      email: usuario.email,
+      cpf: usuario.cpf,
+      genero: perfil?.genero,
+      dataNascimento: perfil?.dataNascimento?.toISOString().split('T')[0], // Formato YYYY-MM-DD
+      telefone: undefined, // TODO
+      enderecos: [], // TODO
+    };
+  }
+
+  public async registrarCliente(dados: ICriarClienteDto) {
     if (dados.senha !== dados.confirmacao_senha) {
       throw new Error('Senha e confirmação de senha não conferem.');
     }
@@ -340,8 +369,8 @@ export class ServicoClientes {
       });
     }
 
-    // Criar endereços se fornecido (obrigatório no DTO completo)
-    if ('enderecoCobranca' in dados) {
+    // Criar endereços se fornecido (opcional no registro, pode ser adicionado via PUT /perfil)
+    if (dados.enderecoCobranca) {
       await this.criarEndereco(usuario.id, dados.enderecoCobranca, 'cobranca', true);
 
       if (dados.enderecoEntregaIgualCobranca) {

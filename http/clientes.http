@@ -2,8 +2,10 @@
 @token = Bearer <insira_o_token_aqui>
 @tokenAdmin = Bearer <insira_o_token_admin_aqui>
 
-### Registro de Cliente - Payload mínimo (compatível com protótipo atual)
-# Cenário Feliz: Registro bem-sucedido com dados mínimos válidos
+### Registro de Cliente - Payload mínimo
+# Cenário Feliz: Registro bem-sucedido com dados obrigatórios apenas
+# Endereço, telefone, gênero e data de nascimento são opcionais no registro
+# e podem ser adicionados/atualizados posteriormente via PUT /api/clientes/perfil
 # Status: 201
 # Tipo de Retorno: {uuid: string, nome: string, email: string, role: string}
 # Exemplo de Retorno: {"uuid":"uuid-cliente","nome":"João Silva","email":"joao.comprador@email.com","role":"cliente"}
@@ -25,8 +27,8 @@ Content-Type: application/json
 }
 
 ###
-### Registro de Cliente - Payload completo (atualizado)
-# Cenário Feliz: Registro bem-sucedido com dados completos válidos
+### Registro de Cliente - Payload completo (com endereço opcional)
+# Cenário Feliz: Registro bem-sucedido incluindo endereço e telefone opcionais
 # Status: 201
 # Tipo de Retorno: {uuid: string, nome: string, email: string, role: string}
 # Exemplo de Retorno: {"uuid":"uuid-cliente","nome":"João Silva","email":"joao.comprador+completo@email.com","role":"cliente"}
@@ -75,6 +77,19 @@ Content-Type: application/json
   },
   "enderecoEntregaIgualCobranca": true
 }
+
+###
+### Obter Perfil do Cliente
+# Cenário Feliz: Obtenção bem-sucedida dos dados do perfil
+# Status: 200
+# Tipo de Retorno: {uuid: string, nome: string, email: string, cpf: string, genero?: string, dataNascimento?: string, telefone?: {tipo: string, ddd: string, numero: string}, enderecos: Array<IEnderecoDto>}
+# Exemplo de Retorno: {"uuid":"uuid-cliente","nome":"João Silva","email":"joao@email.com","cpf":"123.456.789-00","genero":"Masculino","dataNascimento":"1990-05-15","telefone":{"tipo":"Celular","ddd":"11","numero":"98888-7777"},"enderecos":[{...}]}
+# Cenários de Falha:
+# - Usuário não autenticado: Status 401, mensagem "Usuário não autenticado."
+# - Erro ao obter perfil: Status 400, mensagem "Erro ao obter perfil do cliente."
+# Requer: Authorization header com token JWT
+GET {{baseUrl}}/api/clientes/perfil
+Authorization: {{token}}
 
 ###
 ### Atualizar Perfil do Cliente

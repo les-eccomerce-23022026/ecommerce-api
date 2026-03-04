@@ -13,6 +13,11 @@ export function registrarRotasClientes(app: Application): void {
     ControladorClientes.registrarCliente(requisicao, resposta),
   );
 
+  // Rota protegida para obter perfil próprio
+  app.get('/api/clientes/perfil', autenticacaoMiddleware, clienteOnlyMiddleware, (requisicao, resposta) =>
+    ControladorClientes.obterPerfil(requisicao, resposta),
+  );
+
   // Rota protegida para atualizar perfil próprio
   app.put('/api/clientes/perfil', autenticacaoMiddleware, clienteOnlyMiddleware, (requisicao, resposta) =>
     ControladorClientes.atualizarCliente(requisicao, resposta),

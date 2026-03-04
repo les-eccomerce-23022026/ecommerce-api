@@ -9,11 +9,13 @@ type DadosCadastroCliente = {
   cpf?: string;
   email?: string;
   genero?: string;
-  data_nascimento?: string;
+  dataNascimento?: string;
   telefone?: unknown;
   senha?: string;
   confirmacao_senha?: string;
-  endereco_residencial?: unknown;
+  enderecoCobranca?: unknown;
+  enderecoEntrega?: unknown;
+  enderecoEntregaIgualCobranca?: boolean;
 };
 
 export async function registrarCliente(
@@ -46,6 +48,7 @@ export async function obterTokenCliente(app: Application): Promise<string> {
   await registrarCliente(app);
   const respostaLogin = await realizarLogin(app, 'cliente.teste@email.com', 'SenhaForte@123');
 
+  // Em ambiente de teste (JEST_WORKER_ID definido), o token é retornado no body
   return respostaLogin.body?.dados?.token as string;
 }
 

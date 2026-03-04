@@ -19,8 +19,9 @@ export interface IEnderecoDto {
 }
 
 /**
- * DTO completo de criação de cliente.
- * Inclui todos os campos conforme especificação do usuário.
+ * DTO de criação de cliente.
+ * Endereço e telefone são opcionais no registro e podem ser adicionados
+ * posteriormente via PUT /api/clientes/perfil.
  */
 export interface ICriarClienteDto {
   nome: string;
@@ -31,20 +32,9 @@ export interface ICriarClienteDto {
   genero?: string;
   dataNascimento?: string;
   telefone?: ITelefoneDto;
-  enderecoCobranca: IEnderecoDto;
+  enderecoCobranca?: IEnderecoDto;
   enderecoEntrega?: IEnderecoDto;
-  enderecoEntregaIgualCobranca: boolean;
-}
-
-/**
- * DTO mínimo atualmente enviado pelo frontend.
- */
-export interface ICriarClienteMinimoDto {
-  nome: string;
-  cpf: string;
-  email: string;
-  senha: string;
-  confirmacao_senha: string;
+  enderecoEntregaIgualCobranca?: boolean;
 }
 
 /**
@@ -65,5 +55,19 @@ export interface IAlterarSenhaDto {
   senha_atual: string;
   nova_senha: string;
   confirmacao_senha: string;
+}
+
+/**
+ * DTO para resposta do perfil do cliente.
+ */
+export interface IPerfilClienteDto {
+  uuid: string;
+  nome: string;
+  email: string;
+  cpf: string;
+  genero?: string;
+  dataNascimento?: string;
+  telefone?: ITelefoneDto;
+  enderecos: IEnderecoDto[];
 }
 
