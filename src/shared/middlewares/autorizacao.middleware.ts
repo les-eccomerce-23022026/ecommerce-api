@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { PAPEL_ADMIN, PAPEL_CLIENTE } from '../types/papeis';
 
 /**
  * Middleware para garantir que o usuário autenticado tenha permissões de Administrador.
@@ -10,7 +11,7 @@ export function adminOnlyMiddleware(
 ): void {
   const { usuario } = req;
 
-  if (!usuario || usuario.role !== 'admin') {
+  if (!usuario || usuario.role !== PAPEL_ADMIN.descricao) {
     res.status(403).json({
       mensagem: 'Acesso negado. Esta rota é restrita a administradores.',
       sucesso: false,
@@ -31,7 +32,7 @@ export function clienteOnlyMiddleware(
 ): void {
   const { usuario } = req;
 
-  if (!usuario || usuario.role !== 'cliente') {
+  if (!usuario || usuario.role !== PAPEL_CLIENTE.descricao) {
     res.status(403).json({
       mensagem: 'Acesso negado. Esta rota é restrita a clientes.',
       sucesso: false,
