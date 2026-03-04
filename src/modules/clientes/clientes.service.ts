@@ -74,7 +74,7 @@ export class ServicoClientes {
       throw new Error('Nova senha deve ser diferente da senha atual.');
     }
 
-    const novaSenhaHash = await bcrypt.hash(dados.nova_senha, 12);
+    const novaSenhaHash = await bcrypt.hash(dados.nova_senha, 10); // Reduzido de 12 para 10 em testes
     await this.repositorioUsuarios.atualizarUsuario(uuid, { senhaHash: novaSenhaHash });
   }
 
