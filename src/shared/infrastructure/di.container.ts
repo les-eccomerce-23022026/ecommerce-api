@@ -29,7 +29,7 @@ class ContainerDI {
   public static readonly repoCartoes = new RepositorioCartaoUsuario(ContainerDI.db);
 
   // Serviços
-  public static readonly servicoClientes = new ServicoClientes(ContainerDI.repoUsuarios, ContainerDI.repoPerfil, ContainerDI.repoTelefone);
+  public static readonly servicoClientes = new ServicoClientes(ContainerDI.repoUsuarios, ContainerDI.repoPerfil, ContainerDI.repoTelefone, ContainerDI.repoEndereco, ContainerDI.db);
 
   public static readonly servicoConsultaClientes = new ServicoConsultaClientes(ContainerDI.repoUsuarios);
 

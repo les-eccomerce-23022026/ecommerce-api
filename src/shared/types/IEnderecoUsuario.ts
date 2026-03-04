@@ -9,7 +9,6 @@ export interface IEnderecoUsuario {
   idPais: number;
   idTipoResidencia: number;
   idLogradouro: number;
-  numero: string;
   complemento?: string;
   idCidade: number;
   idBairro: number;

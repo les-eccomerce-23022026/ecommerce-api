@@ -1,5 +1,16 @@
+@baseUrl = http://localhost:3000
+@token = Bearer <insira_o_token_aqui>
+
 ### Login - Administrador Mestre
-POST http://localhost:3000/api/auth/login
+# Cenário Feliz: Autenticação bem-sucedida com credenciais válidas
+# Status: 200
+# Tipo de Retorno: {user: {uuid: string, nome: string, email: string, role: string}}
+# Exemplo de Retorno: {"user":{"uuid":"uuid-admin","nome":"Admin","email":"admin@livraria.com.br","role":"admin"}}
+# Cenários de Falha:
+# - Campos obrigatórios ausentes (email ou senha): Status 400, mensagem "Email e senha são obrigatórios."
+# - Credenciais inválidas (email não existe, senha incorreta, usuário inativo): Status 401, mensagem "Credenciais inválidas."
+# - Erro interno: Status 401, mensagem "Erro ao autenticar usuário."
+POST {{baseUrl}}/api/auth/login
 Content-Type: application/json
 
 {
@@ -9,7 +20,12 @@ Content-Type: application/json
 
 ###
 ### Login - Cliente (após registro)
-POST http://localhost:3000/api/auth/login
+# Cenário Feliz: Autenticação bem-sucedida com credenciais válidas
+# Status: 200
+# Tipo de Retorno: {user: {uuid: string, nome: string, email: string, role: string}}
+# Exemplo de Retorno: {"user":{"uuid":"uuid-cliente","nome":"João Silva","email":"joao.comprador@email.com","role":"cliente"}}
+# Cenários de Falha: Ver acima
+POST {{baseUrl}}/api/auth/login
 Content-Type: application/json
 
 {
@@ -19,7 +35,11 @@ Content-Type: application/json
 
 ###
 ### Login - Credenciais inválidas
-POST http://localhost:3000/api/auth/login
+# Cenário de Falha: Credenciais inválidas
+# Status: 401
+# Tipo de Retorno: {erro: string}
+# Exemplo de Retorno: {"erro":"Credenciais inválidas."}
+POST {{baseUrl}}/api/auth/login
 Content-Type: application/json
 
 {

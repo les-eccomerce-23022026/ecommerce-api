@@ -1,0 +1,24 @@
+@baseUrl = http://localhost:3000
+@tokenAdmin = Bearer <insira_o_token_admin_aqui>
+
+### Registrar Novo Administrador
+# Cenário Feliz: Registro de admin bem-sucedido
+# Status: 201
+# Tipo de Retorno: {uuid: string, nome: string, email: string, role: string}
+# Exemplo de Retorno: {"uuid":"uuid-admin","nome":"Novo Admin","email":"novo@admin.com","role":"admin"}
+# Cenários de Falha:
+# - Campos obrigatórios ausentes: Status 400, mensagem "Campos obrigatórios ausentes: ..."
+# - Email ou CPF já cadastrado: Status 400, mensagem "Já existe um usuário cadastrado com este e-mail." ou similar
+# - Senhas não conferem ou fraca: Status 400
+# Requer: Authorization header com token JWT de admin
+POST {{baseUrl}}/api/admin/registro
+Content-Type: application/json
+Authorization: {{tokenAdmin}}
+
+{
+  "nome": "Novo Administrador",
+  "cpf": "987.654.321-00",
+  "email": "novo.admin@livraria.com.br",
+  "senha": "Admin@123",
+  "confirmacao_senha": "Admin@123"
+}

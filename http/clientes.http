@@ -1,5 +1,19 @@
+@baseUrl = http://localhost:3000
+@token = Bearer <insira_o_token_aqui>
+@tokenAdmin = Bearer <insira_o_token_admin_aqui>
+
 ### Registro de Cliente - Payload mínimo (compatível com protótipo atual)
-POST http://localhost:3000/api/clientes/registro
+# Cenário Feliz: Registro bem-sucedido com dados mínimos válidos
+# Status: 201
+# Tipo de Retorno: {uuid: string, nome: string, email: string, role: string}
+# Exemplo de Retorno: {"uuid":"uuid-cliente","nome":"João Silva","email":"joao.comprador@email.com","role":"cliente"}
+# Cenários de Falha:
+# - Campos obrigatórios ausentes (nome, cpf, email, senha, confirmacao_senha): Status 400, mensagem "Campos obrigatórios ausentes: ..."
+# - Senha e confirmação não conferem: Status 400, mensagem "Senha e confirmação de senha não conferem."
+# - Senha fraca: Status 400, mensagem "Senha fraca. É necessário pelo menos 8 caracteres, incluindo maiúsculas, minúsculas e caractere especial."
+# - Email já cadastrado: Status 400, mensagem "Já existe um usuário cadastrado com este e-mail."
+# - CPF já cadastrado: Status 400, mensagem "Já existe um usuário cadastrado com este CPF."
+POST {{baseUrl}}/api/clientes/registro
 Content-Type: application/json
 
 {
@@ -11,33 +25,122 @@ Content-Type: application/json
 }
 
 ###
-### Registro de Cliente - Payload completo (futuro)
-POST http://localhost:3000/api/clientes/registro
+### Registro de Cliente - Payload completo (atualizado)
+# Cenário Feliz: Registro bem-sucedido com dados completos válidos
+# Status: 201
+# Tipo de Retorno: {uuid: string, nome: string, email: string, role: string}
+# Exemplo de Retorno: {"uuid":"uuid-cliente","nome":"João Silva","email":"joao.comprador+completo@email.com","role":"cliente"}
+# Cenários de Falha: Ver acima
+POST {{baseUrl}}/api/clientes/registro
 Content-Type: application/json
 
 {
   "nome": "João Silva",
-  "genero": "M",
-  "dataNascimento": "1990-05-15",
   "cpf": "123.456.789-01",
-  "telefone": {
-    "tipo": "CELULAR",
-    "ddd": "11",
-    "numero": "98888-7777"
-  },
   "email": "joao.comprador+completo@email.com",
   "senha": "Password@123",
   "confirmacao_senha": "Password@123",
-  "endereco_residencial": {
-    "tipo_residencia": "CASA",
-    "tipo_logradouro": "RUA",
+  "genero": "Masculino",
+  "dataNascimento": "1990-05-15",
+  "telefone": {
+    "tipo": "Celular",
+    "ddd": "11",
+    "numero": "98888-7777"
+  },
+  "enderecoCobranca": {
+    "apelido": "Casa",
+    "tipoResidencia": "Casa",
+    "tipoLogradouro": "Rua",
     "logradouro": "Avenida Paulista",
     "numero": "1000",
+    "complemento": "Apto 45",
     "bairro": "Bela Vista",
     "cep": "01310-100",
     "cidade": "São Paulo",
     "estado": "SP",
     "pais": "Brasil"
-  }
+  },
+  "enderecoEntrega": {
+    "apelido": "Casa",
+    "tipoResidencia": "Casa",
+    "tipoLogradouro": "Rua",
+    "logradouro": "Avenida Paulista",
+    "numero": "1000",
+    "complemento": "Apto 45",
+    "bairro": "Bela Vista",
+    "cep": "01310-100",
+    "cidade": "São Paulo",
+    "estado": "SP",
+    "pais": "Brasil"
+  },
+  "enderecoEntregaIgualCobranca": true
 }
+
+###
+### Atualizar Perfil do Cliente
+# Cenário Feliz: Atualização bem-sucedida dos dados do perfil
+# Status: 200
+# Tipo de Retorno: Dados atualizados do cliente (depende do que foi enviado)
+# Exemplo de Retorno: {"uuid":"uuid-cliente","nome":"João Silva Atualizado","email":"joao@email.com","role":"cliente"}
+# Cenários de Falha:
+# - Usuário não autenticado: Status 401, mensagem "Identificador de usuário não encontrado."
+# - Erro ao atualizar: Status 400, mensagem "Erro ao atualizar dados do cliente."
+# Requer: Authorization header com token JWT
+PUT {{baseUrl}}/api/clientes/perfil
+Content-Type: application/json
+Authorization: {{token}}
+
+{
+  "nome": "João Silva Atualizado"
+}
+
+###
+### Alterar Senha do Cliente
+# Cenário Feliz: Alteração de senha bem-sucedida
+# Status: 200
+# Tipo de Retorno: {mensagem: string}
+# Exemplo de Retorno: {"mensagem":"Senha alterada com sucesso."}
+# Cenários de Falha:
+# - Usuário não autenticado: Status 401, mensagem "Usuário não autenticado."
+# - Senha atual incorreta: Status 400, mensagem "Senha atual incorreta."
+# - Nova senha e confirmação não conferem: Status 400, mensagem "Nova senha e confirmação não conferem."
+# - Nova senha fraca: Status 400, mensagem "Nova senha muito fraca."
+# - Nova senha igual à atual: Status 400, mensagem "Nova senha deve ser diferente da senha atual."
+# Requer: Authorization header com token JWT
+PATCH {{baseUrl}}/api/clientes/seguranca/alterar-senha
+Content-Type: application/json
+Authorization: {{token}}
+
+{
+  "senha_atual": "Password@123",
+  "nova_senha": "NewPassword@123",
+  "confirmacao_senha": "NewPassword@123"
+}
+
+###
+### Inativar Cadastro do Cliente
+# Cenário Feliz: Inativação bem-sucedida
+# Status: 200
+# Tipo de Retorno: {mensagem: string}
+# Exemplo de Retorno: {"mensagem":"Cadastro inativado com sucesso."}
+# Cenários de Falha:
+# - Usuário não autenticado: Status 401, mensagem "Usuário não autenticado."
+# - Erro ao inativar: Status 400, mensagem "Erro ao inativar cadastro."
+# Requer: Authorization header com token JWT
+DELETE {{baseUrl}}/api/clientes/perfil
+Authorization: {{token}}
+
+###
+### Consultar Clientes (Admin)
+# Cenário Feliz: Consulta bem-sucedida com filtros opcionais
+# Status: 200
+# Tipo de Retorno: {clientes: Array<{uuid: string, nome: string, email: string, cpf: string, ativo: boolean, dataCriacao: Date}>, total: number, pagina: number, limite: number, totalPaginas: number}
+# Exemplo de Retorno: {"clientes":[{"uuid":"uuid","nome":"João","email":"joao@email.com","cpf":"123","ativo":true,"dataCriacao":"2023-01-01"}],"total":1,"pagina":1,"limite":10,"totalPaginas":1}
+# Cenários de Falha:
+# - Usuário não autenticado: Status 401
+# - Usuário não é admin: Status 403
+# - Erro na consulta: Status 400, mensagem "Erro ao consultar clientes."
+# Requer: Authorization header com token JWT de admin
+GET {{baseUrl}}/api/clientes?nome=João&pagina=1&limite=10
+Authorization: {{tokenAdmin}}
 

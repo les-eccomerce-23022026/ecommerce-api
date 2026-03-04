@@ -1,0 +1,81 @@
+@baseUrl = http://localhost:3000
+@token = Bearer <insira_o_token_aqui>
+
+### Listar Cartões do Usuário
+# Cenário Feliz: Lista cartões com sucesso
+# Status: 200
+# Tipo de Retorno: Array<{uuid: string, final: string, nomeImpresso: string, bandeira: string, validade: string, principal: boolean}>
+# Exemplo de Retorno: [{"uuid":"uuid-cartao","final":"1234","nomeImpresso":"João Silva","bandeira":"Visa","validade":"2025-12","principal":true}]
+# Cenários de Falha:
+# - Usuário não autenticado: Status 401, mensagem "Usuário não autenticado."
+# - Erro ao listar: Status 400, mensagem "Erro ao listar cartões."
+# Requer: Authorization header com token JWT
+GET {{baseUrl}}/api/clientes/perfil/cartoes
+Authorization: {{token}}
+
+###
+### Cadastrar Novo Cartão
+# Cenário Feliz: Cadastro bem-sucedido
+# Status: 201
+# Tipo de Retorno: {uuid: string, final: string, nomeImpresso: string, bandeira: string, validade: string, principal: boolean}
+# Exemplo de Retorno: {"uuid":"uuid-cartao","final":"1234","nomeImpresso":"João Silva","bandeira":"Visa","validade":"2025-12","principal":false}
+# Cenários de Falha:
+# - Usuário não autenticado: Status 401
+# - Campos obrigatórios ausentes: Status 400, mensagem "Campos obrigatórios ausentes: ..."
+# - Erro ao cadastrar: Status 400, mensagem "Erro ao cadastrar cartão."
+# Requer: Authorization header com token JWT
+POST {{baseUrl}}/api/clientes/perfil/cartoes
+Content-Type: application/json
+Authorization: {{token}}
+
+{
+  "idBandeiraCartao": 1,
+  "tokenCartao": "tok_visa_123456789",
+  "finalCartao": "1234",
+  "nomeImpresso": "João Silva",
+  "validade": "2025-12-31T23:59:59.999Z",
+  "principal": false
+}
+
+###
+### Atualizar Cartão
+# Cenário Feliz: Atualização bem-sucedida
+# Status: 200
+# Tipo de Retorno: Cartão atualizado formatado
+# Cenários de Falha:
+# - Cartão não encontrado: Status 404, mensagem "Cartão não encontrado."
+# - Erro ao atualizar: Status 400
+# Requer: Authorization header com token JWT
+PUT {{baseUrl}}/api/clientes/perfil/cartoes/uuid-cartao
+Content-Type: application/json
+Authorization: {{token}}
+
+{
+  "nomeImpresso": "João Silva Atualizado"
+}
+
+###
+### Remover Cartão
+# Cenário Feliz: Remoção bem-sucedida
+# Status: 200
+# Tipo de Retorno: {mensagem: string}
+# Exemplo de Retorno: {"mensagem":"Cartão removido com sucesso."}
+# Cenários de Falha:
+# - Cartão não encontrado: Status 404
+# - Erro ao remover: Status 400
+# Requer: Authorization header com token JWT
+DELETE {{baseUrl}}/api/clientes/perfil/cartoes/uuid-cartao
+Authorization: {{token}}
+
+###
+### Definir Cartão como Principal
+# Cenário Feliz: Definição bem-sucedida
+# Status: 200
+# Tipo de Retorno: {mensagem: string}
+# Exemplo de Retorno: {"mensagem":"Cartão definido como principal."}
+# Cenários de Falha:
+# - Cartão não encontrado: Status 404
+# - Erro: Status 400
+# Requer: Authorization header com token JWT
+PATCH {{baseUrl}}/api/clientes/perfil/cartoes/uuid-cartao/principal
+Authorization: {{token}}

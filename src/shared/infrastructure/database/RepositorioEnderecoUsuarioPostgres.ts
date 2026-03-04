@@ -14,9 +14,9 @@ export class RepositorioEnderecoUsuarioPostgres implements IRepositorioEnderecoU
       id: Number(row.id_endereco),
       uuid: row.uuid_endereco as string,
       idUsuario: Number(row.id_usuario),
+      tipoEndereco: row.dsc_tipo_endereco as 'cobranca' | 'entrega',
       idTipoResidencia: Number(row.id_tipo_residencia),
       idLogradouro: Number(row.id_logradouro),
-      numero: row.num_endereco as string,
       complemento: (row.dsc_complemento as string | null | undefined) || undefined,
       idCidade: Number(row.id_cidade),
       idBairro: Number(row.id_bairro),
@@ -29,15 +29,15 @@ export class RepositorioEnderecoUsuarioPostgres implements IRepositorioEnderecoU
   public async criar(endereco: IEnderecoUsuario): Promise<void> {
     const query = `
       INSERT INTO ecm_endereco_usuario (
-        id_usuario, id_tipo_residencia, id_logradouro, num_endereco, dsc_complemento,
+        id_usuario, dsc_tipo_endereco, id_tipo_residencia, id_logradouro, dsc_complemento,
         id_cidade, id_bairro, id_cep, id_pais, flg_principal
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
     `;
     await this.db.executar(query, [
       endereco.idUsuario,
+      endereco.tipoEndereco,
       endereco.idTipoResidencia,
       endereco.idLogradouro,
-      endereco.numero,
       endereco.complemento,
       endereco.idCidade,
       endereco.idBairro,
@@ -56,14 +56,14 @@ export class RepositorioEnderecoUsuarioPostgres implements IRepositorioEnderecoU
   public async atualizar(endereco: IEnderecoUsuario): Promise<void> {
     const query = `
       UPDATE ecm_endereco_usuario
-      SET id_tipo_residencia = $1, id_logradouro = $2, num_endereco = $3, dsc_complemento = $4,
+      SET dsc_tipo_endereco = $1, id_tipo_residencia = $2, id_logradouro = $3, dsc_complemento = $4,
           id_cidade = $5, id_bairro = $6, id_cep = $7, id_pais = $8, flg_principal = $9
       WHERE id_usuario = $10 AND uuid_endereco = $11
     `;
     await this.db.executar(query, [
+      endereco.tipoEndereco,
       endereco.idTipoResidencia,
       endereco.idLogradouro,
-      endereco.numero,
       endereco.complemento,
       endereco.idCidade,
       endereco.idBairro,

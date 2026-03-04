@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
+import { di } from '@/shared/infrastructure/di.container';
 
 /**
  * Middleware para autenticação via JWT no header Authorization Bearer.
@@ -45,8 +46,19 @@ export async function autenticacaoMiddleware(
 
     const decodificado = jwt.verify(token, segredo) as { sub: string; role: string };
 
+    // Buscar o usuário para obter o id
+    const usuario = await di.repoUsuarios.buscarPorUuid(decodificado.sub);
+    if (!usuario) {
+      res.status(401).json({
+        mensagem: 'Usuário não encontrado.',
+        sucesso: false,
+      });
+      return;
+    }
+
     req.usuario = {
       uuid: decodificado.sub,
+      id: usuario.id,
       role: decodificado.role,
     };
 
