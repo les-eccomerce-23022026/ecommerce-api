@@ -20,3 +20,24 @@ export function adminOnlyMiddleware(
 
   next();
 }
+
+/**
+ * Middleware para garantir que o usuário autenticado seja um Cliente.
+ */
+export function clienteOnlyMiddleware(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): void {
+  const { usuario } = req;
+
+  if (!usuario || usuario.role !== 'cliente') {
+    res.status(403).json({
+      mensagem: 'Acesso negado. Esta rota é restrita a clientes.',
+      sucesso: false,
+    });
+    return;
+  }
+
+  next();
+}

@@ -24,7 +24,7 @@ class ContainerDI {
   public static readonly repoTelefone = new RepositorioTelefoneUsuarioPostgres(ContainerDI.db);
 
   // Serviços
-  public static readonly servicoClientes = new ServicoClientes(ContainerDI.repoUsuarios);
+  public static readonly servicoClientes = new ServicoClientes(ContainerDI.repoUsuarios, ContainerDI.repoPerfil, ContainerDI.repoTelefone);
 
   public static readonly servicoAdmin = new ServicoAdmin(ContainerDI.repoUsuarios);
 

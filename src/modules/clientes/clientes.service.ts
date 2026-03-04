@@ -1,5 +1,7 @@
 import bcrypt from 'bcryptjs';
 import { IRepositorioUsuarios } from '@/modules/usuarios/IRepositorioUsuarios';
+import { IRepositorioPerfilCliente } from '@/shared/types/IRepositorioPerfilCliente';
+import { IRepositorioTelefoneUsuario } from '@/shared/types/IRepositorioTelefoneUsuario';
 import {
   ICriarClienteDto,
   ICriarClienteMinimoDto,
@@ -14,12 +16,33 @@ import { PAPEL_CLIENTE } from '@/shared/types/papeis';
  */
 export class ServicoClientes {
   private readonly repositorioUsuarios: IRepositorioUsuarios;
+  private readonly repositorioPerfil: IRepositorioPerfilCliente;
+  private readonly repositorioTelefone: IRepositorioTelefoneUsuario;
 
   /**
-   * Construtor injetado com o repositório — sem saber a implementação (Inversão de Dependência)
+   * Construtor injetado com os repositórios — sem saber a implementação (Inversão de Dependência)
    */
-  constructor(repositorioUsuarios: IRepositorioUsuarios) {
+  constructor(
+    repositorioUsuarios: IRepositorioUsuarios,
+    repositorioPerfil: IRepositorioPerfilCliente,
+    repositorioTelefone: IRepositorioTelefoneUsuario,
+  ) {
     this.repositorioUsuarios = repositorioUsuarios;
+    this.repositorioPerfil = repositorioPerfil;
+    this.repositorioTelefone = repositorioTelefone;
+  }
+
+  private mapearTipoTelefone(tipo: string): number {
+    switch (tipo.toLowerCase()) {
+      case 'celular':
+        return 1;
+      case 'residencial':
+        return 2;
+      case 'comercial':
+        return 3;
+      default:
+        return 1; // default celular
+    }
   }
 
   /**
@@ -47,7 +70,11 @@ export class ServicoClientes {
       throw new Error('Nova senha muito fraca.');
     }
 
-    const novaSenhaHash = await bcrypt.hash(dados.nova_senha, 10);
+    if (dados.nova_senha === dados.senha_atual) {
+      throw new Error('Nova senha deve ser diferente da senha atual.');
+    }
+
+    const novaSenhaHash = await bcrypt.hash(dados.nova_senha, 12);
     await this.repositorioUsuarios.atualizarUsuario(uuid, { senhaHash: novaSenhaHash });
   }
 
@@ -63,17 +90,46 @@ export class ServicoClientes {
       throw new Error('Usuário não encontrado.');
     }
 
-    if (dados.email && dados.email !== usuarioNoBanco.email) {
-      const emailEmUso = await this.repositorioUsuarios.buscarPorEmail(dados.email);
-      if (emailEmUso) {
-        throw new Error('Email já em uso por outro usuário.');
-      }
-    }
+    // Buscar perfil existente
+    const perfilExistente = await this.repositorioPerfil.buscarPorIdUsuario(usuarioNoBanco.id);
+    const telefonesExistentes = await this.repositorioTelefone.buscarPorIdUsuario(usuarioNoBanco.id);
 
     const usuarioAtualizado = await this.repositorioUsuarios.atualizarUsuario(uuid, {
       nome: dados.nome ?? usuarioNoBanco.nome,
-      email: dados.email ?? usuarioNoBanco.email,
     });
+
+    // Atualizar perfil se houver dados
+    if (dados.genero !== undefined || dados.dataNascimento !== undefined) {
+      const perfilAtualizado = {
+        idUsuario: usuarioNoBanco.id,
+        genero: dados.genero ?? perfilExistente?.genero ?? '',
+        dataNascimento: dados.dataNascimento ? new Date(dados.dataNascimento) : perfilExistente?.dataNascimento ?? new Date(),
+      };
+      if (perfilExistente) {
+        await this.repositorioPerfil.atualizar(perfilAtualizado);
+      } else {
+        await this.repositorioPerfil.criar(perfilAtualizado);
+      }
+    }
+
+    // Atualizar telefone se houver
+    if (dados.telefone !== undefined) {
+      // Assumir único telefone, deletar existentes e criar novo
+      for (const tel of telefonesExistentes) {
+        if (tel.uuid) {
+          await this.repositorioTelefone.deletar(usuarioNoBanco.id, tel.uuid);
+        }
+      }
+      if (dados.telefone) {
+        await this.repositorioTelefone.criar({
+          idUsuario: usuarioNoBanco.id,
+          idTipoTelefone: this.mapearTipoTelefone(dados.telefone.tipo),
+          ddd: dados.telefone.ddd,
+          numero: dados.telefone.numero,
+          principal: true, // assumir principal
+        });
+      }
+    }
 
     if (!usuarioAtualizado) {
       throw new Error('Erro ao atualizar usuário.');
@@ -97,6 +153,10 @@ export class ServicoClientes {
     const usuario = await this.repositorioUsuarios.buscarPorUuid(uuid);
     if (!usuario) {
       throw new Error('Usuário não encontrado.');
+    }
+
+    if (!usuario.ativo) {
+      throw new Error('Conta já está inativa.');
     }
 
     await this.repositorioUsuarios.atualizarUsuario(uuid, { ativo: false });
@@ -123,7 +183,7 @@ export class ServicoClientes {
       throw new Error('Já existe um usuário cadastrado com este CPF.');
     }
 
-    const senhaHash = await bcrypt.hash(dados.senha, 10);
+    const senhaHash = await bcrypt.hash(dados.senha, 12);
 
     const usuario = await this.repositorioUsuarios.criarUsuario({
       nome: dados.nome,
@@ -132,6 +192,26 @@ export class ServicoClientes {
       senhaHash,
       role: PAPEL_CLIENTE,
     });
+
+    // Criar perfil se fornecido
+    if ('genero' in dados && dados.genero) {
+      await this.repositorioPerfil.criar({
+        idUsuario: usuario.id,
+        genero: dados.genero,
+        dataNascimento: dados.dataNascimento ? new Date(dados.dataNascimento) : new Date(),
+      });
+    }
+
+    // Criar telefone se fornecido
+    if ('telefone' in dados && dados.telefone) {
+      await this.repositorioTelefone.criar({
+        idUsuario: usuario.id,
+        idTipoTelefone: this.mapearTipoTelefone(dados.telefone.tipo),
+        ddd: dados.telefone.ddd,
+        numero: dados.telefone.numero,
+        principal: true,
+      });
+    }
 
     return {
       uuid: usuario.uuid,

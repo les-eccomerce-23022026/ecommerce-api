@@ -22,7 +22,7 @@ export interface IEnderecoResidencialDto {
 export interface ICriarClienteDto {
   nome: string;
   genero?: string;
-  data_nascimento?: string;
+  dataNascimento?: string;
   cpf: string;
   telefone?: ITelefoneDto;
   email: string;
@@ -47,7 +47,9 @@ export interface ICriarClienteMinimoDto {
  */
 export interface IAtualizarClienteDto {
   nome?: string;
-  email?: string;
+  genero?: string;
+  dataNascimento?: string;
+  telefone?: ITelefoneDto;
 }
 
 /**

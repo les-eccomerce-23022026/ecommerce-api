@@ -1,6 +1,7 @@
 import { Application } from 'express';
 import { ControladorClientes } from '@/modules/clientes/clientes.controller';
 import { autenticacaoMiddleware } from '@/shared/middlewares/autenticacao.middleware';
+import { clienteOnlyMiddleware } from '@/shared/middlewares/autorizacao.middleware';
 
 /**
  * Registra as rotas relacionadas a clientes.
@@ -12,7 +13,7 @@ export function registrarRotasClientes(app: Application): void {
   );
 
   // Rota protegida para atualizar perfil próprio
-  app.put('/api/clientes/perfil', autenticacaoMiddleware, (requisicao, resposta) =>
+  app.put('/api/clientes/perfil', autenticacaoMiddleware, clienteOnlyMiddleware, (requisicao, resposta) =>
     ControladorClientes.atualizarCliente(requisicao, resposta),
   );
 

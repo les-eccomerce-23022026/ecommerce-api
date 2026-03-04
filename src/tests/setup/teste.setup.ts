@@ -2,6 +2,8 @@
 // As variáveis de ambiente devem ser explicitamente definidas;
 // não há fallbacks por segurança para evitar uso acidental de valores padrão em produção.
 
+import 'dotenv/config';
+
 const variaveisObrigatorias = [
   'DB_TYPE',
   'JWT_SEGREDO',

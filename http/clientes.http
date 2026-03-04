@@ -18,7 +18,7 @@ Content-Type: application/json
 {
   "nome": "João Silva",
   "genero": "M",
-  "data_nascimento": "1990-05-15",
+  "dataNascimento": "1990-05-15",
   "cpf": "123.456.789-01",
   "telefone": {
     "tipo": "CELULAR",
