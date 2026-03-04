@@ -42,3 +42,10 @@
 - **Quando** é enviado `POST /api/clientes/registro` com o mesmo CPF (demais dados válidos)
 - **Então** a resposta tem status `400`
 - **E** o corpo é JSON padronizado com `sucesso: false` e `mensagem: "Já existe um usuário cadastrado com este CPF."`
+
+### Campos adicionais obrigatórios ausentes (RN0026)
+
+- **Dado** um body com `nome`, `cpf`, `email`, `senha`, `confirmacao_senha` válidos mas sem `genero`, `data_nascimento` ou `telefone`
+- **Quando** é enviado `POST /api/clientes/registro` omitindo um desses campos
+- **Então** a resposta tem status `400`
+- **E** o corpo é JSON padronizado com `sucesso: false` e `mensagem` indicando o campo obrigatório ausente

@@ -15,10 +15,17 @@
 - **Então** a resposta tem status `400`
 - **E** o corpo é JSON padronizado com `sucesso: false` e `mensagem: "Email e senha são obrigatórios."`
 
-### Credenciais inválidas (usuário inexistente ou inativo)
+### Credenciais inválidas (usuário não cadastrado)
 
-- **Dado** um email não cadastrado ou usuário inativo
+- **Dado** um email que não existe na base de dados
 - **Quando** é enviado `POST /api/auth/login` com esse email e qualquer senha
+- **Então** a resposta tem status `401`
+- **E** o corpo é JSON padronizado com `sucesso: false` e `mensagem: "Credenciais inválidas."`
+
+### Credenciais inválidas (usuário inativo)
+
+- **Dado** um usuário cadastrado com email válido mas com `ativo = false` (conta inativada)
+- **Quando** é enviado `POST /api/auth/login` com as credenciais corretas desse usuário
 - **Então** a resposta tem status `401`
 - **E** o corpo é JSON padronizado com `sucesso: false` e `mensagem: "Credenciais inválidas."`
 

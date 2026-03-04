@@ -14,3 +14,5 @@
 - **Quando** é enviado `POST /api/clientes/registro` com corpo contendo `nome`, `cpf`, `email`, `senha`, `confirmacao_senha` válidos (senha forte e confirmação igual à senha)
 - **Então** a resposta tem status `201`
 - **E** o corpo é JSON padronizado com `sucesso: true` e `dados` contendo `uuid`, `nome`, `email`, `cpf`, `role`
+- **E** o campo `dados.role` é `"cliente"` (nunca `"admin"`)
+- **E** a resposta não expõe nenhum campo `id` numérico sequencial — apenas `uuid` (RNF0035)
