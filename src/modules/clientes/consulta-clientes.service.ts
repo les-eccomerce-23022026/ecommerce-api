@@ -14,9 +14,6 @@ export interface IResultadoConsultaClientes {
     nome: string;
     email: string;
     cpf: string;
-    genero?: string;
-    dataNascimento?: Date;
-    telefone?: string;
     ativo: boolean;
     dataCriacao: Date;
   }>;
@@ -66,9 +63,6 @@ export class ServicoConsultaClientes {
         nome: cliente.nome,
         email: cliente.email,
         cpf: cliente.cpf,
-        genero: cliente.genero,
-        dataNascimento: cliente.dataNascimento ? new Date(cliente.dataNascimento) : undefined,
-        telefone: cliente.telefone,
         ativo: cliente.ativo,
         dataCriacao: cliente.dataCriacao || new Date()
       })),

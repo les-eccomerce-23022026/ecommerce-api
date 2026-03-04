@@ -8,6 +8,7 @@ import {
   IAtualizarClienteDto,
   IAlterarSenhaDto,
 } from '@/modules/clientes/Iclientes.dto';
+import { IPerfilCliente } from '@/shared/types/IPerfilCliente';
 import { verificarForcaSenha } from '@/shared/utils/senha.util';
 import { PAPEL_CLIENTE } from '@/shared/types/papeis';
 
@@ -89,7 +90,6 @@ export class ServicoClientes {
       throw new Error('Usuário não encontrado.');
     }
 
-    // Buscar perfil existente
     const perfilExistente = await this.repositorioPerfil.buscarPorIdUsuario(usuarioNoBanco.id);
     const telefonesExistentes = await this.repositorioTelefone.buscarPorIdUsuario(usuarioNoBanco.id);
 
@@ -97,12 +97,16 @@ export class ServicoClientes {
       nome: dados.nome ?? usuarioNoBanco.nome,
     });
 
-    // Atualizar perfil se houver dados
+    if (!usuarioAtualizado) {
+      throw new Error('Erro ao atualizar usuário.');
+    }
+
+    // Atualizar perfil (genero / dataNascimento) — RF0022
     if (dados.genero !== undefined || dados.dataNascimento !== undefined) {
-      const perfilAtualizado = {
+      const perfilAtualizado: IPerfilCliente = {
         idUsuario: usuarioNoBanco.id,
-        genero: dados.genero ?? perfilExistente?.genero ?? '',
-        dataNascimento: dados.dataNascimento ? new Date(dados.dataNascimento) : perfilExistente?.dataNascimento ?? new Date(),
+        genero: dados.genero ?? perfilExistente?.genero,
+        dataNascimento: dados.dataNascimento ? new Date(dados.dataNascimento) : perfilExistente?.dataNascimento,
       };
       if (perfilExistente) {
         await this.repositorioPerfil.atualizar(perfilAtualizado);
@@ -111,9 +115,8 @@ export class ServicoClientes {
       }
     }
 
-    // Atualizar telefone se houver
+    // Atualizar telefone — RF0022: recriar telefone principal se enviado
     if (dados.telefone !== undefined) {
-      // Assumir único telefone, deletar existentes e criar novo
       await Promise.all(
         telefonesExistentes
           .filter((tel) => tel.uuid)
@@ -125,13 +128,9 @@ export class ServicoClientes {
           idTipoTelefone: ServicoClientes.mapearTipoTelefone(dados.telefone.tipo),
           ddd: dados.telefone.ddd,
           numero: dados.telefone.numero,
-          principal: true, // assumir principal
+          principal: true,
         });
       }
-    }
-
-    if (!usuarioAtualizado) {
-      throw new Error('Erro ao atualizar usuário.');
     }
 
     return {
@@ -204,7 +203,7 @@ export class ServicoClientes {
     if ('telefone' in dados && dados.telefone) {
       await this.repositorioTelefone.criar({
         idUsuario: usuario.id,
-        idTipoTelefone: this.mapearTipoTelefone(dados.telefone.tipo),
+        idTipoTelefone: ServicoClientes.mapearTipoTelefone(dados.telefone.tipo),
         ddd: dados.telefone.ddd,
         numero: dados.telefone.numero,
         principal: true,

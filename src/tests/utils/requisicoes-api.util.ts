@@ -8,11 +8,12 @@ type DadosCadastroCliente = {
   nome?: string;
   cpf?: string;
   email?: string;
-  senha?: string;
-  confirmacao_senha?: string;
   genero?: string;
   data_nascimento?: string;
   telefone?: unknown;
+  senha?: string;
+  confirmacao_senha?: string;
+  endereco_residencial?: unknown;
 };
 
 export async function registrarCliente(

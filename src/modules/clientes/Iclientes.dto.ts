@@ -5,6 +5,7 @@ export interface ITelefoneDto {
 }
 
 export interface IEnderecoResidencialDto {
+  tipo_endereco: 'cobranca' | 'entrega';
   tipo_residencia: string;
   tipo_logradouro: string;
   logradouro: string;
@@ -18,14 +19,15 @@ export interface IEnderecoResidencialDto {
 
 /**
  * DTO completo de criação de cliente.
+ * Exige gênero, data de nascimento, telefone e endereços conforme RN0026/RF0021.
  */
 export interface ICriarClienteDto {
   nome: string;
+  cpf: string;
+  email: string;
   genero?: string;
   dataNascimento?: string;
-  cpf: string;
   telefone?: ITelefoneDto;
-  email: string;
   senha: string;
   confirmacao_senha: string;
   endereco_residencial?: IEnderecoResidencialDto;
@@ -44,6 +46,7 @@ export interface ICriarClienteMinimoDto {
 
 /**
  * DTO para atualização de informações básicas do cliente.
+ * Dados editaveis conforme RF0022: nome, gênero, data de nascimento, telefone.
  */
 export interface IAtualizarClienteDto {
   nome?: string;

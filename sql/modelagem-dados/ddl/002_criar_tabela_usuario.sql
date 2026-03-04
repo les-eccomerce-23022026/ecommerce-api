@@ -25,10 +25,10 @@
 CREATE TABLE IF NOT EXISTS ecm_usuario (
     id_usuario          BIGSERIAL       PRIMARY KEY,
     uuid_usuario        UUID            NOT NULL    DEFAULT gen_random_uuid(),
-    nom_usuario         VARCHAR(150)    NOT NULL,
+    nom_usuario         VARCHAR(80)     NOT NULL,
     dsc_email           VARCHAR(255)    NOT NULL,
     dsc_cpf             CHAR(14)        NOT NULL,
-    dsc_senha_hash      VARCHAR(255)    NOT NULL,
+    dsc_senha_hash      VARCHAR(100)    NOT NULL,
     id_papel            INTEGER         NOT NULL,
     flg_ativo           BOOLEAN         NOT NULL    DEFAULT TRUE,
     dat_criacao         TIMESTAMPTZ     NOT NULL    DEFAULT NOW(),
@@ -61,10 +61,6 @@ COMMENT ON COLUMN ecm_usuario.dat_atualizacao  IS 'Timestamp da última atualiza
 -- -----------------------------------------------------------------------------
 -- Índices de busca frequente
 -- -----------------------------------------------------------------------------
-CREATE INDEX IF NOT EXISTS idx_usuario_email  ON ecm_usuario (dsc_email);
-CREATE INDEX IF NOT EXISTS idx_usuario_cpf    ON ecm_usuario (dsc_cpf);
-CREATE INDEX IF NOT EXISTS idx_usuario_uuid   ON ecm_usuario (uuid_usuario);
-CREATE INDEX IF NOT EXISTS idx_usuario_papel  ON ecm_usuario (id_papel);
 
 
 -- -----------------------------------------------------------------------------

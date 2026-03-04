@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS ecm_endereco_usuario (
     id_endereco             BIGSERIAL       PRIMARY KEY,
     uuid_endereco           UUID            NOT NULL    DEFAULT gen_random_uuid(),
     id_usuario              BIGINT          NOT NULL,
+    dsc_tipo_endereco       VARCHAR(20)     NOT NULL    DEFAULT 'entrega',
     id_tipo_residencia      INTEGER,
     id_logradouro           INTEGER,
     dsc_complemento         VARCHAR(100),
@@ -28,6 +29,9 @@ CREATE TABLE IF NOT EXISTS ecm_endereco_usuario (
     id_cep                  INTEGER,
     id_pais                 INTEGER         NOT NULL    DEFAULT 1, -- 1 = Brasil
     flg_principal           BOOLEAN         NOT NULL    DEFAULT FALSE,
+
+    -- RN0021/RN0022: cobrança ou entrega
+    CONSTRAINT ck_endereco_tipo CHECK (dsc_tipo_endereco IN ('cobranca', 'entrega')),
     dat_criacao             TIMESTAMPTZ     NOT NULL    DEFAULT NOW(),
     dat_atualizacao         TIMESTAMPTZ     NOT NULL    DEFAULT NOW(),
 
@@ -85,6 +89,7 @@ COMMENT ON TABLE  ecm_endereco_usuario                        IS 'Endereços vin
 COMMENT ON COLUMN ecm_endereco_usuario.id_endereco            IS 'Chave primária interna. Nunca exposta nas rotas HTTP.';
 COMMENT ON COLUMN ecm_endereco_usuario.uuid_endereco          IS 'Identificador público (UUID v4). Retornado pelas rotas HTTP.';
 COMMENT ON COLUMN ecm_endereco_usuario.id_usuario             IS 'FK para ecm_usuario — proprietário do endereço.';
+COMMENT ON COLUMN ecm_endereco_usuario.dsc_tipo_endereco      IS 'Tipo do endereço: cobranca ou entrega. RN0021/RN0022. Padrão: entrega.';
 COMMENT ON COLUMN ecm_endereco_usuario.id_tipo_residencia     IS 'FK para ecm_tipo_residencia (Casa, Apartamento…). Opcional.';
 COMMENT ON COLUMN ecm_endereco_usuario.id_logradouro          IS 'FK para ecm_logradouro — logradouro completo (tipo + nome + número).';
 COMMENT ON COLUMN ecm_endereco_usuario.dsc_complemento        IS 'Complemento opcional (ex.: apto 42, bloco B).';
@@ -99,7 +104,6 @@ COMMENT ON COLUMN ecm_endereco_usuario.dat_atualizacao        IS 'Timestamp da �
 
 -- Índices de acesso frequente
 CREATE INDEX IF NOT EXISTS idx_endereco_usuario   ON ecm_endereco_usuario (id_usuario);
-CREATE INDEX IF NOT EXISTS idx_endereco_uuid      ON ecm_endereco_usuario (uuid_endereco);
 CREATE INDEX IF NOT EXISTS idx_endereco_logradouro ON ecm_endereco_usuario (id_logradouro);
 CREATE INDEX IF NOT EXISTS idx_endereco_cidade    ON ecm_endereco_usuario (id_cidade);
 CREATE INDEX IF NOT EXISTS idx_endereco_bairro    ON ecm_endereco_usuario (id_bairro);

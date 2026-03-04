@@ -39,10 +39,8 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
         descricao: Number(row.id_papel) === PAPEL_ADMIN.id ? PAPEL_ADMIN.descricao : PAPEL_CLIENTE.descricao,
       },
       ativo: row.flg_ativo as boolean,
-      genero: row.dsc_genero as string | undefined,
-      dataNascimento: row.dat_nascimento as string | undefined,
-      telefone: row.dsc_telefone as string | undefined,
       dataCriacao: row.dat_criacao ? new Date(row.dat_criacao as string) : undefined,
+      dataAtualizacao: row.dat_atualizacao ? new Date(row.dat_atualizacao as string) : undefined,
     };
   }
 
@@ -121,21 +119,6 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
       contador += 1;
       valores.push(dados.ativo);
     }
-    if (dados.genero !== undefined) {
-      campos.push(`dsc_genero = $${contador}`);
-      contador += 1;
-      valores.push(dados.genero);
-    }
-    if (dados.dataNascimento !== undefined) {
-      campos.push(`dat_nascimento = $${contador}`);
-      contador += 1;
-      valores.push(dados.dataNascimento);
-    }
-    if (dados.telefone !== undefined) {
-      campos.push(`dsc_telefone = $${contador}`);
-      contador += 1;
-      valores.push(dados.telefone);
-    }
 
     if (campos.length === 0) return this.buscarPorUuid(uuid);
 
@@ -163,8 +146,7 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
 
     let query = `
       SELECT id_usuario, uuid_usuario, nom_usuario, dsc_email, dsc_cpf,
-             dsc_senha_hash, id_papel, flg_ativo, dsc_genero, dat_nascimento,
-             dsc_telefone, dat_criacao
+             dsc_senha_hash, id_papel, flg_ativo, dat_criacao, dat_atualizacao
       FROM ecm_usuario
       WHERE id_papel = $1
     `;

@@ -11,13 +11,13 @@ until pg_isready -h localhost -p 5432 -U ecm_user -d ecm_livraria; do
 done
 
 echo "Aplicando DDL..."
-for file in sql/ddl/*.sql; do
+for file in sql/modelagem-dados/ddl/*.sql; do
   echo "Executando $file..."
   psql "$DB_URL" -f "$file"
 done
 
 echo "Aplicando DML..."
-for file in sql/dml/*.sql; do
+for file in sql/modelagem-dados/dml/*.sql; do
   echo "Executando $file..."
   psql "$DB_URL" -f "$file"
 done

@@ -9,9 +9,7 @@ export interface IUsuario {
   senhaHash: string;
   role: IPapelUsuario;
   ativo: boolean;
-  genero?: string;
-  dataNascimento?: string;
-  telefone?: string;
   dataCriacao?: Date;
+  dataAtualizacao?: Date;
 }
 

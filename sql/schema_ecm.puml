@@ -1,153 +1,232 @@
 @startuml Schema ECM - E-Commerce de Livros
 
 !define Table(name,desc) class name as "name\n<size:10>desc</size>" << (T,#FFAAAA) >>
-!define PK(name) <b>name</b>
-!define FK(name) <i>name</i>
-!define UK(name) <color:blue>name</color>
+!define PK(name)  <b>name</b>
+!define FK(name)  <i>name</i>
+!define UK(name)  <color:blue>name</color>
+!define CK(name)  <color:orange>name</color>
+!define EX(name)  <color:purple>name</color>
+
+' Paleta de pacotes
+' #EFEFEF  referencia    #DDEEFF  usuario
+' #DDFFD4  contato       #FFF5CC  endereco
+' #FFE8D6  localizacao   #FFD6F0  cartao
 
 ' =============================================================================
-' DOMÍNIO: USUARIO
-' Responsável por identidade, autenticação e perfil dos usuários do sistema.
+' DOMÍNIO: REFERENCIA — tabelas de domínio sem dependências externas
 ' =============================================================================
-package "usuario" #DDEEFF {
+package "referencia" #EFEFEF {
 
-    Table(ecm_papel_usuario, Papéis de usuário) {
-        PK(id_papel: BIGSERIAL)
+    Table(ecm_papel_usuario, "Papéis de usuário") {
+        PK(id_papel: SERIAL)
         UK(dsc_papel: VARCHAR(30))
         dat_criacao: TIMESTAMPTZ
     }
 
-    Table(ecm_usuario, Usuários do sistema) {
-        PK(id_usuario: BIGSERIAL)
-        UK(uuid_usuario: UUID)
-        nom_usuario: VARCHAR(150)
-        UK(dsc_email: VARCHAR(255))
-        UK(dsc_cpf: CHAR(14))
-        dsc_senha_hash: VARCHAR(255)
-        FK(id_papel: INTEGER)
-        flg_ativo: BOOLEAN
-        dat_criacao: TIMESTAMPTZ
-        dat_atualizacao: TIMESTAMPTZ
-    }
-
-    Table(ecm_perfil_cliente, Perfil de clientes) {
-        PK(id_perfil_cliente: BIGSERIAL)
-        UK(uuid_perfil_cliente: UUID)
-        FK(id_usuario: BIGINT)
-        dsc_genero: VARCHAR(30)
-        dat_nascimento: DATE
-        dat_criacao: TIMESTAMPTZ
-        dat_atualizacao: TIMESTAMPTZ
-    }
-}
-
-' =============================================================================
-' DOMÍNIO: CONTATO
-' Responsável pelos meios de contato do usuário (telefones).
-' =============================================================================
-package "contato" #DDFFD4 {
-
-    Table(ecm_tipo_telefone, Tipos de telefone) {
+    Table(ecm_tipo_telefone, "Tipos de telefone") {
         PK(id_tipo_telefone: SERIAL)
         UK(dsc_tipo_telefone: VARCHAR(30))
     }
 
-    Table(ecm_telefone_usuario, Telefones dos usuários) {
-        PK(id_telefone: BIGSERIAL)
-        UK(uuid_telefone: UUID)
-        FK(id_usuario: BIGINT)
-        FK(id_tipo_telefone: INTEGER)
-        num_ddd: CHAR(2)
-        num_telefone: VARCHAR(9)
-        flg_principal: BOOLEAN
-        UK(id_usuario, num_ddd, num_telefone)
-        dat_criacao: TIMESTAMPTZ
-        dat_atualizacao: TIMESTAMPTZ
+    Table(ecm_tipo_logradouro, "Tipos de logradouro") {
+        PK(id_tipo_logradouro: SERIAL)
+        UK(dsc_tipo_logradouro: VARCHAR(50))
     }
-}
 
-' =============================================================================
-' DOMÍNIO: ENDERECO
-' Responsável pelos endereços cadastrados pelo usuário.
-' =============================================================================
-package "endereco" #FFF5CC {
-
-    Table(ecm_tipo_residencia, Tipos de residência) {
+    Table(ecm_tipo_residencia, "Tipos de residência") {
         PK(id_tipo_residencia: SERIAL)
         UK(dsc_tipo_residencia: VARCHAR(50))
     }
 
-    Table(ecm_endereco_usuario, Endereços dos usuários) {
-        PK(id_endereco: BIGSERIAL)
-        UK(uuid_endereco: UUID)
-        FK(id_usuario: BIGINT)
-        FK(id_tipo_residencia: INTEGER)
-        FK(id_logradouro: INTEGER)
-        dsc_complemento: VARCHAR(100)
-        FK(id_cidade: INTEGER)
-        FK(id_bairro: INTEGER)
-        FK(id_cep: INTEGER)
-        FK(id_pais: INTEGER)
-        flg_principal: BOOLEAN
-        dat_criacao: TIMESTAMPTZ
-        dat_atualizacao: TIMESTAMPTZ
-    }
-}
-
-' =============================================================================
-' DOMÍNIO: LOCALIZACAO
-' Responsável pela hierarquia geográfica (país → estado → cidade → bairro → CEP)
-' e por logradouros normalizados.
-' =============================================================================
-package "localizacao" #FFE8D6 {
-
-    Table(ecm_pais, Países) {
-        PK(id_pais: SERIAL)
-        UK(nom_pais: VARCHAR(80))
-        dat_criacao: TIMESTAMPTZ
-    }
-
-    Table(ecm_estado_brasileiro, Estados brasileiros) {
+    Table(ecm_estado_brasileiro, "Estados brasileiros") {
         PK(id_estado: SERIAL)
         UK(sig_estado: CHAR(2))
         UK(nom_estado: VARCHAR(60))
     }
 
-    Table(ecm_cidade, Cidades brasileiras) {
+    Table(ecm_bandeira_cartao, "Bandeiras de cartão — RN0025") {
+        PK(id_bandeira_cartao: SERIAL)
+        UK(dsc_bandeira: VARCHAR(30))
+        dat_criacao: TIMESTAMPTZ
+    }
+}
+
+' =============================================================================
+' DOMÍNIO: USUARIO — identidade, autenticação e perfil do cliente
+' =============================================================================
+package "usuario" #DDEEFF {
+
+    Table(ecm_usuario, "Usuários do sistema") {
+        PK(id_usuario: BIGSERIAL)
+        UK(uuid_usuario: UUID)
+        nom_usuario: VARCHAR(80)
+        UK(dsc_email: VARCHAR(255))
+        UK(dsc_cpf: CHAR(14))
+        dsc_senha_hash: VARCHAR(100)
+        FK(id_papel: INTEGER)
+        flg_ativo: BOOLEAN  DEFAULT TRUE
+        dat_criacao: TIMESTAMPTZ
+        dat_atualizacao: TIMESTAMPTZ
+        ..
+        ' Migration 001 — campos de perfil rápido (sem JOIN):
+        dsc_genero: VARCHAR(30)  NULL
+        dat_nascimento: DATE  NULL
+        dsc_telefone: VARCHAR(20)  NULL
+        ..
+        ' tg_usuario_dat_atualizacao (BEFORE UPDATE)
+        ' fk_usuario_papel → ecm_papel_usuario (RESTRICT)
+    }
+
+    Table(ecm_perfil_cliente, "Perfil 1:1 do cliente") {
+        PK(id_perfil_cliente: BIGSERIAL)
+        UK(uuid_perfil_cliente: UUID)
+        UK(FK(id_usuario: BIGINT))
+        dsc_genero: VARCHAR(30)  NULL
+        dat_nascimento: DATE  NULL
+        num_ranking: INTEGER  DEFAULT 0
+        dat_criacao: TIMESTAMPTZ
+        dat_atualizacao: TIMESTAMPTZ
+        ..
+        ' RN0026: gênero e data de nascimento opcionais no mínimo
+        ' RN0027: ranking baseado em perfil de compra
+        ' tg_perfil_cliente_dat_atualizacao (BEFORE UPDATE)
+        ' fk_perfil_cliente_usuario → ecm_usuario (CASCADE DELETE)
+    }
+}
+
+' =============================================================================
+' DOMÍNIO: CONTATO — telefones normalizados por tipo
+' =============================================================================
+package "contato" #DDFFD4 {
+
+    Table(ecm_telefone_usuario, "Telefones dos usuários") {
+        PK(id_telefone: BIGSERIAL)
+        UK(uuid_telefone: UUID)
+        FK(id_usuario: BIGINT)
+        FK(id_tipo_telefone: INTEGER)
+        CK(num_ddd: CHAR(2))
+        CK(num_telefone: VARCHAR(9))
+        EX(flg_principal: BOOLEAN  DEFAULT FALSE)
+        dat_criacao: TIMESTAMPTZ
+        dat_atualizacao: TIMESTAMPTZ
+        ..
+        ' UK(id_usuario, num_ddd, num_telefone)
+        ' EXCLUDE id_usuario WHERE flg_principal = TRUE
+        ' CK num_ddd ~ '^[0-9]{2}$'
+        ' CK num_telefone ~ '^[0-9]{8,9}$'
+        ' tg_telefone_usuario_dat_atualizacao (BEFORE UPDATE)
+    }
+}
+
+' =============================================================================
+' DOMÍNIO: LOCALIZACAO — hierarquia geográfica completa
+' =============================================================================
+package "localizacao" #FFE8D6 {
+
+    Table(ecm_pais, "Países") {
+        PK(id_pais: SERIAL)
+        UK(nom_pais: VARCHAR(80))
+        dat_criacao: TIMESTAMPTZ
+    }
+
+    Table(ecm_cidade, "Cidades") {
         PK(id_cidade: SERIAL)
-        nom_cidade: VARCHAR(100)
-        UK(nom_cidade_norm: VARCHAR(100))
-        FK(id_estado: INTEGER)
+        uuid_cidade: UUID
+        nom_cidade: VARCHAR(200)
+        UK(nom_cidade_norm: VARCHAR(200))
+        FK(id_estado: INTEGER)  NULL
         dat_criacao: TIMESTAMPTZ
+        ..
+        ' UK(nom_cidade_norm, id_estado)
+        ' fk_cidade_estado → ecm_estado_brasileiro (SET NULL)
     }
 
-    Table(ecm_bairro, Bairros) {
+    Table(ecm_bairro, "Bairros") {
         PK(id_bairro: SERIAL)
-        nom_bairro: VARCHAR(100)
-        UK(nom_bairro_norm: VARCHAR(100))
+        uuid_bairro: UUID
+        nom_bairro: VARCHAR(200)
+        UK(nom_bairro_norm: VARCHAR(200))
         FK(id_cidade: INTEGER)
         dat_criacao: TIMESTAMPTZ
+        ..
+        ' UK(nom_bairro_norm, id_cidade)
+        ' fk_bairro_cidade → ecm_cidade (CASCADE DELETE)
     }
 
-    Table(ecm_cep, CEPs brasileiros) {
+    Table(ecm_cep, "CEPs brasileiros") {
         PK(id_cep: SERIAL)
-        UK(num_cep: CHAR(8))
-        FK(id_cidade: INTEGER)
-        FK(id_bairro: INTEGER)
+        UK(CK(num_cep: CHAR(8)))
+        FK(id_cidade: INTEGER)  NULL
+        FK(id_bairro: INTEGER)  NULL
         dat_criacao: TIMESTAMPTZ
+        ..
+        ' CK num_cep ~ '^[0-9]{8}$'
     }
 
-    Table(ecm_tipo_logradouro, Tipos de logradouro) {
-        PK(id_tipo_logradouro: SERIAL)
-        UK(dsc_tipo_logradouro: VARCHAR(50))
-    }
-
-    Table(ecm_logradouro, Logradouros) {
+    Table(ecm_logradouro, "Logradouros normalizados") {
         PK(id_logradouro: SERIAL)
-        FK(id_tipo_logradouro: INTEGER)
-        UK(dsc_logradouro: VARCHAR(200))
+        FK(id_tipo_logradouro: INTEGER)  NULL
+        dsc_logradouro: VARCHAR(200)
         num_logradouro: VARCHAR(10)
         dat_criacao: TIMESTAMPTZ
+        ..
+        ' UK(id_tipo_logradouro, dsc_logradouro, num_logradouro)
+        ' fk_logradouro_tipo → ecm_tipo_logradouro (SET NULL)
+    }
+}
+
+' =============================================================================
+' DOMÍNIO: ENDERECO — endereços por tipo cobrança/entrega (RN0021/RN0022)
+' =============================================================================
+package "endereco" #FFF5CC {
+
+    Table(ecm_endereco_usuario, "Endereços dos usuários") {
+        PK(id_endereco: BIGSERIAL)
+        UK(uuid_endereco: UUID)
+        FK(id_usuario: BIGINT)
+        CK(dsc_tipo_endereco: VARCHAR(20)  DEFAULT 'entrega')
+        FK(id_tipo_residencia: INTEGER)  NULL
+        FK(id_logradouro: INTEGER)  NULL
+        dsc_complemento: VARCHAR(100)  NULL
+        FK(id_cidade: INTEGER)  NULL
+        FK(id_bairro: INTEGER)  NULL
+        FK(id_cep: INTEGER)  NULL
+        FK(id_pais: INTEGER)  DEFAULT 1
+        EX(flg_principal: BOOLEAN  DEFAULT FALSE)
+        dat_criacao: TIMESTAMPTZ
+        dat_atualizacao: TIMESTAMPTZ
+        ..
+        ' CK dsc_tipo_endereco IN ('cobranca','entrega') — RN0021/RN0022
+        ' EXCLUDE id_usuario WHERE flg_principal = TRUE
+        ' Índices: idx_endereco_usuario, _logradouro, _cidade,
+        '          _bairro, _cep, _principal
+        ' tg_endereco_usuario_dat_atualizacao (BEFORE UPDATE)
+    }
+}
+
+' =============================================================================
+' DOMÍNIO: CARTAO — cartões de crédito tokenizados (RN0024/RN0025)
+' =============================================================================
+package "cartao" #FFD6F0 {
+
+    Table(ecm_cartao_usuario, "Cartões de crédito") {
+        PK(id_cartao: BIGSERIAL)
+        UK(uuid_cartao: UUID)
+        FK(id_usuario: BIGINT)
+        FK(id_bandeira_cartao: INTEGER)
+        UK(dsc_token_cartao: VARCHAR(255))
+        CK(dsc_final_cartao: CHAR(4))
+        dsc_nome_impresso: VARCHAR(50)
+        dat_validade: DATE
+        EX(flg_principal: BOOLEAN  DEFAULT FALSE)
+        dat_criacao: TIMESTAMPTZ
+        dat_atualizacao: TIMESTAMPTZ
+        ..
+        ' UK(id_usuario, dsc_token_cartao)
+        ' EXCLUDE id_usuario WHERE flg_principal = TRUE
+        ' CK dsc_final_cartao ~ '^[0-9]{4}$'
+        ' CVV NUNCA armazenado — RN0024
+        ' tg_cartao_dat_atualizacao (BEFORE UPDATE)
     }
 }
 
@@ -155,42 +234,78 @@ package "localizacao" #FFE8D6 {
 ' Relacionamentos
 ' =============================================================================
 
-' usuario
-ecm_papel_usuario ||..o{ ecm_usuario : "id_papel"
-ecm_usuario ||..|| ecm_perfil_cliente : "id_usuario"
+' referencia → usuario
+ecm_papel_usuario       ||..o{  ecm_usuario             : "id_papel\n(RESTRICT)"
+
+' usuario (1:1)
+ecm_usuario             ||..||  ecm_perfil_cliente       : "id_usuario\n(CASCADE)"
 
 ' contato
-ecm_usuario ||..o{ ecm_telefone_usuario : "id_usuario"
-ecm_tipo_telefone ||..o{ ecm_telefone_usuario : "id_tipo_telefone"
+ecm_usuario             ||..o{  ecm_telefone_usuario     : "id_usuario\n(CASCADE)"
+ecm_tipo_telefone       ||..o{  ecm_telefone_usuario     : "id_tipo_telefone"
 
 ' endereco
-ecm_usuario ||..o{ ecm_endereco_usuario : "id_usuario"
-ecm_tipo_residencia ||..o{ ecm_endereco_usuario : "id_tipo_residencia"
+ecm_usuario             ||..o{  ecm_endereco_usuario     : "id_usuario\n(CASCADE)"
+ecm_tipo_residencia     ||..o{  ecm_endereco_usuario     : "id_tipo_residencia\n(SET NULL)"
+ecm_logradouro          ||..o{  ecm_endereco_usuario     : "id_logradouro\n(SET NULL)"
+ecm_cidade              ||..o{  ecm_endereco_usuario     : "id_cidade\n(SET NULL)"
+ecm_bairro              ||..o{  ecm_endereco_usuario     : "id_bairro\n(SET NULL)"
+ecm_cep                 ||..o{  ecm_endereco_usuario     : "id_cep\n(SET NULL)"
+ecm_pais                ||..o{  ecm_endereco_usuario     : "id_pais\n(SET NULL)"
 
 ' localizacao interna
-ecm_estado_brasileiro ||..o{ ecm_cidade : "id_estado"
-ecm_cidade ||..o{ ecm_bairro : "id_cidade"
-ecm_cidade ||..o{ ecm_cep : "id_cidade"
-ecm_bairro ||..o{ ecm_cep : "id_bairro"
-ecm_tipo_logradouro ||..o{ ecm_logradouro : "id_tipo_logradouro"
+ecm_estado_brasileiro   ||..o{  ecm_cidade               : "id_estado\n(SET NULL)"
+ecm_cidade              ||..o{  ecm_bairro               : "id_cidade\n(CASCADE)"
+ecm_cidade              ||..o{  ecm_cep                  : "id_cidade\n(SET NULL)"
+ecm_bairro              ||..o{  ecm_cep                  : "id_bairro\n(SET NULL)"
+ecm_tipo_logradouro     ||..o{  ecm_logradouro            : "id_tipo_logradouro\n(SET NULL)"
 
-' localizacao → endereco
-ecm_pais ||..o{ ecm_endereco_usuario : "id_pais"
-ecm_logradouro ||..o{ ecm_endereco_usuario : "id_logradouro"
-ecm_cidade ||..o{ ecm_endereco_usuario : "id_cidade"
-ecm_bairro ||..o{ ecm_endereco_usuario : "id_bairro"
-ecm_cep ||..o{ ecm_endereco_usuario : "id_cep"
+' cartao
+ecm_usuario             ||..o{  ecm_cartao_usuario        : "id_usuario\n(CASCADE)"
+ecm_bandeira_cartao     ||..o{  ecm_cartao_usuario        : "id_bandeira_cartao\n(RESTRICT)"
 
+' =============================================================================
+' Legenda
+' =============================================================================
 legend right
-  |= Notação |= Descrição |
-  | **negrito** | Chave Primária (PK) |
-  | _itálico_ | Chave Estrangeira (FK) |
-  | <color:blue>azul</color> | Chave Única (UK) |
-  |<#DDEEFF> usuario | Identidade e acesso |
-  |<#DDFFD4> contato | Meios de contato |
-  |<#FFF5CC> endereco | Endereços do usuário |
-  |<#FFE8D6> localizacao | Hierarquia geográfica |
+  |= Notação               |= Significado                     |
+  | **negrito**             | Chave Primária (PK)              |
+  | _itálico_               | Chave Estrangeira (FK)           |
+  | <color:blue>azul</color>       | Chave Única (UK)          |
+  | <color:orange>laranja</color>  | CHECK Constraint (CK)     |
+  | <color:purple>roxo</color>     | EXCLUDE Constraint        |
+  |<#EFEFEF> referencia     | Tabelas de domínio / lookup   |
+  |<#DDEEFF> usuario        | Identidade e autenticação     |
+  |<#DDFFD4> contato        | Telefones normalizados        |
+  |<#FFF5CC> endereco       | Endereços (cobrança/entrega)  |
+  |<#FFE8D6> localizacao    | Hierarquia geográfica         |
+  |<#FFD6F0> cartao         | Cartões tokenizados           |
+  | ||..||                  | Relacionamento 1:1            |
+  | ||..o{                  | Relacionamento 1:N            |
 endlegend
+
+note as N1
+  <b>Convenções de nomenclatura de colunas</b>
+  --
+  id_*   → PK/FK interna (BIGSERIAL/SERIAL) — nunca exposta na API
+  uuid_* → identificador público (UUID v4)  — único retornado pela API
+  nom_*  → nome próprio de pessoa ou lugar
+  dsc_*  → texto descritivo (e-mail, CPF, hash, tipo…)
+  num_*  → número/código (DDD, telefone, CEP, ranking…)
+  flg_*  → booleano / flag
+  dat_*  → data ou timestamp com fuso
+
+  <b>Observações importantes</b>
+  --
+  • Migration 001 adiciona dsc_genero / dat_nascimento / dsc_telefone
+    diretamente a ecm_usuario (acesso sem JOIN — campo opcional)
+  • ecm_perfil_cliente também possui dsc_genero e dat_nascimento
+    para o perfil completo do cliente (RN0026)
+  • dsc_tipo_endereco ∈ {'cobranca','entrega'} — RN0021 / RN0022
+  • CVV nunca armazenado em ecm_cartao_usuario — RN0024
+  • Bandeiras válidas: Visa, Mastercard, Elo, AmEx, Hipercard — RN0025
+  • Triggers: ecm_fn_atualizar_dat_atualizacao() reutilizada em 5 tabelas
+end note
 
 @enduml</content>
 <parameter name="filePath">/home/vinicius/Downloads/estudo/fatec/lab-eng-segunda-noite/backend/sql/schema_ecm.puml

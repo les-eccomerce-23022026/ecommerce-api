@@ -71,7 +71,6 @@ COMMENT ON COLUMN ecm_telefone_usuario.dat_atualizacao   IS 'Timestamp da últim
 
 -- Índices de acesso frequente
 CREATE INDEX IF NOT EXISTS idx_telefone_usuario   ON ecm_telefone_usuario (id_usuario);
-CREATE INDEX IF NOT EXISTS idx_telefone_uuid      ON ecm_telefone_usuario (uuid_telefone);
 CREATE INDEX IF NOT EXISTS idx_telefone_principal ON ecm_telefone_usuario (id_usuario) WHERE flg_principal = TRUE;
 
 

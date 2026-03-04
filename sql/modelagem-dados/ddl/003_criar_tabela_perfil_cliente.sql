@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS ecm_perfil_cliente (
     id_usuario              BIGINT      NOT NULL,
     dsc_genero              VARCHAR(30),
     dat_nascimento          DATE,
+    num_ranking             INTEGER     NOT NULL    DEFAULT 0,
     dat_criacao             TIMESTAMPTZ NOT NULL    DEFAULT NOW(),
     dat_atualizacao         TIMESTAMPTZ NOT NULL    DEFAULT NOW(),
 
@@ -40,15 +41,14 @@ COMMENT ON TABLE  ecm_perfil_cliente                       IS 'Perfil 1:1 com ec
 COMMENT ON COLUMN ecm_perfil_cliente.id_perfil_cliente     IS 'Chave primária interna. Nunca exposta nas rotas HTTP.';
 COMMENT ON COLUMN ecm_perfil_cliente.uuid_perfil_cliente   IS 'Identificador público (UUID v4). Retornado nas rotas HTTP quando necessário.';
 COMMENT ON COLUMN ecm_perfil_cliente.id_usuario            IS 'FK única para ecm_usuario — garante relação 1:1.';
-COMMENT ON COLUMN ecm_perfil_cliente.dsc_genero            IS 'Gênero autodeclarado pelo cliente (opcional). Sem restrição de domínio para suportar diversidade.';
-COMMENT ON COLUMN ecm_perfil_cliente.dat_nascimento        IS 'Data de nascimento do cliente (opcional).';
+COMMENT ON COLUMN ecm_perfil_cliente.dsc_genero            IS 'Gênero autodeclarado pelo cliente (opcional). Sem restrição de domínio para suportar diversidade. RN0026.';
+COMMENT ON COLUMN ecm_perfil_cliente.dat_nascimento        IS 'Data de nascimento do cliente (opcional). RN0026.';
+COMMENT ON COLUMN ecm_perfil_cliente.num_ranking           IS 'Ranking numérico do cliente baseado no perfil de compra. RN0027. Valor padrão 0.';
 COMMENT ON COLUMN ecm_perfil_cliente.dat_criacao           IS 'Timestamp de criação do perfil.';
 COMMENT ON COLUMN ecm_perfil_cliente.dat_atualizacao       IS 'Timestamp da última atualização (mantido via trigger).';
 
 
 -- Índice para facilitar join por usuario
-CREATE INDEX IF NOT EXISTS idx_perfil_cliente_usuario ON ecm_perfil_cliente (id_usuario);
-CREATE INDEX IF NOT EXISTS idx_perfil_cliente_uuid    ON ecm_perfil_cliente (uuid_perfil_cliente);
 
 
 -- Trigger reutiliza a função genérica criada em 002_criar_tabela_usuario.sql

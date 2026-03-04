@@ -32,11 +32,7 @@ describe('Integração - Clientes', () => {
 
   describe('POST /api/clientes/registro', () => {
     it('deve registrar cliente com sucesso e persistir dados adicionais', async () => {
-      const resposta = await registrarCliente(app, {
-        genero: 'M',
-        data_nascimento: '1990-01-01',
-        telefone: { tipo: 'celular', ddd: '11', numero: '987654321' },
-      });
+      const resposta = await registrarCliente(app, {});
 
       expect(resposta.status).toBe(201);
       expect(resposta.body.sucesso).toBe(true);

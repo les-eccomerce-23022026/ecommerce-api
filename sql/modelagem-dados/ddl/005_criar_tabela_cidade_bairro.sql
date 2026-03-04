@@ -28,9 +28,6 @@ CREATE TABLE IF NOT EXISTS ecm_cidade (
 COMMENT ON TABLE ecm_cidade IS 'Catálogo normalizado de cidades (nomes normalizados para matching).';
 COMMENT ON COLUMN ecm_cidade.nom_cidade_norm IS 'Versão normalizada de nom_cidade (UPPER(TRIM(...))) usada para unicidade e matching.';
 
-CREATE INDEX IF NOT EXISTS idx_cidade_norm_estado ON ecm_cidade (nom_cidade_norm, id_estado);
-CREATE INDEX IF NOT EXISTS idx_cidade_uuid ON ecm_cidade (uuid_cidade);
-
 
 -- -----------------------------------------------------------------------------
 -- ecm_bairro
@@ -54,6 +51,3 @@ CREATE TABLE IF NOT EXISTS ecm_bairro (
 
 COMMENT ON TABLE ecm_bairro IS 'Catálogo normalizado de bairros por cidade (matching via nom_bairro_norm).';
 COMMENT ON COLUMN ecm_bairro.nom_bairro_norm IS 'Versão normalizada de nom_bairro (UPPER(TRIM(...))).';
-
-CREATE INDEX IF NOT EXISTS idx_bairro_norm_cidade ON ecm_bairro (nom_bairro_norm, id_cidade);
-CREATE INDEX IF NOT EXISTS idx_bairro_uuid ON ecm_bairro (uuid_bairro);

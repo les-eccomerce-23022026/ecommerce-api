@@ -7,7 +7,7 @@
 
 ## Board Kanban
 
-| 📋 Todo (3)                                 | 🔄 In Progress (1)              | ✅ Done (14)                                          |
+| 📋 Todo (3)                                 | 🔄 In Progress (1)              | ✅ Done (15)                                          |
 | ------------------------------------------- | ------------------------------- | ----------------------------------------------------- |
 | B12 · [BACKEND] Implementar API de Livros   | B11 · [BACKEND] Gestão de Board | B1 · [BACKEND] Setup Inicial e Arquitetura            |
 | B13 · [BACKEND] Módulo de Carrinho          |                                 | B2 · [BACKEND] Dockerização e Ambiente Dev            |
@@ -21,6 +21,7 @@
 |                                             |                                 | B17 · [BACKEND] Consulta Administrativa              |
 |                                             |                                 | B18 · [BACKEND] Testes Manuais CRUD Clientes         |
 |                                             |                                 | B19 · [BACKEND] Correção Violações Segurança         |
+|                                             |                                 | B20 · [BACKEND] Otimização de Disco Banco            |
 
 ---
 
@@ -47,6 +48,7 @@
 | B17  | BACKEND | Consulta Administrativa de Clientes | **Implementado:** Rota GET /api/clientes com filtros administrativos (nome, CPF, e-mail), paginação e listagem completa de clientes. |
 | B18  | BACKEND | Testes Manuais CRUD Clientes        | **Implementado:** Testes completos via curl das rotas CRUD: registro com validação CPF único; login JWT; atualização perfil; alteração senha com validações; inativação impedindo login. |
 | B19  | BACKEND | Correção Violações Segurança        | **Implementado:** Correção crítica de 4 violações: JWT via HttpOnly cookie (não mais no body); remoção de IDs internos do payload JWT; substituição de switch/case por Record<string, fn>; remoção de dados sensíveis (CPF) das respostas públicas. Configuração de cookie-parser e atualização do middleware de autenticação. |
+| B20  | BACKEND | Otimização de Disco Banco           | **Implementado:** Removidos 11 índices duplicados (UNIQUE constraints mantidos), 4 índices não usados e 3 colunas nulas (dsc_genero, dat_nascimento, dsc_telefone); redimensionados VARCHAR nom_usuario (150→80) e dsc_senha_hash (255→100); entidades, repositórios, DTOs e testes atualizados para refletir mudanças; economia ~196 kB imediatos e ~60 MB em produção (10k usuários). Banco dropado e recriado com DDLs otimizados. |
 
 ---
 
