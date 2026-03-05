@@ -12,7 +12,7 @@ type DadosCadastroCliente = {
   dataNascimento?: string;
   telefone?: unknown;
   senha?: string;
-  confirmacao_senha?: string;
+  confirmacaoSenha?: string;
   enderecoCobranca?: unknown;
   enderecoEntrega?: unknown;
   enderecoEntregaIgualCobranca?: boolean;
@@ -27,7 +27,7 @@ export async function registrarCliente(
     cpf: '123.456.789-10',
     email: 'cliente.teste@email.com',
     senha: 'SenhaForte@123',
-    confirmacao_senha: 'SenhaForte@123',
+    confirmacaoSenha: 'SenhaForte@123',
   };
 
   return request(app).post('/api/clientes/registro').send({

@@ -22,6 +22,7 @@ export type RespostaPadraoJson<T = unknown> = IRespostaSucessoJson<T> | IRespost
 export class RespostaPadrao {
   /**
    * Envia resposta de sucesso padronizada.
+   * Converte automaticamente chaves snake_case para camelCase.
    *
    * @param resposta Objeto Response do Express.
    * @param statusCode Código HTTP (ex: 200, 201).

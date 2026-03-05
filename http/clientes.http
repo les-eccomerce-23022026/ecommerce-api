@@ -23,7 +23,7 @@ Content-Type: application/json
   "cpf": "123.456.789-00",
   "email": "joao.comprador@email.com",
   "senha": "Password@123",
-  "confirmacao_senha": "Password@123"
+  "confirmacaoSenha": "Password@123"
 }
 
 ###
@@ -41,7 +41,7 @@ Content-Type: application/json
   "cpf": "123.456.789-01",
   "email": "joao.comprador+completo@email.com",
   "senha": "Password@123",
-  "confirmacao_senha": "Password@123",
+  "confirmacaoSenha": "Password@123",
   "genero": "Masculino",
   "dataNascimento": "1990-05-15",
   "telefone": {
@@ -101,7 +101,7 @@ Authorization: {{token}}
 # - Usuário não autenticado: Status 401, mensagem "Identificador de usuário não encontrado."
 # - Erro ao atualizar: Status 400, mensagem "Erro ao atualizar dados do cliente."
 # Requer: Authorization header com token JWT
-PUT {{baseUrl}}/api/clientes/perfil
+PATCH {{baseUrl}}/api/clientes/perfil
 Content-Type: application/json
 Authorization: {{token}}
 
@@ -127,9 +127,9 @@ Content-Type: application/json
 Authorization: {{token}}
 
 {
-  "senha_atual": "Password@123",
-  "nova_senha": "NewPassword@123",
-  "confirmacao_senha": "NewPassword@123"
+  "senhaAtual": "Password@123",
+  "novaSenha": "NewPassword@123",
+  "confirmacaoSenha": "NewPassword@123"
 }
 
 ###

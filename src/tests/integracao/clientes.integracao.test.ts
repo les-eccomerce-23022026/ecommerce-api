@@ -51,7 +51,7 @@ describe('Integração - Clientes', () => {
 
     it('deve falhar no registro quando senha e confirmação diferem', async () => {
       const resposta = await registrarCliente(app, {
-        confirmacao_senha: 'SenhaDiferente@123',
+        confirmacaoSenha: 'SenhaDiferente@123',
       });
 
       expect(resposta.status).toBe(400);
@@ -62,7 +62,7 @@ describe('Integração - Clientes', () => {
     it('deve falhar no registro com senha fraca', async () => {
       const resposta = await registrarCliente(app, {
         senha: '123',
-        confirmacao_senha: '123',
+        confirmacaoSenha: '123',
       });
 
       expect(resposta.status).toBe(400);
@@ -145,11 +145,11 @@ describe('Integração - Clientes', () => {
     });
   });
 
-  describe('PUT /api/clientes/perfil', () => {
+  describe('PATCH /api/clientes/perfil', () => {
     it('deve atualizar perfil do cliente com sucesso', async () => {
       const token = await obterTokenCliente(app);
       const resposta = await request(app)
-        .put('/api/clientes/perfil')
+        .patch('/api/clientes/perfil')
         .set('Authorization', `Bearer ${token}`)
         .send({ nome: 'Nome Atualizado' });
 
@@ -160,7 +160,7 @@ describe('Integração - Clientes', () => {
 
     it('deve falhar na atualização sem token', async () => {
       const resposta = await request(app)
-        .put('/api/clientes/perfil')
+        .patch('/api/clientes/perfil')
         .send({ nome: 'Nome Atualizado' });
 
       expect(resposta.status).toBe(401);
@@ -172,7 +172,7 @@ describe('Integração - Clientes', () => {
       // Assumindo que há função para obter token admin
       const tokenAdmin = await obterTokenAdmin(app);
       const resposta = await request(app)
-        .put('/api/clientes/perfil')
+        .patch('/api/clientes/perfil')
         .set('Authorization', `Bearer ${tokenAdmin}`)
         .send({ nome: 'Nome Atualizado' });
 
@@ -189,9 +189,9 @@ describe('Integração - Clientes', () => {
         .patch('/api/clientes/seguranca/alterar-senha')
         .set('Authorization', `Bearer ${token}`)
         .send({
-          senha_atual: 'SenhaForte@123',
-          nova_senha: 'NovaSenha@123',
-          confirmacao_senha: 'NovaSenha@123',
+          senhaAtual: 'SenhaForte@123',
+          novaSenha: 'NovaSenha@123',
+          confirmacaoNovaSenha: 'NovaSenha@123',
         });
 
       expect(resposta.status).toBe(200);
@@ -201,9 +201,9 @@ describe('Integração - Clientes', () => {
 
     it('deve falhar na alteração de senha sem token', async () => {
       const resposta = await request(app).patch('/api/clientes/seguranca/alterar-senha').send({
-        senha_atual: 'SenhaForte@123',
-        nova_senha: 'NovaSenha@123',
-        confirmacao_senha: 'NovaSenha@123',
+        senhaAtual: 'SenhaForte@123',
+        novaSenha: 'NovaSenha@123',
+        confirmacaoNovaSenha: 'NovaSenha@123',
       });
 
       expect(resposta.status).toBe(401);
@@ -217,9 +217,9 @@ describe('Integração - Clientes', () => {
         .patch('/api/clientes/seguranca/alterar-senha')
         .set('Authorization', `Bearer ${token}`)
         .send({
-          senha_atual: 'SenhaAtualErrada@123',
-          nova_senha: 'NovaSenhaValida@123',
-          confirmacao_senha: 'NovaSenhaValida@123',
+          senhaAtual: 'SenhaAtualErrada@123',
+          novaSenha: 'NovaSenhaValida@123',
+          confirmacaoNovaSenha: 'NovaSenhaValida@123',
         });
 
       expect(resposta.status).toBe(400);
@@ -233,9 +233,9 @@ describe('Integração - Clientes', () => {
         .patch('/api/clientes/seguranca/alterar-senha')
         .set('Authorization', `Bearer ${token}`)
         .send({
-          senha_atual: 'SenhaForte@123',
-          nova_senha: 'SenhaForte@123',
-          confirmacao_senha: 'SenhaForte@123',
+          senhaAtual: 'SenhaForte@123',
+          novaSenha: 'SenhaForte@123',
+          confirmacaoNovaSenha: 'SenhaForte@123',
         });
 
       expect(resposta.status).toBe(400);

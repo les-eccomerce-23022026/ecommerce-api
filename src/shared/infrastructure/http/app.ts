@@ -1,4 +1,4 @@
-import express, { Application } from 'express';
+import express, { Application, Router } from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import { registrarRotasAutenticacao } from '@/modules/auth/auth.routes';
@@ -12,15 +12,24 @@ import { middlewareErro } from '@/shared/middlewares/erro.middleware';
  */
 export function criarAplicacao(): Application {
   const app = express();
+  const apiRouter = Router();
 
-  app.use(cors());
+  app.use(cors({
+    origin: true,
+    credentials: true,
+  }));
   app.use(cookieParser());
   app.use(express.json());
 
-  registrarRotasAutenticacao(app);
-  registrarRotasClientes(app);
-  registrarRotasCartoes(app);
-  registrarRotasAdmin(app);
+  // Registro de rotas no roteador da API
+  registrarRotasAutenticacao(apiRouter);
+  registrarRotasClientes(apiRouter);
+  registrarRotasCartoes(apiRouter);
+  registrarRotasAdmin(apiRouter);
+
+  // Aplica o prefixo configurável (default: /api)
+  const prefixo = process.env.API_PREFIX ?? '/api';
+  app.use(prefixo, apiRouter);
 
   app.use(middlewareErro);
 

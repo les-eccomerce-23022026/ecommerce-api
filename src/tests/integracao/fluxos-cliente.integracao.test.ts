@@ -40,7 +40,7 @@ describe('Integração - Fluxos completos do cliente', () => {
       cpf: '321.654.987-00',
       email: 'fluxo.feliz@email.com',
       senha: 'SenhaInicial@123',
-      confirmacao_senha: 'SenhaInicial@123',
+      confirmacaoSenha: 'SenhaInicial@123',
     });
 
     expect(respostaRegistro.status).toBe(201);
@@ -55,7 +55,7 @@ describe('Integração - Fluxos completos do cliente', () => {
     // Atualiza o perfil do cliente usando o token obtido,
     // testando a funcionalidade de edição de dados pessoais.
     const respostaAtualizacao = await request(app)
-      .put('/api/clientes/perfil')
+      .patch('/api/clientes/perfil')
       .set('Authorization', `Bearer ${tokenCliente}`)
       .send({ nome: 'Fluxo Cliente Atualizado' });
 
@@ -68,9 +68,9 @@ describe('Integração - Fluxos completos do cliente', () => {
       .patch('/api/clientes/seguranca/alterar-senha')
       .set('Authorization', `Bearer ${tokenCliente}`)
       .send({
-        senha_atual: 'SenhaInicial@123',
-        nova_senha: 'SenhaNovaFluxo@123',
-        confirmacao_senha: 'SenhaNovaFluxo@123',
+        senhaAtual: 'SenhaInicial@123',
+        novaSenha: 'SenhaNovaFluxo@123',
+        confirmacaoNovaSenha: 'SenhaNovaFluxo@123',
       });
 
     expect(respostaAlterarSenha.status).toBe(200);
@@ -104,7 +104,7 @@ describe('Integração - Fluxos completos do cliente', () => {
       cpf: '654.987.321-00',
       email: 'fluxo.falha@email.com',
       senha: 'SenhaFalha@123',
-      confirmacao_senha: 'SenhaFalha@123',
+      confirmacaoSenha: 'SenhaFalha@123',
     });
 
     const respostaLogin = await realizarLogin(app, 'fluxo.falha@email.com', 'SenhaFalha@123');
@@ -116,9 +116,9 @@ describe('Integração - Fluxos completos do cliente', () => {
       .patch('/api/clientes/seguranca/alterar-senha')
       .set('Authorization', `Bearer ${tokenCliente}`)
       .send({
-        senha_atual: 'SenhaErrada@123',
-        nova_senha: 'SenhaNovaFalha@123',
-        confirmacao_senha: 'SenhaNovaFalha@123',
+        senhaAtual: 'SenhaErrada@123',
+        novaSenha: 'SenhaNovaFalha@123',
+        confirmacaoNovaSenha: 'SenhaNovaFalha@123',
       });
 
     expect(respostaSenhaAtualIncorreta.status).toBe(400);
@@ -134,7 +134,7 @@ describe('Integração - Fluxos completos do cliente', () => {
         cpf: '222.333.444-55',
         email: 'admin.proibido@email.com',
         senha: 'SenhaAdmin@123',
-        confirmacao_senha: 'SenhaAdmin@123',
+        confirmacaoSenha: 'SenhaAdmin@123',
       });
 
     expect(respostaSemPermissaoAdmin.status).toBe(403);
@@ -146,7 +146,7 @@ describe('Integração - Fluxos completos do cliente', () => {
       cpf: '777.888.999-00',
       email: 'fluxo.falha@email.com',
       senha: 'SenhaDuplicada@123',
-      confirmacao_senha: 'SenhaDuplicada@123',
+      confirmacaoSenha: 'SenhaDuplicada@123',
     });
 
     expect(respostaEmailDuplicado.status).toBe(400);

@@ -47,7 +47,7 @@ describe('Integração - Fluxos completos do administrador', () => {
         cpf: '111.111.111-11',
         email: 'admin.fluxo@email.com',
         senha: 'AdminFluxo@123',
-        confirmacao_senha: 'AdminFluxo@123',
+        confirmacaoSenha: 'AdminFluxo@123',
       });
 
     expect(respostaCadastroAdmin.status).toBe(201);

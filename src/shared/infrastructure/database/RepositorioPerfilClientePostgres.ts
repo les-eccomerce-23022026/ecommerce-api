@@ -11,14 +11,14 @@ export class RepositorioPerfilClientePostgres implements IRepositorioPerfilClien
 
   private static mapearParaEntidade(row: Record<string, unknown>): IPerfilCliente {
     return {
-      id: Number(row.id_perfil_cliente),
-      uuid: row.uuid_perfil_cliente as string,
-      idUsuario: Number(row.id_usuario),
-      genero: row.dsc_genero as string | undefined,
-      dataNascimento: row.dat_nascimento ? new Date(row.dat_nascimento as string) : undefined,
-      ranking: Number(row.num_ranking ?? 0),
-      dataCriacao: row.dat_criacao ? new Date(row.dat_criacao as string) : undefined,
-      dataAtualizacao: row.dat_atualizacao ? new Date(row.dat_atualizacao as string) : undefined,
+      id: Number(row.idPerfilCliente),
+      uuid: row.uuidPerfilCliente as string,
+      idUsuario: Number(row.idUsuario),
+      genero: row.dscGenero as string | undefined,
+      dataNascimento: row.datNascimento ? new Date(row.datNascimento as string) : undefined,
+      ranking: Number(row.numRanking ?? 0),
+      dataCriacao: row.datCriacao ? new Date(row.datCriacao as string) : undefined,
+      dataAtualizacao: row.datAtualizacao ? new Date(row.datAtualizacao as string) : undefined,
     };
   }
 
@@ -31,7 +31,13 @@ export class RepositorioPerfilClientePostgres implements IRepositorioPerfilClien
   }
 
   public async buscarPorIdUsuario(idUsuario: number): Promise<IPerfilCliente | null> {
-    const query = 'SELECT * FROM ecm_perfil_cliente WHERE id_usuario = $1';
+    const query = `
+      SELECT id_perfil_cliente AS "idPerfilCliente", uuid_perfil_cliente AS "uuidPerfilCliente", 
+             id_usuario AS "idUsuario", dsc_genero AS "dscGenero", dat_nascimento AS "datNascimento", 
+             num_ranking AS "numRanking", dat_criacao AS "datCriacao", dat_atualizacao AS "datAtualizacao"
+      FROM ecm_perfil_cliente 
+      WHERE id_usuario = $1
+    `;
     const rows = await this.db.executar(query, [idUsuario]);
 
     if (rows.length === 0) return null;

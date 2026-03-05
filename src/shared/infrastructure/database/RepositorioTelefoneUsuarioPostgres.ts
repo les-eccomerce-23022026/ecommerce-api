@@ -11,13 +11,13 @@ export class RepositorioTelefoneUsuarioPostgres implements IRepositorioTelefoneU
 
   private static mapearParaEntidade(row: Record<string, unknown>): ITelefoneUsuario {
     return {
-      id: Number(row.id_telefone),
-      uuid: row.uuid_telefone as string,
-      idUsuario: Number(row.id_usuario),
-      idTipoTelefone: Number(row.id_tipo_telefone),
-      ddd: row.num_ddd as string,
-      numero: row.num_telefone as string,
-      principal: row.flg_principal as boolean,
+      id: Number(row.idTelefone),
+      uuid: row.uuidTelefone as string,
+      idUsuario: Number(row.idUsuario),
+      idTipoTelefone: Number(row.idTipoTelefone),
+      ddd: row.numDdd as string,
+      numero: row.numTelefone as string,
+      principal: row.flgPrincipal as boolean,
     };
   }
 
@@ -36,7 +36,13 @@ export class RepositorioTelefoneUsuarioPostgres implements IRepositorioTelefoneU
   }
 
   public async buscarPorIdUsuario(idUsuario: number): Promise<ITelefoneUsuario[]> {
-    const query = 'SELECT * FROM ecm_telefone_usuario WHERE id_usuario = $1';
+    const query = `
+      SELECT id_telefone AS "idTelefone", uuid_telefone AS "uuidTelefone", 
+             id_usuario AS "idUsuario", id_tipo_telefone AS "idTipoTelefone", 
+             num_ddd AS "numDdd", num_telefone AS "numTelefone", flg_principal AS "flgPrincipal"
+      FROM ecm_telefone_usuario 
+      WHERE id_usuario = $1
+    `;
     const rows = await this.db.executar(query, [idUsuario]);
     return rows.map((row) => RepositorioTelefoneUsuarioPostgres.mapearParaEntidade(row as Record<string, unknown>));
   }

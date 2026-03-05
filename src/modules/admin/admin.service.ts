@@ -20,7 +20,7 @@ export class ServicoAdmin {
    * @param dados Dados para criação do administrador.
    */
   public async registrarNovoAdministrador(dados: ICriarAdminDto): Promise<IRespostaAdminCriadoDto> {
-    if (dados.senha !== dados.confirmacao_senha) {
+    if (dados.senha !== dados.confirmacaoSenha) {
       throw new Error('Senha e confirmação de senha não conferem.');
     }
 

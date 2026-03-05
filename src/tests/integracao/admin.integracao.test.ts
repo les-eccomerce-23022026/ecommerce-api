@@ -44,7 +44,7 @@ describe('Integração - Admin (rotas individuais)', () => {
         cpf: '987.654.321-00',
         email: 'admin.invalido@email.com',
         senha: 'SenhaForte@123',
-        confirmacao_senha: 'SenhaForte@123',
+        confirmacaoSenha: 'SenhaForte@123',
       });
 
     expect(resposta.status).toBe(403);

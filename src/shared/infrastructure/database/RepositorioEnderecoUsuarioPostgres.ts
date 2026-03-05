@@ -11,18 +11,18 @@ export class RepositorioEnderecoUsuarioPostgres implements IRepositorioEnderecoU
 
   private static mapearParaEntidade(row: Record<string, unknown>): IEnderecoUsuario {
     return {
-      id: Number(row.id_endereco),
-      uuid: row.uuid_endereco as string,
-      idUsuario: Number(row.id_usuario),
-      tipoEndereco: row.dsc_tipo_endereco as 'cobranca' | 'entrega',
-      idTipoResidencia: Number(row.id_tipo_residencia),
-      idLogradouro: Number(row.id_logradouro),
-      complemento: (row.dsc_complemento as string | null | undefined) || undefined,
-      idCidade: Number(row.id_cidade),
-      idBairro: Number(row.id_bairro),
-      idCep: Number(row.id_cep),
-      idPais: Number(row.id_pais),
-      principal: row.flg_principal as boolean,
+      id: Number(row.idEndereco),
+      uuid: row.uuidEndereco as string,
+      idUsuario: Number(row.idUsuario),
+      tipoEndereco: row.dscTipoEndereco as 'cobranca' | 'entrega',
+      idTipoResidencia: Number(row.idTipoResidencia),
+      idLogradouro: Number(row.idLogradouro),
+      complemento: (row.dscComplemento as string | null | undefined) || undefined,
+      idCidade: Number(row.idCidade),
+      idBairro: Number(row.idBairro),
+      idCep: Number(row.idCep),
+      idPais: Number(row.idPais),
+      principal: row.flgPrincipal as boolean,
     };
   }
 
@@ -48,7 +48,16 @@ export class RepositorioEnderecoUsuarioPostgres implements IRepositorioEnderecoU
   }
 
   public async buscarPorIdUsuario(idUsuario: number): Promise<IEnderecoUsuario[]> {
-    const query = 'SELECT * FROM ecm_endereco_usuario WHERE id_usuario = $1';
+    const query = `
+      SELECT id_endereco AS "idEndereco", uuid_endereco AS "uuidEndereco", 
+             id_usuario AS "idUsuario", dsc_tipo_endereco AS "dscTipoEndereco", 
+             id_tipo_residencia AS "idTipoResidencia", id_logradouro AS "idLogradouro", 
+             dsc_complemento AS "dscComplemento", id_cidade AS "idCidade", 
+             id_bairro AS "idBairro", id_cep AS "idCep", id_pais AS "idPais", 
+             flg_principal AS "flgPrincipal"
+      FROM ecm_endereco_usuario 
+      WHERE id_usuario = $1
+    `;
     const rows = await this.db.executar(query, [idUsuario]);
     return rows.map((row) => RepositorioEnderecoUsuarioPostgres.mapearParaEntidade(row as Record<string, unknown>));
   }

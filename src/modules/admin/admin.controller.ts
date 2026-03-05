@@ -18,7 +18,7 @@ export class ControladorAdmin {
     try {
       const dados = requisicao.body ?? {};
 
-      const camposObrigatorios = ['nome', 'cpf', 'email', 'senha', 'confirmacao_senha'];
+      const camposObrigatorios = ['nome', 'cpf', 'email', 'senha', 'confirmacaoSenha'];
       const faltando = camposObrigatorios.filter((campo) => !dados[campo]);
 
       if (faltando.length > 0) {

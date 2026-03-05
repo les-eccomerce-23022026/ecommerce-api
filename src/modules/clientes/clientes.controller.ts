@@ -41,7 +41,7 @@ export class ControladorClientes {
     try {
       const dados = requisicao.body ?? {};
 
-      const camposObrigatorios = ['nome', 'cpf', 'email', 'senha', 'confirmacao_senha'];
+      const camposObrigatorios = ['nome', 'cpf', 'email', 'senha', 'confirmacaoSenha'];
       const faltando = camposObrigatorios.filter((campo) => !dados[campo]);
 
       if (faltando.length > 0) {
@@ -130,16 +130,16 @@ export class ControladorClientes {
   public static async alterarSenha(requisicao: Request, resposta: Response): Promise<Response> {
     try {
       const uuid = requisicao.usuario?.uuid;
-      const { senha_atual: senhaAtual, nova_senha: novaSenha, confirmacao_senha: confirmacaoSenha } = requisicao.body;
+      const { senhaAtual, novaSenha, confirmacaoNovaSenha } = requisicao.body;
 
       if (!uuid) {
         return RespostaPadrao.enviarErro(resposta, 401, 'Usuário não autenticado.');
       }
 
       await servicoClientes.alterarSenha(uuid, {
-        senha_atual: senhaAtual,
-        nova_senha: novaSenha,
-        confirmacao_senha: confirmacaoSenha,
+        senhaAtual,
+        novaSenha,
+        confirmacaoNovaSenha,
       });
 
       return RespostaPadrao.enviarSucesso(resposta, 200, {

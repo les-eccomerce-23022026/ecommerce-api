@@ -22,15 +22,15 @@ export class RepositorioCartaoUsuario implements IRepositorioCartaoUsuario {
 
   private static mapearLinha(linha: LinhaCartao): ICartaoUsuario {
     return {
-      id: Number(linha.id_cartao),
-      uuid: linha.uuid_cartao as string,
-      idUsuario: Number(linha.id_usuario),
-      idBandeiraCartao: Number(linha.id_bandeira_cartao),
-      tokenCartao: linha.dsc_token_cartao as string,
-      finalCartao: linha.dsc_final_cartao as string,
-      nomeImpresso: linha.dsc_nome_impresso as string,
-      validade: new Date(linha.dat_validade as string),
-      principal: linha.flg_principal as boolean,
+      id: Number(linha.idCartao),
+      uuid: linha.uuidCartao as string,
+      idUsuario: Number(linha.idUsuario),
+      idBandeiraCartao: Number(linha.idBandeiraCartao),
+      tokenCartao: linha.dscTokenCartao as string,
+      finalCartao: linha.dscFinalCartao as string,
+      nomeImpresso: linha.dscNomeImpresso as string,
+      validade: new Date(linha.datValidade as string),
+      principal: linha.flgPrincipal as boolean,
     };
   }
 
@@ -40,9 +40,10 @@ export class RepositorioCartaoUsuario implements IRepositorioCartaoUsuario {
         id_usuario, id_bandeira_cartao, dsc_token_cartao,
         dsc_final_cartao, dsc_nome_impresso, dat_validade, flg_principal
       ) VALUES ($1, $2, $3, $4, $5, $6, $7)
-      RETURNING id_cartao, uuid_cartao, id_usuario, id_bandeira_cartao,
-                dsc_token_cartao, dsc_final_cartao, dsc_nome_impresso,
-                dat_validade, flg_principal
+      RETURNING id_cartao AS "idCartao", uuid_cartao AS "uuidCartao", id_usuario AS "idUsuario", 
+                id_bandeira_cartao AS "idBandeiraCartao", dsc_token_cartao AS "dscTokenCartao", 
+                dsc_final_cartao AS "dscFinalCartao", dsc_nome_impresso AS "dscNomeImpresso",
+                dat_validade AS "datValidade", flg_principal AS "flgPrincipal"
     `;
 
     const valores = [
@@ -61,9 +62,10 @@ export class RepositorioCartaoUsuario implements IRepositorioCartaoUsuario {
 
   async buscarPorUuid(uuid: string): Promise<ICartaoUsuario | null> {
     const query = `
-      SELECT id_cartao, uuid_cartao, id_usuario, id_bandeira_cartao,
-             dsc_token_cartao, dsc_final_cartao, dsc_nome_impresso,
-             dat_validade, flg_principal
+      SELECT id_cartao AS "idCartao", uuid_cartao AS "uuidCartao", id_usuario AS "idUsuario", 
+             id_bandeira_cartao AS "idBandeiraCartao", dsc_token_cartao AS "dscTokenCartao", 
+             dsc_final_cartao AS "dscFinalCartao", dsc_nome_impresso AS "dscNomeImpresso",
+             dat_validade AS "datValidade", flg_principal AS "flgPrincipal"
       FROM ecm_cartao_usuario
       WHERE uuid_cartao = $1
     `;
@@ -75,9 +77,10 @@ export class RepositorioCartaoUsuario implements IRepositorioCartaoUsuario {
 
   async buscarPorUsuario(idUsuario: number): Promise<ICartaoUsuario[]> {
     const query = `
-      SELECT id_cartao, uuid_cartao, id_usuario, id_bandeira_cartao,
-             dsc_token_cartao, dsc_final_cartao, dsc_nome_impresso,
-             dat_validade, flg_principal
+      SELECT id_cartao AS "idCartao", uuid_cartao AS "uuidCartao", id_usuario AS "idUsuario", 
+             id_bandeira_cartao AS "idBandeiraCartao", dsc_token_cartao AS "dscTokenCartao", 
+             dsc_final_cartao AS "dscFinalCartao", dsc_nome_impresso AS "dscNomeImpresso",
+             dat_validade AS "datValidade", flg_principal AS "flgPrincipal"
       FROM ecm_cartao_usuario
       WHERE id_usuario = $1
       ORDER BY flg_principal DESC, dat_criacao DESC
@@ -129,9 +132,10 @@ export class RepositorioCartaoUsuario implements IRepositorioCartaoUsuario {
       UPDATE ecm_cartao_usuario
       SET ${campos.join(', ')}
       WHERE uuid_cartao = $${contador}
-      RETURNING id_cartao, uuid_cartao, id_usuario, id_bandeira_cartao,
-                dsc_token_cartao, dsc_final_cartao, dsc_nome_impresso,
-                dat_validade, flg_principal
+      RETURNING id_cartao AS "idCartao", uuid_cartao AS "uuidCartao", id_usuario AS "idUsuario", 
+                id_bandeira_cartao AS "idBandeiraCartao", dsc_token_cartao AS "dscTokenCartao", 
+                dsc_final_cartao AS "dscFinalCartao", dsc_nome_impresso AS "dscNomeImpresso",
+                dat_validade AS "datValidade", flg_principal AS "flgPrincipal"
     `;
 
     valores.push(uuid);

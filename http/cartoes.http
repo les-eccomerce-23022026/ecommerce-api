@@ -46,7 +46,7 @@ Authorization: {{token}}
 # - Cartão não encontrado: Status 404, mensagem "Cartão não encontrado."
 # - Erro ao atualizar: Status 400
 # Requer: Authorization header com token JWT
-PUT {{baseUrl}}/api/clientes/perfil/cartoes/uuid-cartao
+PATCH {{baseUrl}}/api/clientes/perfil/cartoes/uuid-cartao
 Content-Type: application/json
 Authorization: {{token}}
 

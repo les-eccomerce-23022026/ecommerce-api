@@ -41,7 +41,7 @@ export class ConexaoPostgres implements IConexaoBanco {
   public async executar<T = unknown>(sql: string, parametros?: unknown[]): Promise<T[]> {
     const executor = this.clienteTransacao || this.pool;
     const { rows } = await executor.query(sql, parametros);
-    return rows;
+    return rows as T[];
   }
 
   public async iniciarTransacao(): Promise<void> {

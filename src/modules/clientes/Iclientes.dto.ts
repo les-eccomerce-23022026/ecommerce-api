@@ -20,15 +20,13 @@ export interface IEnderecoDto {
 
 /**
  * DTO de criação de cliente.
- * Endereço e telefone são opcionais no registro e podem ser adicionados
- * posteriormente via PUT /api/clientes/perfil.
  */
 export interface ICriarClienteDto {
   nome: string;
   cpf: string;
   email: string;
   senha: string;
-  confirmacao_senha: string;
+  confirmacaoSenha: string;
   genero?: string;
   dataNascimento?: string;
   telefone?: ITelefoneDto;
@@ -39,7 +37,6 @@ export interface ICriarClienteDto {
 
 /**
  * DTO para atualização de informações básicas do cliente.
- * Dados editaveis conforme RF0022: nome, gênero, data de nascimento, telefone.
  */
 export interface IAtualizarClienteDto {
   nome?: string;
@@ -52,9 +49,9 @@ export interface IAtualizarClienteDto {
  * DTO para alteração de senha do cliente.
  */
 export interface IAlterarSenhaDto {
-  senha_atual: string;
-  nova_senha: string;
-  confirmacao_senha: string;
+  senhaAtual: string;
+  novaSenha: string;
+  confirmacaoNovaSenha: string;
 }
 
 /**
@@ -70,4 +67,3 @@ export interface IPerfilClienteDto {
   telefone?: ITelefoneDto;
   enderecos: IEnderecoDto[];
 }
-

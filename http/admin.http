@@ -20,5 +20,5 @@ Authorization: {{tokenAdmin}}
   "cpf": "987.654.321-00",
   "email": "novo.admin@livraria.com.br",
   "senha": "Admin@123",
-  "confirmacao_senha": "Admin@123"
+  "confirmacaoSenha": "Admin@123"
 }

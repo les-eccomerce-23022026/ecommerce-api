@@ -28,19 +28,19 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
    */
   private static mapearParaEntidade(row: LinhaResultado): IUsuario {
     return {
-      id: Number(row.id_usuario),
-      uuid: row.uuid_usuario as string,
-      nome: row.nom_usuario as string,
-      email: row.dsc_email as string,
-      cpf: row.dsc_cpf as string,
-      senhaHash: row.dsc_senha_hash as string,
+      id: Number(row.idUsuario),
+      uuid: row.uuidUsuario as string,
+      nome: row.nomUsuario as string,
+      email: row.dscEmail as string,
+      cpf: row.dscCpf as string,
+      senhaHash: row.dscSenhaHash as string,
       role: {
-        id: Number(row.id_papel),
-        descricao: Number(row.id_papel) === PAPEL_ADMIN.id ? PAPEL_ADMIN.descricao : PAPEL_CLIENTE.descricao,
+        id: Number(row.idPapel),
+        descricao: Number(row.idPapel) === PAPEL_ADMIN.id ? PAPEL_ADMIN.descricao : PAPEL_CLIENTE.descricao,
       },
-      ativo: row.flg_ativo as boolean,
-      dataCriacao: row.dat_criacao ? new Date(row.dat_criacao as string) : undefined,
-      dataAtualizacao: row.dat_atualizacao ? new Date(row.dat_atualizacao as string) : undefined,
+      ativo: row.flgAtivo as boolean,
+      dataCriacao: row.datCriacao ? new Date(row.datCriacao as string) : undefined,
+      dataAtualizacao: row.datAtualizacao ? new Date(row.datAtualizacao as string) : undefined,
     };
   }
 
@@ -51,7 +51,9 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
     const query = `
       INSERT INTO ecm_usuario (nom_usuario, dsc_email, dsc_cpf, dsc_senha_hash, id_papel)
       VALUES ($1, $2, $3, $4, $5)
-      RETURNING *
+      RETURNING id_usuario AS "idUsuario", uuid_usuario AS "uuidUsuario", nom_usuario AS "nomUsuario", 
+                dsc_email AS "dscEmail", dsc_cpf AS "dscCpf", dsc_senha_hash AS "dscSenhaHash", 
+                id_papel AS "idPapel", flg_ativo AS "flgAtivo", dat_criacao AS "datCriacao", dat_atualizacao AS "datAtualizacao"
     `;
 
     const values = [nome, email, cpf, senhaHash, idPapel];
@@ -61,7 +63,10 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
   }
 
   public async buscarPorEmail(email: string): Promise<IUsuario | undefined> {
-    const query = 'SELECT * FROM ecm_usuario WHERE dsc_email = $1';
+    const query = `SELECT id_usuario AS "idUsuario", uuid_usuario AS "uuidUsuario", nom_usuario AS "nomUsuario", 
+                          dsc_email AS "dscEmail", dsc_cpf AS "dscCpf", dsc_senha_hash AS "dscSenhaHash", 
+                          id_papel AS "idPapel", flg_ativo AS "flgAtivo", dat_criacao AS "datCriacao", dat_atualizacao AS "datAtualizacao" 
+                   FROM ecm_usuario WHERE dsc_email = $1`;
     const rows = await this.db.executar(query, [email]);
 
     if (rows.length === 0) return undefined;
@@ -69,7 +74,10 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
   }
 
   public async buscarPorCpf(cpf: string): Promise<IUsuario | undefined> {
-    const query = 'SELECT * FROM ecm_usuario WHERE dsc_cpf = $1';
+    const query = `SELECT id_usuario AS "idUsuario", uuid_usuario AS "uuidUsuario", nom_usuario AS "nomUsuario", 
+                          dsc_email AS "dscEmail", dsc_cpf AS "dscCpf", dsc_senha_hash AS "dscSenhaHash", 
+                          id_papel AS "idPapel", flg_ativo AS "flgAtivo", dat_criacao AS "datCriacao", dat_atualizacao AS "datAtualizacao" 
+                   FROM ecm_usuario WHERE dsc_cpf = $1`;
     const rows = await this.db.executar(query, [cpf]);
 
     if (rows.length === 0) return undefined;
@@ -77,7 +85,10 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
   }
 
   public async buscarPorUuid(uuid: string): Promise<IUsuario | undefined> {
-    const query = 'SELECT * FROM ecm_usuario WHERE uuid_usuario = $1';
+    const query = `SELECT id_usuario AS "idUsuario", uuid_usuario AS "uuidUsuario", nom_usuario AS "nomUsuario", 
+                          dsc_email AS "dscEmail", dsc_cpf AS "dscCpf", dsc_senha_hash AS "dscSenhaHash", 
+                          id_papel AS "idPapel", flg_ativo AS "flgAtivo", dat_criacao AS "datCriacao", dat_atualizacao AS "datAtualizacao" 
+                   FROM ecm_usuario WHERE uuid_usuario = $1`;
     const rows = await this.db.executar(query, [uuid]);
 
     if (rows.length === 0) return undefined;
@@ -127,7 +138,9 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
       UPDATE ecm_usuario 
       SET ${campos.join(', ')} 
       WHERE uuid_usuario = $${contador}
-      RETURNING *
+      RETURNING id_usuario AS "idUsuario", uuid_usuario AS "uuidUsuario", nom_usuario AS "nomUsuario", 
+                dsc_email AS "dscEmail", dsc_cpf AS "dscCpf", dsc_senha_hash AS "dscSenhaHash", 
+                id_papel AS "idPapel", flg_ativo AS "flgAtivo", dat_criacao AS "datCriacao", dat_atualizacao AS "datAtualizacao"
     `;
 
     const rows = await this.db.executar(query, valores);
@@ -145,8 +158,9 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
     const { nome, cpf, email, offset, limite } = filtros;
 
     let query = `
-      SELECT id_usuario, uuid_usuario, nom_usuario, dsc_email, dsc_cpf,
-             dsc_senha_hash, id_papel, flg_ativo, dat_criacao, dat_atualizacao
+      SELECT id_usuario AS "idUsuario", uuid_usuario AS "uuidUsuario", nom_usuario AS "nomUsuario", 
+             dsc_email AS "dscEmail", dsc_cpf AS "dscCpf", dsc_senha_hash AS "dscSenhaHash", 
+             id_papel AS "idPapel", flg_ativo AS "flgAtivo", dat_criacao AS "datCriacao", dat_atualizacao AS "datAtualizacao"
       FROM ecm_usuario
       WHERE id_papel = $1
     `;

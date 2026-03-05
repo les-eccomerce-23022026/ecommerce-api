@@ -9,8 +9,10 @@ import {
   IAlterarSenhaDto,
   IEnderecoDto,
   IPerfilClienteDto,
+  ITelefoneDto,
 } from '@/modules/clientes/Iclientes.dto';
 import { IPerfilCliente } from '@/shared/types/IPerfilCliente';
+import { ITelefoneUsuario } from '@/shared/types/ITelefoneUsuario';
 import { verificarForcaSenha } from '@/shared/utils/senha.util';
 import { PAPEL_CLIENTE } from '@/shared/types/papeis';
 import { IConexaoBanco } from '@/shared/infrastructure/database/IConexaoBanco';
@@ -89,7 +91,7 @@ export class ServicoClientes {
     `;
     const existente = await this.db.executar(queryBuscar, [tipoLogradouro, nomeLogradouro, numero]) as Record<string, unknown>[];
     if (existente.length > 0) {
-      return Number((existente[0] as Record<string, unknown>).id_logradouro);
+      return Number((existente[0] as Record<string, unknown>).idLogradouro);
     }
 
     // Criar novo logradouro
@@ -100,7 +102,7 @@ export class ServicoClientes {
       RETURNING id_logradouro
     `;
     const novo = await this.db.executar(queryInserir, [idTipoLogradouro, nomeLogradouro, numero]) as Record<string, unknown>[];
-    return Number((novo[0] as Record<string, unknown>).id_logradouro);
+    return Number((novo[0] as Record<string, unknown>).idLogradouro);
   }
 
   private async obterOuCriarCidade(cidade: string, estado: string): Promise<number> {
@@ -109,12 +111,12 @@ export class ServicoClientes {
     const query = `SELECT id_cidade FROM ecm_cidade WHERE nom_cidade = $1 LIMIT 1`;
     const existente = await this.db.executar(query, [cidade]) as Record<string, unknown>[];
     if (existente.length > 0) {
-      return Number((existente[0] as Record<string, unknown>).id_cidade);
+      return Number((existente[0] as Record<string, unknown>).idCidade);
     }
     // Se não existir, inserir (simplificado)
     const insertQuery = `INSERT INTO ecm_cidade (nom_cidade, nom_cidade_norm) VALUES ($1, $1) RETURNING id_cidade`;
     const novo = await this.db.executar(insertQuery, [cidade]) as Record<string, unknown>[];
-    return Number((novo[0] as Record<string, unknown>).id_cidade);
+    return Number((novo[0] as Record<string, unknown>).idCidade);
   }
 
   private async obterOuCriarBairro(bairro: string): Promise<number> {
@@ -122,11 +124,11 @@ export class ServicoClientes {
     const query = `SELECT id_bairro FROM ecm_bairro WHERE nom_bairro = $1 LIMIT 1`;
     const existente = await this.db.executar(query, [bairro]) as Record<string, unknown>[];
     if (existente.length > 0) {
-      return Number((existente[0] as Record<string, unknown>).id_bairro);
+      return Number((existente[0] as Record<string, unknown>).idBairro);
     }
     const insertQuery = `INSERT INTO ecm_bairro (nom_bairro, nom_bairro_norm, id_cidade) VALUES ($1, $1, $2) RETURNING id_bairro`;
     const novo = await this.db.executar(insertQuery, [bairro, 1]) as Record<string, unknown>[]; // id_cidade 1 por enquanto
-    return Number((novo[0] as Record<string, unknown>).id_bairro);
+    return Number((novo[0] as Record<string, unknown>).idBairro);
   }
 
   private async obterOuCriarCep(cep: string): Promise<number> {
@@ -135,16 +137,58 @@ export class ServicoClientes {
     const query = `SELECT id_cep FROM ecm_cep WHERE num_cep = $1 LIMIT 1`;
     const existente = await this.db.executar(query, [cepLimpo]) as Record<string, unknown>[];
     if (existente.length > 0) {
-      return Number((existente[0] as Record<string, unknown>).id_cep);
+      return Number((existente[0] as Record<string, unknown>).idCep);
     }
     const insertQuery = `INSERT INTO ecm_cep (num_cep, id_cidade, id_bairro) VALUES ($1, $2, $3) RETURNING id_cep`;
     const novo = await this.db.executar(insertQuery, [cepLimpo, 1, 1]) as Record<string, unknown>[]; // ids temporários
-    return Number((novo[0] as Record<string, unknown>).id_cep);
+    return Number((novo[0] as Record<string, unknown>).idCep);
   }
 
   private async obterOuCriarPais(pais: string): Promise<number> {
     // Brasil é 1 por padrão
     return 1;
+  }
+
+  private async obterCidadePorId(idCidade: number): Promise<any> {
+    const query = `SELECT c.nom_cidade as dsc_cidade, e.dsc_estado
+                   FROM ecm_cidade c
+                   JOIN ecm_estado e ON c.id_estado = e.id_estado
+                   WHERE c.id_cidade = $1`;
+    const result = await this.db.executar(query, [idCidade]) as Record<string, unknown>[];
+    return result.length > 0 ? result[0] : null;
+  }
+
+  private async obterBairroPorId(idBairro: number): Promise<any> {
+    const query = `SELECT nom_bairro as dsc_bairro FROM ecm_bairro WHERE id_bairro = $1`;
+    const result = await this.db.executar(query, [idBairro]) as Record<string, unknown>[];
+    return result.length > 0 ? result[0] : null;
+  }
+
+  private async obterCepPorId(idCep: number): Promise<any> {
+    const query = `SELECT num_cep FROM ecm_cep WHERE id_cep = $1`;
+    const result = await this.db.executar(query, [idCep]) as Record<string, unknown>[];
+    return result.length > 0 ? result[0] : null;
+  }
+
+  private async obterPaisPorId(idPais: number): Promise<any> {
+    const query = `SELECT dsc_pais FROM ecm_pais WHERE id_pais = $1`;
+    const result = await this.db.executar(query, [idPais]) as Record<string, unknown>[];
+    return result.length > 0 ? result[0] : null;
+  }
+
+  private async obterTipoResidenciaPorId(idTipoResidencia: number): Promise<any> {
+    const query = `SELECT dsc_tipo_residencia FROM ecm_tipo_residencia WHERE id_tipo_residencia = $1`;
+    const result = await this.db.executar(query, [idTipoResidencia]) as Record<string, unknown>[];
+    return result.length > 0 ? result[0] : null;
+  }
+
+  private async obterLogradouroPorId(idLogradouro: number): Promise<any> {
+    const query = `SELECT l.dsc_logradouro, l.num_logradouro, tl.dsc_tipo_logradouro as tipoLogradouro
+                   FROM ecm_logradouro l
+                   JOIN ecm_tipo_logradouro tl ON l.id_tipo_logradouro = tl.id_tipo_logradouro
+                   WHERE l.id_logradouro = $1`;
+    const result = await this.db.executar(query, [idLogradouro]) as Record<string, unknown>[];
+    return result.length > 0 ? result[0] : null;
   }
 
   private async criarEndereco(idUsuario: number, enderecoDto: IEnderecoDto, tipo: 'cobranca' | 'entrega', principal: boolean = false): Promise<void> {
@@ -187,24 +231,24 @@ export class ServicoClientes {
       throw new Error('Usuário não encontrado.');
     }
 
-    const senhaValida = await bcrypt.compare(dados.senha_atual, usuario.senhaHash);
+    const senhaValida = await bcrypt.compare(dados.senhaAtual, usuario.senhaHash);
     if (!senhaValida) {
       throw new Error('Senha atual incorreta.');
     }
 
-    if (dados.nova_senha !== dados.confirmacao_senha) {
+    if (dados.novaSenha !== dados.confirmacaoNovaSenha) {
       throw new Error('Nova senha e confirmação não conferem.');
     }
 
-    if (!verificarForcaSenha(dados.nova_senha)) {
+    if (!verificarForcaSenha(dados.novaSenha)) {
       throw new Error('Nova senha muito fraca.');
     }
 
-    if (dados.nova_senha === dados.senha_atual) {
+    if (dados.novaSenha === dados.senhaAtual) {
       throw new Error('Nova senha deve ser diferente da senha atual.');
     }
 
-    const novaSenhaHash = await bcrypt.hash(dados.nova_senha, 10); // Reduzido de 12 para 10 em testes
+    const novaSenhaHash = await bcrypt.hash(dados.novaSenha, 10); // Reduzido de 12 para 10 em testes
     await this.repositorioUsuarios.atualizarUsuario(uuid, { senhaHash: novaSenhaHash });
   }
 
@@ -303,8 +347,13 @@ export class ServicoClientes {
 
     const perfil = await this.repositorioPerfil.buscarPorIdUsuario(usuario.id);
 
-    // Por enquanto, retornar apenas dados básicos
-    // TODO: implementar busca completa de telefone e endereços com joins
+    // Buscar telefone principal
+    const telefones = await this.repositorioTelefone.buscarPorIdUsuario(usuario.id);
+    const telefonePrincipal = telefones.find(t => t.principal);
+
+    // Buscar endereços
+    const enderecosUsuario = await this.repositorioEndereco.buscarPorIdUsuario(usuario.id);
+    const enderecosDto = await this.converterEnderecosParaDto(enderecosUsuario);
 
     return {
       uuid: usuario.uuid,
@@ -312,14 +361,66 @@ export class ServicoClientes {
       email: usuario.email,
       cpf: usuario.cpf,
       genero: perfil?.genero,
-      dataNascimento: perfil?.dataNascimento?.toISOString().split('T')[0], // Formato YYYY-MM-DD
-      telefone: undefined, // TODO
-      enderecos: [], // TODO
+      dataNascimento: perfil?.dataNascimento
+        ? perfil.dataNascimento.toISOString().split('T')[0]
+        : undefined, // Formato YYYY-MM-DD
+      telefone: telefonePrincipal ? this.converterTelefoneParaDto(telefonePrincipal) : undefined,
+      enderecos: enderecosDto,
     };
   }
 
+  /**
+   * Converte telefone do banco para DTO.
+   */
+  private converterTelefoneParaDto(telefone: ITelefoneUsuario): ITelefoneDto {
+    const tipos: Record<number, string> = {
+      1: 'Celular',
+      2: 'Residencial',
+      3: 'Comercial',
+    };
+
+    return {
+      tipo: tipos[telefone.idTipoTelefone] || 'Celular',
+      ddd: telefone.ddd,
+      numero: telefone.numero,
+    };
+  }
+
+  /**
+   * Converte endereços do banco para DTOs.
+   */
+  private async converterEnderecosParaDto(enderecos: IEnderecoUsuario[]): Promise<IEnderecoDto[]> {
+    const enderecosDto: IEnderecoDto[] = [];
+
+    for (const endereco of enderecos) {
+      // Buscar informações relacionadas (cidade, bairro, etc.)
+      const cidade = await this.obterCidadePorId(endereco.idCidade);
+      const bairro = await this.obterBairroPorId(endereco.idBairro);
+      const cep = await this.obterCepPorId(endereco.idCep);
+      const pais = await this.obterPaisPorId(endereco.idPais);
+      const tipoResidencia = await this.obterTipoResidenciaPorId(endereco.idTipoResidencia);
+      const logradouro = await this.obterLogradouroPorId(endereco.idLogradouro);
+
+      enderecosDto.push({
+        apelido: endereco.principal ? 'Principal' : `Endereço ${endereco.id}`,
+        tipoResidencia: tipoResidencia?.dscTipoResidencia || 'Casa',
+        tipoLogradouro: logradouro?.tipoLogradouro || 'Rua',
+        logradouro: logradouro?.dscLogradouro || '',
+        numero: logradouro?.numLogradouro || '',
+        complemento: endereco.complemento,
+        bairro: bairro?.dscBairro || '',
+        cep: cep?.numCep || '',
+        cidade: cidade?.dscCidade || '',
+        estado: cidade?.dscEstado || '',
+        pais: pais?.dscPais || 'Brasil',
+      });
+    }
+
+    return enderecosDto;
+  }
+
   public async registrarCliente(dados: ICriarClienteDto) {
-    if (dados.senha !== dados.confirmacao_senha) {
+    if (dados.senha !== dados.confirmacaoSenha) {
       throw new Error('Senha e confirmação de senha não conferem.');
     }
 
