@@ -82,8 +82,8 @@ Content-Type: application/json
 ### Obter Perfil do Cliente
 # Cenário Feliz: Obtenção bem-sucedida dos dados do perfil
 # Status: 200
-# Tipo de Retorno: {uuid: string, nome: string, email: string, cpf: string, genero?: string, dataNascimento?: string, telefone?: {tipo: string, ddd: string, numero: string}, enderecos: Array<IEnderecoDto>}
-# Exemplo de Retorno: {"uuid":"uuid-cliente","nome":"João Silva","email":"joao@email.com","cpf":"123.456.789-00","genero":"Masculino","dataNascimento":"1990-05-15","telefone":{"tipo":"Celular","ddd":"11","numero":"98888-7777"},"enderecos":[{...}]}
+# Tipo de Retorno: {uuid: string, nome: string, email: string, cpf: string, cpfMascarado: string, genero?: string, dataNascimento?: string, telefone?: {tipo: string, ddd: string, numero: string, numeroMascarado?: string}, enderecos: Array<IEnderecoDto>}
+# Exemplo de Retorno: {"uuid":"uuid-cliente","nome":"João Silva","email":"joao@email.com","cpf":"123.456.789-00","cpfMascarado":"***.456.***-**","genero":"Masculino","dataNascimento":"1990-05-15","telefone":{"tipo":"Celular","ddd":"11","numero":"988887777","numeroMascarado":"*****7777"},"enderecos":[{"uuid":"uuid-endereco","logradouro":"Rua A"}]}
 # Cenários de Falha:
 # - Usuário não autenticado: Status 401, mensagem "Usuário não autenticado."
 # - Erro ao obter perfil: Status 400, mensagem "Erro ao obter perfil do cliente."
@@ -106,8 +106,56 @@ Content-Type: application/json
 Authorization: {{token}}
 
 {
-  "nome": "João Silva Atualizado"
+  "nome": "João Silva Atualizado",
+  "genero": "Masculino",
+  "telefone": {
+    "tipo": "Celular",
+    "ddd": "12",
+    "numero": "98888-7776"
+  },
+  "enderecos": [
+    {
+      "apelido": "Casa Principal",
+      "tipoResidencia": "Casa",
+      "tipoLogradouro": "Rua",
+      "logradouro": "Nova Rua",
+      "numero": "100",
+      "bairro": "Novo Bairro",
+      "cep": "12345-678",
+      "cidade": "SJC",
+      "estado": "SP"
+    }
+  ]
 }
+
+###
+### Adicionar Novo Endereço
+# Cenário Feliz: Adição de novo endereço ao perfil
+# Status: 201
+# Requer: Authorization header com token JWT
+POST {{baseUrl}}/api/clientes/perfil/enderecos
+Content-Type: application/json
+Authorization: {{token}}
+
+{
+  "apelido": "Trabalho",
+  "tipoResidencia": "Escritório",
+  "tipoLogradouro": "Avenida",
+  "logradouro": "Avenida das Américas",
+  "numero": "500",
+  "bairro": "Barra",
+  "cep": "22640-100",
+  "cidade": "Rio de Janeiro",
+  "estado": "RJ"
+}
+
+###
+### Remover Endereço
+# Cenário Feliz: Remoção de endereço por UUID
+# Status: 200
+# Requer: Authorization header com token JWT e UUID do endereço na URL
+DELETE {{baseUrl}}/api/clientes/perfil/enderecos/uuid-do-endereco
+Authorization: {{token}}
 
 ###
 ### Alterar Senha do Cliente
@@ -129,7 +177,7 @@ Authorization: {{token}}
 {
   "senhaAtual": "Password@123",
   "novaSenha": "NewPassword@123",
-  "confirmacaoSenha": "NewPassword@123"
+  "confirmacaoNovaSenha": "NewPassword@123"
 }
 
 ###

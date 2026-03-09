@@ -122,6 +122,46 @@ export class ControladorClientes {
   }
 
   /**
+   * Adiciona um novo endereço ao perfil do cliente.
+   */
+  public static async adicionarEndereco(requisicao: Request, resposta: Response): Promise<Response> {
+    try {
+      const uuid = requisicao.usuario?.uuid;
+      const dados = requisicao.body;
+
+      if (!uuid) {
+        return RespostaPadrao.enviarErro(resposta, 401, 'Usuário não autenticado.');
+      }
+
+      const novoEndereco = await servicoClientes.adicionarEndereco(uuid, dados);
+      return RespostaPadrao.enviarSucesso(resposta, 201, novoEndereco);
+    } catch (erro) {
+      const mensagem = RespostaPadrao.obterMensagemErro(erro, 'Erro ao adicionar endereço.');
+      return RespostaPadrao.enviarErro(resposta, 400, mensagem);
+    }
+  }
+
+  /**
+   * Remove um endereço do perfil do cliente.
+   */
+  public static async removerEndereco(requisicao: Request, resposta: Response): Promise<Response> {
+    try {
+      const uuid = requisicao.usuario?.uuid;
+      const { uuidEndereco } = requisicao.params;
+
+      if (!uuid || !uuidEndereco) {
+        return RespostaPadrao.enviarErro(resposta, 401, 'Parâmetros insuficientes.');
+      }
+
+      await servicoClientes.removerEndereco(uuid, uuidEndereco);
+      return RespostaPadrao.enviarSucesso(resposta, 200, { mensagem: 'Endereço removido com sucesso.' });
+    } catch (erro) {
+      const mensagem = RespostaPadrao.obterMensagemErro(erro, 'Erro ao remover endereço.');
+      return RespostaPadrao.enviarErro(resposta, 400, mensagem);
+    }
+  }
+
+  /**
    * Realiza a alteração de senha de um cliente.
    *
    * @param requisicao Objeto da requisição contendo senhas.

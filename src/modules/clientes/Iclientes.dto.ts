@@ -2,9 +2,11 @@ export interface ITelefoneDto {
   tipo: string;
   ddd: string;
   numero: string;
+  numeroMascarado?: string;
 }
 
 export interface IEnderecoDto {
+  uuid?: string;
   apelido?: string;
   tipoResidencia?: string;
   tipoLogradouro?: string;
@@ -43,6 +45,7 @@ export interface IAtualizarClienteDto {
   genero?: string;
   dataNascimento?: string;
   telefone?: ITelefoneDto;
+  enderecos?: IEnderecoDto[];
 }
 
 /**
@@ -62,6 +65,7 @@ export interface IPerfilClienteDto {
   nome: string;
   email: string;
   cpf: string;
+  cpfMascarado: string;
   genero?: string;
   dataNascimento?: string;
   telefone?: ITelefoneDto;

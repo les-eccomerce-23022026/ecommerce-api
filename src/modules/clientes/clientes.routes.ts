@@ -23,6 +23,15 @@ export function registrarRotasClientes(app: IRouter): void {
     ControladorClientes.atualizarCliente(requisicao, resposta),
   );
 
+  // Rotas de Endereços (RF0026)
+  app.post('/clientes/perfil/enderecos', autenticacaoMiddleware, clienteOnlyMiddleware, (req, res) =>
+    ControladorClientes.adicionarEndereco(req, res),
+  );
+
+  app.delete('/clientes/perfil/enderecos/:uuidEndereco', autenticacaoMiddleware, clienteOnlyMiddleware, (req, res) =>
+    ControladorClientes.removerEndereco(req, res),
+  );
+
   // Rota de alteração de senha (RF0028)
   app.patch('/clientes/seguranca/alterar-senha', autenticacaoMiddleware, (req, res) =>
     ControladorClientes.alterarSenha(req, res),
