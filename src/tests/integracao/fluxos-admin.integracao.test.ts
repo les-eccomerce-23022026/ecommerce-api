@@ -4,7 +4,7 @@ import {
   iniciarEscopoIsolamentoIntegracao,
   EscopoIsolamentoIntegracao,
 } from '@/tests/utils/isolamento-integracao.util';
-import { realizarLogin, obterTokenAdmin } from '@/tests/utils/requisicoes-api.util';
+import { registrarCliente, realizarLogin, obterTokenAdmin } from '@/tests/utils/requisicoes-api.util';
 import request from 'supertest';
 
 // Testes de integração que simulam o fluxo completo do domínio admin,
@@ -57,5 +57,35 @@ describe('Integração - Fluxos completos do administrador', () => {
     const respostaLoginNovoAdmin = await realizarLogin(app, 'admin.fluxo@email.com', 'AdminFluxo@123');
     expect(respostaLoginNovoAdmin.status).toBe(200);
     expect(respostaLoginNovoAdmin.body?.dados?.user?.role).toBe('admin');
+  });
+
+  it('deve promover um cliente existente para administrador com nova senha', async () => {
+    await registrarCliente(app, {
+      nome: 'Cliente Promovido',
+      cpf: '321.654.987-00',
+      email: 'cliente.promovido@email.com',
+      senha: 'Cliente@123',
+      confirmacaoSenha: 'Cliente@123',
+    });
+
+    const tokenAdmin = await obterTokenAdmin(app);
+
+    const respostaCadastroAdmin = await request(app)
+      .post('/api/admin/registro')
+      .set('Authorization', `Bearer ${tokenAdmin}`)
+      .send({
+        nome: 'Cliente Promovido',
+        cpf: '321.654.987-00',
+        email: 'cliente.promovido@email.com',
+        senha: 'AdminPromovido@123',
+        confirmacaoSenha: 'AdminPromovido@123',
+      });
+
+    expect(respostaCadastroAdmin.status).toBe(201);
+    expect(respostaCadastroAdmin.body?.dados?.role).toBe('admin');
+
+    const respostaLoginPromovido = await realizarLogin(app, 'cliente.promovido@email.com', 'AdminPromovido@123');
+    expect(respostaLoginPromovido.status).toBe(200);
+    expect(respostaLoginPromovido.body?.dados?.user?.role).toBe('admin');
   });
 });

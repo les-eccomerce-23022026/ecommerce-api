@@ -19,3 +19,13 @@ export interface IRespostaAdminCriadoDto {
   cpf: string;
   role: string;
 }
+
+/**
+ * DTO para listagem de administradores.
+ */
+export interface IListaAdminDto {
+  uuid: string;
+  nome: string;
+  email: string;
+  ativo: boolean;
+}

@@ -61,7 +61,7 @@ describe('Integração - Auth (rotas individuais)', () => {
       cpf: '555.444.333-22',
       email: 'cliente.inativado@email.com',
       senha: 'SenhaInativada@123',
-      confirmacao_senha: 'SenhaInativada@123',
+      confirmacaoSenha: 'SenhaInativada@123',
     });
 
     const respostaLoginInicial = await realizarLogin(

@@ -1,24 +1,40 @@
 @baseUrl = http://localhost:3000
 @tokenAdmin = Bearer <insira_o_token_admin_aqui>
 
+### Listar Administradores
+# Cenário Feliz: Listagem de administradores por um admin logado
+# Status: 200 OK
+# Requer: Token JWT de admin
+GET {{baseUrl}}/api/admin/administradores
+Authorization: {{tokenAdmin}}
+
 ### Registrar Novo Administrador
 # Cenário Feliz: Registro de admin bem-sucedido
-# Status: 201
-# Tipo de Retorno: {uuid: string, nome: string, email: string, role: string}
-# Exemplo de Retorno: {"uuid":"uuid-admin","nome":"Novo Admin","email":"novo@admin.com","role":"admin"}
-# Cenários de Falha:
-# - Campos obrigatórios ausentes: Status 400, mensagem "Campos obrigatórios ausentes: ..."
-# - Email ou CPF já cadastrado: Status 400, mensagem "Já existe um usuário cadastrado com este e-mail." ou similar
-# - Senhas não conferem ou fraca: Status 400
-# Requer: Authorization header com token JWT de admin
+# Status: 201 Created
+# Cenários de Falha: Status 400 (duplicidade/campos ausentes) ou 403 (acesso não-admin)
 POST {{baseUrl}}/api/admin/registro
 Content-Type: application/json
 Authorization: {{tokenAdmin}}
 
 {
-  "nome": "Novo Administrador",
-  "cpf": "987.654.321-00",
-  "email": "novo.admin@livraria.com.br",
+  "nome": "Novo Administrador de Teste",
+  "cpf": "111.111.111-11",
+  "email": "teste.admin@livraria.com.br",
   "senha": "Admin@123",
   "confirmacaoSenha": "Admin@123"
 }
+
+### Inativar Administrador
+# Cenário Feliz: Inativação de outro administrador por um admin logado
+# Status: 200 OK
+# Falha: Status 403 (se tentar inativar a si mesmo)
+# Substituir :uuid pelo UUID de um admin cadastrado
+PATCH {{baseUrl}}/api/admin/administradores/:uuid/inativar
+Authorization: {{tokenAdmin}}
+
+### Ativar Administrador
+# Cenário Feliz: Ativação de um administrador inativo
+# Status: 200 OK
+# Substituir :uuid pelo UUID do admin inativado
+PATCH {{baseUrl}}/api/admin/administradores/:uuid/ativar
+Authorization: {{tokenAdmin}}
