@@ -150,6 +150,24 @@ Authorization: {{token}}
 }
 
 ###
+### Adicionar Novo Cartão
+# Cenário Feliz: Adição de novo cartão de crédito tokenizado ao perfil
+# Status: 201
+# Requer: Authorization header com token JWT
+POST {{baseUrl}}/api/clientes/perfil/cartoes
+Content-Type: application/json
+Authorization: {{token}}
+
+{
+  "idBandeiraCartao": 1,
+  "tokenCartao": "tok_visa_exemplo_123",
+  "finalCartao": "4321",
+  "nomeImpresso": "JOAO SILVA",
+  "validade": "2029-12-31T23:59:59.999Z",
+  "principal": true
+}
+
+###
 ### Remover Endereço
 # Cenário Feliz: Remoção de endereço por UUID
 # Status: 200

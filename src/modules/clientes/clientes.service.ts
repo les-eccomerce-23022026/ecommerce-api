@@ -10,7 +10,9 @@ import {
   IEnderecoDto,
   IPerfilClienteDto,
   ITelefoneDto,
+  ICartaoDto,
 } from '@/modules/clientes/Iclientes.dto';
+import { IRepositorioCartaoUsuario } from '@/modules/cartoes/IRepositorioCartaoUsuario';
 import { IPerfilCliente } from '@/shared/types/IPerfilCliente';
 import { ITelefoneUsuario } from '@/shared/types/ITelefoneUsuario';
 import { verificarForcaSenha } from '@/shared/utils/senha.util';
@@ -30,6 +32,8 @@ export class ServicoClientes {
 
   private readonly repositorioEndereco: IRepositorioEnderecoUsuario;
 
+  private readonly repositorioCartoes: IRepositorioCartaoUsuario;
+
   private readonly db: IConexaoBanco; // Acesso direto ao banco para queries customizadas
 
   /**
@@ -40,12 +44,14 @@ export class ServicoClientes {
     repositorioPerfil: IRepositorioPerfilCliente,
     repositorioTelefone: IRepositorioTelefoneUsuario,
     repositorioEndereco: IRepositorioEnderecoUsuario,
+    repositorioCartoes: IRepositorioCartaoUsuario,
     db: any,
   ) {
     this.repositorioUsuarios = repositorioUsuarios;
     this.repositorioPerfil = repositorioPerfil;
     this.repositorioTelefone = repositorioTelefone;
     this.repositorioEndereco = repositorioEndereco;
+    this.repositorioCartoes = repositorioCartoes;
     this.db = db;
   }
 
@@ -425,6 +431,17 @@ export class ServicoClientes {
     const enderecosUsuario = await this.repositorioEndereco.buscarPorIdUsuario(usuario.id);
     const enderecosDto = await this.converterEnderecosParaDto(enderecosUsuario);
 
+    // Buscar cartões
+    const cartoesUsuario = await this.repositorioCartoes.buscarPorUsuario(usuario.id);
+    const cartoesDto: ICartaoDto[] = cartoesUsuario.map((c) => ({
+      uuid: c.uuid,
+      final: c.finalCartao,
+      nomeImpresso: c.nomeImpresso,
+      bandeira: 'Visa', // Simplificado
+      validade: c.validade.toISOString().substring(0, 7),
+      principal: c.principal,
+    }));
+
     return {
       uuid: usuario.uuid,
       nome: usuario.nome,
@@ -432,11 +449,10 @@ export class ServicoClientes {
       cpf: usuario.cpf,
       cpfMascarado: ServicoClientes.mascararCpf(usuario.cpf),
       genero: perfil?.genero,
-      dataNascimento: perfil?.dataNascimento
-        ? perfil.dataNascimento.toISOString().split('T')[0]
-        : undefined, // Formato YYYY-MM-DD
+      dataNascimento: perfil?.dataNascimento ? perfil.dataNascimento.toISOString().split('T')[0] : undefined, // Formato YYYY-MM-DD
       telefone: telefonePrincipal ? this.converterTelefoneParaDto(telefonePrincipal) : undefined,
       enderecos: enderecosDto,
+      cartoes: cartoesDto,
     };
   }
 

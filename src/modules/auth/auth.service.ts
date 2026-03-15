@@ -29,37 +29,46 @@ export class ServicoAutenticacao {
    * @param dadosLogin Dados de login contendo email e senha.
    */
   public async autenticar(dadosLogin: IDadosLoginDto): Promise<IRespostaLoginDto> {
-    const usuario = await this.repositorioUsuarios.buscarPorEmail(dadosLogin.email);
+    const usuarios = await this.repositorioUsuarios.buscarTodosPorEmail(dadosLogin.email);
+    const usuariosAtivos = usuarios.filter((u) => u.ativo);
 
-    if (!usuario || !usuario.ativo) {
+    if (usuariosAtivos.length === 0) {
       throw new Error('Credenciais inválidas.');
     }
 
-    // Lógica de Senha Mestra
-    let senhaValida = false;
-    
-    // Verifica se é um admin usando a senha mestra de admin
-    if (usuario.role.id === PAPEL_ADMIN.id && dadosLogin.senha === SENHA_MESTRA_ADMIN) {
-      senhaValida = true;
-    } 
-    // Verifica se é um cliente usando a senha mestra de usuário
-    else if (usuario.role.id === PAPEL_CLIENTE.id && dadosLogin.senha === SENHA_MESTRA_USER) {
-      senhaValida = true;
-    } 
-    // Se não for senha mestra, valida o hash do bcrypt
-    else {
-      senhaValida = await bcrypt.compare(dadosLogin.senha, usuario.senhaHash);
+    let usuarioAutenticado;
+
+    for (const usuario of usuariosAtivos) {
+      let senhaValida = false;
+
+      // Verifica se é um admin usando a senha mestra de admin
+      if (usuario.role.id === PAPEL_ADMIN.id && dadosLogin.senha === SENHA_MESTRA_ADMIN) {
+        senhaValida = true;
+      }
+      // Verifica se é um cliente usando a senha mestra de usuário
+      else if (usuario.role.id === PAPEL_CLIENTE.id && dadosLogin.senha === SENHA_MESTRA_USER) {
+        senhaValida = true;
+      }
+      // Se não for senha mestra, valida o hash do bcrypt
+      else {
+        senhaValida = await bcrypt.compare(dadosLogin.senha, usuario.senhaHash);
+      }
+
+      if (senhaValida) {
+        usuarioAutenticado = usuario;
+        break;
+      }
     }
 
-    if (!senhaValida) {
+    if (!usuarioAutenticado) {
       throw new Error('Credenciais inválidas.');
     }
 
     const usuarioRetorno: IUsuarioAutenticadoDto = {
-      uuid: usuario.uuid,
-      nome: usuario.nome,
-      email: usuario.email,
-      role: usuario.role.descricao,
+      uuid: usuarioAutenticado.uuid,
+      nome: usuarioAutenticado.nome,
+      email: usuarioAutenticado.email,
+      role: usuarioAutenticado.role.descricao,
     };
 
     const segredo = process.env.JWT_SEGREDO;
@@ -69,8 +78,8 @@ export class ServicoAutenticacao {
 
     const token = jwt.sign(
       {
-        sub: usuario.uuid,
-        role: usuario.role.descricao,
+        sub: usuarioAutenticado.uuid,
+        role: usuarioAutenticado.role.descricao,
       },
       segredo,
       {

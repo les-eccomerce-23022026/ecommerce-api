@@ -157,6 +157,11 @@ export class RepositorioCartaoUsuario implements IRepositorioCartaoUsuario {
       [idUsuario]
     );
 
+    // Se o UUID estiver vazio, apenas limpamos o flag de todos (não define um novo como principal)
+    if (!uuid) {
+      return true;
+    }
+
     // Depois, define o cartão específico como principal
     const query = 'UPDATE ecm_cartao_usuario SET flg_principal = TRUE WHERE uuid_cartao = $1 AND id_usuario = $2';
     const rows = await this.pool.executar<LinhaCartao>(query, [uuid, idUsuario]);

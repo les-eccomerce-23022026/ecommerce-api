@@ -8,10 +8,9 @@
 GET {{baseUrl}}/api/admin/administradores
 Authorization: {{tokenAdmin}}
 
-### Registrar Novo Administrador
-# Cenário Feliz: Registro de admin bem-sucedido
+### Registrar Novo Administrador (Puro)
+# Cenário Feliz: Registro de admin novo sem vínculo prévio
 # Status: 201 Created
-# Cenários de Falha: Status 400 (duplicidade/campos ausentes) ou 403 (acesso não-admin)
 POST {{baseUrl}}/api/admin/registro
 Content-Type: application/json
 Authorization: {{tokenAdmin}}
@@ -21,7 +20,24 @@ Authorization: {{tokenAdmin}}
   "cpf": "111.111.111-11",
   "email": "teste.admin@livraria.com.br",
   "senha": "Admin@123",
-  "confirmacaoSenha": "Admin@123"
+  "confirmacaoSenha": "Admin@123",
+  "usarMesmaSenha": false
+}
+
+### Registrar Novo Administrador (Promoção de Cliente)
+# Cenário Feliz: Promover um cliente existente a admin usando a mesma senha
+# Status: 201 Created
+POST {{baseUrl}}/api/admin/registro
+Content-Type: application/json
+Authorization: {{tokenAdmin}}
+
+{
+  "nome": "João Silva Admin",
+  "cpf": "123.456.789-00",
+  "email": "joao.comprador@email.com",
+  "senha": "Password@123",
+  "confirmacaoSenha": "Password@123",
+  "usarMesmaSenha": true
 }
 
 ### Inativar Administrador

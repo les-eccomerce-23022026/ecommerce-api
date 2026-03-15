@@ -28,6 +28,27 @@
 - **E** um novo usuário é criado na base de dados com campo `role = 'admin'`
 - **E** a resposta retorna o DTO do novo admin criado
 
+### Promoção de Cliente para Administrador com mesma senha (RN0074 / RN0075)
+
+- **Dado** que já existe um usuário com o papel de `cliente` e e-mail `cliente@email.com`
+- **E** uma requisição autenticada de um `admin` logado
+- **E** o payload de registro de admin contém o mesmo e-mail e `usarMesmaSenha: true`
+- **Quando** é enviado `POST /api/admin/registro`
+- **Então** a resposta tem status `201`
+- **E** um NOVO registro de usuário é criado com `role = 'admin'` e o mesmo e-mail
+- **E** o hash da senha do novo registro é IDÊNTICO ao registro do cliente original
+
+### Promoção de Cliente para Administrador com senha nova (RN0074 / RN0075)
+
+- **Dado** que já existe um usuário com o papel de `cliente` e e-mail `cliente@email.com`
+- **E** uma requisição autenticada de um `admin` logado
+- **E** o payload de registro de admin contém o mesmo e-mail e `usarMesmaSenha: false`
+- **E** uma nova senha válida é fornecida
+- **Quando** é enviado `POST /api/admin/registro`
+- **Então** a resposta tem status `201`
+- **E** um NOVO registro de usuário é criado com `role = 'admin'` e o mesmo e-mail
+- **E** o hash da senha do novo registro é baseado na nova senha fornecida, sendo independente do registro de cliente
+
 ### Inativar outro administrador (RF0060)
 
 - **Dado** uma requisição autenticada cujo JWT tenha claim `role == "admin"`

@@ -7,6 +7,7 @@ export interface ICriarAdminDto {
   cpf: string;
   senha: string;
   confirmacaoSenha: string;
+  usarMesmaSenha?: boolean;
 }
 
 /**

@@ -8,6 +8,7 @@ export interface IFiltrosConsultaClientes {
   nome?: string;
   cpf?: string;
   email?: string;
+  idPapel?: number;
   offset: number;
   limite: number;
 }
@@ -18,7 +19,10 @@ export interface IFiltrosConsultaClientes {
  */
 export interface IRepositorioUsuarios {
   buscarPorEmail(email: string): Promise<IUsuario | undefined>;
+  buscarPorEmailPapel(email: string, idPapel: number): Promise<IUsuario | undefined>;
+  buscarTodosPorEmail(email: string): Promise<IUsuario[]>;
   buscarPorCpf(cpf: string): Promise<IUsuario | undefined>;
+  buscarPorCpfPapel(cpf: string, idPapel: number): Promise<IUsuario | undefined>;
   buscarPorUuid(uuid: string): Promise<IUsuario | undefined>;
   criarUsuario(dados: IDadosCriarUsuario): Promise<IUsuario>;
   atualizarUsuario(uuid: string, dados: Partial<IUsuario>): Promise<IUsuario | undefined>;

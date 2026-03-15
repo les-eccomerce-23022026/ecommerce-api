@@ -57,6 +57,15 @@ export interface IAlterarSenhaDto {
   confirmacaoNovaSenha: string;
 }
 
+export interface ICartaoDto {
+  uuid: string;
+  final: string;
+  nomeImpresso: string;
+  bandeira: string;
+  validade: string;
+  principal: boolean;
+}
+
 /**
  * DTO para resposta do perfil do cliente.
  */
@@ -70,4 +79,5 @@ export interface IPerfilClienteDto {
   dataNascimento?: string;
   telefone?: ITelefoneDto;
   enderecos: IEnderecoDto[];
+  cartoes?: ICartaoDto[];
 }

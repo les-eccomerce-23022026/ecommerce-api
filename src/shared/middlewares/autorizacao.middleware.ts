@@ -32,7 +32,8 @@ export function clienteOnlyMiddleware(
 ): void {
   const { usuario } = req;
 
-  if (!usuario || usuario.role !== PAPEL_CLIENTE.descricao) {
+  // Um administrador também é um cliente (extensão)
+  if (!usuario || (usuario.role !== PAPEL_CLIENTE.descricao && usuario.role !== PAPEL_ADMIN.descricao)) {
     res.status(403).json({
       mensagem: 'Acesso negado. Esta rota é restrita a clientes.',
       sucesso: false,

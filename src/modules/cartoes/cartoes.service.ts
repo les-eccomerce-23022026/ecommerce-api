@@ -33,9 +33,9 @@ export class ServicoCartoes {
    * Cadastra um novo cartão para um usuário.
    */
   async cadastrarCartao(idUsuario: number, dados: ICriarCartaoDto): Promise<ICartaoUsuario> {
-    // Se for principal, remove o flag dos outros cartões
+    // Se for principal, remove o flag dos outros cartões do usuário
     if (dados.principal) {
-      await this.repositorioCartoes.definirComoPrincipal('', idUsuario); // Remove todos
+      await this.repositorioCartoes.definirComoPrincipal('', idUsuario); 
     }
 
     const cartao = await this.repositorioCartoes.criar({

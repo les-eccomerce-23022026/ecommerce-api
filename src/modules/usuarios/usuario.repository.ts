@@ -66,19 +66,50 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
     const query = `SELECT id_usuario AS "idUsuario", uuid_usuario AS "uuidUsuario", nom_usuario AS "nomUsuario", 
                           dsc_email AS "dscEmail", dsc_cpf AS "dscCpf", dsc_senha_hash AS "dscSenhaHash", 
                           id_papel AS "idPapel", flg_ativo AS "flgAtivo", dat_criacao AS "datCriacao", dat_atualizacao AS "datAtualizacao" 
-                   FROM ecm_usuario WHERE dsc_email = $1`;
+                   FROM ecm_usuario WHERE dsc_email = $1 LIMIT 1`;
     const rows = await this.db.executar(query, [email]);
 
     if (rows.length === 0) return undefined;
     return RepositorioUsuarios.mapearParaEntidade(rows[0] as LinhaResultado);
   }
 
+  public async buscarPorEmailPapel(email: string, idPapel: number): Promise<IUsuario | undefined> {
+    const query = `SELECT id_usuario AS "idUsuario", uuid_usuario AS "uuidUsuario", nom_usuario AS "nomUsuario", 
+                          dsc_email AS "dscEmail", dsc_cpf AS "dscCpf", dsc_senha_hash AS "dscSenhaHash", 
+                          id_papel AS "idPapel", flg_ativo AS "flgAtivo", dat_criacao AS "datCriacao", dat_atualizacao AS "datAtualizacao" 
+                   FROM ecm_usuario WHERE dsc_email = $1 AND id_papel = $2`;
+    const rows = await this.db.executar(query, [email, idPapel]);
+
+    if (rows.length === 0) return undefined;
+    return RepositorioUsuarios.mapearParaEntidade(rows[0] as LinhaResultado);
+  }
+
+  public async buscarTodosPorEmail(email: string): Promise<IUsuario[]> {
+    const query = `SELECT id_usuario AS "idUsuario", uuid_usuario AS "uuidUsuario", nom_usuario AS "nomUsuario", 
+                          dsc_email AS "dscEmail", dsc_cpf AS "dscCpf", dsc_senha_hash AS "dscSenhaHash", 
+                          id_papel AS "idPapel", flg_ativo AS "flgAtivo", dat_criacao AS "datCriacao", dat_atualizacao AS "datAtualizacao" 
+                   FROM ecm_usuario WHERE dsc_email = $1`;
+    const rows = await this.db.executar(query, [email]);
+    return rows.map((row) => RepositorioUsuarios.mapearParaEntidade(row as LinhaResultado));
+  }
+
   public async buscarPorCpf(cpf: string): Promise<IUsuario | undefined> {
     const query = `SELECT id_usuario AS "idUsuario", uuid_usuario AS "uuidUsuario", nom_usuario AS "nomUsuario", 
                           dsc_email AS "dscEmail", dsc_cpf AS "dscCpf", dsc_senha_hash AS "dscSenhaHash", 
                           id_papel AS "idPapel", flg_ativo AS "flgAtivo", dat_criacao AS "datCriacao", dat_atualizacao AS "datAtualizacao" 
-                   FROM ecm_usuario WHERE dsc_cpf = $1`;
+                   FROM ecm_usuario WHERE dsc_cpf = $1 LIMIT 1`;
     const rows = await this.db.executar(query, [cpf]);
+
+    if (rows.length === 0) return undefined;
+    return RepositorioUsuarios.mapearParaEntidade(rows[0] as LinhaResultado);
+  }
+
+  public async buscarPorCpfPapel(cpf: string, idPapel: number): Promise<IUsuario | undefined> {
+    const query = `SELECT id_usuario AS "idUsuario", uuid_usuario AS "uuidUsuario", nom_usuario AS "nomUsuario", 
+                          dsc_email AS "dscEmail", dsc_cpf AS "dscCpf", dsc_senha_hash AS "dscSenhaHash", 
+                          id_papel AS "idPapel", flg_ativo AS "flgAtivo", dat_criacao AS "datCriacao", dat_atualizacao AS "datAtualizacao" 
+                   FROM ecm_usuario WHERE dsc_cpf = $1 AND id_papel = $2`;
+    const rows = await this.db.executar(query, [cpf, idPapel]);
 
     if (rows.length === 0) return undefined;
     return RepositorioUsuarios.mapearParaEntidade(rows[0] as LinhaResultado);
@@ -155,7 +186,7 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
   }
 
   public async buscarClientesComFiltros(filtros: IFiltrosConsultaClientes): Promise<IUsuario[]> {
-    const { nome, cpf, email, offset, limite } = filtros;
+    const { nome, cpf, email, idPapel, offset, limite } = filtros;
 
     let query = `
       SELECT id_usuario AS "idUsuario", uuid_usuario AS "uuidUsuario", nom_usuario AS "nomUsuario", 
@@ -165,7 +196,8 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
       WHERE id_papel = $1
     `;
 
-    const valores: unknown[] = [PAPEL_CLIENTE.id];
+    const papelBusca = idPapel ?? PAPEL_CLIENTE.id;
+    const valores: unknown[] = [papelBusca];
     let contador = 2;
 
     if (nome) {

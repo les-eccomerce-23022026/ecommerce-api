@@ -34,6 +34,30 @@ Content-Type: application/json
 }
 
 ###
+### Login - Acesso Dual (Admin com Mesma Senha)
+# Cenário Feliz: Usuário possui acessos de cliente e admin com a mesma senha
+# Prioridade: O login retornará o papel de "admin" por padrão em caso de conflito
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "dual@example.com",
+  "senha": "SamePass@123"
+}
+
+###
+### Login - Acesso Dual (Senhas Distintas)
+# Cenário Feliz: Usuário com e-mail único mas senhas diferentes para cliente e admin
+# O papel retornado no JWT dependerá de qual senha foi fornecida.
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "dual@example.com",
+  "senha": "AdminDual@123"
+}
+
+###
 ### Login - Credenciais inválidas
 # Cenário de Falha: Credenciais inválidas
 # Status: 401

@@ -2,7 +2,7 @@ import bcrypt from 'bcryptjs';
 import { IRepositorioUsuarios } from '@/modules/usuarios/IRepositorioUsuarios';
 import { ICriarAdminDto, IListaAdminDto, IRespostaAdminCriadoDto } from '@/modules/admin/Iadmin.dto';
 import { verificarForcaSenha } from '@/shared/utils/senha.util';
-import { PAPEL_ADMIN } from '@/shared/types/papeis';
+import { PAPEL_ADMIN, PAPEL_CLIENTE } from '@/shared/types/papeis';
 
 /**
  * Serviço responsável por tarefas de administração do sistema.
@@ -18,21 +18,17 @@ export class ServicoAdmin {
    * Lista todos os administradores cadastrados.
    */
   public async listarAdministradores(): Promise<IListaAdminDto[]> {
-    // Usamos um filtro de busca que pegue todos, mas garantimos que filtramos por papel admin depois
-    // ou usamos um método específico se existir. Como o IRepositorioUsuarios é genérico,
-    // vamos buscar filtrando pelo papel se possível ou buscar todos e filtrar na memória se a base for pequena.
-    // O ideal é ter um método no repositório para buscar por papel.
-    // Por enquanto, vamos assumir que buscarClientesComFiltros pode ser usado ou implementamos algo.
-
-    const todos = await this.repositorioUsuarios.buscarClientesComFiltros({ offset: 0, limite: 1000 });
-    return todos
-      .filter((u) => u.role.id === PAPEL_ADMIN.id)
-      .map((u) => ({
-        uuid: u.uuid,
-        nome: u.nome,
-        email: u.email,
-        ativo: u.ativo,
-      }));
+    const todos = await this.repositorioUsuarios.buscarClientesComFiltros({
+      idPapel: PAPEL_ADMIN.id,
+      offset: 0,
+      limite: 1000,
+    });
+    return todos.map((u) => ({
+      uuid: u.uuid,
+      nome: u.nome,
+      email: u.email,
+      ativo: u.ativo,
+    }));
   }
 
   /**
@@ -87,62 +83,42 @@ export class ServicoAdmin {
       );
     }
 
-    const existentePorEmail = await this.repositorioUsuarios.buscarPorEmail(dados.email);
-    const existentePorCpf = await this.repositorioUsuarios.buscarPorCpf(dados.cpf);
-
-    if (existentePorEmail && existentePorEmail.cpf !== dados.cpf) {
-      throw new Error('O e-mail informado pertence a um usuário com CPF diferente.');
+    const existenteAdminPorEmail = await this.repositorioUsuarios.buscarPorEmailPapel(
+      dados.email,
+      PAPEL_ADMIN.id,
+    );
+    if (existenteAdminPorEmail) {
+      throw new Error('Já existe um administrador cadastrado com este e-mail.');
     }
 
-    if (existentePorCpf && existentePorCpf.email !== dados.email) {
-      throw new Error('O CPF informado pertence a um usuário com e-mail diferente.');
+    const existenteAdminPorCpf = await this.repositorioUsuarios.buscarPorCpfPapel(
+      dados.cpf,
+      PAPEL_ADMIN.id,
+    );
+    if (existenteAdminPorCpf) {
+      throw new Error('Já existe um administrador cadastrado com este CPF.');
     }
 
-    if (existentePorEmail && existentePorCpf && existentePorEmail.uuid !== existentePorCpf.uuid) {
-      throw new Error('O e-mail e o CPF informados pertencem a usuários diferentes.');
+    // Se o usuário existe como cliente, ele será "promovido" (novo registro de admin)
+    const existenteClientePorEmail = await this.repositorioUsuarios.buscarPorEmailPapel(
+      dados.email,
+      PAPEL_CLIENTE.id,
+    );
+
+    let senhaHash: string;
+
+    if (existenteClientePorEmail && dados.usarMesmaSenha) {
+      senhaHash = existenteClientePorEmail.senhaHash;
+    } else {
+      senhaHash = await bcrypt.hash(dados.senha, 10);
     }
-
-    const usuarioExistente = existentePorEmail ?? existentePorCpf;
-
-    if (usuarioExistente) {
-      if (usuarioExistente.role.id === PAPEL_ADMIN.id) {
-        throw new Error('O usuário informado já possui papel de administrador.');
-      }
-
-      const senhaAtualIgual = await bcrypt.compare(dados.senha, usuarioExistente.senhaHash);
-      if (senhaAtualIgual) {
-        throw new Error('A senha administrativa deve ser diferente da senha atual do usuário.');
-      }
-
-      const senhaHashAtualizada = await bcrypt.hash(dados.senha, 10);
-      const usuarioPromovido = await this.repositorioUsuarios.atualizarUsuario(usuarioExistente.uuid, {
-        nome: dados.nome,
-        senhaHash: senhaHashAtualizada,
-        role: PAPEL_ADMIN,
-        ativo: true,
-      });
-
-      if (!usuarioPromovido) {
-        throw new Error('Não foi possível promover o usuário para administrador.');
-      }
-
-      return {
-        uuid: usuarioPromovido.uuid,
-        nome: usuarioPromovido.nome,
-        email: usuarioPromovido.email,
-        cpf: usuarioPromovido.cpf,
-        role: usuarioPromovido.role.descricao,
-      };
-    }
-
-    const senhaHash = await bcrypt.hash(dados.senha, 10);
 
     const usuario = await this.repositorioUsuarios.criarUsuario({
       nome: dados.nome,
       email: dados.email,
       cpf: dados.cpf,
       senhaHash,
-      role: PAPEL_ADMIN, // Força papel de administrador
+      role: PAPEL_ADMIN,
     });
 
     return {

@@ -34,3 +34,21 @@
 - **Quando** é enviado `DELETE /api/clientes/perfil/enderecos/:uuid`
 - **Então** a resposta tem status `200`
 - **E** o endereço é removido permanentemente do perfil do cliente
+
+### Adição de Novo Cartão (POST) (RF0027 / RN0024)
+
+- **Dado** um cliente autenticado
+- **E** um novo objeto de cartão tokenizado (idBandeira, token, final, nomeImpresso, validade)
+- **Quando** é enviado `POST /api/clientes/perfil/cartoes`
+- **Então** a resposta tem status `201`
+- **E** o novo cartão é vinculado ao cliente e marcado opcionalmente como principal
+- **E** os outros cartões deixam de ser principais se o novo for definido como principal
+
+### Obtenção de Perfil Unificado (GET) (RN0077)
+
+- **Dado** um cliente autenticado com endereços e cartões cadastrados
+- **Quando** é enviado `GET /api/clientes/perfil`
+- **Então** a resposta tem status `200`
+- **E** o corpo contém `dados` com as listas de `enderecos` e `cartoes` agregadas
+- **E** os dados sensíveis dos cartões (como tokens) não são expostos
+- **E** as informações de telefone e data de nascimento estão formatadas corretamente

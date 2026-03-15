@@ -24,3 +24,15 @@
 - **Então** a resposta tem status `200`
 - **E** `dados.user.role` é `"admin"`
 - **E** o token JWT gerado, ao ser decodificado, contém o claim `role: "admin"` (necessário para autorização em rotas protegidas por `adminOnlyMiddleware`)
+
+### Login Contextual (Dual Role) baseado na senha (RF0071)
+
+- **Dado** que um usuário possui acessos independentes como `cliente` e `admin` com o mesmo e-mail
+- **E** a senha para o acesso de `cliente` é "SenhaCliente123"
+- **E** a senha para o acesso de `admin` é "SenhaAdmin123"
+- **Quando** é enviado `POST /api/auth/login` com e-mail do usuário e senha "SenhaCliente123"
+- **Então** a resposta tem status `200`
+- **E** o papel retornado no corpo e no JWT é `"cliente"`
+- **Quando** é enviado `POST /api/auth/login` com e-mail do usuário e senha "SenhaAdmin123"
+- **Então** a resposta tem status `200`
+- **E** o papel retornado no corpo e no JWT é `"admin"`
