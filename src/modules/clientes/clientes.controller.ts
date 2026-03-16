@@ -215,5 +215,26 @@ export class ControladorClientes {
       return RespostaPadrao.enviarErro(resposta, 400, mensagem);
     }
   }
+
+  /**
+   * Edita um endereço existente de um cliente.
+   */
+  public static async editarEndereco(requisicao: Request, resposta: Response): Promise<Response> {
+    try {
+      const uuidUsuario = requisicao.usuario?.uuid;
+      const { uuidEndereco } = requisicao.params;
+      const dados = requisicao.body;
+
+      if (!uuidUsuario || !uuidEndereco) {
+        return RespostaPadrao.enviarErro(resposta, 401, 'Parâmetros insuficientes.');
+      }
+
+      const enderecosAtualizados = await servicoClientes.editarEndereco(uuidUsuario, uuidEndereco, dados);
+      return RespostaPadrao.enviarSucesso(resposta, 200, enderecosAtualizados);
+    } catch (erro) {
+      const mensagem = RespostaPadrao.obterMensagemErro(erro, 'Erro ao editar endereço.');
+      return RespostaPadrao.enviarErro(resposta, 400, mensagem);
+    }
+  }
 }
 

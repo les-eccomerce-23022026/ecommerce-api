@@ -28,6 +28,10 @@ export function registrarRotasClientes(app: IRouter): void {
     ControladorClientes.adicionarEndereco(req, res),
   );
 
+  app.patch('/clientes/perfil/enderecos/:uuidEndereco', autenticacaoMiddleware, clienteOnlyMiddleware, (req, res) =>
+    ControladorClientes.editarEndereco(req, res),
+  );
+
   app.delete('/clientes/perfil/enderecos/:uuidEndereco', autenticacaoMiddleware, clienteOnlyMiddleware, (req, res) =>
     ControladorClientes.removerEndereco(req, res),
   );
