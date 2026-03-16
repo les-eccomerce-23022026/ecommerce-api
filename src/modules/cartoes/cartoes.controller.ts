@@ -26,7 +26,7 @@ export class ControladorCartoes {
         uuid: cartao.uuid,
         final: cartao.finalCartao,
         nomeImpresso: cartao.nomeImpresso,
-        bandeira: 'Visa', // TODO: buscar descrição da bandeira
+        bandeira: cartao.bandeira || 'Outra',
         validade: cartao.validade.toISOString().substring(0, 7), // YYYY-MM
         principal: cartao.principal
       }));
@@ -72,7 +72,7 @@ export class ControladorCartoes {
         uuid: cartao.uuid,
         final: cartao.finalCartao,
         nomeImpresso: cartao.nomeImpresso,
-        bandeira: 'Visa', // TODO: buscar descrição da bandeira
+        bandeira: cartao.bandeira || 'Outra',
         validade: cartao.validade.toISOString().substring(0, 7),
         principal: cartao.principal
       };
@@ -101,7 +101,7 @@ export class ControladorCartoes {
         uuid: cartao.uuid,
         final: cartao.finalCartao,
         nomeImpresso: cartao.nomeImpresso,
-        bandeira: 'Visa', // TODO: buscar descrição da bandeira
+        bandeira: cartao.bandeira || 'Outra',
         validade: cartao.validade.toISOString().substring(0, 7),
         principal: cartao.principal
       };

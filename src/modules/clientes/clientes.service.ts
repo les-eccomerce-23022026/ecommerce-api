@@ -181,12 +181,15 @@ export class ServicoClientes {
       const insertQuery = `INSERT INTO ecm_cep (num_cep, id_cidade, id_bairro) VALUES ($1, $2, $3) RETURNING id_cep`;
       const novo = (await this.db.executar(insertQuery, [cepLimpo, idCidade, idBairro])) as Record<string, unknown>[];
       return Number(novo[0].id_cep);
-    } catch (err: any) {
-      // Se der erro de unicidade, buscar o que já existe
-      if (err.message.includes('unique constraint') || err.code === '23505') {
-        const queryRebusca = `SELECT id_cep FROM ecm_cep WHERE num_cep = $1 LIMIT 1`;
-        const rebuasca = (await this.db.executar(queryRebusca, [cepLimpo])) as Record<string, unknown>[];
-        return Number(rebuasca[0].id_cep);
+    } catch (err: unknown) {
+      if (err && typeof err === 'object' && 'message' in err) {
+        const error = err as { message: string; code?: string };
+        // Se der erro de unicidade, buscar o que já existe
+        if (error.message.includes('unique constraint') || error.code === '23505') {
+          const queryRebusca = `SELECT id_cep FROM ecm_cep WHERE num_cep = $1 LIMIT 1`;
+          const rebuasca = (await this.db.executar(queryRebusca, [cepLimpo])) as Record<string, unknown>[];
+          return Number(rebuasca[0].id_cep);
+        }
       }
       throw err;
     }
@@ -518,7 +521,7 @@ export class ServicoClientes {
       uuid: c.uuid,
       final: c.finalCartao,
       nomeImpresso: c.nomeImpresso,
-      bandeira: 'Visa', // Simplificado
+      bandeira: c.bandeira || 'Outra',
       validade: c.validade.toISOString().substring(0, 7),
       principal: c.principal,
     }));
@@ -683,16 +686,37 @@ export class ServicoClientes {
 
     // Atualizar apenas os campos fornecidos
     if (dados.apelido !== undefined) enderecoExistente.apelido = dados.apelido;
-    if (dados.logradouro !== undefined) enderecoExistente.logradouro = dados.logradouro;
-    if (dados.numero !== undefined) enderecoExistente.numero = dados.numero;
+
+    if (dados.cidade !== undefined || dados.estado !== undefined) {
+      const cidade = dados.cidade || ''; // Fallback se quiser manter o que já tem precisaria buscar o nome atual
+      const estado = dados.estado || '';
+      enderecoExistente.idCidade = await this.obterOuCriarCidade(cidade, estado);
+    }
+
+    if (dados.bairro !== undefined) {
+      enderecoExistente.idBairro = await this.obterOuCriarBairro(dados.bairro, enderecoExistente.idCidade);
+    }
+
+    if (dados.cep !== undefined) {
+      enderecoExistente.idCep = await this.obterOuCriarCep(dados.cep, enderecoExistente.idCidade, enderecoExistente.idBairro);
+    }
+
+    if (dados.logradouro !== undefined || dados.numero !== undefined) {
+      const logradouro = dados.logradouro || ''; 
+      const numero = dados.numero || '';
+      const tipoLogradouro = dados.tipoLogradouro || 'Rua';
+      enderecoExistente.idLogradouro = await this.obterOuCriarLogradouro(tipoLogradouro, logradouro, numero);
+    }
+
     if (dados.complemento !== undefined) enderecoExistente.complemento = dados.complemento;
-    if (dados.bairro !== undefined) enderecoExistente.bairro = dados.bairro;
-    if (dados.cep !== undefined) enderecoExistente.cep = dados.cep;
-    if (dados.cidade !== undefined) enderecoExistente.cidade = dados.cidade;
-    if (dados.estado !== undefined) enderecoExistente.estado = dados.estado;
-    if (dados.pais !== undefined) enderecoExistente.pais = dados.pais;
-    if (dados.tipoResidencia !== undefined) enderecoExistente.tipoResidencia = dados.tipoResidencia;
-    if (dados.tipoLogradouro !== undefined) enderecoExistente.tipoLogradouro = dados.tipoLogradouro;
+    
+    if (dados.pais !== undefined) {
+      enderecoExistente.idPais = ServicoClientes.obterOuCriarPais(dados.pais);
+    }
+
+    if (dados.tipoResidencia !== undefined) {
+      enderecoExistente.idTipoResidencia = await ServicoClientes.obterIdTipoResidencia(this.db, dados.tipoResidencia);
+    }
 
     await this.repositorioEndereco.atualizar(enderecoExistente);
 

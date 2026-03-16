@@ -13,6 +13,7 @@ const configuracao: Config = {
   setupFilesAfterEnv: ['<rootDir>/src/tests/setup/teste.setup.ts'],
   globalTeardown: '<rootDir>/src/tests/setup/global-teardown.ts',
   clearMocks: true,
+  maxWorkers: 1, // Executa testes sequencialmente
 };
 
 export default configuracao;

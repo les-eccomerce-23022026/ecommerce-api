@@ -3,6 +3,7 @@ export interface ICartaoUsuario {
   uuid: string;
   idUsuario: number;
   idBandeiraCartao: number;
+  bandeira?: string;
   tokenCartao: string;
   finalCartao: string;
   nomeImpresso: string;

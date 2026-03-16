@@ -7,6 +7,7 @@ export interface ICriarCartaoDto {
   finalCartao: string;
   nomeImpresso: string;
   validade: Date;
+  cvv?: string; // Adicionado para validação
   principal?: boolean;
 }
 
@@ -16,6 +17,7 @@ export interface IAtualizarCartaoDto {
   finalCartao?: string;
   nomeImpresso?: string;
   validade?: Date;
+  cvv?: string; // Adicionado para validação
   principal?: boolean;
 }
 
@@ -33,10 +35,23 @@ export class ServicoCartoes {
    * Cadastra um novo cartão para um usuário.
    */
   async cadastrarCartao(idUsuario: number, dados: ICriarCartaoDto): Promise<ICartaoUsuario> {
-    // Se for principal, remove o flag dos outros cartões do usuário
-    if (dados.principal) {
-      await this.repositorioCartoes.definirComoPrincipal('', idUsuario); 
+    // Validação de CVV (RN0027 - Apenas 3 dígitos numéricos)
+    if (dados.cvv) {
+      const cvvLimpo = dados.cvv.replace(/\D/g, '');
+      if (cvvLimpo.length !== 3) {
+        throw new Error('O CVV deve conter exatamente 3 dígitos numéricos.');
+      }
     }
+
+    // Validação de Validade (MM/AAAA - Apenas mês e ano)
+    if (dados.validade && (dados.validade instanceof Date)) {
+      const mes = dados.validade.getMonth() + 1;
+      if (mes < 1 || mes > 12) {
+        throw new Error('O mês de validade deve ser entre 01 e 12.');
+      }
+    }
+
+    // Se for principal, remove o flag dos outros cartões do usuário
 
     const cartao = await this.repositorioCartoes.criar({
       idUsuario,

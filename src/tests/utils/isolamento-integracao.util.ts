@@ -5,19 +5,40 @@ export type EscopoIsolamentoIntegracao = {
 };
 
 /**
- * Inicia um escopo de isolamento para testes de integração usando TRUNCATE
- * em vez de transações, para evitar problemas com conexões abertas no Jest.
+ * Inicia um escopo de isolamento para testes de integração usando TRANSACTION (ROLLBACK).
+ * Garante que os dados do teste nunca sejam persistidos, protegendo a base de desenvolvimento.
  */
 export async function iniciarEscopoIsolamentoIntegracao(): Promise<EscopoIsolamentoIntegracao> {
   const db = FabricaConexaoBanco.obterConexao();
 
-  // Limpa todas as tabelas relevantes para garantir isolamento
-  await db.executar('TRUNCATE TABLE ecm_usuario CASCADE');
+  // Inicia transação global para o teste
+  await db.iniciarTransacao();
 
-  return {
-    finalizar: async () => {
-      // Limpa novamente após o teste para manter consistência
-      await db.executar('TRUNCATE TABLE ecm_usuario CASCADE');
-    },
-  };
+  try {
+    // Garante que as bandeiras existem (necessário para FK de cartões)
+    await db.executar(`
+      INSERT INTO ecm_bandeira_cartao (id_bandeira_cartao, dsc_bandeira) VALUES
+      (1, 'Visa'),
+      (2, 'Mastercard')
+      ON CONFLICT (id_bandeira_cartao) DO NOTHING
+    `);
+
+    // Insere cliente de teste dentro da transação
+    const uuidCliente = '550e8400-e29b-41d4-a716-446655440000'; 
+    await db.executar(`
+      INSERT INTO ecm_usuario (id_usuario, uuid_usuario, nom_usuario, dsc_email, dsc_cpf, dsc_senha_hash, id_papel, flg_ativo, dat_criacao)
+      VALUES (1, $1, 'Cliente Teste', 'cliente.teste@email.com', '123.456.789-01', '$2b$10$dummy', 2, true, NOW())
+      ON CONFLICT (dsc_email, id_papel) DO NOTHING
+    `, [uuidCliente]);
+
+    return {
+      finalizar: async () => {
+        // SEMPRE reverte tudo no final, limpando o lixo do teste sem afetar outros dados
+        await db.reverterTransacao();
+      },
+    };
+  } catch (error) {
+    await db.reverterTransacao();
+    throw error;
+  }
 }

@@ -26,6 +26,7 @@ export class RepositorioCartaoUsuario implements IRepositorioCartaoUsuario {
       uuid: linha.uuidCartao as string,
       idUsuario: Number(linha.idUsuario),
       idBandeiraCartao: Number(linha.idBandeiraCartao),
+      bandeira: linha.dscBandeira as string | undefined,
       tokenCartao: linha.dscTokenCartao as string,
       finalCartao: linha.dscFinalCartao as string,
       nomeImpresso: linha.dscNomeImpresso as string,
@@ -41,7 +42,9 @@ export class RepositorioCartaoUsuario implements IRepositorioCartaoUsuario {
         dsc_final_cartao, dsc_nome_impresso, dat_validade, flg_principal
       ) VALUES ($1, $2, $3, $4, $5, $6, $7)
       RETURNING id_cartao AS "idCartao", uuid_cartao AS "uuidCartao", id_usuario AS "idUsuario", 
-                id_bandeira_cartao AS "idBandeiraCartao", dsc_token_cartao AS "dscTokenCartao", 
+                id_bandeira_cartao AS "idBandeiraCartao", 
+                (SELECT dsc_bandeira FROM ecm_bandeira_cartao WHERE id_bandeira_cartao = ecm_cartao_usuario.id_bandeira_cartao) AS "dscBandeira",
+                dsc_token_cartao AS "dscTokenCartao", 
                 dsc_final_cartao AS "dscFinalCartao", dsc_nome_impresso AS "dscNomeImpresso",
                 dat_validade AS "datValidade", flg_principal AS "flgPrincipal"
     `;
@@ -62,12 +65,14 @@ export class RepositorioCartaoUsuario implements IRepositorioCartaoUsuario {
 
   async buscarPorUuid(uuid: string): Promise<ICartaoUsuario | null> {
     const query = `
-      SELECT id_cartao AS "idCartao", uuid_cartao AS "uuidCartao", id_usuario AS "idUsuario", 
-             id_bandeira_cartao AS "idBandeiraCartao", dsc_token_cartao AS "dscTokenCartao", 
-             dsc_final_cartao AS "dscFinalCartao", dsc_nome_impresso AS "dscNomeImpresso",
-             dat_validade AS "datValidade", flg_principal AS "flgPrincipal"
-      FROM ecm_cartao_usuario
-      WHERE uuid_cartao = $1
+      SELECT c.id_cartao AS "idCartao", c.uuid_cartao AS "uuidCartao", c.id_usuario AS "idUsuario", 
+             c.id_bandeira_cartao AS "idBandeiraCartao", b.dsc_bandeira AS "dscBandeira",
+             c.dsc_token_cartao AS "dscTokenCartao", c.dsc_final_cartao AS "dscFinalCartao", 
+             c.dsc_nome_impresso AS "dscNomeImpresso", c.dat_validade AS "datValidade", 
+             c.flg_principal AS "flgPrincipal"
+      FROM ecm_cartao_usuario c
+      LEFT JOIN ecm_bandeira_cartao b ON c.id_bandeira_cartao = b.id_bandeira_cartao
+      WHERE c.uuid_cartao = $1
     `;
 
     const rows = await this.pool.executar<LinhaCartao>(query, [uuid]);
@@ -77,13 +82,15 @@ export class RepositorioCartaoUsuario implements IRepositorioCartaoUsuario {
 
   async buscarPorUsuario(idUsuario: number): Promise<ICartaoUsuario[]> {
     const query = `
-      SELECT id_cartao AS "idCartao", uuid_cartao AS "uuidCartao", id_usuario AS "idUsuario", 
-             id_bandeira_cartao AS "idBandeiraCartao", dsc_token_cartao AS "dscTokenCartao", 
-             dsc_final_cartao AS "dscFinalCartao", dsc_nome_impresso AS "dscNomeImpresso",
-             dat_validade AS "datValidade", flg_principal AS "flgPrincipal"
-      FROM ecm_cartao_usuario
-      WHERE id_usuario = $1
-      ORDER BY flg_principal DESC, dat_criacao DESC
+      SELECT c.id_cartao AS "idCartao", c.uuid_cartao AS "uuidCartao", c.id_usuario AS "idUsuario", 
+             c.id_bandeira_cartao AS "idBandeiraCartao", b.dsc_bandeira AS "dscBandeira",
+             c.dsc_token_cartao AS "dscTokenCartao", c.dsc_final_cartao AS "dscFinalCartao", 
+             c.dsc_nome_impresso AS "dscNomeImpresso", c.dat_validade AS "datValidade", 
+             c.flg_principal AS "flgPrincipal"
+      FROM ecm_cartao_usuario c
+      LEFT JOIN ecm_bandeira_cartao b ON c.id_bandeira_cartao = b.id_bandeira_cartao
+      WHERE c.id_usuario = $1
+      ORDER BY c.flg_principal DESC, c.dat_criacao DESC
     `;
 
     const rows = await this.pool.executar<LinhaCartao>(query, [idUsuario]);
@@ -133,7 +140,9 @@ export class RepositorioCartaoUsuario implements IRepositorioCartaoUsuario {
       SET ${campos.join(', ')}
       WHERE uuid_cartao = $${contador}
       RETURNING id_cartao AS "idCartao", uuid_cartao AS "uuidCartao", id_usuario AS "idUsuario", 
-                id_bandeira_cartao AS "idBandeiraCartao", dsc_token_cartao AS "dscTokenCartao", 
+                id_bandeira_cartao AS "idBandeiraCartao", 
+                (SELECT dsc_bandeira FROM ecm_bandeira_cartao WHERE id_bandeira_cartao = ecm_cartao_usuario.id_bandeira_cartao) AS "dscBandeira",
+                dsc_token_cartao AS "dscTokenCartao", 
                 dsc_final_cartao AS "dscFinalCartao", dsc_nome_impresso AS "dscNomeImpresso",
                 dat_validade AS "datValidade", flg_principal AS "flgPrincipal"
     `;
@@ -145,12 +154,38 @@ export class RepositorioCartaoUsuario implements IRepositorioCartaoUsuario {
   }
 
   async excluir(uuid: string): Promise<boolean> {
+    // Verificar se o cartão existe antes de deletar
+    const cartaoExiste = await this.pool.executar<LinhaCartao>(
+      'SELECT * FROM ecm_cartao_usuario WHERE uuid_cartao = $1',
+      [uuid]
+    );
+    
+    if (cartaoExiste.length === 0) {
+      return false;
+    }
+
     const query = 'DELETE FROM ecm_cartao_usuario WHERE uuid_cartao = $1';
-    const rows = await this.pool.executar<LinhaCartao>(query, [uuid]);
-    return rows.length > 0;
+    await this.pool.executar<LinhaCartao>(query, [uuid]);
+    
+    // Verificar se foi deletado
+    const cartaoDepois = await this.pool.executar<LinhaCartao>(
+      'SELECT * FROM ecm_cartao_usuario WHERE uuid_cartao = $1',
+      [uuid]
+    );
+    return cartaoDepois.length === 0;
   }
 
   async definirComoPrincipal(uuid: string, idUsuario: number): Promise<boolean> {
+    // Verificar se o cartão existe
+    const cartaoExiste = await this.pool.executar<LinhaCartao>(
+      'SELECT * FROM ecm_cartao_usuario WHERE uuid_cartao = $1 AND id_usuario = $2',
+      [uuid, idUsuario]
+    );
+    
+    if (cartaoExiste.length === 0) {
+      return false;
+    }
+
     // Primeiro, remove o flag principal de todos os cartões do usuário
     await this.pool.executar<LinhaCartao>(
       'UPDATE ecm_cartao_usuario SET flg_principal = FALSE WHERE id_usuario = $1',
@@ -164,7 +199,13 @@ export class RepositorioCartaoUsuario implements IRepositorioCartaoUsuario {
 
     // Depois, define o cartão específico como principal
     const query = 'UPDATE ecm_cartao_usuario SET flg_principal = TRUE WHERE uuid_cartao = $1 AND id_usuario = $2';
-    const rows = await this.pool.executar<LinhaCartao>(query, [uuid, idUsuario]);
-    return (rows.length ?? 0) > 0;
+    await this.pool.executar<LinhaCartao>(query, [uuid, idUsuario]);
+    
+    // Verificar se o cartão foi atualizado
+    const cartaoAtualizado = await this.pool.executar<LinhaCartao>(
+      'SELECT * FROM ecm_cartao_usuario WHERE uuid_cartao = $1 AND id_usuario = $2 AND flg_principal = TRUE',
+      [uuid, idUsuario]
+    );
+    return cartaoAtualizado.length > 0;
   }
 }

@@ -33,12 +33,56 @@ Authorization: {{token}}
   "tokenCartao": "tok_visa_123456789",
   "finalCartao": "1234",
   "nomeImpresso": "João Silva",
-  "validade": "2025-12-31T23:59:59.999Z",
+  "validade": "2025-12-01",
+  "cvv": "123",
   "principal": false
 }
 
 ###
-### Atualizar Cartão
+### Editar Cartão
+# Cenário Feliz: Edição bem-sucedida
+# Status: 200
+PATCH {{baseUrl}}/api/clientes/perfil/cartoes/{{cartaoUuid}}
+Content-Type: application/json
+Authorization: {{token}}
+
+{
+  "nomeImpresso": "JOAO O SILVA",
+  "validade": "2027-01-01",
+  "idBandeiraCartao": 1
+}
+
+###
+### Cadastrar Cartão (ex: alterar nome impresso) Mastercard
+POST {{baseUrl}}/api/clientes/perfil/cartoes
+Content-Type: application/json
+Authorization: {{token}}
+
+{
+  "idBandeiraCartao": 2,
+  "tokenCartao": "tok_mastercard_987654321",
+  "finalCartao": "5678",
+  "nomeImpresso": "Maria Santos",
+  "validade": "2026-06-01",
+  "cvv": "456",
+  "principal": true
+}
+
+###
+### Cadastrar Cartão Elo
+POST {{baseUrl}}/api/clientes/perfil/cartoes
+Content-Type: application/json
+Authorization: {{token}}
+
+{
+  "idBandeiraCartao": 3,
+  "tokenCartao": "tok_elo_456789123",
+  "finalCartao": "9012",
+  "nomeImpresso": "Pedro Lima",
+  "validade": "2027-03-01",
+  "cvv": "789",
+  "principal": false
+}
 # Cenário Feliz: Atualização bem-sucedida
 # Status: 200
 # Tipo de Retorno: Cartão atualizado formatado
