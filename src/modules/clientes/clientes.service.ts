@@ -285,6 +285,7 @@ export class ServicoClientes {
 
   /**
    * Atualiza os dados de um cliente existente.
+   * Suporta atualização parcial e exige senha para dados críticos (E-mail, CPF, Telefone).
    *
    * @param uuid Identificador único do cliente.
    * @param dados Dados a serem atualizados (parcial).
@@ -295,24 +296,55 @@ export class ServicoClientes {
       throw new Error('Usuário não encontrado.');
     }
 
-    const perfilExistente = await this.repositorioPerfil.buscarPorIdUsuario(usuarioNoBanco.id);
+    // 1. Verificar se há alteração de dados críticos que exijam senha
+    const alterandoEmail = dados.email !== undefined && dados.email !== usuarioNoBanco.email;
+    const alterandoCpf = dados.cpf !== undefined && dados.cpf !== usuarioNoBanco.cpf;
+    
     const telefonesExistentes = await this.repositorioTelefone.buscarPorIdUsuario(usuarioNoBanco.id);
+    const telefonePrincipal = telefonesExistentes.find(t => t.principal) || telefonesExistentes[0];
+    const alterandoTelefone = dados.telefone !== undefined && 
+                             dados.telefone.numero !== telefonePrincipal?.numero && 
+                             !dados.telefone.numero.includes('*');
 
-    const usuarioAtualizado = await this.repositorioUsuarios.atualizarUsuario(uuid, {
-      nome: dados.nome ?? usuarioNoBanco.nome,
-    });
-
-    if (!usuarioAtualizado) {
-      throw new Error('Erro ao atualizar usuário.');
+    if (alterandoEmail || alterandoCpf || alterandoTelefone) {
+      if (!dados.senhaConfirmacao) {
+        throw new Error('Senha de confirmação é obrigatória para alterar E-mail, CPF ou Telefone.');
+      }
+      const senhaValida = await bcrypt.compare(dados.senhaConfirmacao, usuarioNoBanco.senhaHash);
+      if (!senhaValida) {
+        throw new Error('Senha de confirmação inválida.');
+      }
+      
+      // Se estiver alterando e-mail, verificar se já existe
+      if (alterandoEmail) {
+        const existente = await this.repositorioUsuarios.buscarPorEmail(dados.email!);
+        if (existente && existente.uuid !== uuid) {
+          throw new Error('Este e-mail já está em uso por outro usuário.');
+        }
+      }
     }
 
-    // Atualizar perfil (genero / dataNascimento) — RF0022
+    // 2. Atualizar dados básicos (Nome, Email, CPF) no repositório de usuários
+    const payloadUsuario: any = {};
+    if (dados.nome !== undefined) payloadUsuario.nome = dados.nome;
+    if (alterandoEmail) payloadUsuario.email = dados.email;
+    if (alterandoCpf) payloadUsuario.cpf = dados.cpf;
+
+    let usuarioAtualizado = usuarioNoBanco;
+    if (Object.keys(payloadUsuario).length > 0) {
+      usuarioAtualizado = await this.repositorioUsuarios.atualizarUsuario(uuid, payloadUsuario);
+      if (!usuarioAtualizado) throw new Error('Erro ao atualizar dados básicos do usuário.');
+    }
+
+    // 3. Atualizar perfil (gênero / dataNascimento)
     if (dados.genero !== undefined || dados.dataNascimento !== undefined) {
+      const perfilExistente = await this.repositorioPerfil.buscarPorIdUsuario(usuarioNoBanco.id);
       const perfilAtualizado: IPerfilCliente = {
         idUsuario: usuarioNoBanco.id,
-        genero: dados.genero ?? perfilExistente?.genero,
-        dataNascimento: dados.dataNascimento ? new Date(dados.dataNascimento) : perfilExistente?.dataNascimento,
+        genero: dados.genero !== undefined ? dados.genero : perfilExistente?.genero,
+        dataNascimento: dados.dataNascimento !== undefined ? new Date(dados.dataNascimento) : perfilExistente?.dataNascimento,
       };
+
       if (perfilExistente) {
         await this.repositorioPerfil.atualizar(perfilAtualizado);
       } else {
@@ -320,14 +352,16 @@ export class ServicoClientes {
       }
     }
 
-    // Atualizar telefone — RF0022: recriar telefone principal se enviado
-    if (dados.telefone !== undefined) {
-      await Promise.all(
-        telefonesExistentes
-          .filter((tel) => tel.uuid)
-          .map((tel) => this.repositorioTelefone.deletar(usuarioNoBanco.id, tel.uuid!)),
-      );
-      if (dados.telefone) {
+    // 4. Atualizar telefone (cirúrgico)
+    if (alterandoTelefone && dados.telefone) {
+      if (telefonePrincipal && telefonePrincipal.uuid) {
+        await this.repositorioTelefone.atualizar({
+          ...telefonePrincipal,
+          idTipoTelefone: ServicoClientes.mapearTipoTelefone(dados.telefone.tipo),
+          ddd: dados.telefone.ddd,
+          numero: dados.telefone.numero,
+        });
+      } else {
         await this.repositorioTelefone.criar({
           idUsuario: usuarioNoBanco.id,
           idTipoTelefone: ServicoClientes.mapearTipoTelefone(dados.telefone.tipo),
@@ -338,23 +372,15 @@ export class ServicoClientes {
       }
     }
 
-    // Atualizar endereços (substituição total para simplificar sincronia do front)
+    // 5. Atualizar endereços (se fornecidos no payload)
     if (dados.enderecos !== undefined) {
       const enderecosExistentes = await this.repositorioEndereco.buscarPorIdUsuario(usuarioNoBanco.id);
-      
-      // Remover endereços existentes (deletar logradouros etc é complexo, aqui deletamos apenas o vínculo usuario_endereco)
       for (const end of enderecosExistentes) {
-        if (end.uuid) {
-          await this.repositorioEndereco.deletar(usuarioNoBanco.id, end.uuid);
-        }
+        if (end.uuid) await this.repositorioEndereco.deletar(usuarioNoBanco.id, end.uuid);
       }
-
-      // Adicionar novos endereços fornecidos
       if (Array.isArray(dados.enderecos)) {
         for (let i = 0; i < dados.enderecos.length; i++) {
-          const endDto = dados.enderecos[i];
-          // O primeiro endereço enviado será marcado como principal (ou baseado em alguma lógica póstuma)
-          await this.criarEndereco(usuarioNoBanco.id, endDto, 'entrega', i === 0);
+          await this.criarEndereco(usuarioNoBanco.id, dados.enderecos[i], 'entrega', i === 0);
         }
       }
     }

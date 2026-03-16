@@ -44,8 +44,11 @@ export interface IAtualizarClienteDto {
   nome?: string;
   genero?: string;
   dataNascimento?: string;
+  email?: string; // Novo: permitir alteração de E-mail sob validação
+  cpf?: string; 
   telefone?: ITelefoneDto;
   enderecos?: IEnderecoDto[];
+  senhaConfirmacao?: string; 
 }
 
 /**

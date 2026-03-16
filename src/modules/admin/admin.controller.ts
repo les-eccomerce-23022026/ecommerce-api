@@ -78,15 +78,29 @@ export class ControladorAdmin {
     try {
       const dados = requisicao.body ?? {};
 
-      const camposObrigatorios = ['nome', 'cpf', 'email', 'senha', 'confirmacaoSenha'];
-      const faltando = camposObrigatorios.filter((campo) => !dados[campo]);
+      const camposBaseObrigatorios = ['nome', 'cpf', 'email'];
+      const faltandoBase = camposBaseObrigatorios.filter((campo) => !dados[campo]);
 
-      if (faltando.length > 0) {
+      if (faltandoBase.length > 0) {
         return RespostaPadrao.enviarErro(
           resposta,
           400,
-          `Campos obrigatórios ausentes: ${faltando.join(', ')}`,
+          `Campos obrigatórios ausentes: ${faltandoBase.join(', ')}`,
         );
+      }
+
+      // Senha só é obrigatória se NÃO for usar a mesma senha do cliente
+      if (!dados.usarMesmaSenha) {
+        const camposSenha = ['senha', 'confirmacaoSenha'];
+        const faltandoSenha = camposSenha.filter((campo) => !dados[campo]);
+        
+        if (faltandoSenha.length > 0) {
+          return RespostaPadrao.enviarErro(
+            resposta,
+            400,
+            `Senha e confirmação são obrigatórias quando não se utiliza a senha existente: ${faltandoSenha.join(', ')}`,
+          );
+        }
       }
 
       const adminCriado = await servicoAdmin.registrarNovoAdministrador(dados);
