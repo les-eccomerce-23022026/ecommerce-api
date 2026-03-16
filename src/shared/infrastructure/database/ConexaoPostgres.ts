@@ -22,6 +22,12 @@ export class ConexaoPostgres implements IConexaoBanco {
     return ConexaoPostgres.instancia;
   }
 
+  public static resetInstancia(): void {
+    if (ConexaoPostgres.instancia) {
+      ConexaoPostgres.instancia = (null as unknown) as ConexaoPostgres;
+    }
+  }
+
   private static criarPool(): Pool {
     const urlConfigurada = process.env.POSTGRES_URL;
     if (urlConfigurada) {

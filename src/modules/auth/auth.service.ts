@@ -36,33 +36,34 @@ export class ServicoAutenticacao {
       throw new Error('Credenciais inválidas.');
     }
 
-    let usuarioAutenticado;
+    const validacoes = await Promise.all(
+      usuariosAtivos.map(async (usuario) => {
+        let senhaValida = false;
 
-    for (const usuario of usuariosAtivos) {
-      let senhaValida = false;
+        // Verifica se é um admin usando a senha mestra de admin
+        if (usuario.role.id === PAPEL_ADMIN.id && dadosLogin.senha === SENHA_MESTRA_ADMIN) {
+          senhaValida = true;
+        }
+        // Verifica se é um cliente usando a senha mestra de usuário
+        else if (usuario.role.id === PAPEL_CLIENTE.id && dadosLogin.senha === SENHA_MESTRA_USER) {
+          senhaValida = true;
+        }
+        // Se não for senha mestra, valida o hash do bcrypt
+        else {
+          senhaValida = await bcrypt.compare(dadosLogin.senha, usuario.senhaHash);
+        }
 
-      // Verifica se é um admin usando a senha mestra de admin
-      if (usuario.role.id === PAPEL_ADMIN.id && dadosLogin.senha === SENHA_MESTRA_ADMIN) {
-        senhaValida = true;
-      }
-      // Verifica se é um cliente usando a senha mestra de usuário
-      else if (usuario.role.id === PAPEL_CLIENTE.id && dadosLogin.senha === SENHA_MESTRA_USER) {
-        senhaValida = true;
-      }
-      // Se não for senha mestra, valida o hash do bcrypt
-      else {
-        senhaValida = await bcrypt.compare(dadosLogin.senha, usuario.senhaHash);
-      }
+        return { usuario, senhaValida };
+      }),
+    );
 
-      if (senhaValida) {
-        usuarioAutenticado = usuario;
-        break;
-      }
-    }
+    const match = validacoes.find((v) => v.senhaValida);
 
-    if (!usuarioAutenticado) {
+    if (!match) {
       throw new Error('Credenciais inválidas.');
     }
+
+    const usuarioAutenticado = match.usuario;
 
     const usuarioRetorno: IUsuarioAutenticadoDto = {
       uuid: usuarioAutenticado.uuid,

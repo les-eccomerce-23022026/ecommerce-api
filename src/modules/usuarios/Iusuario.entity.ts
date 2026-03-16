@@ -6,6 +6,7 @@ export interface IUsuario {
   nome: string;
   email: string;
   cpf: string;
+  telefone?: string;
   senhaHash: string;
   role: IPapelUsuario;
   ativo: boolean;

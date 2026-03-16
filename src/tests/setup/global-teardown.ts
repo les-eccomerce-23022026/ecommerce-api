@@ -15,10 +15,12 @@ export default async function globalTeardown(): Promise<void> {
     await conexao.finalizar();
 
     // Força reset da instância singleton para próximos testes
-    (ConexaoPostgres as any).instancia = null;
+    ConexaoPostgres.resetInstancia();
 
     // Pequena pausa para garantir que tudo seja fechado
-    await new Promise(resolve => setTimeout(resolve, 500));
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, 500);
+    });
   } catch (erro) {
     // eslint-disable-next-line no-console
     console.warn('Erro no globalTeardown:', erro);

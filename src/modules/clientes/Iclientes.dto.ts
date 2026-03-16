@@ -76,6 +76,7 @@ export interface IPerfilClienteDto {
   uuid: string;
   nome: string;
   email: string;
+  emailMascarado?: string;
   cpf: string;
   cpfMascarado: string;
   genero?: string;

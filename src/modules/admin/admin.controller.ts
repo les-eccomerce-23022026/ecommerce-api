@@ -33,7 +33,7 @@ export class ControladorAdmin {
   public static async inativarAdmin(requisicao: Request, resposta: Response): Promise<Response> {
     try {
       const { uuid } = requisicao.params;
-      const adminAutenticado = (requisicao as any).usuario;
+      const adminAutenticado = requisicao.usuario;
 
       if (adminAutenticado && adminAutenticado.uuid === uuid) {
         return RespostaPadrao.enviarErro(

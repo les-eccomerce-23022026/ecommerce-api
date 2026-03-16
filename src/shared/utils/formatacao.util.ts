@@ -4,15 +4,16 @@
  * @param obj Objeto a ser convertido.
  * @returns Novo objeto com chaves em camelCase.
  */
-export function snakeParaCamel(obj: any): any {
+export function snakeParaCamel(obj: unknown): unknown {
   if (Array.isArray(obj)) {
     return obj.map((v) => snakeParaCamel(v));
   }
-  if (obj !== null && obj !== undefined && obj.constructor === Object) {
-    return Object.keys(obj).reduce(
+  if (obj !== null && obj !== undefined && typeof obj === 'object' && obj.constructor === Object) {
+    const objeto = obj as Record<string, unknown>;
+    return Object.keys(objeto).reduce(
       (acc, key) => ({
         ...acc,
-        [key.replace(/(_\w)/g, (m) => m[1].toUpperCase())]: snakeParaCamel(obj[key]),
+        [key.replace(/(_\w)/g, (m) => m[1].toUpperCase())]: snakeParaCamel(objeto[key]),
       }),
       {}
     );
@@ -26,15 +27,16 @@ export function snakeParaCamel(obj: any): any {
  * @param obj Objeto a ser convertido.
  * @returns Novo objeto com chaves em snake_case.
  */
-export function camelParaSnake(obj: any): any {
+export function camelParaSnake(obj: unknown): unknown {
   if (Array.isArray(obj)) {
     return obj.map((v) => camelParaSnake(v));
   }
-  if (obj !== null && obj !== undefined && obj.constructor === Object) {
-    return Object.keys(obj).reduce(
+  if (obj !== null && obj !== undefined && typeof obj === 'object' && obj.constructor === Object) {
+    const objeto = obj as Record<string, unknown>;
+    return Object.keys(objeto).reduce(
       (acc, key) => ({
         ...acc,
-        [key.replace(/[A-Z]/g, (m) => `_${m.toLowerCase()}`)]: camelParaSnake(obj[key]),
+        [key.replace(/[A-Z]/g, (m) => `_${m.toLowerCase()}`)]: camelParaSnake(objeto[key]),
       }),
       {}
     );

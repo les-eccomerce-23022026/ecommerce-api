@@ -38,6 +38,7 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
         id: Number(row.idPapel),
         descricao: Number(row.idPapel) === PAPEL_ADMIN.id ? PAPEL_ADMIN.descricao : PAPEL_CLIENTE.descricao,
       },
+      telefone: row.dscTelefone as string,
       ativo: row.flgAtivo as boolean,
       dataCriacao: row.datCriacao ? new Date(row.datCriacao as string) : undefined,
       dataAtualizacao: row.datAtualizacao ? new Date(row.datAtualizacao as string) : undefined,
@@ -96,7 +97,7 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
   public async buscarPorCpf(cpf: string): Promise<IUsuario | undefined> {
     const query = `SELECT id_usuario AS "idUsuario", uuid_usuario AS "uuidUsuario", nom_usuario AS "nomUsuario", 
                           dsc_email AS "dscEmail", dsc_cpf AS "dscCpf", dsc_senha_hash AS "dscSenhaHash", 
-                          id_papel AS "idPapel", flg_ativo AS "flgAtivo", dat_criacao AS "datCriacao", dat_atualizacao AS "datAtualizacao" 
+                          id_papel AS "idPapel", dsc_telefone as "dscTelefone", flg_ativo AS "flgAtivo", dat_criacao AS "datCriacao", dat_atualizacao AS "datAtualizacao" 
                    FROM ecm_usuario WHERE dsc_cpf = $1 LIMIT 1`;
     const rows = await this.db.executar(query, [cpf]);
 
@@ -107,7 +108,7 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
   public async buscarPorCpfPapel(cpf: string, idPapel: number): Promise<IUsuario | undefined> {
     const query = `SELECT id_usuario AS "idUsuario", uuid_usuario AS "uuidUsuario", nom_usuario AS "nomUsuario", 
                           dsc_email AS "dscEmail", dsc_cpf AS "dscCpf", dsc_senha_hash AS "dscSenhaHash", 
-                          id_papel AS "idPapel", flg_ativo AS "flgAtivo", dat_criacao AS "datCriacao", dat_atualizacao AS "datAtualizacao" 
+                          id_papel AS "idPapel", dsc_telefone as "dscTelefone", flg_ativo AS "flgAtivo", dat_criacao AS "datCriacao", dat_atualizacao AS "datAtualizacao" 
                    FROM ecm_usuario WHERE dsc_cpf = $1 AND id_papel = $2`;
     const rows = await this.db.executar(query, [cpf, idPapel]);
 
@@ -118,7 +119,7 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
   public async buscarPorUuid(uuid: string): Promise<IUsuario | undefined> {
     const query = `SELECT id_usuario AS "idUsuario", uuid_usuario AS "uuidUsuario", nom_usuario AS "nomUsuario", 
                           dsc_email AS "dscEmail", dsc_cpf AS "dscCpf", dsc_senha_hash AS "dscSenhaHash", 
-                          id_papel AS "idPapel", flg_ativo AS "flgAtivo", dat_criacao AS "datCriacao", dat_atualizacao AS "datAtualizacao" 
+                          id_papel AS "idPapel", dsc_telefone as "dscTelefone", flg_ativo AS "flgAtivo", dat_criacao AS "datCriacao", dat_atualizacao AS "datAtualizacao" 
                    FROM ecm_usuario WHERE uuid_usuario = $1`;
     const rows = await this.db.executar(query, [uuid]);
 
@@ -145,6 +146,11 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
       campos.push(`dsc_cpf = $${contador}`);
       contador += 1;
       valores.push(dados.cpf);
+    }
+    if (dados.telefone) {
+      campos.push(`dsc_telefone = $${contador}`);
+      contador += 1;
+      valores.push(dados.telefone);
     }
     if (dados.senhaHash) {
       campos.push(`dsc_senha_hash = $${contador}`);
