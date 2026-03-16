@@ -15,6 +15,7 @@ export class RepositorioEnderecoUsuarioPostgres implements IRepositorioEnderecoU
       uuid: row.uuidEndereco as string,
       idUsuario: Number(row.idUsuario),
       tipoEndereco: row.dscTipoEndereco as 'cobranca' | 'entrega',
+      apelido: (row.nomApelido as string | null | undefined) || undefined,
       idTipoResidencia: Number(row.idTipoResidencia),
       idLogradouro: Number(row.idLogradouro),
       complemento: (row.dscComplemento as string | null | undefined) || undefined,
@@ -29,13 +30,14 @@ export class RepositorioEnderecoUsuarioPostgres implements IRepositorioEnderecoU
   public async criar(endereco: IEnderecoUsuario): Promise<void> {
     const query = `
       INSERT INTO ecm_endereco_usuario (
-        id_usuario, dsc_tipo_endereco, id_tipo_residencia, id_logradouro, dsc_complemento,
+        id_usuario, dsc_tipo_endereco, nom_apelido, id_tipo_residencia, id_logradouro, dsc_complemento,
         id_cidade, id_bairro, id_cep, id_pais, flg_principal
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
     `;
     await this.db.executar(query, [
       endereco.idUsuario,
       endereco.tipoEndereco,
+      endereco.apelido,
       endereco.idTipoResidencia,
       endereco.idLogradouro,
       endereco.complemento,
@@ -51,10 +53,10 @@ export class RepositorioEnderecoUsuarioPostgres implements IRepositorioEnderecoU
     const query = `
       SELECT id_endereco AS "idEndereco", uuid_endereco AS "uuidEndereco", 
              id_usuario AS "idUsuario", dsc_tipo_endereco AS "dscTipoEndereco", 
-             id_tipo_residencia AS "idTipoResidencia", id_logradouro AS "idLogradouro", 
-             dsc_complemento AS "dscComplemento", id_cidade AS "idCidade", 
-             id_bairro AS "idBairro", id_cep AS "idCep", id_pais AS "idPais", 
-             flg_principal AS "flgPrincipal"
+             nom_apelido AS "nomApelido", id_tipo_residencia AS "idTipoResidencia", 
+             id_logradouro AS "idLogradouro", dsc_complemento AS "dscComplemento", 
+             id_cidade AS "idCidade", id_bairro AS "idBairro", id_cep AS "idCep", 
+             id_pais AS "idPais", flg_principal AS "flgPrincipal"
       FROM ecm_endereco_usuario 
       WHERE id_usuario = $1
     `;
@@ -65,12 +67,13 @@ export class RepositorioEnderecoUsuarioPostgres implements IRepositorioEnderecoU
   public async atualizar(endereco: IEnderecoUsuario): Promise<void> {
     const query = `
       UPDATE ecm_endereco_usuario
-      SET dsc_tipo_endereco = $1, id_tipo_residencia = $2, id_logradouro = $3, dsc_complemento = $4,
-          id_cidade = $5, id_bairro = $6, id_cep = $7, id_pais = $8, flg_principal = $9
-      WHERE id_usuario = $10 AND uuid_endereco = $11
+      SET dsc_tipo_endereco = $1, nom_apelido = $2, id_tipo_residencia = $3, id_logradouro = $4, dsc_complemento = $5,
+          id_cidade = $6, id_bairro = $7, id_cep = $8, id_pais = $9, flg_principal = $10
+      WHERE id_usuario = $11 AND uuid_endereco = $12
     `;
     await this.db.executar(query, [
       endereco.tipoEndereco,
+      endereco.apelido,
       endereco.idTipoResidencia,
       endereco.idLogradouro,
       endereco.complemento,

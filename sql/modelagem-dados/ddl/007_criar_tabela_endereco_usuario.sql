@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS ecm_endereco_usuario (
     uuid_endereco           UUID            NOT NULL    DEFAULT gen_random_uuid(),
     id_usuario              BIGINT          NOT NULL,
     dsc_tipo_endereco       VARCHAR(20)     NOT NULL    DEFAULT 'entrega',
+    nom_apelido             VARCHAR(50),
     id_tipo_residencia      INTEGER,
     id_logradouro           INTEGER,
     dsc_complemento         VARCHAR(100),
@@ -90,6 +91,7 @@ COMMENT ON COLUMN ecm_endereco_usuario.id_endereco            IS 'Chave primári
 COMMENT ON COLUMN ecm_endereco_usuario.uuid_endereco          IS 'Identificador público (UUID v4). Retornado pelas rotas HTTP.';
 COMMENT ON COLUMN ecm_endereco_usuario.id_usuario             IS 'FK para ecm_usuario — proprietário do endereço.';
 COMMENT ON COLUMN ecm_endereco_usuario.dsc_tipo_endereco      IS 'Tipo do endereço: cobranca ou entrega. RN0021/RN0022. Padrão: entrega.';
+COMMENT ON COLUMN ecm_endereco_usuario.nom_apelido            IS 'Apelido customizado do endereço (ex: Casa, Trabalho).';
 COMMENT ON COLUMN ecm_endereco_usuario.id_tipo_residencia     IS 'FK para ecm_tipo_residencia (Casa, Apartamento…). Opcional.';
 COMMENT ON COLUMN ecm_endereco_usuario.id_logradouro          IS 'FK para ecm_logradouro — logradouro completo (tipo + nome + número).';
 COMMENT ON COLUMN ecm_endereco_usuario.dsc_complemento        IS 'Complemento opcional (ex.: apto 42, bloco B).';

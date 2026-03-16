@@ -259,6 +259,7 @@ export class ServicoClientes {
     const endereco: IEnderecoUsuario = {
       idUsuario,
       tipoEndereco: tipo,
+      apelido: enderecoDto.apelido,
       idPais,
       idTipoResidencia,
       idLogradouro,
@@ -573,7 +574,7 @@ export class ServicoClientes {
 
         return {
           uuid: endereco.uuid,
-          apelido: endereco.principal ? 'Principal' : `Endereço ${endereco.id}`,
+          apelido: endereco.apelido || (endereco.principal ? 'Principal' : `Endereço ${endereco.id}`),
           tipoResidencia: (tipoResidencia?.dscTipoResidencia as string) || 'Casa',
           tipoLogradouro: (logradouro?.tipoLogradouro as string) || 'Rua',
           logradouro: (logradouro?.dscLogradouro as string) || '',

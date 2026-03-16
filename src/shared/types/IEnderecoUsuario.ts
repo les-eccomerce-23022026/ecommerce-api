@@ -6,6 +6,7 @@ export interface IEnderecoUsuario {
   uuid?: string;
   idUsuario: number;
   tipoEndereco: TipoEndereco;
+  apelido?: string;
   idPais: number;
   idTipoResidencia: number;
   idLogradouro: number;
