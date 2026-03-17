@@ -1,13 +1,13 @@
 # Project Board — LES Backend API
 
-> Atualizado em: 15 de março de 2026  
+> Atualizado em: 16 de março de 2026  
 > Status: Gestão local das atividades do projeto.
 
 ---
 
 ## Board Kanban
 
-| 📛 Todo (3)                                 | 🔄 In Progress (0)              | ✅ Done (17)                                          |
+| 📛 Todo (3)                                 | 🔄 In Progress (0)              | ✅ Done (19)                                          |
 | ------------------------------------------- | ------------------------------- | ----------------------------------------------------- |
 | B12 · [BACKEND] Implementar API de Livros   |                                 | B1 · [BACKEND] Setup Inicial e Arquitetura            |
 | B13 · [BACKEND] Módulo de Carrinho          |                                 | B2 · [BACKEND] Dockerização e Ambiente Dev            |
@@ -24,6 +24,8 @@
 |                                             |                                 | B20 · [BACKEND] Otimização de Disco Banco            |
 |                                             |                                 | B21 · [BACKEND] Gestão de Administradores            |
 |                                             |                                 | B22 · [BACKEND] Evolução de Papéis e Acesso Dual     |
+|                                             |                                 | B23 · [BACKEND] Hashing de Senhas (BCrypt)           |
+|                                             |                                 | B24 · [BACKEND] Mascaramento de Dados (Privacidade)  |
 
 ---
 
@@ -32,6 +34,8 @@
 ...
 | B21  | BACKEND | Gestão de Administradores            | **Implementado:** CRUD completo de administradores (listagem, criação, inativação/ativação) com trava de segurança de auto-inativação. |
 | B22  | BACKEND | Evolução de Papéis e Acesso Dual     | **Implementado:** Independência de registros por papel para o mesmo e-mail; opção de senha na promoção; extensão de papel (admin acessa cliente); perfil unificado (agregado); correção de bug de UUID em cartões. |
+| B23  | BACKEND | Hashing de Senhas (BCrypt)           | **Implementado:** Substituição de senhas em texto puro por hashes BCrypt (custo 10). Inclui script de seed para reset de usuários de teste. |
+| B24  | BACKEND | Mascaramento de Dados (Privacidade)  | **Implementado:** Mascaramento automático de CPF (`***.XXX.***-**`) e Telefone nas respostas da API de Perfil para conformidade com a LGPD. |
 
 | B1   | BACKEND | Setup Inicial e Arquitetura          | Definir estrutura de módulos, injeção de dependência manual e padrões SOLID/DDD.                 |
 | B2   | BACKEND | Dockerização e Ambiente Dev          | Criar Dockerfile multi-stage; configurar docker-compose com Node.js + Postgres + Redis; hot reload com ts-node-dev. |

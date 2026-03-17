@@ -4,7 +4,10 @@
 
 - `PATCH /api/clientes/perfil` (Atualizar dados e opcionalmente sincronizar endereços)
 - `POST /api/clientes/perfil/enderecos` (Adicionar endereço individual)
+- `PATCH /api/clientes/perfil/enderecos/:uuid` (Editar endereço individual)
 - `DELETE /api/clientes/perfil/enderecos/:uuid` (Remover endereço individual)
+- `POST /api/clientes/perfil/cartoes` (Adicionar cartão)
+- `DELETE /api/clientes/perfil/cartoes/:uuid` (Remover cartão)
 
 ---
 
@@ -13,42 +16,41 @@
 ### Atualização com dados válidos (PATCH)
 
 - **Dado** um cliente autenticado com token JWT válido
-- **E** os dados fornecidos no corpo da requisição são válidos (nome, gênero, data_nascimento, telefone, enderecos)
+- **E** os dados fornecidos no corpo da requisição são válidos (nome, gênero, data_nascimento, telefone)
 - **Quando** é enviado `PATCH /api/clientes/perfil`
 - **Então** a resposta tem status `200`
 - **E** o corpo é JSON com `sucesso: true` e os dados atualizados
-- **E** os novos endereços (se fornecidos) substituem a lista anterior no perfil principal
+- **E** os dados sensíveis (CPF, Telefone) retornam mascarados para proteção de privacidade (RNF0059)
+
+### Atualização Segura de Dados Críticos (RN0078)
+
+- **Dado** um cliente autenticado
+- **E** o corpo contém alteração de e-mail, CPF ou Telefone
+- **E** o campo `senhaConfirmacao` contém a senha atual correta do usuário
+- **Quando** é enviado `PATCH /api/clientes/perfil`
+- **Então** a resposta tem status `200`
+- **E** os dados críticos são atualizados com sucesso no banco de dados
 
 ### Adição de Novo Endereço (POST)
 
 - **Dado** um cliente autenticado
-- **E** um novo objeto de endereço válido
+- **E** um novo objeto de endereço válido (incluindo apelido, tipo residência, etc)
 - **Quando** é enviado `POST /api/clientes/perfil/enderecos`
 - **Então** a resposta tem status `201`
 - **E** o novo endereço é vinculado ao cliente no banco de dados
 
-### Remoção de Endereço (DELETE)
+### Remoção de Endereço com Confirmação (RN0079)
 
-- **Dado** um cliente autenticado
-- **E** o UUID de um endereço pertencente a esse cliente
-- **Quando** é enviado `DELETE /api/clientes/perfil/enderecos/:uuid`
+- **Dado** um cliente autenticado na interface de perfil
+- **Quando** solicita a remoção de um endereço e confirma no modal
+- **E** a requisição `DELETE /api/clientes/perfil/enderecos/:uuid` é enviada
 - **Então** a resposta tem status `200`
-- **E** o endereço é removido permanentemente do perfil do cliente
+- **E** o endereço é removido do perfil
 
-### Adição de Novo Cartão (POST) (RF0027 / RN0024)
+### Obtenção de Perfil Unificado Mascarado (RN0077 / RNF0059)
 
 - **Dado** um cliente autenticado
-- **E** um novo objeto de cartão tokenizado (idBandeira, token, final, nomeImpresso, validade)
-- **Quando** é enviado `POST /api/clientes/perfil/cartoes`
-- **Então** a resposta tem status `201`
-- **E** o novo cartão é vinculado ao cliente e marcado opcionalmente como principal
-- **E** os outros cartões deixam de ser principais se o novo for definido como principal
-
-### Obtenção de Perfil Unificado (GET) (RN0077)
-
-- **Dado** um cliente autenticado com endereços e cartões cadastrados
 - **Quando** é enviado `GET /api/clientes/perfil`
 - **Então** a resposta tem status `200`
 - **E** o corpo contém `dados` com as listas de `enderecos` e `cartoes` agregadas
-- **E** os dados sensíveis dos cartões (como tokens) não são expostos
-- **E** as informações de telefone e data de nascimento estão formatadas corretamente
+- **E** o `cpfMascarado`, `emailMascarado` e `telefone.numeroMascarado` são retornados ao invés dos valores puros
