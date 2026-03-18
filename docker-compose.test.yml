@@ -1,0 +1,21 @@
+version: "3.9"
+
+services:
+  postgres_test:
+    image: postgres:16-alpine
+    container_name: ecm_postgres_test
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ecm_livraria_test
+      POSTGRES_USER: ecm_user_test
+      POSTGRES_PASSWORD: ecm_senha_test
+    ports:
+      - "5433:5432" # Porta 5433 para não bater com o dev (5432)
+
+  redis_test:
+    image: redis:7-alpine
+    container_name: ecm_redis_test
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6380:6379" # Porta 6380 para não bater com o dev (6379)

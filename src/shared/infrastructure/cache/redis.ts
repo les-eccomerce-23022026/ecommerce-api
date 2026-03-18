@@ -1,32 +1,40 @@
 import Redis from 'ioredis';
+import { obterTipoBancoAtual } from '../database/ContextoBanco';
 
-let clienteRedis: Redis | null = null;
+let clienteRedisProducao: Redis | null = null;
+let clienteRedisTeste: Redis | null = null;
 
 /**
- * Cria (se necessário) e retorna um cliente Redis compartilhado.
- *
- * Usa a variável de ambiente REDIS_URL quando disponível, ou assume redis://localhost:6379.
+ * Cria (se necessário) e retorna um cliente Redis compartilhado baseado no contexto.
  */
 export function obterClienteRedis(): Redis {
-  if (clienteRedis) {
-    return clienteRedis;
+  const tipo = obterTipoBancoAtual();
+
+  if (tipo === 'teste') {
+    if (!clienteRedisTeste) {
+      const url = process.env.REDIS_URL_TEST ?? 'redis://172.17.0.1:6380';
+      clienteRedisTeste = new Redis(url);
+    }
+    return clienteRedisTeste;
   }
 
-  const url = process.env.REDIS_URL ?? 'redis://localhost:6379';
-
-  clienteRedis = new Redis(url);
-
-  return clienteRedis;
+  if (!clienteRedisProducao) {
+    const url = process.env.REDIS_URL ?? 'redis://localhost:6379';
+    clienteRedisProducao = new Redis(url);
+  }
+  return clienteRedisProducao;
 }
 
 /**
- * Fecha a conexão com Redis, se existir.
+ * Fecha todas as conexões com Redis.
  * Deve ser chamado no teardown global dos testes.
  */
 export async function fecharClienteRedis(): Promise<void> {
-  if (clienteRedis) {
-    await clienteRedis.quit();
-    clienteRedis = null;
-  }
+  const fechar = [];
+  if (clienteRedisProducao) fechar.push(clienteRedisProducao.quit());
+  if (clienteRedisTeste) fechar.push(clienteRedisTeste.quit());
+  
+  await Promise.all(fechar);
+  clienteRedisProducao = null;
+  clienteRedisTeste = null;
 }
-

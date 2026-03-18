@@ -2,6 +2,23 @@
 @token = Bearer <insira_o_token_aqui>
 @tokenAdmin = Bearer <insira_o_token_admin_aqui>
 
+### Registro de Cliente - Teste Homologação
+# Cenário Feliz: Registro com credenciais de teste fornecidas
+# Status: 201 Created
+# Tipo de Envio (ICriarClienteDto): {nome: string, cpf: string, email: string, senha: string, confirmacaoSenha: string}
+# Tipo de Resposta: {sucesso: boolean, dados: {uuid: string, nome: string, email: string, role: string}}
+POST {{baseUrl}}/api/clientes/registro
+Content-Type: application/json
+
+{
+  "nome": "Fulano de Tal",
+  "cpf": "123.456.789-01",
+  "email": "email.teste@gmail.com",
+  "senha": "@asdfJKLÇ123",
+  "confirmacaoSenha": "@asdfJKLÇ123"
+}
+
+###
 ### Registro de Cliente - Payload mínimo
 # Cenário Feliz: Registro bem-sucedido com dados obrigatórios apenas
 # Endereço, telefone, gênero e data de nascimento são opcionais no registro

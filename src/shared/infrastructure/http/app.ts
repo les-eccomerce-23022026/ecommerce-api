@@ -6,6 +6,7 @@ import { registrarRotasClientes } from '@/modules/clientes/clientes.routes';
 import { registrarRotasCartoes } from '@/modules/cartoes/cartoes.routes';
 import { registrarRotasAdmin } from '@/modules/admin/admin.routes';
 import { middlewareErro } from '@/shared/middlewares/erro.middleware';
+import { middlewareTrocaBanco } from '@/shared/middlewares/troca-banco.middleware';
 
 /**
  * Cria e configura a aplicação Express principal.
@@ -21,6 +22,9 @@ export function criarAplicacao(): Application {
   app.use(cookieParser());
   app.use(express.json());
 
+  // Middleware de troca de banco deve vir antes das rotas
+  app.use(middlewareTrocaBanco);
+
   // Registro de rotas no roteador da API
   registrarRotasAutenticacao(apiRouter);
   registrarRotasClientes(apiRouter);
@@ -35,4 +39,3 @@ export function criarAplicacao(): Application {
 
   return app;
 }
-
