@@ -157,7 +157,8 @@ export class ControladorClientes {
       return RespostaPadrao.enviarSucesso(resposta, 200, { mensagem: 'Endereço removido com sucesso.' });
     } catch (erro) {
       const mensagem = RespostaPadrao.obterMensagemErro(erro, 'Erro ao remover endereço.');
-      return RespostaPadrao.enviarErro(resposta, 400, mensagem);
+      const status = mensagem === 'Endereço não encontrado.' ? 404 : 400;
+      return RespostaPadrao.enviarErro(resposta, status, mensagem);
     }
   }
 
@@ -233,7 +234,8 @@ export class ControladorClientes {
       return RespostaPadrao.enviarSucesso(resposta, 200, enderecosAtualizados);
     } catch (erro) {
       const mensagem = RespostaPadrao.obterMensagemErro(erro, 'Erro ao editar endereço.');
-      return RespostaPadrao.enviarErro(resposta, 400, mensagem);
+      const status = mensagem === 'Endereço não encontrado.' ? 404 : 400;
+      return RespostaPadrao.enviarErro(resposta, status, mensagem);
     }
   }
 }

@@ -40,7 +40,7 @@ describe('Integração - Clientes (Perfil)', () => {
   });
 
   describe('PATCH /api/clientes/perfil', () => {
-    it('deve atualizar perfil do cliente com sucesso', async () => {
+    it('deve atualizar apenas o nome do cliente', async () => {
       const token = await obterTokenCliente(contexto.app);
       const resposta = await request(contexto.app)
         .patch('/api/clientes/perfil')
@@ -50,6 +50,25 @@ describe('Integração - Clientes (Perfil)', () => {
       expect(resposta.status).toBe(200);
       expect(resposta.body.sucesso).toBe(true);
       expect(resposta.body.dados.nome).toBe('Nome Atualizado');
+    });
+
+    it('deve atualizar múltiplos campos do cliente simultaneamente', async () => {
+      const token = await obterTokenCliente(contexto.app);
+      const novosDados = {
+        nome: 'Novo Nome Completo',
+        dataNascimento: '1990-05-15',
+        genero: 'MASCULINO',
+      };
+
+      const resposta = await request(contexto.app)
+        .patch('/api/clientes/perfil')
+        .set('Authorization', `Bearer ${token}`)
+        .send(novosDados);
+
+      expect(resposta.status).toBe(200);
+      expect(resposta.body.sucesso).toBe(true);
+      expect(resposta.body.dados.nome).toBe(novosDados.nome);
+      expect(resposta.body.dados.genero).toBe(novosDados.genero);
     });
 
     it('deve falhar na atualização sem token', async () => {

@@ -247,7 +247,7 @@ export class ServicoClientes {
     enderecoDto: IEnderecoDto,
     tipo: 'cobranca' | 'entrega',
     principal: boolean = false,
-  ): Promise<void> {
+  ): Promise<IEnderecoDto> {
     const idTipoResidencia = await ServicoClientes.obterIdTipoResidencia(this.db, enderecoDto.tipoResidencia || 'Casa');
     const idLogradouro = await this.obterOuCriarLogradouro(
       enderecoDto.tipoLogradouro || 'Rua',
@@ -273,7 +273,9 @@ export class ServicoClientes {
       principal,
     };
 
-    await this.repositorioEndereco.criar(endereco);
+    const enderecoCriado = await this.repositorioEndereco.criar(endereco);
+    const dtos = await this.converterEnderecosParaDto([enderecoCriado]);
+    return dtos[0];
   }
 
   /**
@@ -427,12 +429,7 @@ export class ServicoClientes {
       }
     }
 
-    return {
-      uuid: usuarioAtualizado.uuid,
-      nome: usuarioAtualizado.nome,
-      email: usuarioAtualizado.email,
-      role: usuarioAtualizado.role.descricao,
-    };
+    return this.obterPerfil(uuid);
   }
 
   /**
@@ -441,15 +438,11 @@ export class ServicoClientes {
   public async adicionarEndereco(
     uuid: string,
     dados: IEnderecoDto & { tipoEndereco?: 'cobranca' | 'entrega' },
-  ): Promise<IEnderecoDto[]> {
+  ): Promise<IEnderecoDto> {
     const usuario = await this.repositorioUsuarios.buscarPorUuid(uuid);
     if (!usuario) throw new Error('Usuário não encontrado.');
 
-    await this.criarEndereco(usuario.id, dados, dados.tipoEndereco || 'entrega', false);
-
-    // Retornar o perfil atualizado ou o novo endereço (simplificado)
-    const enderecos = await this.repositorioEndereco.buscarPorIdUsuario(usuario.id);
-    return this.converterEnderecosParaDto(enderecos);
+    return this.criarEndereco(usuario.id, dados, dados.tipoEndereco || 'entrega', false);
   }
 
   /**
@@ -458,6 +451,13 @@ export class ServicoClientes {
   public async removerEndereco(uuidUsuario: string, uuidEndereco: string): Promise<void> {
     const usuario = await this.repositorioUsuarios.buscarPorUuid(uuidUsuario);
     if (!usuario) throw new Error('Usuário não encontrado.');
+
+    const todosEnderecos = await this.repositorioEndereco.buscarPorIdUsuario(usuario.id);
+    const enderecoExistente = todosEnderecos.find((e) => e.uuid === uuidEndereco);
+
+    if (!enderecoExistente) {
+      throw new Error('Endereço não encontrado.');
+    }
 
     await this.repositorioEndereco.deletar(usuario.id, uuidEndereco);
   }
@@ -670,26 +670,25 @@ export class ServicoClientes {
     uuidUsuario: string,
     uuidEndereco: string,
     dados: Partial<IEnderecoDto>,
-  ): Promise<IEnderecoDto[]> {
+  ): Promise<IEnderecoDto> {
     const usuario = await this.repositorioUsuarios.buscarPorUuid(uuidUsuario);
     if (!usuario) throw new Error('Usuário não encontrado.');
 
-    // No IRepositorioEnderecoUsuario.ts vimos que existe deletar(idUsuario, uuidEndereco)
-    // E atualizar(endereco: IEnderecoUsuario)
-    // Precisamos primeiro garantir que o endereço pertence ao usuário
     const todosEnderecos = await this.repositorioEndereco.buscarPorIdUsuario(usuario.id);
     const enderecoExistente = todosEnderecos.find((e) => e.uuid === uuidEndereco);
 
     if (!enderecoExistente) {
-      throw new Error('Endereço não encontrado ou não pertence a este usuário.');
+      throw new Error('Endereço não encontrado.');
     }
 
-    // Atualizar apenas os campos fornecidos
+    // Para manter dados não enviados, precisamos converter o endereço do banco para o estado atual do DTO
+    const [dtoAtual] = await this.converterEnderecosParaDto([enderecoExistente]);
+
     if (dados.apelido !== undefined) enderecoExistente.apelido = dados.apelido;
 
     if (dados.cidade !== undefined || dados.estado !== undefined) {
-      const cidade = dados.cidade || ''; // Fallback se quiser manter o que já tem precisaria buscar o nome atual
-      const estado = dados.estado || '';
+      const cidade = dados.cidade || dtoAtual.cidade;
+      const estado = dados.estado || dtoAtual.estado;
       enderecoExistente.idCidade = await this.obterOuCriarCidade(cidade, estado);
     }
 
@@ -702,9 +701,9 @@ export class ServicoClientes {
     }
 
     if (dados.logradouro !== undefined || dados.numero !== undefined) {
-      const logradouro = dados.logradouro || ''; 
-      const numero = dados.numero || '';
-      const tipoLogradouro = dados.tipoLogradouro || 'Rua';
+      const logradouro = dados.logradouro || dtoAtual.logradouro;
+      const numero = dados.numero || dtoAtual.numero;
+      const tipoLogradouro = dados.tipoLogradouro || dtoAtual.tipoLogradouro || 'Rua';
       enderecoExistente.idLogradouro = await this.obterOuCriarLogradouro(tipoLogradouro, logradouro, numero);
     }
 
@@ -720,8 +719,8 @@ export class ServicoClientes {
 
     await this.repositorioEndereco.atualizar(enderecoExistente);
 
-    const enderecosAtualizados = await this.repositorioEndereco.buscarPorIdUsuario(usuario.id);
-    return this.converterEnderecosParaDto(enderecosAtualizados);
+    const dtos = await this.converterEnderecosParaDto([enderecoExistente]);
+    return dtos[0];
   }
 }
 

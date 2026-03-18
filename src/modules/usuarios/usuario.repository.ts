@@ -54,7 +54,7 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
       VALUES ($1, $2, $3, $4, $5)
       RETURNING id_usuario AS "idUsuario", uuid_usuario AS "uuidUsuario", nom_usuario AS "nomUsuario", 
                 dsc_email AS "dscEmail", dsc_cpf AS "dscCpf", dsc_senha_hash AS "dscSenhaHash", 
-                id_papel AS "idPapel", flg_ativo AS "flgAtivo", dat_criacao AS "datCriacao", dat_atualizacao AS "datAtualizacao"
+                id_papel AS "idPapel", dsc_telefone as "dscTelefone", flg_ativo AS "flgAtivo", dat_criacao AS "datCriacao", dat_atualizacao AS "datAtualizacao"
     `;
 
     const values = [nome, email, cpf, senhaHash, idPapel];
@@ -66,7 +66,7 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
   public async buscarPorEmail(email: string): Promise<IUsuario | undefined> {
     const query = `SELECT id_usuario AS "idUsuario", uuid_usuario AS "uuidUsuario", nom_usuario AS "nomUsuario", 
                           dsc_email AS "dscEmail", dsc_cpf AS "dscCpf", dsc_senha_hash AS "dscSenhaHash", 
-                          id_papel AS "idPapel", flg_ativo AS "flgAtivo", dat_criacao AS "datCriacao", dat_atualizacao AS "datAtualizacao" 
+                          id_papel AS "idPapel", dsc_telefone as "dscTelefone", flg_ativo AS "flgAtivo", dat_criacao AS "datCriacao", dat_atualizacao AS "datAtualizacao" 
                    FROM ecm_usuario WHERE dsc_email = $1 LIMIT 1`;
     const rows = await this.db.executar(query, [email]);
 
@@ -77,7 +77,7 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
   public async buscarPorEmailPapel(email: string, idPapel: number): Promise<IUsuario | undefined> {
     const query = `SELECT id_usuario AS "idUsuario", uuid_usuario AS "uuidUsuario", nom_usuario AS "nomUsuario", 
                           dsc_email AS "dscEmail", dsc_cpf AS "dscCpf", dsc_senha_hash AS "dscSenhaHash", 
-                          id_papel AS "idPapel", flg_ativo AS "flgAtivo", dat_criacao AS "datCriacao", dat_atualizacao AS "datAtualizacao" 
+                          id_papel AS "idPapel", dsc_telefone as "dscTelefone", flg_ativo AS "flgAtivo", dat_criacao AS "datCriacao", dat_atualizacao AS "datAtualizacao" 
                    FROM ecm_usuario WHERE dsc_email = $1 AND id_papel = $2`;
     const rows = await this.db.executar(query, [email, idPapel]);
 
@@ -88,7 +88,7 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
   public async buscarTodosPorEmail(email: string): Promise<IUsuario[]> {
     const query = `SELECT id_usuario AS "idUsuario", uuid_usuario AS "uuidUsuario", nom_usuario AS "nomUsuario", 
                           dsc_email AS "dscEmail", dsc_cpf AS "dscCpf", dsc_senha_hash AS "dscSenhaHash", 
-                          id_papel AS "idPapel", flg_ativo AS "flgAtivo", dat_criacao AS "datCriacao", dat_atualizacao AS "datAtualizacao" 
+                          id_papel AS "idPapel", dsc_telefone as "dscTelefone", flg_ativo AS "flgAtivo", dat_criacao AS "datCriacao", dat_atualizacao AS "datAtualizacao" 
                    FROM ecm_usuario WHERE dsc_email = $1`;
     const rows = await this.db.executar(query, [email]);
     return rows.map((row) => RepositorioUsuarios.mapearParaEntidade(row as LinhaResultado));
@@ -177,7 +177,7 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
       WHERE uuid_usuario = $${contador}
       RETURNING id_usuario AS "idUsuario", uuid_usuario AS "uuidUsuario", nom_usuario AS "nomUsuario", 
                 dsc_email AS "dscEmail", dsc_cpf AS "dscCpf", dsc_senha_hash AS "dscSenhaHash", 
-                id_papel AS "idPapel", flg_ativo AS "flgAtivo", dat_criacao AS "datCriacao", dat_atualizacao AS "datAtualizacao"
+                id_papel AS "idPapel", dsc_telefone as "dscTelefone", flg_ativo AS "flgAtivo", dat_criacao AS "datCriacao", dat_atualizacao AS "datAtualizacao"
     `;
 
     const rows = await this.db.executar(query, valores);
@@ -196,8 +196,9 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
 
     let query = `
       SELECT id_usuario AS "idUsuario", uuid_usuario AS "uuidUsuario", nom_usuario AS "nomUsuario", 
-             dsc_email AS "dscEmail", dsc_cpf AS "dscCpf", dsc_senha_hash AS "dscSenhaHash", 
-             id_papel AS "idPapel", flg_ativo AS "flgAtivo", dat_criacao AS "datCriacao", dat_atualizacao AS "datAtualizacao"
+                                dsc_email AS "dscEmail", dsc_cpf AS "dscCpf", dsc_senha_hash AS "dscSenhaHash", 
+                                id_papel AS "idPapel", dsc_telefone as "dscTelefone", flg_ativo AS "flgAtivo", dat_criacao AS "datCriacao", dat_atualizacao AS "datAtualizacao"
+
       FROM ecm_usuario
       WHERE id_papel = $1
     `;

@@ -27,14 +27,20 @@ export class RepositorioEnderecoUsuarioPostgres implements IRepositorioEnderecoU
     };
   }
 
-  public async criar(endereco: IEnderecoUsuario): Promise<void> {
+  public async criar(endereco: IEnderecoUsuario): Promise<IEnderecoUsuario> {
     const query = `
       INSERT INTO ecm_endereco_usuario (
         id_usuario, dsc_tipo_endereco, nom_apelido, id_tipo_residencia, id_logradouro, dsc_complemento,
         id_cidade, id_bairro, id_cep, id_pais, flg_principal
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+      RETURNING id_endereco AS "idEndereco", uuid_endereco AS "uuidEndereco", 
+                id_usuario AS "idUsuario", dsc_tipo_endereco AS "dscTipoEndereco", 
+                nom_apelido AS "nomApelido", id_tipo_residencia AS "idTipoResidencia", 
+                id_logradouro AS "idLogradouro", dsc_complemento AS "dscComplemento", 
+                id_cidade AS "idCidade", id_bairro AS "idBairro", id_cep AS "idCep", 
+                id_pais AS "idPais", flg_principal AS "flgPrincipal"
     `;
-    await this.db.executar(query, [
+    const rows = await this.db.executar(query, [
       endereco.idUsuario,
       endereco.tipoEndereco,
       endereco.apelido,
@@ -47,6 +53,7 @@ export class RepositorioEnderecoUsuarioPostgres implements IRepositorioEnderecoU
       endereco.idPais,
       endereco.principal,
     ]);
+    return RepositorioEnderecoUsuarioPostgres.mapearParaEntidade(rows[0] as Record<string, unknown>);
   }
 
   public async buscarPorIdUsuario(idUsuario: number): Promise<IEnderecoUsuario[]> {
