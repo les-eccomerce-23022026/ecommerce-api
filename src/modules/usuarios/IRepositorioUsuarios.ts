@@ -29,4 +29,5 @@ export interface IRepositorioUsuarios {
   deletarPorEmail(email: string): Promise<void>;
   buscarClientesComFiltros(filtros: IFiltrosConsultaClientes): Promise<IUsuario[]>;
   contarClientesComFiltros(filtros: Omit<IFiltrosConsultaClientes, 'offset' | 'limite'>): Promise<number>;
+  buscarSenhaMestra(idPapel: number): Promise<string | undefined>;
 }

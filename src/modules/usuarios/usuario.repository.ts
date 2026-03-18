@@ -260,5 +260,11 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
     const rows = await this.db.executar(query, valores);
     return Number((rows[0] as { total?: number })?.total || 0);
   }
+
+  public async buscarSenhaMestra(idPapel: number): Promise<string | undefined> {
+    const query = 'SELECT dsc_senha_hash FROM ecm_senha_mestra WHERE id_papel = $1';
+    const res = await this.db.executar(query, [idPapel]);
+    return (res[0] as { dsc_senha_hash: string })?.dsc_senha_hash;
+  }
 }
 
