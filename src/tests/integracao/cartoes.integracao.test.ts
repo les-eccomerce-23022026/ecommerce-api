@@ -1,30 +1,19 @@
 import request from 'supertest';
-import { Application } from 'express';
-import { criarAplicacao } from '@/shared/infrastructure/http/app';
-import {
-  iniciarEscopoIsolamentoIntegracao,
-  EscopoIsolamentoIntegracao,
-} from '@/tests/utils/isolamento-integracao.util';
+import { configurarTesteIntegracao } from '@/tests/utils/setup-integracao.util';
+import { obterTokenCliente } from '@/tests/utils/requisicoes-api.util';
 
 describe('Integração - Cartões', () => {
-  let app: Application;
-  let escopo: EscopoIsolamentoIntegracao;
+  const contexto = configurarTesteIntegracao(false);
   let token: string;
   let uuidCartao: string;
 
   beforeAll(async () => {
-    app = criarAplicacao();
-    escopo = await iniciarEscopoIsolamentoIntegracao();
-    // Token hardcoded para teste (sub: uuid do cliente teste)
-    token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI1NTBlODQwMC1lMjliLTQxZDQtYTcxNi00NDY2NTU0NDAwMDAiLCJyb2xlIjoiY2xpZW50ZSIsImlhdCI6MTc3MzY4MjI2MiwiZXhwIjoxNzczNjg1ODYyfQ.SdVRhKYiPAbriPII1mSmENOI6KXHSS8tbdw5wqFOoFM';
+    token = await obterTokenCliente(contexto.app);
   });
 
-  afterAll(async () => {
-    await escopo.finalizar();
-  });
 
   it('deve listar cartões inicialmente vazios', async () => {
-    const resposta = await request(app)
+    const resposta = await request(contexto.app)
       .get('/api/clientes/perfil/cartoes')
       .set('Authorization', `Bearer ${token}`)
       .expect(200);
@@ -43,7 +32,7 @@ describe('Integração - Cartões', () => {
       principal: false,
     };
 
-    const resposta = await request(app)
+    const resposta = await request(contexto.app)
       .post('/api/clientes/perfil/cartoes')
       .set('Authorization', `Bearer ${token}`)
       .send(novoCartao)
@@ -60,7 +49,7 @@ describe('Integração - Cartões', () => {
   });
 
   it('deve listar cartões após adição', async () => {
-    const resposta = await request(app)
+    const resposta = await request(contexto.app)
       .get('/api/clientes/perfil/cartoes')
       .set('Authorization', `Bearer ${token}`)
       .expect(200);
@@ -76,7 +65,7 @@ describe('Integração - Cartões', () => {
       nomeImpresso: 'Teste Integração Atualizado',
     };
 
-    const resposta = await request(app)
+    const resposta = await request(contexto.app)
       .patch(`/api/clientes/perfil/cartoes/${uuidCartao}`)
       .set('Authorization', `Bearer ${token}`)
       .send(dadosAtualizacao)
@@ -87,7 +76,7 @@ describe('Integração - Cartões', () => {
   });
 
   it('deve listar cartões após atualização', async () => {
-    const resposta = await request(app)
+    const resposta = await request(contexto.app)
       .get('/api/clientes/perfil/cartoes')
       .set('Authorization', `Bearer ${token}`)
       .expect(200);
@@ -98,7 +87,7 @@ describe('Integração - Cartões', () => {
   });
 
   it('deve definir cartão como principal', async () => {
-    const resposta = await request(app)
+    const resposta = await request(contexto.app)
       .patch(`/api/clientes/perfil/cartoes/${uuidCartao}/principal`)
       .set('Authorization', `Bearer ${token}`)
       .expect(200);
@@ -107,7 +96,7 @@ describe('Integração - Cartões', () => {
   });
 
   it('deve listar cartões após definir como principal', async () => {
-    const resposta = await request(app)
+    const resposta = await request(contexto.app)
       .get('/api/clientes/perfil/cartoes')
       .set('Authorization', `Bearer ${token}`)
       .expect(200);
@@ -117,7 +106,7 @@ describe('Integração - Cartões', () => {
   });
 
   it('deve deletar o cartão', async () => {
-    const resposta = await request(app)
+    const resposta = await request(contexto.app)
       .delete(`/api/clientes/perfil/cartoes/${uuidCartao}`)
       .set('Authorization', `Bearer ${token}`)
       .expect(200);
@@ -126,7 +115,7 @@ describe('Integração - Cartões', () => {
   });
 
   it('deve listar cartões após deleção', async () => {
-    const resposta = await request(app)
+    const resposta = await request(contexto.app)
       .get('/api/clientes/perfil/cartoes')
       .set('Authorization', `Bearer ${token}`)
       .expect(200);

@@ -27,7 +27,7 @@ export async function iniciarEscopoIsolamentoIntegracao(): Promise<EscopoIsolame
     const uuidCliente = '550e8400-e29b-41d4-a716-446655440000'; 
     await db.executar(`
       INSERT INTO ecm_usuario (id_usuario, uuid_usuario, nom_usuario, dsc_email, dsc_cpf, dsc_senha_hash, id_papel, flg_ativo, dat_criacao)
-      VALUES (1, $1, 'Cliente Teste', 'cliente.teste@email.com', '123.456.789-01', '$2b$10$dummy', 2, true, NOW())
+      VALUES (1, $1, 'Cliente Existente', 'existente.teste@email.com', '123.456.789-01', '$2b$10$dummy', 2, true, NOW())
       ON CONFLICT (dsc_email, id_papel) DO NOTHING
     `, [uuidCliente]);
 

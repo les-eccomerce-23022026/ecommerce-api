@@ -1,42 +1,19 @@
 import request from 'supertest';
-import { Application } from 'express';
-import { criarAplicacao } from '@/shared/infrastructure/http/app';
-import {
-  iniciarEscopoIsolamentoIntegracao,
-  EscopoIsolamentoIntegracao,
-} from '@/tests/utils/isolamento-integracao.util';
+import { configurarTesteIntegracao } from '@/tests/utils/setup-integracao.util';
 import { obterTokenCliente } from '@/tests/utils/requisicoes-api.util';
 
 // Testes de integração para rotas de administração (/api/admin),
 // focados em validar o controle de acesso baseado em papéis (RBAC),
 // garantindo que apenas admins possam acessar rotas restritas.
 describe('Integração - Admin (rotas individuais)', () => {
-  let app: Application;
-  let escopo: EscopoIsolamentoIntegracao;
-
-  // Inicializa a aplicação Express uma vez, reutilizando-a
-  // para eficiência, já que a configuração é estática.
-  beforeAll(() => {
-    app = criarAplicacao();
-  });
-
-  // Cria escopo isolado de banco antes de cada teste
-  // para garantir independência e evitar estado compartilhado.
-  beforeEach(async () => {
-    escopo = await iniciarEscopoIsolamentoIntegracao();
-  });
-
-  // Limpa o escopo após cada teste para manter consistência.
-  afterEach(async () => {
-    await escopo.finalizar();
-  });
+  const contexto = configurarTesteIntegracao();
 
   it('deve falhar no cadastro de admin com token de cliente', async () => {
     // Obtém token de cliente comum e tenta cadastrar admin,
     // testando controle de acesso baseado em papéis de usuário.
-    const tokenCliente = await obterTokenCliente(app);
+    const tokenCliente = await obterTokenCliente(contexto.app);
 
-    const resposta = await request(app)
+    const resposta = await request(contexto.app)
       .post('/api/admin/registro')
       .set('Authorization', `Bearer ${tokenCliente}`)
       .send({
