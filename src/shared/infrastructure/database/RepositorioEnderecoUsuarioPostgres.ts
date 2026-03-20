@@ -11,41 +11,45 @@ export class RepositorioEnderecoUsuarioPostgres implements IRepositorioEnderecoU
 
   private static mapearParaEntidade(row: Record<string, unknown>): IEnderecoUsuario {
     return {
-      id: Number(row.idEndereco),
-      uuid: row.uuidEndereco as string,
+      id: Number(row.id),
+      uuid: row.uuid as string,
       idUsuario: Number(row.idUsuario),
-      tipoEndereco: row.dscTipoEndereco as 'cobranca' | 'entrega',
-      apelido: (row.nomApelido as string | null | undefined) || undefined,
+      tipo: row.tipo as 'cobranca' | 'entrega',
+      apelido: (row.apelido as string | null | undefined) || undefined,
       idTipoResidencia: Number(row.idTipoResidencia),
       idLogradouro: Number(row.idLogradouro),
-      complemento: (row.dscComplemento as string | null | undefined) || undefined,
+      numero: row.numero as string,
+      complemento: (row.complemento as string | null | undefined) || undefined,
       idCidade: Number(row.idCidade),
       idBairro: Number(row.idBairro),
       idCep: Number(row.idCep),
       idPais: Number(row.idPais),
-      principal: row.flgPrincipal as boolean,
+      principal: row.principal as boolean,
+      criadoEm: row.criadoEm ? new Date(row.criadoEm as string) : undefined,
+      atualizadoEm: row.atualizadoEm ? new Date(row.atualizadoEm as string) : undefined,
     };
   }
 
   public async criar(endereco: IEnderecoUsuario): Promise<IEnderecoUsuario> {
     const query = `
-      INSERT INTO ecm_endereco_usuario (
-        id_usuario, dsc_tipo_endereco, nom_apelido, id_tipo_residencia, id_logradouro, dsc_complemento,
-        id_cidade, id_bairro, id_cep, id_pais, flg_principal
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-      RETURNING id_endereco AS "idEndereco", uuid_endereco AS "uuidEndereco", 
-                id_usuario AS "idUsuario", dsc_tipo_endereco AS "dscTipoEndereco", 
-                nom_apelido AS "nomApelido", id_tipo_residencia AS "idTipoResidencia", 
-                id_logradouro AS "idLogradouro", dsc_complemento AS "dscComplemento", 
-                id_cidade AS "idCidade", id_bairro AS "idBairro", id_cep AS "idCep", 
-                id_pais AS "idPais", flg_principal AS "flgPrincipal"
+      INSERT INTO end_enderecos (
+        usu_id, end_tipo, end_apelido, tre_id, log_id, end_numero, end_complemento,
+        cid_id, bai_id, cep_id, pai_id, end_principal
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+      RETURNING end_id AS "id", end_uuid AS "uuid", 
+                usu_id AS "idUsuario", end_tipo AS "tipo", 
+                end_apelido AS "apelido", tre_id AS "idTipoResidencia", 
+                log_id AS "idLogradouro", end_numero AS "numero", end_complemento AS "complemento", 
+                cid_id AS "idCidade", bai_id AS "idBairro", cep_id AS "idCep", 
+                pai_id AS "idPais", end_principal AS "principal"
     `;
     const rows = await this.db.executar(query, [
       endereco.idUsuario,
-      endereco.tipoEndereco,
+      endereco.tipo,
       endereco.apelido,
       endereco.idTipoResidencia,
       endereco.idLogradouro,
+      endereco.numero,
       endereco.complemento,
       endereco.idCidade,
       endereco.idBairro,
@@ -58,14 +62,15 @@ export class RepositorioEnderecoUsuarioPostgres implements IRepositorioEnderecoU
 
   public async buscarPorIdUsuario(idUsuario: number): Promise<IEnderecoUsuario[]> {
     const query = `
-      SELECT id_endereco AS "idEndereco", uuid_endereco AS "uuidEndereco", 
-             id_usuario AS "idUsuario", dsc_tipo_endereco AS "dscTipoEndereco", 
-             nom_apelido AS "nomApelido", id_tipo_residencia AS "idTipoResidencia", 
-             id_logradouro AS "idLogradouro", dsc_complemento AS "dscComplemento", 
-             id_cidade AS "idCidade", id_bairro AS "idBairro", id_cep AS "idCep", 
-             id_pais AS "idPais", flg_principal AS "flgPrincipal"
-      FROM ecm_endereco_usuario 
-      WHERE id_usuario = $1
+      SELECT end_id AS "id", end_uuid AS "uuid", 
+             usu_id AS "idUsuario", end_tipo AS "tipo", 
+             end_apelido AS "apelido", tre_id AS "idTipoResidencia", 
+             log_id AS "idLogradouro", end_numero AS "numero", end_complemento AS "complemento", 
+             cid_id AS "idCidade", bai_id AS "idBairro", cep_id AS "idCep", 
+             pai_id AS "idPais", end_principal AS "principal",
+             end_criado_em AS "criadoEm", end_atualizado_em AS "atualizadoEm"
+      FROM end_enderecos 
+      WHERE usu_id = $1
     `;
     const rows = await this.db.executar(query, [idUsuario]);
     return rows.map((row) => RepositorioEnderecoUsuarioPostgres.mapearParaEntidade(row as Record<string, unknown>));
@@ -73,16 +78,17 @@ export class RepositorioEnderecoUsuarioPostgres implements IRepositorioEnderecoU
 
   public async atualizar(endereco: IEnderecoUsuario): Promise<void> {
     const query = `
-      UPDATE ecm_endereco_usuario
-      SET dsc_tipo_endereco = $1, nom_apelido = $2, id_tipo_residencia = $3, id_logradouro = $4, dsc_complemento = $5,
-          id_cidade = $6, id_bairro = $7, id_cep = $8, id_pais = $9, flg_principal = $10
-      WHERE id_usuario = $11 AND uuid_endereco = $12
+      UPDATE end_enderecos
+      SET end_tipo = $1, end_apelido = $2, tre_id = $3, log_id = $4, end_numero = $5, end_complemento = $6,
+          cid_id = $7, bai_id = $8, cep_id = $9, pai_id = $10, end_principal = $11
+      WHERE usu_id = $12 AND end_uuid = $13
     `;
     await this.db.executar(query, [
-      endereco.tipoEndereco,
+      endereco.tipo,
       endereco.apelido,
       endereco.idTipoResidencia,
       endereco.idLogradouro,
+      endereco.numero,
       endereco.complemento,
       endereco.idCidade,
       endereco.idBairro,
@@ -95,7 +101,7 @@ export class RepositorioEnderecoUsuarioPostgres implements IRepositorioEnderecoU
   }
 
   public async deletar(idUsuario: number, uuidEndereco: string): Promise<void> {
-    const query = 'DELETE FROM ecm_endereco_usuario WHERE id_usuario = $1 AND uuid_endereco = $2';
+    const query = 'DELETE FROM end_enderecos WHERE usu_id = $1 AND end_uuid = $2';
     await this.db.executar(query, [idUsuario, uuidEndereco]);
   }
 }

@@ -2,13 +2,15 @@ export interface ICartaoUsuario {
   id?: number;
   uuid: string;
   idUsuario: number;
-  idBandeiraCartao: number;
+  idBandeira: number;
   bandeira?: string;
-  tokenCartao: string;
-  finalCartao: string;
+  token: string;
+  final: string;
   nomeImpresso: string;
   validade: Date;
   principal: boolean;
+  criadoEm?: Date;
+  atualizadoEm?: Date;
 }
 
 export interface IBandeiraCartao {

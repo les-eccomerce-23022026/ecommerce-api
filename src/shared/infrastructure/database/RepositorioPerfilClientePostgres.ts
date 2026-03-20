@@ -11,20 +11,20 @@ export class RepositorioPerfilClientePostgres implements IRepositorioPerfilClien
 
   private static mapearParaEntidade(row: Record<string, unknown>): IPerfilCliente {
     return {
-      id: Number(row.idPerfilCliente),
-      uuid: row.uuidPerfilCliente as string,
+      id: Number(row.id),
+      uuid: row.uuid as string,
       idUsuario: Number(row.idUsuario),
-      genero: row.dscGenero as string | undefined,
-      dataNascimento: row.datNascimento ? new Date(row.datNascimento as string) : undefined,
-      ranking: Number(row.numRanking ?? 0),
-      dataCriacao: row.datCriacao ? new Date(row.datCriacao as string) : undefined,
-      dataAtualizacao: row.datAtualizacao ? new Date(row.datAtualizacao as string) : undefined,
+      genero: row.genero as string | undefined,
+      dataNascimento: row.dataNascimento ? new Date(row.dataNascimento as string) : undefined,
+      ranking: Number(row.ranking ?? 0),
+      criadoEm: row.criadoEm ? new Date(row.criadoEm as string) : undefined,
+      atualizadoEm: row.atualizadoEm ? new Date(row.atualizadoEm as string) : undefined,
     };
   }
 
   public async criar(perfil: IPerfilCliente): Promise<void> {
     const query = `
-      INSERT INTO ecm_perfil_cliente (id_usuario, dsc_genero, dat_nascimento)
+      INSERT INTO cli_clientes (usu_id, cli_genero, cli_data_nascimento)
       VALUES ($1, $2, $3)
     `;
     await this.db.executar(query, [perfil.idUsuario, perfil.genero ?? null, perfil.dataNascimento ?? null]);
@@ -32,11 +32,11 @@ export class RepositorioPerfilClientePostgres implements IRepositorioPerfilClien
 
   public async buscarPorIdUsuario(idUsuario: number): Promise<IPerfilCliente | null> {
     const query = `
-      SELECT id_perfil_cliente AS "idPerfilCliente", uuid_perfil_cliente AS "uuidPerfilCliente", 
-             id_usuario AS "idUsuario", dsc_genero AS "dscGenero", dat_nascimento AS "datNascimento", 
-             num_ranking AS "numRanking", dat_criacao AS "datCriacao", dat_atualizacao AS "datAtualizacao"
-      FROM ecm_perfil_cliente 
-      WHERE id_usuario = $1
+      SELECT cli_id AS "id", cli_uuid AS "uuid", 
+             usu_id AS "idUsuario", cli_genero AS "genero", cli_data_nascimento AS "dataNascimento", 
+             cli_ranking AS "ranking", cli_criado_em AS "criadoEm", cli_atualizado_em AS "atualizadoEm"
+      FROM cli_clientes 
+      WHERE usu_id = $1
     `;
     const rows = await this.db.executar(query, [idUsuario]);
 
@@ -47,15 +47,15 @@ export class RepositorioPerfilClientePostgres implements IRepositorioPerfilClien
   // eslint-disable-next-line class-methods-use-this
   public async atualizar(perfil: IPerfilCliente): Promise<void> {
     const query = `
-      UPDATE ecm_perfil_cliente
-      SET dsc_genero = $1, dat_nascimento = $2
-      WHERE id_usuario = $3
+      UPDATE cli_clientes
+      SET cli_genero = $1, cli_data_nascimento = $2
+      WHERE usu_id = $3
     `;
     await this.db.executar(query, [perfil.genero ?? null, perfil.dataNascimento ?? null, perfil.idUsuario]);
   }
 
   public async deletar(idUsuario: number): Promise<void> {
-    const query = 'DELETE FROM ecm_perfil_cliente WHERE id_usuario = $1';
+    const query = 'DELETE FROM cli_clientes WHERE usu_id = $1';
     await this.db.executar(query, [idUsuario]);
   }
 }

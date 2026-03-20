@@ -8,41 +8,51 @@ type LinhaResultado = Record<string, unknown>;
 
 /**
  * Repositório para usuários.
- * Implementa persistência real seguindo a modelagem ecm_usuario.
- * Recebe a conexão com o banco via construtor (Inversão de Dependência).
+ * Implementa persistência real seguindo o novo padrão de trigramas.
  */
 export class RepositorioUsuarios implements IRepositorioUsuarios {
   private db: IConexaoBanco;
 
-  /**
-   * Construtor injetado com a abstração do banco de dados.
-   * Não sabe se é Postgres, MySQL ou outro.
-   */
   constructor(db: IConexaoBanco) {
     this.db = db;
   }
 
   /**
    * Mapeia linha do banco para a entidade IUsuario.
-   * Método estático pois não depende de estado da instância.
    */
   private static mapearParaEntidade(row: LinhaResultado): IUsuario {
     return {
-      id: Number(row.idUsuario),
-      uuid: row.uuidUsuario as string,
-      nome: row.nomUsuario as string,
-      email: row.dscEmail as string,
-      cpf: row.dscCpf as string,
-      senhaHash: row.dscSenhaHash as string,
+      id: Number(row.id),
+      uuid: row.uuid as string,
+      nome: row.nome as string,
+      email: row.email as string,
+      cpf: row.cpf as string,
+      senhaHash: row.senhaHash as string,
+      idPapel: Number(row.idPapel),
       role: {
         id: Number(row.idPapel),
-        descricao: Number(row.idPapel) === PAPEL_ADMIN.id ? PAPEL_ADMIN.descricao : PAPEL_CLIENTE.descricao,
+        descricao: (row.papelDescricao as string) || (Number(row.idPapel) === PAPEL_ADMIN.id ? PAPEL_ADMIN.descricao : PAPEL_CLIENTE.descricao),
       },
-      telefone: row.dscTelefone as string,
-      ativo: row.flgAtivo as boolean,
-      dataCriacao: row.datCriacao ? new Date(row.datCriacao as string) : undefined,
-      dataAtualizacao: row.datAtualizacao ? new Date(row.datAtualizacao as string) : undefined,
+      telefoneRapido: row.telefoneRapido as string,
+      ativo: row.ativo as boolean,
+      genero: row.genero as string,
+      dataNascimento: row.dataNascimento ? new Date(row.dataNascimento as string) : undefined,
+      criadoEm: row.criadoEm ? new Date(row.criadoEm as string) : undefined,
+      atualizadoEm: row.atualizadoEm ? new Date(row.atualizadoEm as string) : undefined,
     };
+  }
+
+  private static get SELECT_BASE(): string {
+    return `
+      SELECT u.usu_id AS "id", u.usu_uuid AS "uuid", u.usu_nome AS "nome", 
+             u.usu_email AS "email", u.usu_cpf AS "cpf", u.usu_senha_hash AS "senhaHash", 
+             u.pap_id AS "idPapel", u.usu_telefone_rapido AS "telefoneRapido", 
+             u.usu_ativo AS "ativo", u.usu_genero AS "genero", u.usu_data_nascimento AS "dataNascimento",
+             u.usu_criado_em AS "criadoEm", u.usu_atualizado_em AS "atualizadoEm",
+             p.pap_descricao AS "papelDescricao"
+      FROM usu_usuarios u
+      JOIN pap_papeis p ON u.pap_id = p.pap_id
+    `;
   }
 
   public async criarUsuario(dados: IDadosCriarUsuario): Promise<IUsuario> {
@@ -50,24 +60,23 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
     const idPapel = role?.id ?? PAPEL_CLIENTE.id;
 
     const query = `
-      INSERT INTO ecm_usuario (nom_usuario, dsc_email, dsc_cpf, dsc_senha_hash, id_papel)
+      INSERT INTO usu_usuarios (usu_nome, usu_email, usu_cpf, usu_senha_hash, pap_id)
       VALUES ($1, $2, $3, $4, $5)
-      RETURNING id_usuario AS "idUsuario", uuid_usuario AS "uuidUsuario", nom_usuario AS "nomUsuario", 
-                dsc_email AS "dscEmail", dsc_cpf AS "dscCpf", dsc_senha_hash AS "dscSenhaHash", 
-                id_papel AS "idPapel", dsc_telefone as "dscTelefone", flg_ativo AS "flgAtivo", dat_criacao AS "datCriacao", dat_atualizacao AS "datAtualizacao"
+      RETURNING usu_id AS "id", usu_uuid AS "uuid", usu_nome AS "nome", 
+                usu_email AS "email", usu_cpf AS "cpf", usu_senha_hash AS "senhaHash", 
+                pap_id AS "idPapel", usu_telefone_rapido AS "telefoneRapido", 
+                usu_ativo AS "ativo", usu_criado_em AS "criadoEm", usu_atualizado_em AS "atualizadoEm"
     `;
 
     const values = [nome, email, cpf, senhaHash, idPapel];
     const rows = await this.db.executar(query, values);
 
-    return RepositorioUsuarios.mapearParaEntidade(rows[0] as LinhaResultado);
+    // Como o INSERT RETURNING não traz o JOIN, buscamos o registro completo ou mapeamos manualmente
+    return this.buscarPorUuid(rows[0].uuid as string) as Promise<IUsuario>;
   }
 
   public async buscarPorEmail(email: string): Promise<IUsuario | undefined> {
-    const query = `SELECT id_usuario AS "idUsuario", uuid_usuario AS "uuidUsuario", nom_usuario AS "nomUsuario", 
-                          dsc_email AS "dscEmail", dsc_cpf AS "dscCpf", dsc_senha_hash AS "dscSenhaHash", 
-                          id_papel AS "idPapel", dsc_telefone as "dscTelefone", flg_ativo AS "flgAtivo", dat_criacao AS "datCriacao", dat_atualizacao AS "datAtualizacao" 
-                   FROM ecm_usuario WHERE dsc_email = $1 LIMIT 1`;
+    const query = `${RepositorioUsuarios.SELECT_BASE} WHERE u.usu_email = $1 LIMIT 1`;
     const rows = await this.db.executar(query, [email]);
 
     if (rows.length === 0) return undefined;
@@ -75,10 +84,7 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
   }
 
   public async buscarPorEmailPapel(email: string, idPapel: number): Promise<IUsuario | undefined> {
-    const query = `SELECT id_usuario AS "idUsuario", uuid_usuario AS "uuidUsuario", nom_usuario AS "nomUsuario", 
-                          dsc_email AS "dscEmail", dsc_cpf AS "dscCpf", dsc_senha_hash AS "dscSenhaHash", 
-                          id_papel AS "idPapel", dsc_telefone as "dscTelefone", flg_ativo AS "flgAtivo", dat_criacao AS "datCriacao", dat_atualizacao AS "datAtualizacao" 
-                   FROM ecm_usuario WHERE dsc_email = $1 AND id_papel = $2`;
+    const query = `${RepositorioUsuarios.SELECT_BASE} WHERE u.usu_email = $1 AND u.pap_id = $2`;
     const rows = await this.db.executar(query, [email, idPapel]);
 
     if (rows.length === 0) return undefined;
@@ -86,19 +92,13 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
   }
 
   public async buscarTodosPorEmail(email: string): Promise<IUsuario[]> {
-    const query = `SELECT id_usuario AS "idUsuario", uuid_usuario AS "uuidUsuario", nom_usuario AS "nomUsuario", 
-                          dsc_email AS "dscEmail", dsc_cpf AS "dscCpf", dsc_senha_hash AS "dscSenhaHash", 
-                          id_papel AS "idPapel", dsc_telefone as "dscTelefone", flg_ativo AS "flgAtivo", dat_criacao AS "datCriacao", dat_atualizacao AS "datAtualizacao" 
-                   FROM ecm_usuario WHERE dsc_email = $1`;
+    const query = `${RepositorioUsuarios.SELECT_BASE} WHERE u.usu_email = $1`;
     const rows = await this.db.executar(query, [email]);
     return rows.map((row) => RepositorioUsuarios.mapearParaEntidade(row as LinhaResultado));
   }
 
   public async buscarPorCpf(cpf: string): Promise<IUsuario | undefined> {
-    const query = `SELECT id_usuario AS "idUsuario", uuid_usuario AS "uuidUsuario", nom_usuario AS "nomUsuario", 
-                          dsc_email AS "dscEmail", dsc_cpf AS "dscCpf", dsc_senha_hash AS "dscSenhaHash", 
-                          id_papel AS "idPapel", dsc_telefone as "dscTelefone", flg_ativo AS "flgAtivo", dat_criacao AS "datCriacao", dat_atualizacao AS "datAtualizacao" 
-                   FROM ecm_usuario WHERE dsc_cpf = $1 LIMIT 1`;
+    const query = `${RepositorioUsuarios.SELECT_BASE} WHERE u.usu_cpf = $1 LIMIT 1`;
     const rows = await this.db.executar(query, [cpf]);
 
     if (rows.length === 0) return undefined;
@@ -106,10 +106,7 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
   }
 
   public async buscarPorCpfPapel(cpf: string, idPapel: number): Promise<IUsuario | undefined> {
-    const query = `SELECT id_usuario AS "idUsuario", uuid_usuario AS "uuidUsuario", nom_usuario AS "nomUsuario", 
-                          dsc_email AS "dscEmail", dsc_cpf AS "dscCpf", dsc_senha_hash AS "dscSenhaHash", 
-                          id_papel AS "idPapel", dsc_telefone as "dscTelefone", flg_ativo AS "flgAtivo", dat_criacao AS "datCriacao", dat_atualizacao AS "datAtualizacao" 
-                   FROM ecm_usuario WHERE dsc_cpf = $1 AND id_papel = $2`;
+    const query = `${RepositorioUsuarios.SELECT_BASE} WHERE u.usu_cpf = $1 AND u.pap_id = $2`;
     const rows = await this.db.executar(query, [cpf, idPapel]);
 
     if (rows.length === 0) return undefined;
@@ -117,10 +114,7 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
   }
 
   public async buscarPorUuid(uuid: string): Promise<IUsuario | undefined> {
-    const query = `SELECT id_usuario AS "idUsuario", uuid_usuario AS "uuidUsuario", nom_usuario AS "nomUsuario", 
-                          dsc_email AS "dscEmail", dsc_cpf AS "dscCpf", dsc_senha_hash AS "dscSenhaHash", 
-                          id_papel AS "idPapel", dsc_telefone as "dscTelefone", flg_ativo AS "flgAtivo", dat_criacao AS "datCriacao", dat_atualizacao AS "datAtualizacao" 
-                   FROM ecm_usuario WHERE uuid_usuario = $1`;
+    const query = `${RepositorioUsuarios.SELECT_BASE} WHERE u.usu_uuid = $1`;
     const rows = await this.db.executar(query, [uuid]);
 
     if (rows.length === 0) return undefined;
@@ -133,61 +127,70 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
     let contador = 1;
 
     if (dados.nome) {
-      campos.push(`nom_usuario = $${contador}`);
+      campos.push(`usu_nome = $${contador}`);
       contador += 1;
       valores.push(dados.nome);
     }
     if (dados.email) {
-      campos.push(`dsc_email = $${contador}`);
+      campos.push(`usu_email = $${contador}`);
       contador += 1;
       valores.push(dados.email);
     }
     if (dados.cpf) {
-      campos.push(`dsc_cpf = $${contador}`);
+      campos.push(`usu_cpf = $${contador}`);
       contador += 1;
       valores.push(dados.cpf);
     }
-    if (dados.telefone) {
-      campos.push(`dsc_telefone = $${contador}`);
+    if (dados.telefoneRapido) {
+      campos.push(`usu_telefone_rapido = $${contador}`);
       contador += 1;
-      valores.push(dados.telefone);
+      valores.push(dados.telefoneRapido);
     }
     if (dados.senhaHash) {
-      campos.push(`dsc_senha_hash = $${contador}`);
+      campos.push(`usu_senha_hash = $${contador}`);
       contador += 1;
       valores.push(dados.senhaHash);
     }
-    if (dados.role) {
-      campos.push(`id_papel = $${contador}`);
+    if (dados.idPapel) {
+      campos.push(`pap_id = $${contador}`);
+      contador += 1;
+      valores.push(dados.idPapel);
+    } else if (dados.role) {
+      campos.push(`pap_id = $${contador}`);
       contador += 1;
       valores.push(dados.role.id);
     }
     if (dados.ativo !== undefined) {
-      campos.push(`flg_ativo = $${contador}`);
+      campos.push(`usu_ativo = $${contador}`);
       contador += 1;
       valores.push(dados.ativo);
+    }
+    if (dados.genero) {
+      campos.push(`usu_genero = $${contador}`);
+      contador += 1;
+      valores.push(dados.genero);
+    }
+    if (dados.dataNascimento) {
+      campos.push(`usu_data_nascimento = $${contador}`);
+      contador += 1;
+      valores.push(dados.dataNascimento);
     }
 
     if (campos.length === 0) return this.buscarPorUuid(uuid);
 
     valores.push(uuid);
     const query = `
-      UPDATE ecm_usuario 
+      UPDATE usu_usuarios 
       SET ${campos.join(', ')} 
-      WHERE uuid_usuario = $${contador}
-      RETURNING id_usuario AS "idUsuario", uuid_usuario AS "uuidUsuario", nom_usuario AS "nomUsuario", 
-                dsc_email AS "dscEmail", dsc_cpf AS "dscCpf", dsc_senha_hash AS "dscSenhaHash", 
-                id_papel AS "idPapel", dsc_telefone as "dscTelefone", flg_ativo AS "flgAtivo", dat_criacao AS "datCriacao", dat_atualizacao AS "datAtualizacao"
+      WHERE usu_uuid = $${contador}
     `;
 
-    const rows = await this.db.executar(query, valores);
-
-    if (rows.length === 0) return undefined;
-    return RepositorioUsuarios.mapearParaEntidade(rows[0] as LinhaResultado);
+    await this.db.executar(query, valores);
+    return this.buscarPorUuid(uuid);
   }
 
   public async deletarPorEmail(email: string): Promise<void> {
-    const query = 'DELETE FROM ecm_usuario WHERE dsc_email = $1';
+    const query = 'DELETE FROM usu_usuarios WHERE usu_email = $1';
     await this.db.executar(query, [email]);
   }
 
@@ -195,12 +198,8 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
     const { nome, cpf, email, idPapel, offset, limite } = filtros;
 
     let query = `
-      SELECT id_usuario AS "idUsuario", uuid_usuario AS "uuidUsuario", nom_usuario AS "nomUsuario", 
-                                dsc_email AS "dscEmail", dsc_cpf AS "dscCpf", dsc_senha_hash AS "dscSenhaHash", 
-                                id_papel AS "idPapel", dsc_telefone as "dscTelefone", flg_ativo AS "flgAtivo", dat_criacao AS "datCriacao", dat_atualizacao AS "datAtualizacao"
-
-      FROM ecm_usuario
-      WHERE id_papel = $1
+      ${RepositorioUsuarios.SELECT_BASE}
+      WHERE u.pap_id = $1
     `;
 
     const papelBusca = idPapel ?? PAPEL_CLIENTE.id;
@@ -208,24 +207,24 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
     let contador = 2;
 
     if (nome) {
-      query += ` AND nom_usuario ILIKE $${contador}`;
+      query += ` AND u.usu_nome ILIKE $${contador}`;
       valores.push(`%${nome}%`);
       contador += 1;
     }
 
     if (cpf) {
-      query += ` AND dsc_cpf ILIKE $${contador}`;
+      query += ` AND u.usu_cpf ILIKE $${contador}`;
       valores.push(`%${cpf}%`);
       contador += 1;
     }
 
     if (email) {
-      query += ` AND dsc_email ILIKE $${contador}`;
+      query += ` AND u.usu_email ILIKE $${contador}`;
       valores.push(`%${email}%`);
       contador += 1;
     }
 
-    query += ` ORDER BY dat_criacao DESC LIMIT $${contador} OFFSET $${contador + 1}`;
+    query += ` ORDER BY u.usu_criado_em DESC LIMIT $${contador} OFFSET $${contador + 1}`;
     valores.push(limite, offset);
 
     const rows = await this.db.executar(query, valores);
@@ -235,24 +234,24 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
   public async contarClientesComFiltros(filtros: Omit<IFiltrosConsultaClientes, 'offset' | 'limite'>): Promise<number> {
     const { nome, cpf, email } = filtros;
 
-    let query = 'SELECT COUNT(*) as total FROM ecm_usuario WHERE id_papel = $1';
+    let query = 'SELECT COUNT(*) as total FROM usu_usuarios WHERE pap_id = $1';
     const valores: unknown[] = [PAPEL_CLIENTE.id];
     let contador = 2;
 
     if (nome) {
-      query += ` AND nom_usuario ILIKE $${contador}`;
+      query += ` AND usu_nome ILIKE $${contador}`;
       valores.push(`%${nome}%`);
       contador += 1;
     }
 
     if (cpf) {
-      query += ` AND dsc_cpf ILIKE $${contador}`;
+      query += ` AND usu_cpf ILIKE $${contador}`;
       valores.push(`%${cpf}%`);
       contador += 1;
     }
 
     if (email) {
-      query += ` AND dsc_email ILIKE $${contador}`;
+      query += ` AND usu_email ILIKE $${contador}`;
       valores.push(`%${email}%`);
       contador += 1;
     }
@@ -262,9 +261,20 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
   }
 
   public async buscarSenhaMestra(idPapel: number): Promise<string | undefined> {
-    const query = 'SELECT dsc_senha_hash FROM ecm_senha_mestra WHERE id_papel = $1';
-    const res = await this.db.executar(query, [idPapel]);
-    return (res[0] as { dsc_senha_hash: string })?.dsc_senha_hash;
+    const query = 'SELECT sma_senha_hash FROM sma_senhas_mestras WHERE pap_id = $1';
+
+    try {
+      const res = await this.db.executar(query, [idPapel]);
+      return (res[0] as { sma_senha_hash: string })?.sma_senha_hash;
+    } catch (erro) {
+      const codigoErro = (erro as { code?: string }).code;
+
+      // A tabela de senhas mestras é opcional; se ela não existir, seguimos sem senha mestra.
+      if (codigoErro === '42P01') {
+        return undefined;
+      }
+
+      throw erro;
+    }
   }
 }
-

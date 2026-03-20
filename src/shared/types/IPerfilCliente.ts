@@ -5,6 +5,6 @@ export interface IPerfilCliente {
   genero?: string;
   dataNascimento?: Date;
   ranking?: number;
-  dataCriacao?: Date;
-  dataAtualizacao?: Date;
+  criadoEm?: Date;
+  atualizadoEm?: Date;
 }

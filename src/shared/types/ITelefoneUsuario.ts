@@ -6,4 +6,6 @@ export interface ITelefoneUsuario {
   ddd: string;
   numero: string;
   principal: boolean;
+  criadoEm?: Date;
+  atualizadoEm?: Date;
 }

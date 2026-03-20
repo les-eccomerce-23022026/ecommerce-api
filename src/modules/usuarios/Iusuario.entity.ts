@@ -6,11 +6,13 @@ export interface IUsuario {
   nome: string;
   email: string;
   cpf: string;
-  telefone?: string;
+  telefoneRapido?: string;
   senhaHash: string;
+  idPapel: number;
   role: IPapelUsuario;
   ativo: boolean;
-  dataCriacao?: Date;
-  dataAtualizacao?: Date;
+  genero?: string;
+  dataNascimento?: Date;
+  criadoEm?: Date;
+  atualizadoEm?: Date;
 }
-

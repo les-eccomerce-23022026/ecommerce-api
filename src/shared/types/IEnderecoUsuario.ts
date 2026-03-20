@@ -5,14 +5,17 @@ export interface IEnderecoUsuario {
   id?: number;
   uuid?: string;
   idUsuario: number;
-  tipoEndereco: TipoEndereco;
+  tipo: TipoEndereco;
   apelido?: string;
   idPais: number;
   idTipoResidencia: number;
   idLogradouro: number;
+  numero: string;
   complemento?: string;
   idCidade: number;
   idBairro: number;
   idCep: number;
   principal: boolean;
+  criadoEm?: Date;
+  atualizadoEm?: Date;
 }

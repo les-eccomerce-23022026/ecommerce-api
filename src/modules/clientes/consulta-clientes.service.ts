@@ -15,7 +15,7 @@ export interface IResultadoConsultaClientes {
     email: string;
     cpf: string;
     ativo: boolean;
-    dataCriacao: Date;
+    criadoEm: Date;
   }>;
   total: number;
   pagina: number;
@@ -64,7 +64,7 @@ export class ServicoConsultaClientes {
         email: cliente.email,
         cpf: cliente.cpf,
         ativo: cliente.ativo,
-        dataCriacao: cliente.dataCriacao || new Date()
+        criadoEm: cliente.criadoEm || new Date()
       })),
       total,
       pagina: filtros.pagina,

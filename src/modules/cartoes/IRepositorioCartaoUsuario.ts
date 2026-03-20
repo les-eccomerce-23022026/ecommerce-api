@@ -22,41 +22,43 @@ export class RepositorioCartaoUsuario implements IRepositorioCartaoUsuario {
 
   private static mapearLinha(linha: LinhaCartao): ICartaoUsuario {
     return {
-      id: Number(linha.idCartao),
-      uuid: linha.uuidCartao as string,
+      id: Number(linha.id),
+      uuid: linha.uuid as string,
       idUsuario: Number(linha.idUsuario),
-      idBandeiraCartao: Number(linha.idBandeiraCartao),
-      bandeira: linha.dscBandeira as string | undefined,
-      tokenCartao: linha.dscTokenCartao as string,
-      finalCartao: linha.dscFinalCartao as string,
-      nomeImpresso: linha.dscNomeImpresso as string,
-      validade: new Date(linha.datValidade as string),
-      principal: linha.flgPrincipal as boolean,
+      idBandeira: Number(linha.idBandeira),
+      bandeira: linha.bandeira as string | undefined,
+      token: linha.token as string,
+      final: linha.final as string,
+      nomeImpresso: linha.nomeImpresso as string,
+      validade: new Date(linha.validade as string),
+      principal: linha.principal as boolean,
+      criadoEm: linha.criadoEm ? new Date(linha.criadoEm as string) : undefined,
+      atualizadoEm: linha.atualizadoEm ? new Date(linha.atualizadoEm as string) : undefined,
     };
   }
 
   async criar(cartao: Omit<ICartaoUsuario, 'id' | 'uuid'>): Promise<ICartaoUsuario> {
     const query = `
-      INSERT INTO ecm_cartao_usuario (
-        id_usuario, id_bandeira_cartao, dsc_token_cartao,
-        dsc_final_cartao, dsc_nome_impresso, dat_validade, flg_principal
+      INSERT INTO crt_cartoes (
+        usu_id, ban_id, crt_token,
+        crt_final, crt_nome_impresso, crt_validade, crt_principal
       ) VALUES ($1, $2, $3, $4, $5, $6, $7)
-      RETURNING id_cartao AS "idCartao", uuid_cartao AS "uuidCartao", id_usuario AS "idUsuario", 
-                id_bandeira_cartao AS "idBandeiraCartao", 
-                (SELECT dsc_bandeira FROM ecm_bandeira_cartao WHERE id_bandeira_cartao = ecm_cartao_usuario.id_bandeira_cartao) AS "dscBandeira",
-                dsc_token_cartao AS "dscTokenCartao", 
-                dsc_final_cartao AS "dscFinalCartao", dsc_nome_impresso AS "dscNomeImpresso",
-                dat_validade AS "datValidade", flg_principal AS "flgPrincipal"
+      RETURNING crt_id AS "id", crt_uuid AS "uuid", usu_id AS "idUsuario",
+                ban_id AS "idBandeira",
+                (SELECT ban_descricao FROM ban_bandeiras WHERE ban_id = crt_cartoes.ban_id) AS "bandeira",
+                crt_token AS "token",
+                crt_final AS "final", crt_nome_impresso AS "nomeImpresso",
+                crt_validade AS "validade", crt_principal AS "principal"
     `;
 
     const valores = [
       cartao.idUsuario,
-      cartao.idBandeiraCartao,
-      cartao.tokenCartao,
-      cartao.finalCartao,
+      cartao.idBandeira,
+      cartao.token,
+      cartao.final,
       cartao.nomeImpresso,
       cartao.validade,
-      cartao.principal
+      cartao.principal,
     ];
 
     const rows = await this.pool.executar<LinhaCartao>(query, valores);
@@ -65,16 +67,16 @@ export class RepositorioCartaoUsuario implements IRepositorioCartaoUsuario {
 
   async buscarPorUuid(uuid: string): Promise<ICartaoUsuario | null> {
     const query = `
-      SELECT c.id_cartao AS "idCartao", c.uuid_cartao AS "uuidCartao", c.id_usuario AS "idUsuario", 
-             c.id_bandeira_cartao AS "idBandeiraCartao", b.dsc_bandeira AS "dscBandeira",
-             c.dsc_token_cartao AS "dscTokenCartao", c.dsc_final_cartao AS "dscFinalCartao", 
-             c.dsc_nome_impresso AS "dscNomeImpresso", c.dat_validade AS "datValidade", 
-             c.flg_principal AS "flgPrincipal"
-      FROM ecm_cartao_usuario c
-      LEFT JOIN ecm_bandeira_cartao b ON c.id_bandeira_cartao = b.id_bandeira_cartao
-      WHERE c.uuid_cartao = $1
+      SELECT c.crt_id AS "id", c.crt_uuid AS "uuid", c.usu_id AS "idUsuario",
+             c.ban_id AS "idBandeira", b.ban_descricao AS "bandeira",
+             c.crt_token AS "token", c.crt_final AS "final", 
+             c.crt_nome_impresso AS "nomeImpresso", c.crt_validade AS "validade", 
+             c.crt_principal AS "principal", c.crt_criado_em AS "criadoEm", 
+             c.crt_atualizado_em AS "atualizadoEm"
+      FROM crt_cartoes c
+      JOIN ban_bandeiras b ON c.ban_id = b.ban_id
+      WHERE c.crt_uuid = $1
     `;
-
     const rows = await this.pool.executar<LinhaCartao>(query, [uuid]);
     if (rows.length === 0) return null;
     return RepositorioCartaoUsuario.mapearLinha(rows[0]);
@@ -82,130 +84,89 @@ export class RepositorioCartaoUsuario implements IRepositorioCartaoUsuario {
 
   async buscarPorUsuario(idUsuario: number): Promise<ICartaoUsuario[]> {
     const query = `
-      SELECT c.id_cartao AS "idCartao", c.uuid_cartao AS "uuidCartao", c.id_usuario AS "idUsuario", 
-             c.id_bandeira_cartao AS "idBandeiraCartao", b.dsc_bandeira AS "dscBandeira",
-             c.dsc_token_cartao AS "dscTokenCartao", c.dsc_final_cartao AS "dscFinalCartao", 
-             c.dsc_nome_impresso AS "dscNomeImpresso", c.dat_validade AS "datValidade", 
-             c.flg_principal AS "flgPrincipal"
-      FROM ecm_cartao_usuario c
-      LEFT JOIN ecm_bandeira_cartao b ON c.id_bandeira_cartao = b.id_bandeira_cartao
-      WHERE c.id_usuario = $1
-      ORDER BY c.flg_principal DESC, c.dat_criacao DESC
+      SELECT c.crt_id AS "id", c.crt_uuid AS "uuid", c.usu_id AS "idUsuario",
+             c.ban_id AS "idBandeira", b.ban_descricao AS "bandeira",
+             c.crt_token AS "token", c.crt_final AS "final", 
+             c.crt_nome_impresso AS "nomeImpresso", c.crt_validade AS "validade", 
+             c.crt_principal AS "principal", c.crt_criado_em AS "criadoEm", 
+             c.crt_atualizado_em AS "atualizadoEm"
+      FROM crt_cartoes c
+      JOIN ban_bandeiras b ON c.ban_id = b.ban_id
+      WHERE c.usu_id = $1
+      ORDER BY c.crt_principal DESC, c.crt_criado_em DESC
     `;
-
     const rows = await this.pool.executar<LinhaCartao>(query, [idUsuario]);
-    return rows.map((linha) => RepositorioCartaoUsuario.mapearLinha(linha));
+    return rows.map(RepositorioCartaoUsuario.mapearLinha);
   }
 
-  async atualizar(uuid: string, dados: Partial<Omit<ICartaoUsuario, 'id' | 'uuid' | 'idUsuario'>>): Promise<ICartaoUsuario | null> {
-    const campos = [];
-    const valores = [];
+  async atualizar(
+    uuid: string,
+    dados: Partial<Omit<ICartaoUsuario, 'id' | 'uuid' | 'idUsuario'>>,
+  ): Promise<ICartaoUsuario | null> {
+    const campos: string[] = [];
+    const valores: unknown[] = [];
     let contador = 1;
 
-    if (dados.idBandeiraCartao !== undefined) {
-      campos.push(`id_bandeira_cartao = $${contador}`);
+    if (dados.idBandeira !== undefined) {
+      campos.push(`ban_id = $${contador}`);
+      valores.push(dados.idBandeira);
       contador += 1;
-      valores.push(dados.idBandeiraCartao);
     }
-    if (dados.tokenCartao !== undefined) {
-      campos.push(`dsc_token_cartao = $${contador}`);
+    if (dados.token !== undefined) {
+      campos.push(`crt_token = $${contador}`);
+      valores.push(dados.token);
       contador += 1;
-      valores.push(dados.tokenCartao);
     }
-    if (dados.finalCartao !== undefined) {
-      campos.push(`dsc_final_cartao = $${contador}`);
+    if (dados.final !== undefined) {
+      campos.push(`crt_final = $${contador}`);
+      valores.push(dados.final);
       contador += 1;
-      valores.push(dados.finalCartao);
     }
     if (dados.nomeImpresso !== undefined) {
-      campos.push(`dsc_nome_impresso = $${contador}`);
-      contador += 1;
+      campos.push(`crt_nome_impresso = $${contador}`);
       valores.push(dados.nomeImpresso);
+      contador += 1;
     }
     if (dados.validade !== undefined) {
-      campos.push(`dat_validade = $${contador}`);
-      contador += 1;
+      campos.push(`crt_validade = $${contador}`);
       valores.push(dados.validade);
+      contador += 1;
     }
     if (dados.principal !== undefined) {
-      campos.push(`flg_principal = $${contador}`);
-      contador += 1;
+      campos.push(`crt_principal = $${contador}`);
       valores.push(dados.principal);
+      contador += 1;
     }
 
-    if (campos.length === 0) return null;
-
-    const query = `
-      UPDATE ecm_cartao_usuario
-      SET ${campos.join(', ')}
-      WHERE uuid_cartao = $${contador}
-      RETURNING id_cartao AS "idCartao", uuid_cartao AS "uuidCartao", id_usuario AS "idUsuario", 
-                id_bandeira_cartao AS "idBandeiraCartao", 
-                (SELECT dsc_bandeira FROM ecm_bandeira_cartao WHERE id_bandeira_cartao = ecm_cartao_usuario.id_bandeira_cartao) AS "dscBandeira",
-                dsc_token_cartao AS "dscTokenCartao", 
-                dsc_final_cartao AS "dscFinalCartao", dsc_nome_impresso AS "dscNomeImpresso",
-                dat_validade AS "datValidade", flg_principal AS "flgPrincipal"
-    `;
+    if (campos.length === 0) return this.buscarPorUuid(uuid);
 
     valores.push(uuid);
-    const rows = await this.pool.executar<LinhaCartao>(query, valores);
-    if (rows.length === 0) return null;
-    return RepositorioCartaoUsuario.mapearLinha(rows[0]);
+    const query = `
+      UPDATE crt_cartoes
+      SET ${campos.join(', ')}
+      WHERE crt_uuid = $${contador}
+    `;
+
+    await this.pool.executar(query, valores);
+    return this.buscarPorUuid(uuid);
   }
 
   async excluir(uuid: string): Promise<boolean> {
-    // Verificar se o cartão existe antes de deletar
-    const cartaoExiste = await this.pool.executar<LinhaCartao>(
-      'SELECT * FROM ecm_cartao_usuario WHERE uuid_cartao = $1',
-      [uuid]
-    );
-    
-    if (cartaoExiste.length === 0) {
-      return false;
-    }
-
-    const query = 'DELETE FROM ecm_cartao_usuario WHERE uuid_cartao = $1';
-    await this.pool.executar<LinhaCartao>(query, [uuid]);
-    
-    // Verificar se foi deletado
-    const cartaoDepois = await this.pool.executar<LinhaCartao>(
-      'SELECT * FROM ecm_cartao_usuario WHERE uuid_cartao = $1',
-      [uuid]
-    );
-    return cartaoDepois.length === 0;
+    const query = 'DELETE FROM crt_cartoes WHERE crt_uuid = $1';
+    await this.pool.executar(query, [uuid]);
+    return true;
   }
 
   async definirComoPrincipal(uuid: string, idUsuario: number): Promise<boolean> {
-    // Verificar se o cartão existe
-    const cartaoExiste = await this.pool.executar<LinhaCartao>(
-      'SELECT * FROM ecm_cartao_usuario WHERE uuid_cartao = $1 AND id_usuario = $2',
-      [uuid, idUsuario]
-    );
-    
-    if (cartaoExiste.length === 0) {
-      return false;
-    }
+    // 1. Remove principal de todos os outros cartões do usuário
+    await this.pool.executar('UPDATE crt_cartoes SET crt_principal = false WHERE usu_id = $1', [idUsuario]);
 
-    // Primeiro, remove o flag principal de todos os cartões do usuário
-    await this.pool.executar<LinhaCartao>(
-      'UPDATE ecm_cartao_usuario SET flg_principal = FALSE WHERE id_usuario = $1',
-      [idUsuario]
-    );
+    if (!uuid) return true;
 
-    // Se o UUID estiver vazio, apenas limpamos o flag de todos (não define um novo como principal)
-    if (!uuid) {
-      return true;
-    }
+    // 2. Define o cartão específico como principal
+    const query = 'UPDATE crt_cartoes SET crt_principal = true WHERE crt_uuid = $1 AND usu_id = $2';
+    await this.pool.executar(query, [uuid, idUsuario]);
 
-    // Depois, define o cartão específico como principal
-    const query = 'UPDATE ecm_cartao_usuario SET flg_principal = TRUE WHERE uuid_cartao = $1 AND id_usuario = $2';
-    await this.pool.executar<LinhaCartao>(query, [uuid, idUsuario]);
-    
-    // Verificar se o cartão foi atualizado
-    const cartaoAtualizado = await this.pool.executar<LinhaCartao>(
-      'SELECT * FROM ecm_cartao_usuario WHERE uuid_cartao = $1 AND id_usuario = $2 AND flg_principal = TRUE',
-      [uuid, idUsuario]
-    );
-    return cartaoAtualizado.length > 0;
+    return true;
   }
 }

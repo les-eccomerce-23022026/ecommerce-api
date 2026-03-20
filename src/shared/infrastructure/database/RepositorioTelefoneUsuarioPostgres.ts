@@ -11,19 +11,21 @@ export class RepositorioTelefoneUsuarioPostgres implements IRepositorioTelefoneU
 
   private static mapearParaEntidade(row: Record<string, unknown>): ITelefoneUsuario {
     return {
-      id: Number(row.idTelefone),
-      uuid: row.uuidTelefone as string,
+      id: Number(row.id),
+      uuid: row.uuid as string,
       idUsuario: Number(row.idUsuario),
       idTipoTelefone: Number(row.idTipoTelefone),
-      ddd: row.numDdd as string,
-      numero: row.numTelefone as string,
-      principal: row.flgPrincipal as boolean,
+      ddd: row.ddd as string,
+      numero: row.numero as string,
+      principal: row.principal as boolean,
+      criadoEm: row.criadoEm ? new Date(row.criadoEm as string) : undefined,
+      atualizadoEm: row.atualizadoEm ? new Date(row.atualizadoEm as string) : undefined,
     };
   }
 
   public async criar(telefone: ITelefoneUsuario): Promise<void> {
     const query = `
-      INSERT INTO ecm_telefone_usuario (id_usuario, id_tipo_telefone, num_ddd, num_telefone, flg_principal)
+      INSERT INTO tel_telefones (usu_id, ttp_id, tel_ddd, tel_numero, tel_principal)
       VALUES ($1, $2, $3, $4, $5)
     `;
     await this.db.executar(query, [
@@ -37,11 +39,12 @@ export class RepositorioTelefoneUsuarioPostgres implements IRepositorioTelefoneU
 
   public async buscarPorIdUsuario(idUsuario: number): Promise<ITelefoneUsuario[]> {
     const query = `
-      SELECT id_telefone AS "idTelefone", uuid_telefone AS "uuidTelefone", 
-             id_usuario AS "idUsuario", id_tipo_telefone AS "idTipoTelefone", 
-             num_ddd AS "numDdd", num_telefone AS "numTelefone", flg_principal AS "flgPrincipal"
-      FROM ecm_telefone_usuario 
-      WHERE id_usuario = $1
+      SELECT tel_id AS "id", tel_uuid AS "uuid", 
+             usu_id AS "idUsuario", ttp_id AS "idTipoTelefone", 
+             tel_ddd AS "ddd", tel_numero AS "numero", tel_principal AS "principal",
+             tel_criado_em AS "criadoEm", tel_atualizado_em AS "atualizadoEm"
+      FROM tel_telefones 
+      WHERE usu_id = $1
     `;
     const rows = await this.db.executar(query, [idUsuario]);
     return rows.map((row) => RepositorioTelefoneUsuarioPostgres.mapearParaEntidade(row as Record<string, unknown>));
@@ -49,9 +52,9 @@ export class RepositorioTelefoneUsuarioPostgres implements IRepositorioTelefoneU
 
   public async atualizar(telefone: ITelefoneUsuario): Promise<void> {
     const query = `
-      UPDATE ecm_telefone_usuario
-      SET id_tipo_telefone = $1, num_ddd = $2, num_telefone = $3, flg_principal = $4
-      WHERE id_usuario = $5 AND uuid_telefone = $6
+      UPDATE tel_telefones
+      SET ttp_id = $1, tel_ddd = $2, tel_numero = $3, tel_principal = $4
+      WHERE usu_id = $5 AND tel_uuid = $6
     `;
     await this.db.executar(query, [
       telefone.idTipoTelefone,
@@ -64,7 +67,7 @@ export class RepositorioTelefoneUsuarioPostgres implements IRepositorioTelefoneU
   }
 
   public async deletar(idUsuario: number, uuidTelefone: string): Promise<void> {
-    const query = 'DELETE FROM ecm_telefone_usuario WHERE id_usuario = $1 AND uuid_telefone = $2';
+    const query = 'DELETE FROM tel_telefones WHERE usu_id = $1 AND tel_uuid = $2';
     await this.db.executar(query, [idUsuario, uuidTelefone]);
   }
 }

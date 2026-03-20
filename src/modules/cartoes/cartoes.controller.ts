@@ -24,7 +24,7 @@ export class ControladorCartoes {
       // Formatar resposta para o frontend (sem dados sensíveis)
       const cartoesFormatados = cartoes.map(cartao => ({
         uuid: cartao.uuid,
-        final: cartao.finalCartao,
+        final: cartao.final,
         nomeImpresso: cartao.nomeImpresso,
         bandeira: cartao.bandeira || 'Outra',
         validade: cartao.validade.toISOString().substring(0, 7), // YYYY-MM
@@ -51,12 +51,12 @@ export class ControladorCartoes {
       const dados: ICriarCartaoDto = requisicao.body;
 
       // Validações básicas
-      const { idBandeiraCartao, tokenCartao, finalCartao, nomeImpresso, validade } = dados;
-      if (!idBandeiraCartao || !tokenCartao || !finalCartao || !nomeImpresso || !validade) {
+      const { idBandeira, token, final, nomeImpresso, validade } = dados;
+      if (!idBandeira || !token || !final || !nomeImpresso || !validade) {
         const faltando = [];
-        if (!idBandeiraCartao) faltando.push('idBandeiraCartao');
-        if (!tokenCartao) faltando.push('tokenCartao');
-        if (!finalCartao) faltando.push('finalCartao');
+        if (!idBandeira) faltando.push('idBandeira');
+        if (!token) faltando.push('token');
+        if (!final) faltando.push('final');
         if (!nomeImpresso) faltando.push('nomeImpresso');
         if (!validade) faltando.push('validade');
         return RespostaPadrao.enviarErro(
@@ -70,7 +70,7 @@ export class ControladorCartoes {
 
       const cartaoFormatado = {
         uuid: cartao.uuid,
-        final: cartao.finalCartao,
+        final: cartao.final,
         nomeImpresso: cartao.nomeImpresso,
         bandeira: cartao.bandeira || 'Outra',
         validade: cartao.validade.toISOString().substring(0, 7),
@@ -99,7 +99,7 @@ export class ControladorCartoes {
 
       const cartaoFormatado = {
         uuid: cartao.uuid,
-        final: cartao.finalCartao,
+        final: cartao.final,
         nomeImpresso: cartao.nomeImpresso,
         bandeira: cartao.bandeira || 'Outra',
         validade: cartao.validade.toISOString().substring(0, 7),

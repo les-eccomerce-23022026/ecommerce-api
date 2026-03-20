@@ -24,9 +24,9 @@ describe('Integração - Cartões', () => {
 
   it('deve adicionar um novo cartão', async () => {
     const novoCartao = {
-      idBandeiraCartao: 1, // Visa
-      tokenCartao: 'tok_test_integration',
-      finalCartao: '9999',
+      idBandeira: 1, // Visa
+      token: 'tok_test_integration',
+      final: '9999',
       nomeImpresso: 'Teste Integração',
       validade: '2026-12-01',
       principal: false,

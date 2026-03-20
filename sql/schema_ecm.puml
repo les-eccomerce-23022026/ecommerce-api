@@ -167,10 +167,9 @@ package "localizacao" #FFE8D6 {
         PK(id_logradouro: SERIAL)
         FK(id_tipo_logradouro: INTEGER)  NULL
         dsc_logradouro: VARCHAR(200)
-        num_logradouro: VARCHAR(10)
         dat_criacao: TIMESTAMPTZ
         ..
-        ' UK(id_tipo_logradouro, dsc_logradouro, num_logradouro)
+        ' UK(id_tipo_logradouro, dsc_logradouro)
         ' fk_logradouro_tipo → ecm_tipo_logradouro (SET NULL)
     }
 }
@@ -187,6 +186,7 @@ package "endereco" #FFF5CC {
         CK(dsc_tipo_endereco: VARCHAR(20)  DEFAULT 'entrega')
         FK(id_tipo_residencia: INTEGER)  NULL
         FK(id_logradouro: INTEGER)  NULL
+        num_logradouro: VARCHAR(10)
         dsc_complemento: VARCHAR(100)  NULL
         FK(id_cidade: INTEGER)  NULL
         FK(id_bairro: INTEGER)  NULL

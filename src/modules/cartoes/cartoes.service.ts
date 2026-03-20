@@ -2,9 +2,9 @@ import { IRepositorioCartaoUsuario } from './IRepositorioCartaoUsuario';
 import { ICartaoUsuario } from '../../shared/types/ICartaoUsuario';
 
 export interface ICriarCartaoDto {
-  idBandeiraCartao: number;
-  tokenCartao: string;
-  finalCartao: string;
+  idBandeira: number;
+  token: string;
+  final: string;
   nomeImpresso: string;
   validade: Date;
   cvv?: string; // Adicionado para validação
@@ -12,9 +12,9 @@ export interface ICriarCartaoDto {
 }
 
 export interface IAtualizarCartaoDto {
-  idBandeiraCartao?: number;
-  tokenCartao?: string;
-  finalCartao?: string;
+  idBandeira?: number;
+  token?: string;
+  final?: string;
   nomeImpresso?: string;
   validade?: Date;
   cvv?: string; // Adicionado para validação
@@ -51,13 +51,11 @@ export class ServicoCartoes {
       }
     }
 
-    // Se for principal, remove o flag dos outros cartões do usuário
-
     const cartao = await this.repositorioCartoes.criar({
       idUsuario,
-      idBandeiraCartao: dados.idBandeiraCartao,
-      tokenCartao: dados.tokenCartao,
-      finalCartao: dados.finalCartao,
+      idBandeira: dados.idBandeira,
+      token: dados.token,
+      final: dados.final,
       nomeImpresso: dados.nomeImpresso,
       validade: dados.validade,
       principal: dados.principal || false

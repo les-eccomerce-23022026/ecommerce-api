@@ -1,6 +1,6 @@
 import { Pool, PoolClient } from 'pg';
 import { IConexaoBanco } from './IConexaoBanco';
-import { obterTipoBancoAtual } from './ContextoBanco';
+import { obterTipoBancoAtual, obterTransacaoAtual, contextoBanco, obterContextoAtual, definirTransacaoGlobalParaTestes } from './ContextoBanco';
 
 /**
  * Implementação da interface IConexaoBanco para Postgres utilizando 'pg' Pool.
@@ -12,8 +12,6 @@ export class ConexaoPostgres implements IConexaoBanco {
   private poolProducao: Pool;
 
   private poolTeste: Pool | null = null;
-
-  private clienteTransacao: PoolClient | null = null;
 
   private constructor() {
     this.poolProducao = ConexaoPostgres.criarPoolProducao();
@@ -72,40 +70,66 @@ export class ConexaoPostgres implements IConexaoBanco {
   }
 
   public async executar<T = unknown>(sql: string, parametros?: unknown[]): Promise<T[]> {
-    const executor = this.clienteTransacao || this.obterPoolAtivo();
+    const transacao = obterTransacaoAtual();
+    const executor = transacao || this.obterPoolAtivo();
     const { rows } = await executor.query(sql, parametros);
     return rows as T[];
   }
 
   public async iniciarTransacao(): Promise<void> {
-    if (this.clienteTransacao) {
-      throw new Error('Transação já está em andamento nesta conexão.');
+    const transacaoExistente = obterTransacaoAtual();
+    if (transacaoExistente) {
+      throw new Error('Transação já está em andamento neste contexto.');
     }
-    this.clienteTransacao = await this.obterPoolAtivo().connect();
-    await this.clienteTransacao.query('BEGIN');
+
+    const cliente = await this.obterPoolAtivo().connect();
+    await cliente.query('BEGIN');
+
+    // Define fallback global para testes onde o contexto assíncrono é perdido
+    definirTransacaoGlobalParaTestes(cliente);
+
+    const contextoAtual = obterContextoAtual() || { tipo: obterTipoBancoAtual() };
+    contextoBanco.enterWith({
+      ...contextoAtual,
+      transacao: cliente,
+    });
   }
 
   public async confirmarTransacao(): Promise<void> {
-    if (!this.clienteTransacao) {
+    const cliente = obterTransacaoAtual();
+    if (!cliente) {
       throw new Error('Nenhuma transação ativa para confirmar.');
     }
     try {
-      await this.clienteTransacao.query('COMMIT');
+      await cliente.query('COMMIT');
     } finally {
-      this.clienteTransacao.release();
-      this.clienteTransacao = null;
+      cliente.release();
+      definirTransacaoGlobalParaTestes(undefined); // Limpa fallback global
+      const contextoAtual = obterContextoAtual();
+      if (contextoAtual) {
+        delete contextoAtual.transacao;
+        contextoBanco.enterWith(contextoAtual);
+      }
     }
   }
 
   public async reverterTransacao(): Promise<void> {
-    if (!this.clienteTransacao) {
+    const cliente = obterTransacaoAtual();
+    const transacaoExistente = obterContextoAtual();
+    if (!cliente) {
+      console.log('REVERTER FALHOU. ContextoAtual:', JSON.stringify(transacaoExistente));
       throw new Error('Nenhuma transação ativa para reverter.');
     }
     try {
-      await this.clienteTransacao.query('ROLLBACK');
+      await cliente.query('ROLLBACK');
     } finally {
-      this.clienteTransacao.release();
-      this.clienteTransacao = null;
+      cliente.release();
+      definirTransacaoGlobalParaTestes(undefined); // Limpa fallback global
+      const contextoAtual = obterContextoAtual();
+      if (contextoAtual) {
+        delete contextoAtual.transacao;
+        contextoBanco.enterWith(contextoAtual);
+      }
     }
   }
 
