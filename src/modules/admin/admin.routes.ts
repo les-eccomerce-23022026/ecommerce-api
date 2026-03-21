@@ -39,4 +39,9 @@ export function registrarRotasAdmin(app: IRouter): void {
     adminOnlyMiddleware,
     (requisicao, resposta) => ControladorAdmin.ativarAdmin(requisicao, resposta),
   );
+
+  // Endpoint de Bootstrap EXCLUSIVO para ambiente de testes (sandboxed).
+  // NÃO UTILIZA autenticacaoMiddleware ou adminOnlyMiddleware porque seu propósito
+  // é justamente criar o primeiro admin nos testes automatizados sem intervenção no DB.
+  app.post('/admin/bootstrap', (requisicao, resposta) => ControladorAdmin.bootstrapAdmin(requisicao, resposta));
 }

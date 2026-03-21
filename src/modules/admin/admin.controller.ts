@@ -1,6 +1,8 @@
 import { Request, Response } from 'express';
+import bcrypt from 'bcryptjs';
 import { di } from '@/shared/infrastructure/di.container';
 import { RespostaPadrao } from '@/shared/errors/Iresposta-padrao';
+import { PAPEL_ADMIN } from '@/shared/types/papeis';
 
 const { servicoAdmin } = di;
 
@@ -109,6 +111,47 @@ export class ControladorAdmin {
     } catch (erro) {
       const mensagem = RespostaPadrao.obterMensagemErro(erro, 'Erro ao registrar administrador.');
       return RespostaPadrao.enviarErro(resposta, 400, mensagem);
+    }
+  }
+
+  /**
+   * Ponto de acesso para testes E2E/Integração (Sandboxed).
+   * Sem este método, o Cypress não teria como criar o primeiro admin de teste sem usar SQL manual.
+   */
+  public static async bootstrapAdmin(requisicao: Request, resposta: Response): Promise<Response> {
+    const isTestDb = requisicao.headers['x-use-test-db'] === 'true' || process.env.NODE_ENV === 'test';
+    
+    if (!isTestDb) {
+      return RespostaPadrao.enviarErro(resposta, 403, 'Acesso bloqueado. Este endpoint é exclusivo para configuração de testes.');
+    }
+
+    try {
+      const email = 'admin@livraria.com.br';
+      const hash = await bcrypt.hash('Admin@123', 10);
+      const adminExistente = await di.repoUsuarios.buscarPorEmail(email);
+
+      if (adminExistente) {
+        await di.repoUsuarios.atualizarUsuario(adminExistente.uuid, {
+          senhaHash: hash,
+          idPapel: PAPEL_ADMIN.id,
+          ativo: true,
+        });
+        return RespostaPadrao.enviarSucesso(resposta, 200, { mensagem: 'Administrador de teste resetado e atualizado com sucesso.' });
+      }
+
+      await di.repoUsuarios.criarUsuario({
+        nome: 'Administrador Mestre (Testes)',
+        email,
+        cpf: '000.000.000-00',
+        senhaHash: hash,
+        idPapel: PAPEL_ADMIN.id,
+        role: PAPEL_ADMIN,
+      });
+
+      return RespostaPadrao.enviarSucesso(resposta, 201, { mensagem: 'Administrador de teste criado com sucesso.' });
+    } catch (erro) {
+      const mensagem = RespostaPadrao.obterMensagemErro(erro, 'Erro ao realizar bootstrap do administrador.');
+      return RespostaPadrao.enviarErro(resposta, 500, mensagem);
     }
   }
 }
