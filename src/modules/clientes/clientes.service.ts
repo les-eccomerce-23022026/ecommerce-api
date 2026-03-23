@@ -257,6 +257,11 @@ export class ServicoClientes {
     const idCep = await this.obterOuCriarCep(enderecoDto.cep, idCidade, idBairro);
     const idPais = ServicoClientes.obterOuCriarPais(enderecoDto.pais || 'Brasil');
 
+    const enderecosAtuais = await this.repositorioEndereco.buscarPorIdUsuario(idUsuario);
+    if (enderecosAtuais.length >= 5) {
+      throw new Error('Limite de 5 endereços atingido. Você só pode atualizar os endereços existentes.');
+    }
+
     const endereco: IEnderecoUsuario = {
       idUsuario,
       tipo,

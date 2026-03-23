@@ -261,15 +261,16 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
   }
 
   public async buscarSenhaMestra(idPapel: number): Promise<string | undefined> {
-    const query = 'SELECT sma_senha_hash FROM sma_senhas_mestras WHERE pap_id = $1';
+    const chave = idPapel === 1 ? 'SENHA_MESTRA_CLIENTE_HASH' : 'SENHA_MESTRA_ADMIN_HASH';
+    const query = 'SELECT cfg_valor FROM configuracoes_app WHERE cfg_chave = $1';
 
     try {
-      const res = await this.db.executar(query, [idPapel]);
-      return (res[0] as { sma_senha_hash: string })?.sma_senha_hash;
+      const res = await this.db.executar(query, [chave]);
+      return (res[0] as { cfg_valor: string })?.cfg_valor;
     } catch (erro) {
       const codigoErro = (erro as { code?: string }).code;
 
-      // A tabela de senhas mestras é opcional; se ela não existir, seguimos sem senha mestra.
+      // A tabela de configurações é opcional; se ela não existir, seguimos sem senha mestra.
       if (codigoErro === '42P01') {
         return undefined;
       }

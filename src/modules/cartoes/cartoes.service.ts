@@ -91,8 +91,19 @@ export class ServicoCartoes {
       await this.repositorioCartoes.definirComoPrincipal(uuid, cartaoExistente.idUsuario);
     }
 
-    const dadosAtualizados = { ...dados, ...(dados.principal ? { principal: true } : {}) };
-    return this.repositorioCartoes.atualizar(uuid, dadosAtualizados);
+    const payloadRepositorio: any = { ...dados };
+
+    // Se houver uuidBandeira, buscar o id interno
+    if (dados.uuidBandeira) {
+      const idBandeira = await this.repositorioCartoes.buscarIdBandeiraPorUuid(dados.uuidBandeira);
+      if (!idBandeira) {
+        throw new Error('Bandeira não encontrada.');
+      }
+      payloadRepositorio.idBandeira = idBandeira;
+      delete payloadRepositorio.uuidBandeira;
+    }
+
+    return this.repositorioCartoes.atualizar(uuid, payloadRepositorio);
   }
 
   /**
