@@ -1,5 +1,8 @@
 @baseUrl = http://localhost:3000
-@token = Bearer <insira_o_token_aqui>
+
+@bandeiraVisaUuid = 3f3f7cfe-3768-4f0d-b7f3-ac33e0c4b293
+@bandeiraMasterUuid = acb58271-6046-46f7-a846-a8bc105478a2
+@bandeiraEloUuid = 7cf28270-fc29-4f66-8a60-a46a4cf71a8e
 
 ### Listar Cartões do Usuário
 # Cenário Feliz: Lista cartões com sucesso
@@ -11,7 +14,7 @@
 # - Erro ao listar: Status 400, mensagem "Erro ao listar cartões."
 # Requer: Authorization header com token JWT
 GET {{baseUrl}}/api/clientes/perfil/cartoes
-Authorization: {{token}}
+Authorization: Bearer {{authToken}}
 
 ###
 ### Cadastrar Novo Cartão
@@ -26,12 +29,12 @@ Authorization: {{token}}
 # Requer: Authorization header com token JWT
 POST {{baseUrl}}/api/clientes/perfil/cartoes
 Content-Type: application/json
-Authorization: {{token}}
+Authorization: Bearer {{authToken}}
 
 {
-  "idBandeiraCartao": 1,
-  "tokenCartao": "tok_visa_123456789",
-  "finalCartao": "1234",
+  "uuidBandeira": "{{bandeiraVisaUuid}}",
+  "token": "tok_visa_123456789",
+  "final": "1234",
   "nomeImpresso": "João Silva",
   "validade": "2025-12-01",
   "cvv": "123",
@@ -44,24 +47,24 @@ Authorization: {{token}}
 # Status: 200
 PATCH {{baseUrl}}/api/clientes/perfil/cartoes/{{cartaoUuid}}
 Content-Type: application/json
-Authorization: {{token}}
+Authorization: Bearer {{authToken}}
 
 {
   "nomeImpresso": "JOAO O SILVA",
   "validade": "2027-01-01",
-  "idBandeiraCartao": 1
+  "uuidBandeira": "{{bandeiraVisaUuid}}"
 }
 
 ###
 ### Cadastrar Cartão (ex: alterar nome impresso) Mastercard
 POST {{baseUrl}}/api/clientes/perfil/cartoes
 Content-Type: application/json
-Authorization: {{token}}
+Authorization: Bearer {{authToken}}
 
 {
-  "idBandeiraCartao": 2,
-  "tokenCartao": "tok_mastercard_987654321",
-  "finalCartao": "5678",
+  "uuidBandeira": "{{bandeiraMasterUuid}}",
+  "token": "tok_mastercard_987654321",
+  "final": "5678",
   "nomeImpresso": "Maria Santos",
   "validade": "2026-06-01",
   "cvv": "456",
@@ -72,12 +75,12 @@ Authorization: {{token}}
 ### Cadastrar Cartão Elo
 POST {{baseUrl}}/api/clientes/perfil/cartoes
 Content-Type: application/json
-Authorization: {{token}}
+Authorization: Bearer {{authToken}}
 
 {
-  "idBandeiraCartao": 3,
-  "tokenCartao": "tok_elo_456789123",
-  "finalCartao": "9012",
+  "uuidBandeira": "{{bandeiraEloUuid}}",
+  "token": "tok_elo_456789123",
+  "final": "9012",
   "nomeImpresso": "Pedro Lima",
   "validade": "2027-03-01",
   "cvv": "789",
@@ -92,7 +95,7 @@ Authorization: {{token}}
 # Requer: Authorization header com token JWT
 PATCH {{baseUrl}}/api/clientes/perfil/cartoes/uuid-cartao
 Content-Type: application/json
-Authorization: {{token}}
+Authorization: Bearer {{authToken}}
 
 {
   "nomeImpresso": "João Silva Atualizado"
@@ -109,7 +112,7 @@ Authorization: {{token}}
 # - Erro ao remover: Status 400
 # Requer: Authorization header com token JWT
 DELETE {{baseUrl}}/api/clientes/perfil/cartoes/uuid-cartao
-Authorization: {{token}}
+Authorization: Bearer {{authToken}}
 
 ###
 ### Definir Cartão como Principal
@@ -122,4 +125,4 @@ Authorization: {{token}}
 # - Erro: Status 400
 # Requer: Authorization header com token JWT
 PATCH {{baseUrl}}/api/clientes/perfil/cartoes/uuid-cartao/principal
-Authorization: {{token}}
+Authorization: Bearer {{authToken}}

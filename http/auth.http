@@ -2,10 +2,7 @@
 @token = Bearer <insira_o_token_aqui>
 
 ### Login - Teste Homologação
-# Cenário Feliz: Autenticação com e-mail e senha de teste fornecidos
-# Status: 200 OK
-# Tipo de Envio (IDadosLoginDto): {email: string, senha: string}
-# Tipo de Resposta (IRespostaLoginDto): {sucesso: boolean, dados: {user: {uuid: string, nome: string, email: string, role: string}}}
+# @name login
 POST {{baseUrl}}/api/auth/login
 Content-Type: application/json
 
@@ -15,6 +12,8 @@ Content-Type: application/json
 }
 
 ###
+@authToken = {{login.response.body.token}}
+
 ### Login - Administrador Mestre
 # Cenário Feliz: Autenticação bem-sucedida com credenciais válidas
 # Status: 200

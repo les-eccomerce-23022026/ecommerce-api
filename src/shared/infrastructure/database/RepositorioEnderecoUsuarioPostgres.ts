@@ -32,7 +32,7 @@ export class RepositorioEnderecoUsuarioPostgres implements IRepositorioEnderecoU
 
   public async criar(endereco: IEnderecoUsuario): Promise<IEnderecoUsuario> {
     const query = `
-      INSERT INTO end_enderecos (
+      INSERT INTO enderecos (
         usu_id, end_tipo, end_apelido, tre_id, log_id, end_numero, end_complemento,
         cid_id, bai_id, cep_id, pai_id, end_principal
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
@@ -69,7 +69,7 @@ export class RepositorioEnderecoUsuarioPostgres implements IRepositorioEnderecoU
              cid_id AS "idCidade", bai_id AS "idBairro", cep_id AS "idCep", 
              pai_id AS "idPais", end_principal AS "principal",
              end_criado_em AS "criadoEm", end_atualizado_em AS "atualizadoEm"
-      FROM end_enderecos 
+      FROM enderecos 
       WHERE usu_id = $1
     `;
     const rows = await this.db.executar(query, [idUsuario]);
@@ -78,7 +78,7 @@ export class RepositorioEnderecoUsuarioPostgres implements IRepositorioEnderecoU
 
   public async atualizar(endereco: IEnderecoUsuario): Promise<void> {
     const query = `
-      UPDATE end_enderecos
+      UPDATE enderecos
       SET end_tipo = $1, end_apelido = $2, tre_id = $3, log_id = $4, end_numero = $5, end_complemento = $6,
           cid_id = $7, bai_id = $8, cep_id = $9, pai_id = $10, end_principal = $11
       WHERE usu_id = $12 AND end_uuid = $13
@@ -101,7 +101,7 @@ export class RepositorioEnderecoUsuarioPostgres implements IRepositorioEnderecoU
   }
 
   public async deletar(idUsuario: number, uuidEndereco: string): Promise<void> {
-    const query = 'DELETE FROM end_enderecos WHERE usu_id = $1 AND end_uuid = $2';
+    const query = 'DELETE FROM enderecos WHERE usu_id = $1 AND end_uuid = $2';
     await this.db.executar(query, [idUsuario, uuidEndereco]);
   }
 }

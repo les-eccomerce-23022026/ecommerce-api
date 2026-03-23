@@ -50,8 +50,8 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
              u.usu_ativo AS "ativo", u.usu_genero AS "genero", u.usu_data_nascimento AS "dataNascimento",
              u.usu_criado_em AS "criadoEm", u.usu_atualizado_em AS "atualizadoEm",
              p.pap_descricao AS "papelDescricao"
-      FROM usu_usuarios u
-      JOIN pap_papeis p ON u.pap_id = p.pap_id
+      FROM usuarios u
+      JOIN papeis p ON u.pap_id = p.pap_id
     `;
   }
 
@@ -60,7 +60,7 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
     const idPapel = role?.id ?? PAPEL_CLIENTE.id;
 
     const query = `
-      INSERT INTO usu_usuarios (usu_nome, usu_email, usu_cpf, usu_senha_hash, pap_id)
+      INSERT INTO usuarios (usu_nome, usu_email, usu_cpf, usu_senha_hash, pap_id)
       VALUES ($1, $2, $3, $4, $5)
       RETURNING usu_id AS "id", usu_uuid AS "uuid", usu_nome AS "nome", 
                 usu_email AS "email", usu_cpf AS "cpf", usu_senha_hash AS "senhaHash", 
@@ -180,7 +180,7 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
 
     valores.push(uuid);
     const query = `
-      UPDATE usu_usuarios 
+      UPDATE usuarios 
       SET ${campos.join(', ')} 
       WHERE usu_uuid = $${contador}
     `;
@@ -190,7 +190,7 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
   }
 
   public async deletarPorEmail(email: string): Promise<void> {
-    const query = 'DELETE FROM usu_usuarios WHERE usu_email = $1';
+    const query = 'DELETE FROM usuarios WHERE usu_email = $1';
     await this.db.executar(query, [email]);
   }
 
@@ -234,7 +234,7 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
   public async contarClientesComFiltros(filtros: Omit<IFiltrosConsultaClientes, 'offset' | 'limite'>): Promise<number> {
     const { nome, cpf, email } = filtros;
 
-    let query = 'SELECT COUNT(*) as total FROM usu_usuarios WHERE pap_id = $1';
+    let query = 'SELECT COUNT(*) as total FROM usuarios WHERE pap_id = $1';
     const valores: unknown[] = [PAPEL_CLIENTE.id];
     let contador = 2;
 

@@ -1,121 +1,135 @@
 -- =============================================================================
 -- DDL 005 — Tabela de endereços do usuário
--- Sistema: ECM – E-Commerce de Livros
+-- Sistema: LES – E-Commerce de Livros
 -- =============================================================================
 
 -- -----------------------------------------------------------------------------
--- ecm_endereco_usuario
+-- end_enderecos
 -- Objeto de valor: um usuário pode ter N endereços cadastrados.
 -- Todas as colunas textuais foram normalizadas em tabelas separadas para
 -- eliminar redundância e garantir consistência de dados.
 --
 -- Decisões de modelagem:
 --   • Campos textuais (cidade, bairro, país, CEP, logradouro) foram movidos
---     para tabelas normalizadas (ecm_cidade, ecm_bairro, ecm_pais, ecm_cep, ecm_logradouro)
+--     para tabelas normalizadas (cid_cidades, bai_bairros, pai_paises, cep_ceps, log_logradouros)
 --     para evitar duplicação e inconsistências.
---   • id_tipo_residencia permanece como FK opcional para compatibilidade.
---   • Apenas um endereço por usuário pode ser flg_principal = TRUE.
+--   • tre_id permanece como FK opcional para compatibilidade.
+--   • Apenas um endereço por usuário pode ser end_principal = TRUE.
 -- -----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS ecm_endereco_usuario (
-    id_endereco             BIGSERIAL       PRIMARY KEY,
-    uuid_endereco           UUID            NOT NULL    DEFAULT gen_random_uuid(),
-    id_usuario              BIGINT          NOT NULL,
-    dsc_tipo_endereco       VARCHAR(20)     NOT NULL    DEFAULT 'entrega',
-    nom_apelido             VARCHAR(50),
-    id_tipo_residencia      INTEGER,
-    id_logradouro           INTEGER,
-    dsc_complemento         VARCHAR(100),
-    id_cidade               INTEGER,
-    id_bairro               INTEGER,
-    id_cep                  INTEGER,
-    id_pais                 INTEGER         NOT NULL    DEFAULT 1, -- 1 = Brasil
-    flg_principal           BOOLEAN         NOT NULL    DEFAULT FALSE,
+CREATE TABLE IF NOT EXISTS enderecos (
+    end_id                  BIGSERIAL       PRIMARY KEY,
+    end_uuid                UUID            NOT NULL    DEFAULT gen_random_uuid(),
+    usu_id                  BIGINT          NOT NULL,
+    end_tipo                VARCHAR(20)     NOT NULL    DEFAULT 'entrega',
+    end_apelido             VARCHAR(50),
+    tre_id                  INTEGER,
+    log_id                  INTEGER,
+    end_numero              VARCHAR(10)     NOT NULL,
+    end_complemento         VARCHAR(100),
+    cid_id                  INTEGER,
+    bai_id                  INTEGER,
+    cep_id                  INTEGER,
+    pai_id                  INTEGER         NOT NULL    DEFAULT 1, -- 1 = Brasil
+    end_principal           BOOLEAN         NOT NULL    DEFAULT FALSE,
+    end_criado_em           TIMESTAMPTZ     NOT NULL    DEFAULT NOW(),
+    end_atualizado_em       TIMESTAMPTZ     NOT NULL    DEFAULT NOW(),
 
     -- RN0021/RN0022: cobrança ou entrega
-    CONSTRAINT ck_endereco_tipo CHECK (dsc_tipo_endereco IN ('cobranca', 'entrega')),
-    dat_criacao             TIMESTAMPTZ     NOT NULL    DEFAULT NOW(),
-    dat_atualizacao         TIMESTAMPTZ     NOT NULL    DEFAULT NOW(),
+    CONSTRAINT ck_enderecos_tipo CHECK (end_tipo IN ('cobranca', 'entrega')),
 
-    CONSTRAINT uq_endereco_uuid UNIQUE (uuid_endereco),
+    CONSTRAINT uq_enderecos_uuid UNIQUE (end_uuid),
 
     -- Apenas um endereço principal por usuário
-    CONSTRAINT uq_endereco_usuario_principal
-        EXCLUDE USING btree (id_usuario WITH =)
-        WHERE (flg_principal = TRUE),
+    CONSTRAINT uq_enderecos_usuario_principal
+        EXCLUDE USING btree (usu_id WITH =)
+        WHERE (end_principal = TRUE),
 
-    CONSTRAINT fk_endereco_usuario
-        FOREIGN KEY (id_usuario)
-        REFERENCES ecm_usuario (id_usuario)
+    CONSTRAINT fk_enderecos_usuarios
+        FOREIGN KEY (usu_id)
+        REFERENCES usuarios (usu_id)
         ON UPDATE CASCADE
         ON DELETE CASCADE,
 
-    CONSTRAINT fk_endereco_tipo_residencia
-        FOREIGN KEY (id_tipo_residencia)
-        REFERENCES ecm_tipo_residencia (id_tipo_residencia)
+    CONSTRAINT fk_enderecos_tipos_residencias
+        FOREIGN KEY (tre_id)
+        REFERENCES tipos_residencias (tre_id)
         ON UPDATE CASCADE
         ON DELETE SET NULL,
 
-    CONSTRAINT fk_endereco_logradouro
-        FOREIGN KEY (id_logradouro)
-        REFERENCES ecm_logradouro (id_logradouro)
+    CONSTRAINT fk_enderecos_logradouros
+        FOREIGN KEY (log_id)
+        REFERENCES logradouros (log_id)
         ON UPDATE CASCADE
         ON DELETE SET NULL,
 
-    CONSTRAINT fk_endereco_cidade
-        FOREIGN KEY (id_cidade)
-        REFERENCES ecm_cidade (id_cidade)
+    CONSTRAINT fk_enderecos_cidades
+        FOREIGN KEY (cid_id)
+        REFERENCES cidades (cid_id)
         ON UPDATE CASCADE
         ON DELETE SET NULL,
 
-    CONSTRAINT fk_endereco_bairro
-        FOREIGN KEY (id_bairro)
-        REFERENCES ecm_bairro (id_bairro)
+    CONSTRAINT fk_enderecos_bairros
+        FOREIGN KEY (bai_id)
+        REFERENCES bairros (bai_id)
         ON UPDATE CASCADE
         ON DELETE SET NULL,
 
-    CONSTRAINT fk_endereco_cep
-        FOREIGN KEY (id_cep)
-        REFERENCES ecm_cep (id_cep)
+    CONSTRAINT fk_enderecos_ceps
+        FOREIGN KEY (cep_id)
+        REFERENCES ceps (cep_id)
         ON UPDATE CASCADE
         ON DELETE SET NULL,
 
-    CONSTRAINT fk_endereco_pais
-        FOREIGN KEY (id_pais)
-        REFERENCES ecm_pais (id_pais)
+    CONSTRAINT fk_enderecos_paises
+        FOREIGN KEY (pai_id)
+        REFERENCES paises (pai_id)
         ON UPDATE CASCADE
         ON DELETE SET NULL
 );
 
-COMMENT ON TABLE  ecm_endereco_usuario                        IS 'Endereços vinculados a um usuário. Um usuário pode ter N endereços, mas apenas um principal. Todos os componentes do endereço são normalizados em tabelas separadas.';
-COMMENT ON COLUMN ecm_endereco_usuario.id_endereco            IS 'Chave primária interna. Nunca exposta nas rotas HTTP.';
-COMMENT ON COLUMN ecm_endereco_usuario.uuid_endereco          IS 'Identificador público (UUID v4). Retornado pelas rotas HTTP.';
-COMMENT ON COLUMN ecm_endereco_usuario.id_usuario             IS 'FK para ecm_usuario — proprietário do endereço.';
-COMMENT ON COLUMN ecm_endereco_usuario.dsc_tipo_endereco      IS 'Tipo do endereço: cobranca ou entrega. RN0021/RN0022. Padrão: entrega.';
-COMMENT ON COLUMN ecm_endereco_usuario.nom_apelido            IS 'Apelido customizado do endereço (ex: Casa, Trabalho).';
-COMMENT ON COLUMN ecm_endereco_usuario.id_tipo_residencia     IS 'FK para ecm_tipo_residencia (Casa, Apartamento…). Opcional.';
-COMMENT ON COLUMN ecm_endereco_usuario.id_logradouro          IS 'FK para ecm_logradouro — logradouro completo (tipo + nome + número).';
-COMMENT ON COLUMN ecm_endereco_usuario.dsc_complemento        IS 'Complemento opcional (ex.: apto 42, bloco B).';
-COMMENT ON COLUMN ecm_endereco_usuario.id_cidade              IS 'FK para ecm_cidade — cidade do endereço.';
-COMMENT ON COLUMN ecm_endereco_usuario.id_bairro              IS 'FK para ecm_bairro — bairro do endereço.';
-COMMENT ON COLUMN ecm_endereco_usuario.id_cep                 IS 'FK para ecm_cep — CEP do endereço.';
-COMMENT ON COLUMN ecm_endereco_usuario.id_pais                IS 'FK para ecm_pais — país do endereço (padrão: Brasil).';
-COMMENT ON COLUMN ecm_endereco_usuario.flg_principal          IS 'TRUE indica que este é o endereço de entrega padrão do usuário.';
-COMMENT ON COLUMN ecm_endereco_usuario.dat_criacao            IS 'Timestamp de criação do registro.';
-COMMENT ON COLUMN ecm_endereco_usuario.dat_atualizacao        IS 'Timestamp da última atualização.';
+COMMENT ON TABLE  enderecos                        IS 'Endereços vinculados a um usuário. Um usuário pode ter N endereços, mas apenas um principal. Todos os componentes do endereço são normalizados em tabelas separadas.';
+COMMENT ON COLUMN enderecos.end_id                IS 'Chave primária interna. Nunca exposta nas rotas HTTP.';
+COMMENT ON COLUMN enderecos.end_uuid              IS 'Identificador público (UUID v4). Retornado pelas rotas HTTP.';
+COMMENT ON COLUMN enderecos.usu_id                IS 'FK para usuarios — proprietário do endereço.';
+COMMENT ON COLUMN enderecos.end_tipo              IS 'Tipo do endereço: cobranca ou entrega. RN0021/RN0022. Padrão: entrega.';
+COMMENT ON COLUMN enderecos.end_apelido           IS 'Apelido customizado do endereço (ex: Casa, Trabalho).';
+COMMENT ON COLUMN enderecos.tre_id                IS 'FK para tipos_residencias (Casa, Apartamento…). Opcional.';
+COMMENT ON COLUMN enderecos.log_id                IS 'FK para logradouros — logradouro (tipo + nome).';
+COMMENT ON COLUMN enderecos.end_numero            IS 'Número do imóvel no logradouro.';
+COMMENT ON COLUMN enderecos.end_complemento       IS 'Complemento opcional (ex.: apto 42, bloco B).';
+COMMENT ON COLUMN enderecos.cid_id                IS 'FK para cidades — cidade do endereço.';
+COMMENT ON COLUMN enderecos.bai_id                IS 'FK para bairros — bairro do endereço.';
+COMMENT ON COLUMN enderecos.cep_id                IS 'FK para ceps — CEP do endereço.';
+COMMENT ON COLUMN enderecos.pai_id                IS 'FK para paises — país do endereço (padrão: Brasil).';
+COMMENT ON COLUMN enderecos.end_principal         IS 'TRUE indica que este é o endereço de entrega padrão do usuário.';
+COMMENT ON COLUMN enderecos.end_criado_em         IS 'Timestamp de criação do registro.';
+COMMENT ON COLUMN enderecos.end_atualizado_em     IS 'Timestamp da última atualização.';
 
 
 -- Índices de acesso frequente
-CREATE INDEX IF NOT EXISTS idx_endereco_usuario   ON ecm_endereco_usuario (id_usuario);
-CREATE INDEX IF NOT EXISTS idx_endereco_logradouro ON ecm_endereco_usuario (id_logradouro);
-CREATE INDEX IF NOT EXISTS idx_endereco_cidade    ON ecm_endereco_usuario (id_cidade);
-CREATE INDEX IF NOT EXISTS idx_endereco_bairro    ON ecm_endereco_usuario (id_bairro);
-CREATE INDEX IF NOT EXISTS idx_endereco_cep       ON ecm_endereco_usuario (id_cep);
-CREATE INDEX IF NOT EXISTS idx_endereco_principal ON ecm_endereco_usuario (id_usuario) WHERE flg_principal = TRUE;
+CREATE INDEX IF NOT EXISTS idx_enderecos_usuario   ON enderecos (usu_id);
+CREATE INDEX IF NOT EXISTS idx_enderecos_logradouro ON enderecos (log_id);
+CREATE INDEX IF NOT EXISTS idx_enderecos_cidade    ON enderecos (cid_id);
+CREATE INDEX IF NOT EXISTS idx_enderecos_bairro    ON enderecos (bai_id);
+CREATE INDEX IF NOT EXISTS idx_enderecos_cep       ON enderecos (cep_id);
+CREATE INDEX IF NOT EXISTS idx_enderecos_principal ON enderecos (usu_id) WHERE end_principal = TRUE;
 
 
--- Trigger de atualização automática de dat_atualizacao
-DROP TRIGGER IF EXISTS tg_endereco_usuario_dat_atualizacao ON ecm_endereco_usuario;
-CREATE TRIGGER tg_endereco_usuario_dat_atualizacao
-    BEFORE UPDATE ON ecm_endereco_usuario
+-- Trigger de atualização automática de end_atualizado_em
+-- E atualizamos a função para incluir enderecos
+CREATE OR REPLACE FUNCTION fn_atualizar_timestamp()
+RETURNS TRIGGER LANGUAGE plpgsql AS $$
+BEGIN
+    IF TG_TABLE_NAME = 'usuarios' THEN NEW.usu_atualizado_em := NOW(); END IF;
+    IF TG_TABLE_NAME = 'clientes' THEN NEW.cli_atualizado_em := NOW(); END IF;
+    IF TG_TABLE_NAME = 'telefones' THEN NEW.tel_atualizado_em := NOW(); END IF;
+    IF TG_TABLE_NAME = 'enderecos' THEN NEW.end_atualizado_em := NOW(); END IF;
+    RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS tg_enderecos_atualizado_em ON enderecos;
+CREATE TRIGGER tg_enderecos_atualizado_em
+    BEFORE UPDATE ON enderecos
     FOR EACH ROW
-    EXECUTE FUNCTION ecm_fn_atualizar_dat_atualizacao();
+    EXECUTE FUNCTION fn_atualizar_timestamp();

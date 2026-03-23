@@ -1,53 +1,53 @@
 -- =============================================================================
 -- DDL 006 — Tabelas de domínio: cidade e bairro
 -- Sistema: LES – E-Commerce de Livros
--- Objetivo: normalizar `nom_cidade` e `nom_bairro` de `ecm_endereco_usuario`.
+-- Objetivo: normalizar `cid_nome` e `bai_nome` de `enderecos`.
 -- Nota: usa `gen_random_uuid()` já empregado nos demais DDLs do projeto.
 -- =============================================================================
 
 -- -----------------------------------------------------------------------------
--- ecm_cidade
+-- cidades
 -- -----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS ecm_cidade (
-    id_cidade           SERIAL          PRIMARY KEY,
-    uuid_cidade         UUID            NOT NULL DEFAULT gen_random_uuid(),
-    nom_cidade          VARCHAR(200)    NOT NULL,
-    nom_cidade_norm     VARCHAR(200)    NOT NULL,
-    id_estado           INTEGER,
-    dat_criacao         TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
+CREATE TABLE IF NOT EXISTS cidades (
+    cid_id              SERIAL          PRIMARY KEY,
+    cid_uuid            UUID            NOT NULL DEFAULT gen_random_uuid(),
+    cid_nome            VARCHAR(200)    NOT NULL,
+    cid_nome_norm       VARCHAR(200)    NOT NULL,
+    est_id              INTEGER,
+    cid_criado_em       TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
 
-    CONSTRAINT uq_cidade_norm_estado UNIQUE (nom_cidade_norm, id_estado),
+    CONSTRAINT uq_cidades_norm_estado UNIQUE (cid_nome_norm, est_id),
 
-    CONSTRAINT fk_cidade_estado
-        FOREIGN KEY (id_estado)
-        REFERENCES ecm_estado_brasileiro (id_estado)
+    CONSTRAINT fk_cidades_estados
+        FOREIGN KEY (est_id)
+        REFERENCES estados (est_id)
         ON UPDATE CASCADE
         ON DELETE SET NULL
 );
 
-COMMENT ON TABLE ecm_cidade IS 'Catálogo normalizado de cidades (nomes normalizados para matching).';
-COMMENT ON COLUMN ecm_cidade.nom_cidade_norm IS 'Versão normalizada de nom_cidade (UPPER(TRIM(...))) usada para unicidade e matching.';
+COMMENT ON TABLE cidades IS 'Catálogo normalizado de cidades (nomes normalizados para matching).';
+COMMENT ON COLUMN cidades.cid_nome_norm IS 'Versão normalizada de cid_nome (UPPER(TRIM(...))) usada para unicidade e matching.';
 
 
 -- -----------------------------------------------------------------------------
--- ecm_bairro
+-- bairros
 -- -----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS ecm_bairro (
-    id_bairro           SERIAL          PRIMARY KEY,
-    uuid_bairro         UUID            NOT NULL DEFAULT gen_random_uuid(),
-    nom_bairro          VARCHAR(200)    NOT NULL,
-    nom_bairro_norm     VARCHAR(200)    NOT NULL,
-    id_cidade           INTEGER         NOT NULL,
-    dat_criacao         TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
+CREATE TABLE IF NOT EXISTS bairros (
+    bai_id              SERIAL          PRIMARY KEY,
+    bai_uuid            UUID            NOT NULL DEFAULT gen_random_uuid(),
+    bai_nome            VARCHAR(200)    NOT NULL,
+    bai_nome_norm       VARCHAR(200)    NOT NULL,
+    cid_id              INTEGER         NOT NULL,
+    bai_criado_em       TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
 
-    CONSTRAINT uq_bairro_norm_cidade UNIQUE (nom_bairro_norm, id_cidade),
+    CONSTRAINT uq_bairros_norm_cidade UNIQUE (bai_nome_norm, cid_id),
 
-    CONSTRAINT fk_bairro_cidade
-        FOREIGN KEY (id_cidade)
-        REFERENCES ecm_cidade (id_cidade)
+    CONSTRAINT fk_bairros_cidades
+        FOREIGN KEY (cid_id)
+        REFERENCES cidades (cid_id)
         ON UPDATE CASCADE
         ON DELETE CASCADE
 );
 
-COMMENT ON TABLE ecm_bairro IS 'Catálogo normalizado de bairros por cidade (matching via nom_bairro_norm).';
-COMMENT ON COLUMN ecm_bairro.nom_bairro_norm IS 'Versão normalizada de nom_bairro (UPPER(TRIM(...))).';
+COMMENT ON TABLE bairros IS 'Catálogo normalizado de bairros por cidade (matching via bai_nome_norm).';
+COMMENT ON COLUMN bairros.bai_nome_norm IS 'Versão normalizada de bai_nome (UPPER(TRIM(...))).';

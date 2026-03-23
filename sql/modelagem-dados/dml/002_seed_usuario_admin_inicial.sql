@@ -22,24 +22,24 @@ DECLARE
     v_uuid_admin      UUID := '00000000-0000-0000-0000-000000000001';
 BEGIN
     -- Obtém o id interno do papel 'admin' de forma segura
-    SELECT id_papel
+    SELECT pap_id
     INTO   v_id_papel_admin
-    FROM   ecm_papel_usuario
-    WHERE  dsc_papel = 'admin'
+    FROM   papeis
+    WHERE  pap_descricao = 'admin'
     LIMIT  1;
 
     IF v_id_papel_admin IS NULL THEN
         RAISE EXCEPTION 'Papel "admin" não encontrado. Execute 001_seeds_tipos_referencia.sql antes deste script.';
     END IF;
 
-    INSERT INTO ecm_usuario (
-        uuid_usuario,
-        nom_usuario,
-        dsc_email,
-        dsc_cpf,
-        dsc_senha_hash,
-        id_papel,
-        flg_ativo
+    INSERT INTO usuarios (
+        usu_uuid,
+        usu_nome,
+        usu_email,
+        usu_cpf,
+        usu_senha_hash,
+        pap_id,
+        usu_ativo
     )
     VALUES (
         v_uuid_admin,
@@ -50,6 +50,6 @@ BEGIN
         v_id_papel_admin,
         TRUE
     )
-    ON CONFLICT (dsc_email) DO NOTHING;
+    ON CONFLICT (usu_email) DO NOTHING;
 END;
 $$;

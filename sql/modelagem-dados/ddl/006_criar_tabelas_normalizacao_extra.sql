@@ -1,65 +1,64 @@
 -- =============================================================================
 -- DDL 007 — Tabelas de normalização extra para endereços
--- Sistema: ECM – E-Commerce de Livros
+-- Sistema: LES – E-Commerce de Livros
 -- =============================================================================
 
 -- -----------------------------------------------------------------------------
--- ecm_pais
--- Normalização do campo nom_pais para eliminar redundância da string 'Brasil'
+-- pai_paises
+-- Normalização do campo pai_nome para eliminar redundância da string 'Brasil'
 -- repetida em todos os endereços. Permite expansão futura para internacionalização.
 -- -----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS ecm_pais (
-    id_pais     SERIAL      PRIMARY KEY,
-    nom_pais    VARCHAR(80) UNIQUE NOT NULL,
-    dat_criacao TIMESTAMPTZ NOT NULL DEFAULT NOW()
+CREATE TABLE IF NOT EXISTS paises (
+    pai_id        SERIAL      PRIMARY KEY,
+    pai_nome      VARCHAR(80) UNIQUE NOT NULL,
+    pai_criado_em TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-COMMENT ON TABLE  ecm_pais         IS 'Países suportados pelo sistema. Inicialmente apenas Brasil.';
-COMMENT ON COLUMN ecm_pais.id_pais IS 'Identificador interno do país.';
-COMMENT ON COLUMN ecm_pais.nom_pais IS 'Nome completo do país (ex.: Brasil, Estados Unidos).';
+COMMENT ON TABLE  paises         IS 'Países suportados pelo sistema. Inicialmente apenas Brasil.';
+COMMENT ON COLUMN paises.pai_id  IS 'Identificador interno do país.';
+COMMENT ON COLUMN paises.pai_nome IS 'Nome completo do país (ex.: Brasil, Estados Unidos).';
 
 
 -- -----------------------------------------------------------------------------
--- ecm_cep
+-- ceps
 -- Normalização dos CEPs brasileiros para centralizar dados postais.
 -- Um CEP pode servir múltiplos endereços, mas centralizar evita inconsistências.
 -- -----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS ecm_cep (
-    id_cep      SERIAL      PRIMARY KEY,
-    num_cep     CHAR(8)     UNIQUE NOT NULL,
-    id_cidade   INTEGER     REFERENCES ecm_cidade(id_cidade) ON UPDATE CASCADE ON DELETE SET NULL,
-    id_bairro   INTEGER     REFERENCES ecm_bairro(id_bairro) ON UPDATE CASCADE ON DELETE SET NULL,
-    dat_criacao TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+CREATE TABLE IF NOT EXISTS ceps (
+    cep_id        SERIAL      PRIMARY KEY,
+    cep_numero    CHAR(8)     UNIQUE NOT NULL,
+    cid_id        INTEGER     REFERENCES cidades(cid_id) ON UPDATE CASCADE ON DELETE SET NULL,
+    bai_id        INTEGER     REFERENCES bairros(bai_id) ON UPDATE CASCADE ON DELETE SET NULL,
+    cep_criado_em TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
     -- CEP deve conter exatamente 8 dígitos numéricos
-    CONSTRAINT ck_cep_numerico CHECK (num_cep ~ '^[0-9]{8}$')
+    CONSTRAINT ck_ceps_numero_numerico CHECK (cep_numero ~ '^[0-9]{8}$')
 );
 
-COMMENT ON TABLE  ecm_cep             IS 'CEPs brasileiros normalizados. Centraliza dados postais e evita duplicação.';
-COMMENT ON COLUMN ecm_cep.id_cep      IS 'Identificador interno do CEP.';
-COMMENT ON COLUMN ecm_cep.num_cep     IS 'CEP com 8 dígitos numéricos.';
-COMMENT ON COLUMN ecm_cep.id_cidade   IS 'FK para ecm_cidade — cidade do CEP.';
-COMMENT ON COLUMN ecm_cep.id_bairro   IS 'FK para ecm_bairro — bairro principal do CEP (opcional, pois CEPs abrangem áreas).';
+COMMENT ON TABLE  ceps             IS 'CEPs brasileiros normalizados. Centraliza dados postais e evita duplicação.';
+COMMENT ON COLUMN ceps.cep_id      IS 'Identificador interno do CEP.';
+COMMENT ON COLUMN ceps.cep_numero  IS 'CEP com 8 dígitos numéricos.';
+COMMENT ON COLUMN ceps.cid_id      IS 'FK para cidades — cidade do CEP.';
+COMMENT ON COLUMN ceps.bai_id      IS 'FK para bairros — bairro principal do CEP (opcional, pois CEPs abrangem áreas).';
 
 
 -- -----------------------------------------------------------------------------
--- ecm_logradouro
--- Normalização completa do logradouro (tipo + nome + número) para reusar
+-- logradouros
+-- Normalização completa do logradouro (tipo + nome) para reusar
 -- endereços de rua idênticos entre usuários. Evita duplicação de dados.
+-- Nota: O número foi movido para a tabela de endereços na migração 006 final.
 -- -----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS ecm_logradouro (
-    id_logradouro           SERIAL      PRIMARY KEY,
-    id_tipo_logradouro      INTEGER     REFERENCES ecm_tipo_logradouro(id_tipo_logradouro) ON UPDATE CASCADE ON DELETE SET NULL,
-    dsc_logradouro          VARCHAR(200) NOT NULL,
-    num_logradouro          VARCHAR(10)  NOT NULL,
-    dat_criacao             TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+CREATE TABLE IF NOT EXISTS logradouros (
+    log_id              SERIAL      PRIMARY KEY,
+    tlo_id              INTEGER     REFERENCES tipos_logradouros(tlo_id) ON UPDATE CASCADE ON DELETE SET NULL,
+    log_nome            VARCHAR(200) NOT NULL,
+    log_criado_em       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
     -- Garante unicidade do logradouro completo
-    CONSTRAINT uq_logradouro_completo UNIQUE (id_tipo_logradouro, dsc_logradouro, num_logradouro)
+    CONSTRAINT uq_logradouros_completo UNIQUE (tlo_id, log_nome)
 );
 
-COMMENT ON TABLE  ecm_logradouro                     IS 'Logradouros normalizados (tipo + nome + número). Permite reusar endereços de rua idênticos.';
-COMMENT ON COLUMN ecm_logradouro.id_logradouro       IS 'Identificador interno do logradouro.';
-COMMENT ON COLUMN ecm_logradouro.id_tipo_logradouro  IS 'FK para ecm_tipo_logradouro (Rua, Avenida…).';
-COMMENT ON COLUMN ecm_logradouro.dsc_logradouro      IS 'Nome do logradouro sem o tipo.';
-COMMENT ON COLUMN ecm_logradouro.num_logradouro      IS 'Número do imóvel.';
+COMMENT ON TABLE  logradouros                    IS 'Logradouros normalizados (tipo + nome). Permite reusar endereços de rua idênticos.';
+COMMENT ON COLUMN logradouros.log_id             IS 'Identificador interno do logradouro.';
+COMMENT ON COLUMN logradouros.tlo_id             IS 'FK para tipos_logradouros (Rua, Avenida…).';
+COMMENT ON COLUMN logradouros.log_nome           IS 'Nome do logradouro sem o tipo.';

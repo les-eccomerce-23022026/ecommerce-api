@@ -1,6 +1,4 @@
 @baseUrl = http://localhost:3000
-@token = Bearer <insira_o_token_aqui>
-@tokenAdmin = Bearer <insira_o_token_admin_aqui>
 
 ### Registro de Cliente - Teste Homologação
 # Cenário Feliz: Registro com credenciais de teste fornecidas
@@ -106,7 +104,7 @@ Content-Type: application/json
 # - Erro ao obter perfil: Status 400, mensagem "Erro ao obter perfil do cliente."
 # Requer: Authorization header com token JWT
 GET {{baseUrl}}/api/clientes/perfil
-Authorization: {{token}}
+Authorization: Bearer {{authToken}}
 
 ###
 ### Atualizar Perfil do Cliente
@@ -120,7 +118,7 @@ Authorization: {{token}}
 # Requer: Authorization header com token JWT
 PATCH {{baseUrl}}/api/clientes/perfil
 Content-Type: application/json
-Authorization: {{token}}
+Authorization: Bearer {{authToken}}
 
 {
   "nome": "João Silva Atualizado",
@@ -152,7 +150,7 @@ Authorization: {{token}}
 # Requer: Authorization header com token JWT
 POST {{baseUrl}}/api/clientes/perfil/enderecos
 Content-Type: application/json
-Authorization: {{token}}
+Authorization: Bearer {{authToken}}
 
 {
   "apelido": "Trabalho",
@@ -167,18 +165,20 @@ Authorization: {{token}}
 }
 
 ###
+@bandeiraVisaUuid = ae91785d-a5a2-489f-b36f-5bb8d7cff87b
+
 ### Adicionar Novo Cartão
 # Cenário Feliz: Adição de novo cartão de crédito tokenizado ao perfil
 # Status: 201
 # Requer: Authorization header com token JWT
 POST {{baseUrl}}/api/clientes/perfil/cartoes
 Content-Type: application/json
-Authorization: {{token}}
+Authorization: Bearer {{authToken}}
 
 {
-  "idBandeiraCartao": 1,
-  "tokenCartao": "tok_visa_exemplo_123",
-  "finalCartao": "4321",
+  "uuidBandeira": "{{bandeiraVisaUuid}}",
+  "token": "tok_visa_exemplo_123",
+  "final": "4321",
   "nomeImpresso": "JOAO SILVA",
   "validade": "2029-12-31T23:59:59.999Z",
   "principal": true
@@ -190,7 +190,7 @@ Authorization: {{token}}
 # Status: 200
 # Requer: Authorization header com token JWT e UUID do endereço na URL
 DELETE {{baseUrl}}/api/clientes/perfil/enderecos/uuid-do-endereco
-Authorization: {{token}}
+Authorization: Bearer {{authToken}}
 
 ###
 ### Alterar Senha do Cliente
@@ -207,7 +207,7 @@ Authorization: {{token}}
 # Requer: Authorization header com token JWT
 PATCH {{baseUrl}}/api/clientes/seguranca/alterar-senha
 Content-Type: application/json
-Authorization: {{token}}
+Authorization: Bearer {{authToken}}
 
 {
   "senhaAtual": "Password@123",
@@ -226,7 +226,7 @@ Authorization: {{token}}
 # - Erro ao inativar: Status 400, mensagem "Erro ao inativar cadastro."
 # Requer: Authorization header com token JWT
 DELETE {{baseUrl}}/api/clientes/perfil
-Authorization: {{token}}
+Authorization: Bearer {{authToken}}
 
 ###
 ### Consultar Clientes (Admin)
@@ -240,5 +240,5 @@ Authorization: {{token}}
 # - Erro na consulta: Status 400, mensagem "Erro ao consultar clientes."
 # Requer: Authorization header com token JWT de admin
 GET {{baseUrl}}/api/clientes?nome=João&pagina=1&limite=10
-Authorization: {{tokenAdmin}}
+Authorization: Bearer {{authToken}}
 

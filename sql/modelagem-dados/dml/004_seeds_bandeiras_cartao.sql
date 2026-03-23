@@ -6,10 +6,10 @@
 -- -----------------------------------------------------------------------------
 -- Insere as bandeiras de cartão suportadas (RN0025)
 -- -----------------------------------------------------------------------------
-INSERT INTO ecm_bandeira_cartao (dsc_bandeira) VALUES
+INSERT INTO bandeiras_cartao (ban_descricao) VALUES
 ('Visa'),
 ('Mastercard'),
 ('Elo'),
 ('American Express'),
 ('Hipercard')
-ON CONFLICT (dsc_bandeira) DO NOTHING;
+ON CONFLICT (ban_descricao) DO NOTHING;

@@ -15,5 +15,6 @@ export interface ICartaoUsuario {
 
 export interface IBandeiraCartao {
   id: number;
+  uuid: string;
   descricao: string;
 }

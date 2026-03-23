@@ -25,7 +25,7 @@ export class RepositorioTelefoneUsuarioPostgres implements IRepositorioTelefoneU
 
   public async criar(telefone: ITelefoneUsuario): Promise<void> {
     const query = `
-      INSERT INTO tel_telefones (usu_id, ttp_id, tel_ddd, tel_numero, tel_principal)
+      INSERT INTO telefones (usu_id, ttp_id, tel_ddd, tel_numero, tel_principal)
       VALUES ($1, $2, $3, $4, $5)
     `;
     await this.db.executar(query, [
@@ -43,7 +43,7 @@ export class RepositorioTelefoneUsuarioPostgres implements IRepositorioTelefoneU
              usu_id AS "idUsuario", ttp_id AS "idTipoTelefone", 
              tel_ddd AS "ddd", tel_numero AS "numero", tel_principal AS "principal",
              tel_criado_em AS "criadoEm", tel_atualizado_em AS "atualizadoEm"
-      FROM tel_telefones 
+      FROM telefones 
       WHERE usu_id = $1
     `;
     const rows = await this.db.executar(query, [idUsuario]);
@@ -52,7 +52,7 @@ export class RepositorioTelefoneUsuarioPostgres implements IRepositorioTelefoneU
 
   public async atualizar(telefone: ITelefoneUsuario): Promise<void> {
     const query = `
-      UPDATE tel_telefones
+      UPDATE telefones
       SET ttp_id = $1, tel_ddd = $2, tel_numero = $3, tel_principal = $4
       WHERE usu_id = $5 AND tel_uuid = $6
     `;
@@ -67,7 +67,7 @@ export class RepositorioTelefoneUsuarioPostgres implements IRepositorioTelefoneU
   }
 
   public async deletar(idUsuario: number, uuidTelefone: string): Promise<void> {
-    const query = 'DELETE FROM tel_telefones WHERE usu_id = $1 AND tel_uuid = $2';
+    const query = 'DELETE FROM telefones WHERE usu_id = $1 AND tel_uuid = $2';
     await this.db.executar(query, [idUsuario, uuidTelefone]);
   }
 }

@@ -7,31 +7,31 @@
 -- =============================================================================
 
 -- -----------------------------------------------------------------------------
--- ecm_papel_usuario
+-- papeis
 -- -----------------------------------------------------------------------------
-INSERT INTO ecm_papel_usuario (dsc_papel)
+INSERT INTO papeis (pap_descricao)
 VALUES
     ('cliente'),
     ('admin')
-ON CONFLICT (dsc_papel) DO NOTHING;
+ON CONFLICT (pap_descricao) DO NOTHING;
 
 
 -- -----------------------------------------------------------------------------
--- ecm_tipo_telefone
+-- tipos_telefones
 -- -----------------------------------------------------------------------------
-INSERT INTO ecm_tipo_telefone (dsc_tipo_telefone)
+INSERT INTO tipos_telefones (ttp_descricao)
 VALUES
     ('celular'),
     ('residencial'),
     ('comercial')
-ON CONFLICT (dsc_tipo_telefone) DO NOTHING;
+ON CONFLICT (ttp_descricao) DO NOTHING;
 
 
 -- -----------------------------------------------------------------------------
--- ecm_tipo_logradouro
+-- tipos_logradouros
 -- Tipos mais comuns no endereçamento postal brasileiro.
 -- -----------------------------------------------------------------------------
-INSERT INTO ecm_tipo_logradouro (dsc_tipo_logradouro)
+INSERT INTO tipos_logradouros (tlo_descricao)
 VALUES
     ('Rua'),
     ('Avenida'),
@@ -45,13 +45,13 @@ VALUES
     ('Setor'),
     ('Quadra'),
     ('Conjunto')
-ON CONFLICT (dsc_tipo_logradouro) DO NOTHING;
+ON CONFLICT (tlo_descricao) DO NOTHING;
 
 
 -- -----------------------------------------------------------------------------
--- ecm_tipo_residencia
+-- tipos_residencias
 -- -----------------------------------------------------------------------------
-INSERT INTO ecm_tipo_residencia (dsc_tipo_residencia)
+INSERT INTO tipos_residencias (tre_descricao)
 VALUES
     ('Casa'),
     ('Apartamento'),
@@ -59,14 +59,14 @@ VALUES
     ('Comercial'),
     ('Sítio / Chácara'),
     ('Outro')
-ON CONFLICT (dsc_tipo_residencia) DO NOTHING;
+ON CONFLICT (tre_descricao) DO NOTHING;
 
 
 -- -----------------------------------------------------------------------------
--- ecm_estado_brasileiro
+-- estados
 -- 26 estados + Distrito Federal (ordem alfabética pelo nome).
 -- -----------------------------------------------------------------------------
-INSERT INTO ecm_estado_brasileiro (sig_estado, nom_estado)
+INSERT INTO estados (est_sigla, est_nome)
 VALUES
     ('AC', 'Acre'),
     ('AL', 'Alagoas'),
@@ -95,4 +95,4 @@ VALUES
     ('SP', 'São Paulo'),
     ('SE', 'Sergipe'),
     ('TO', 'Tocantins')
-ON CONFLICT (sig_estado) DO NOTHING;
+ON CONFLICT (est_sigla) DO NOTHING;

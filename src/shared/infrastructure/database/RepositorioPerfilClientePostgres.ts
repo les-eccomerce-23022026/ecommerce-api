@@ -24,7 +24,7 @@ export class RepositorioPerfilClientePostgres implements IRepositorioPerfilClien
 
   public async criar(perfil: IPerfilCliente): Promise<void> {
     const query = `
-      INSERT INTO cli_clientes (usu_id, cli_genero, cli_data_nascimento)
+      INSERT INTO clientes (usu_id, cli_genero, cli_data_nascimento)
       VALUES ($1, $2, $3)
     `;
     await this.db.executar(query, [perfil.idUsuario, perfil.genero ?? null, perfil.dataNascimento ?? null]);
@@ -35,7 +35,7 @@ export class RepositorioPerfilClientePostgres implements IRepositorioPerfilClien
       SELECT cli_id AS "id", cli_uuid AS "uuid", 
              usu_id AS "idUsuario", cli_genero AS "genero", cli_data_nascimento AS "dataNascimento", 
              cli_ranking AS "ranking", cli_criado_em AS "criadoEm", cli_atualizado_em AS "atualizadoEm"
-      FROM cli_clientes 
+      FROM clientes 
       WHERE usu_id = $1
     `;
     const rows = await this.db.executar(query, [idUsuario]);
@@ -47,7 +47,7 @@ export class RepositorioPerfilClientePostgres implements IRepositorioPerfilClien
   // eslint-disable-next-line class-methods-use-this
   public async atualizar(perfil: IPerfilCliente): Promise<void> {
     const query = `
-      UPDATE cli_clientes
+      UPDATE clientes
       SET cli_genero = $1, cli_data_nascimento = $2
       WHERE usu_id = $3
     `;
@@ -55,7 +55,7 @@ export class RepositorioPerfilClientePostgres implements IRepositorioPerfilClien
   }
 
   public async deletar(idUsuario: number): Promise<void> {
-    const query = 'DELETE FROM cli_clientes WHERE usu_id = $1';
+    const query = 'DELETE FROM clientes WHERE usu_id = $1';
     await this.db.executar(query, [idUsuario]);
   }
 }

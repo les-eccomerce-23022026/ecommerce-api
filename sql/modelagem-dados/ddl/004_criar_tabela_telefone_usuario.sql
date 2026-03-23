@@ -4,79 +4,90 @@
 -- =============================================================================
 
 -- -----------------------------------------------------------------------------
--- ecm_telefone_usuario
+-- tel_telefones
 -- Objeto de valor: um usuário pode ter N telefones.
 -- O DDD é armazenado separadamente para facilitar validações e formatações.
 --
 -- Regras de negócio modeladas:
---   • Um usuário pode ter múltiplos telefones, mas somente um flg_principal = TRUE.
---     A constraint uq_telefone_usuario_principal garante isso no banco.
---   • O tipo de telefone é normalizado via FK para ecm_tipo_telefone,
+--   • Um usuário pode ter múltiplos telefones, mas somente um tel_principal = TRUE.
+--     A constraint uq_telefones_usuario_principal garante isso no banco.
+--   • O tipo de telefone é normalizado via FK para ttp_tipos_telefones,
 --     eliminando strings como 'celular'/'residencial' diretamente na tabela.
---   • num_ddd: exatamente 2 dígitos. num_telefone: 8 ou 9 dígitos (somente números).
+--   • tel_ddd: exatamente 2 dígitos. tel_numero: 8 ou 9 dígitos (somente números).
 --     Formatação (ex.: (11) 91234-5678) é responsabilidade da camada de apresentação.
 -- -----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS ecm_telefone_usuario (
-    id_telefone         BIGSERIAL   PRIMARY KEY,
-    uuid_telefone       UUID        NOT NULL    DEFAULT gen_random_uuid(),
-    id_usuario          BIGINT      NOT NULL,
-    id_tipo_telefone    INTEGER     NOT NULL,
-    num_ddd             CHAR(2)     NOT NULL,
-    num_telefone        VARCHAR(9)  NOT NULL,
-    flg_principal       BOOLEAN     NOT NULL    DEFAULT FALSE,
-    dat_criacao         TIMESTAMPTZ NOT NULL    DEFAULT NOW(),
-    dat_atualizacao     TIMESTAMPTZ NOT NULL    DEFAULT NOW(),
+CREATE TABLE IF NOT EXISTS telefones (
+    tel_id              BIGSERIAL   PRIMARY KEY,
+    tel_uuid            UUID        NOT NULL    DEFAULT gen_random_uuid(),
+    usu_id              BIGINT      NOT NULL,
+    ttp_id              INTEGER     NOT NULL,
+    tel_ddd             CHAR(2)     NOT NULL,
+    tel_numero          VARCHAR(9)  NOT NULL,
+    tel_principal       BOOLEAN     NOT NULL    DEFAULT FALSE,
+    tel_criado_em       TIMESTAMPTZ NOT NULL    DEFAULT NOW(),
+    tel_atualizado_em   TIMESTAMPTZ NOT NULL    DEFAULT NOW(),
 
-    CONSTRAINT uq_telefone_uuid             UNIQUE (uuid_telefone),
+    CONSTRAINT uq_telefones_uuid             UNIQUE (tel_uuid),
 
     -- Garante que um usuário não registre o mesmo número duas vezes
-    CONSTRAINT uq_telefone_usuario_numero   UNIQUE (id_usuario, num_ddd, num_telefone),
+    CONSTRAINT uq_telefones_usuario_numero   UNIQUE (usu_id, tel_ddd, tel_numero),
 
     -- Garante que somente um telefone por usuário seja marcado como principal
-    CONSTRAINT uq_telefone_usuario_principal
-        EXCLUDE USING btree (id_usuario WITH =)
-        WHERE (flg_principal = TRUE),
+    CONSTRAINT uq_telefones_usuario_principal
+        EXCLUDE USING btree (usu_id WITH =)
+        WHERE (tel_principal = TRUE),
 
     -- Validação de formato: apenas dígitos em DDD e número
-    CONSTRAINT ck_telefone_ddd_numerico
-        CHECK (num_ddd ~ '^[0-9]{2}$'),
+    CONSTRAINT ck_telefones_ddd_numerico
+        CHECK (tel_ddd ~ '^[0-9]{2}$'),
 
-    CONSTRAINT ck_telefone_numero_numerico
-        CHECK (num_telefone ~ '^[0-9]{8,9}$'),
+    CONSTRAINT ck_telefones_numero_numerico
+        CHECK (tel_numero ~ '^[0-9]{8,9}$'),
 
-    CONSTRAINT fk_telefone_usuario
-        FOREIGN KEY (id_usuario)
-        REFERENCES ecm_usuario (id_usuario)
+    CONSTRAINT fk_telefones_usuarios
+        FOREIGN KEY (usu_id)
+        REFERENCES usuarios (usu_id)
         ON UPDATE CASCADE
         ON DELETE CASCADE,
 
-    CONSTRAINT fk_telefone_tipo
-        FOREIGN KEY (id_tipo_telefone)
-        REFERENCES ecm_tipo_telefone (id_tipo_telefone)
+    CONSTRAINT fk_telefones_tipos
+        FOREIGN KEY (ttp_id)
+        REFERENCES tipos_telefones (ttp_id)
         ON UPDATE CASCADE
         ON DELETE RESTRICT
 );
 
-COMMENT ON TABLE  ecm_telefone_usuario                   IS 'Objetos de valor de telefone vinculados a um usuário. Um usuário pode ter N telefones, mas apenas um principal.';
-COMMENT ON COLUMN ecm_telefone_usuario.id_telefone       IS 'Chave primária interna. Nunca exposta nas rotas HTTP.';
-COMMENT ON COLUMN ecm_telefone_usuario.uuid_telefone     IS 'Identificador público (UUID v4). Retornado nas rotas HTTP.';
-COMMENT ON COLUMN ecm_telefone_usuario.id_usuario        IS 'FK para ecm_usuario — dono do telefone.';
-COMMENT ON COLUMN ecm_telefone_usuario.id_tipo_telefone  IS 'FK para ecm_tipo_telefone (celular, residencial, comercial…).';
-COMMENT ON COLUMN ecm_telefone_usuario.num_ddd           IS 'Código DDD de 2 dígitos (somente números).';
-COMMENT ON COLUMN ecm_telefone_usuario.num_telefone      IS 'Número local com 8 ou 9 dígitos (somente números, sem formatação).';
-COMMENT ON COLUMN ecm_telefone_usuario.flg_principal     IS 'TRUE indica que este é o telefone de contato principal do usuário.';
-COMMENT ON COLUMN ecm_telefone_usuario.dat_criacao       IS 'Timestamp de criação do registro.';
-COMMENT ON COLUMN ecm_telefone_usuario.dat_atualizacao   IS 'Timestamp da última atualização.';
+COMMENT ON TABLE  telefones                   IS 'Objetos de valor de telefone vinculados a um usuário. Um usuário pode ter N telefones, mas apenas um principal.';
+COMMENT ON COLUMN telefones.tel_id            IS 'Chave primária interna. Nunca exposta nas rotas HTTP.';
+COMMENT ON COLUMN telefones.tel_uuid          IS 'Identificador público (UUID v4). Retornado nas rotas HTTP.';
+COMMENT ON COLUMN telefones.usu_id            IS 'FK para usuarios — dono do telefone.';
+COMMENT ON COLUMN telefones.ttp_id            IS 'FK para tipos_telefones (celular, residencial, comercial…).';
+COMMENT ON COLUMN telefones.tel_ddd           IS 'Código DDD de 2 dígitos (somente números).';
+COMMENT ON COLUMN telefones.tel_numero        IS 'Número local com 8 ou 9 dígitos (somente números, sem formatação).';
+COMMENT ON COLUMN telefones.tel_principal     IS 'TRUE indica que este é o telefone de contato principal do usuário.';
+COMMENT ON COLUMN telefones.tel_criado_em     IS 'Timestamp de criação do registro.';
+COMMENT ON COLUMN telefones.tel_atualizado_em IS 'Timestamp da última atualização.';
 
 
 -- Índices de acesso frequente
-CREATE INDEX IF NOT EXISTS idx_telefone_usuario   ON ecm_telefone_usuario (id_usuario);
-CREATE INDEX IF NOT EXISTS idx_telefone_principal ON ecm_telefone_usuario (id_usuario) WHERE flg_principal = TRUE;
+CREATE INDEX IF NOT EXISTS idx_telefones_usuario   ON telefones (usu_id);
+CREATE INDEX IF NOT EXISTS idx_telefones_principal ON telefones (usu_id) WHERE tel_principal = TRUE;
 
 
--- Trigger de atualização automática de dat_atualizacao
-DROP TRIGGER IF EXISTS tg_telefone_usuario_dat_atualizacao ON ecm_telefone_usuario;
-CREATE TRIGGER tg_telefone_usuario_dat_atualizacao
-    BEFORE UPDATE ON ecm_telefone_usuario
+-- Trigger de atualização automática de tel_atualizado_em
+-- E atualizamos a função para incluir telefones
+CREATE OR REPLACE FUNCTION fn_atualizar_timestamp()
+RETURNS TRIGGER LANGUAGE plpgsql AS $$
+BEGIN
+    IF TG_TABLE_NAME = 'usuarios' THEN NEW.usu_atualizado_em := NOW(); END IF;
+    IF TG_TABLE_NAME = 'clientes' THEN NEW.cli_atualizado_em := NOW(); END IF;
+    IF TG_TABLE_NAME = 'telefones' THEN NEW.tel_atualizado_em := NOW(); END IF;
+    RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS tg_telefones_atualizado_em ON telefones;
+CREATE TRIGGER tg_telefones_atualizado_em
+    BEFORE UPDATE ON telefones
     FOR EACH ROW
-    EXECUTE FUNCTION ecm_fn_atualizar_dat_atualizacao();
+    EXECUTE FUNCTION fn_atualizar_timestamp();

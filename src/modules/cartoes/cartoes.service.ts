@@ -2,7 +2,7 @@ import { IRepositorioCartaoUsuario } from './IRepositorioCartaoUsuario';
 import { ICartaoUsuario } from '../../shared/types/ICartaoUsuario';
 
 export interface ICriarCartaoDto {
-  idBandeira: number;
+  uuidBandeira: string;
   token: string;
   final: string;
   nomeImpresso: string;
@@ -12,7 +12,7 @@ export interface ICriarCartaoDto {
 }
 
 export interface IAtualizarCartaoDto {
-  idBandeira?: number;
+  uuidBandeira?: string;
   token?: string;
   final?: string;
   nomeImpresso?: string;
@@ -51,9 +51,15 @@ export class ServicoCartoes {
       }
     }
 
+    // Buscar ID interno da bandeira pelo UUID público
+    const idBandeira = await this.repositorioCartoes.buscarIdBandeiraPorUuid(dados.uuidBandeira);
+    if (!idBandeira) {
+      throw new Error('Bandeira não encontrada.');
+    }
+
     const cartao = await this.repositorioCartoes.criar({
       idUsuario,
-      idBandeira: dados.idBandeira,
+      idBandeira: idBandeira,
       token: dados.token,
       final: dados.final,
       nomeImpresso: dados.nomeImpresso,

@@ -51,10 +51,10 @@ export class ControladorCartoes {
       const dados: ICriarCartaoDto = requisicao.body;
 
       // Validações básicas
-      const { idBandeira, token, final, nomeImpresso, validade } = dados;
-      if (!idBandeira || !token || !final || !nomeImpresso || !validade) {
+      const { uuidBandeira, token, final, nomeImpresso, validade } = dados;
+      if (!uuidBandeira || !token || !final || !nomeImpresso || !validade) {
         const faltando = [];
-        if (!idBandeira) faltando.push('idBandeira');
+        if (!uuidBandeira) faltando.push('uuidBandeira');
         if (!token) faltando.push('token');
         if (!final) faltando.push('final');
         if (!nomeImpresso) faltando.push('nomeImpresso');
