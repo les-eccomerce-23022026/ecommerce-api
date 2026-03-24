@@ -9,7 +9,9 @@ declare global {
       usuario?: {
         uuid: string;
         id: number;
+        email: string;
         role: string;
+        isAdminMestre?: boolean;
       };
     }
   }

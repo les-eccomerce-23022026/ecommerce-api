@@ -44,11 +44,17 @@ export async function autenticacaoMiddleware(
       throw new Error('Configuração de JWT ausente.');
     }
 
-    const decodificado = jwt.verify(token, segredo) as { sub: string; role: string };
+    const decodificado = jwt.verify(token, segredo) as { 
+      sub: string; 
+      email: string; 
+      role: string;
+      isAdminMestre?: boolean;
+    };
 
     // Buscar o usuário para obter o id
     const usuario = await di.repoUsuarios.buscarPorUuid(decodificado.sub);
     if (!usuario) {
+      console.error(`[auth] Usuário não encontrado no banco: ${decodificado.sub}`);
       res.status(401).json({
         mensagem: 'Usuário não encontrado.',
         sucesso: false,
@@ -59,11 +65,14 @@ export async function autenticacaoMiddleware(
     req.usuario = {
       uuid: decodificado.sub,
       id: usuario.id,
+      email: decodificado.email,
       role: decodificado.role,
+      isAdminMestre: decodificado.isAdminMestre,
     };
 
     next();
-  } catch {
+  } catch (erro) {
+    console.error('[auth] Erro na verificação do token:', erro);
     res.status(401).json({
       mensagem: 'Token inválido ou expirado.',
       sucesso: false,

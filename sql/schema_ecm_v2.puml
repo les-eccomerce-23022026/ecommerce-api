@@ -24,30 +24,30 @@ package "referencia" #EFEFEF {
     }
 
     Table(tipos_telefones, "Tipos de telefone") {
-        PK(tpt_id: SERIAL)
-        UK(tpt_descricao: VARCHAR(30))
+        PK(ttp_id: SERIAL)
+        UK(ttp_descricao: VARCHAR(30))
     }
 
     Table(tipos_logradouros, "Tipos de logradouro") {
-        PK(tpl_id: SERIAL)
-        UK(tpl_descricao: VARCHAR(50))
+        PK(tlo_id: SERIAL)
+        UK(tlo_descricao: VARCHAR(50))
     }
 
     Table(tipos_residencias, "Tipos de residência") {
-        PK(tpr_id: SERIAL)
-        UK(tpr_descricao: VARCHAR(50))
+        PK(tre_id: SERIAL)
+        UK(tre_descricao: VARCHAR(50))
     }
 
     Table(paises, "Países") {
         PK(pai_id: SERIAL)
-        UK(pai_nome: VARCHAR(60))
+        UK(pai_nome: VARCHAR(80))
+        pai_criado_em: TIMESTAMPTZ
     }
 
     Table(estados, "Estados brasileiros") {
         PK(est_id: SERIAL)
         UK(est_sigla: CHAR(2))
         UK(est_nome: VARCHAR(60))
-        FK(pai_id: INTEGER)
     }
 
     Table(bandeiras_cartao, "Bandeiras de cartão — RN0025") {
@@ -55,6 +55,14 @@ package "referencia" #EFEFEF {
         UK(ban_uuid: UUID)
         UK(ban_descricao: VARCHAR(30))
         ban_criado_em: TIMESTAMPTZ
+    }
+
+    Table(configuracoes_app, "Configurações globais do sistema") {
+        PK(cfg_id: SERIAL)
+        UK(cfg_chave: VARCHAR(50))
+        cfg_valor: TEXT
+        cfg_descricao: VARCHAR(255)
+        cfg_atualizado_em: TIMESTAMPTZ
     }
 }
 
@@ -66,13 +74,14 @@ package "usuario" #DDEEFF {
     Table(usuarios, "Usuários do sistema") {
         PK(usu_id: BIGSERIAL)
         UK(usu_uuid: UUID)
-        usu_nome: VARCHAR(100)
+        usu_nome: VARCHAR(80)
         UK(usu_email: VARCHAR(255))
-        UK(usu_cpf: VARCHAR(14))
-        usu_senha: VARCHAR(255)
+        UK(usu_cpf: CHAR(14))
+        usu_senha_hash: VARCHAR(100)
         FK(pap_id: INTEGER)
-        usu_genero: VARCHAR(30)
-        usu_nascimento: DATE
+        usu_telefone_rapido: VARCHAR(15)
+        usu_genero: VARCHAR(20)
+        usu_data_nascimento: DATE
         usu_ativo: BOOLEAN  DEFAULT TRUE
         usu_criado_em: TIMESTAMPTZ
         usu_atualizado_em: TIMESTAMPTZ
@@ -82,6 +91,8 @@ package "usuario" #DDEEFF {
         PK(cli_id: BIGSERIAL)
         UK(cli_uuid: UUID)
         FK(usu_id: BIGINT)
+        cli_genero: VARCHAR(30)
+        cli_data_nascimento: DATE
         cli_ranking: INTEGER  DEFAULT 0
         cli_criado_em: TIMESTAMPTZ
         cli_atualizado_em: TIMESTAMPTZ
@@ -95,50 +106,66 @@ package "contato" #FFF5CC {
 
     Table(ceps, "Base de CEPs") {
         PK(cep_id: SERIAL)
-        UK(cep_codigo: CHAR(8))
+        UK(cep_numero: CHAR(8))
+        FK(cid_id: INTEGER)
+        FK(bai_id: INTEGER)
+        cep_criado_em: TIMESTAMPTZ
     }
 
     Table(cidades, "Cidades") {
         PK(cid_id: SERIAL)
-        cid_nome: VARCHAR(80)
+        UK(cid_uuid: UUID)
+        cid_nome: VARCHAR(200)
+        cid_nome_norm: VARCHAR(200)
         FK(est_id: INTEGER)
+        cid_criado_em: TIMESTAMPTZ
     }
 
     Table(bairros, "Bairros") {
         PK(bai_id: SERIAL)
-        bai_nome: VARCHAR(80)
+        UK(bai_uuid: UUID)
+        bai_nome: VARCHAR(200)
+        bai_nome_norm: VARCHAR(200)
         FK(cid_id: INTEGER)
+        bai_criado_em: TIMESTAMPTZ
     }
 
     Table(logradouros, "Logradouros") {
         PK(log_id: SERIAL)
-        log_nome: VARCHAR(100)
-        FK(tpl_id: INTEGER)
+        FK(tlo_id: INTEGER)
+        log_nome: VARCHAR(200)
+        log_criado_em: TIMESTAMPTZ
     }
 
     Table(telefones, "Telefones dos usuários") {
         PK(tel_id: BIGSERIAL)
+        UK(tel_uuid: UUID)
         FK(usu_id: BIGINT)
-        FK(tpt_id: INTEGER)
-        tel_ddd: VARCHAR(3)
-        tel_numero: VARCHAR(15)
+        FK(ttp_id: INTEGER)
+        tel_ddd: CHAR(2)
+        tel_numero: VARCHAR(9)
+        tel_principal: BOOLEAN DEFAULT FALSE
         tel_criado_em: TIMESTAMPTZ
+        tel_atualizado_em: TIMESTAMPTZ
     }
 
     Table(enderecos, "Endereços dos usuários") {
         PK(end_id: BIGSERIAL)
         UK(end_uuid: UUID)
         FK(usu_id: BIGINT)
+        end_tipo: VARCHAR(20)
         end_apelido: VARCHAR(50)
-        FK(tpr_id: INTEGER)
+        FK(tre_id: INTEGER)
         FK(log_id: INTEGER)
-        end_numero: VARCHAR(20)
+        end_numero: VARCHAR(10)
         end_complemento: VARCHAR(100)
+        FK(cid_id: INTEGER)
         FK(bai_id: INTEGER)
         FK(cep_id: INTEGER)
-        end_cobranca: BOOLEAN DEFAULT FALSE
-        end_entrega: BOOLEAN DEFAULT FALSE
+        FK(pai_id: INTEGER)
+        end_principal: BOOLEAN DEFAULT FALSE
         end_criado_em: TIMESTAMPTZ
+        end_atualizado_em: TIMESTAMPTZ
     }
 }
 
@@ -153,8 +180,8 @@ package "cartao" #FFD6F0 {
         FK(usu_id: BIGINT)
         FK(ban_id: INTEGER)
         UK(crt_token: VARCHAR(255))
-        crt_final: VARCHAR(4)
-        crt_nome_impresso: VARCHAR(100)
+        crt_final: CHAR(4)
+        crt_nome_impresso: VARCHAR(50)
         crt_validade: DATE
         crt_principal: BOOLEAN DEFAULT FALSE
         crt_criado_em: TIMESTAMPTZ
@@ -172,10 +199,13 @@ enderecos  "*" --> "1" tipos_residencias
 enderecos  "*" --> "1" logradouros
 enderecos  "*" --> "1" bairros
 enderecos  "*" --> "1" ceps
+enderecos  "*" --> "1" cidades
+enderecos  "*" --> "1" paises
+ceps       "*" --> "1" cidades
+ceps       "*" --> "1" bairros
 logradouros "*" --> "1" tipos_logradouros
 bairros    "*" --> "1" cidades
 cidades    "*" --> "1" estados
-estados    "*" --> "1" paises
 cartoes    "*" --> "1" usuarios
 cartoes    "*" --> "1" bandeiras_cartao
 

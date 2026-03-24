@@ -15,6 +15,7 @@ export interface IUsuarioAutenticadoDto {
   nome: string;
   email: string;
   role: string;
+  eAdminMestre?: boolean;
 }
 
 /**

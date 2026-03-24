@@ -1,7 +1,10 @@
 import { IRouter } from 'express';
 import { ControladorAdmin } from '@/modules/admin/admin.controller';
 import { autenticacaoMiddleware } from '@/shared/middlewares/autenticacao.middleware';
-import { adminOnlyMiddleware } from '@/shared/middlewares/autorizacao.middleware';
+import { 
+  adminOnlyMiddleware, 
+  adminMestreOnlyMiddleware 
+} from '@/shared/middlewares/autorizacao.middleware';
 
 /**
  * Registra as rotas administrativas restritas.
@@ -13,6 +16,7 @@ export function registrarRotasAdmin(app: IRouter): void {
     '/admin/administradores',
     autenticacaoMiddleware,
     adminOnlyMiddleware,
+    adminMestreOnlyMiddleware,
     (requisicao, resposta) => ControladorAdmin.listarAdmins(requisicao, resposta),
   );
 
@@ -21,6 +25,7 @@ export function registrarRotasAdmin(app: IRouter): void {
     '/admin/registro',
     autenticacaoMiddleware,
     adminOnlyMiddleware,
+    adminMestreOnlyMiddleware,
     (requisicao, resposta) => ControladorAdmin.registrarAdmin(requisicao, resposta),
   );
 
@@ -29,6 +34,7 @@ export function registrarRotasAdmin(app: IRouter): void {
     '/admin/administradores/:uuid/inativar',
     autenticacaoMiddleware,
     adminOnlyMiddleware,
+    adminMestreOnlyMiddleware,
     (requisicao, resposta) => ControladorAdmin.inativarAdmin(requisicao, resposta),
   );
 
@@ -37,6 +43,7 @@ export function registrarRotasAdmin(app: IRouter): void {
     '/admin/administradores/:uuid/ativar',
     autenticacaoMiddleware,
     adminOnlyMiddleware,
+    adminMestreOnlyMiddleware,
     (requisicao, resposta) => ControladorAdmin.ativarAdmin(requisicao, resposta),
   );
 

@@ -26,7 +26,7 @@ export class ControladorClientes {
 
       return RespostaPadrao.enviarSucesso(resposta, 200, perfil);
     } catch (erro) {
-      console.error('Erro em obterPerfil:', erro);
+
       const mensagem = RespostaPadrao.obterMensagemErro(erro, 'Erro ao obter perfil do cliente.');
       return RespostaPadrao.enviarErro(resposta, 400, mensagem);
     }
@@ -92,7 +92,7 @@ export class ControladorClientes {
 
       return RespostaPadrao.enviarSucesso(resposta, 201, clienteCriado);
     } catch (erro) {
-      console.error('Erro em registrarCliente:', erro);
+
       const mensagem = RespostaPadrao.obterMensagemErro(erro, 'Erro ao registrar cliente.');
       return RespostaPadrao.enviarErro(resposta, 400, mensagem);
     }

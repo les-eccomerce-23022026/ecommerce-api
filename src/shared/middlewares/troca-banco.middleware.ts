@@ -18,7 +18,7 @@ export const middlewareTrocaBanco = (req: Request, _res: Response, next: NextFun
   }
 
   // O run() garante que todo o fluxo assíncrono desta requisição tenha acesso ao contexto
-  contextoBanco.run({ tipo: ambiente }, () => {
+  return contextoBanco.run({ tipo: ambiente }, () => {
     next();
   });
 };

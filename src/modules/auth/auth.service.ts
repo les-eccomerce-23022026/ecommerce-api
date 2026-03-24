@@ -2,7 +2,9 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { IDadosLoginDto, IRespostaLoginDto, IUsuarioAutenticadoDto } from '@/modules/auth/Iauth.dto';
 import { IRepositorioUsuarios } from '@/modules/usuarios/IRepositorioUsuarios';
-import { PAPEL_ADMIN, PAPEL_CLIENTE } from '@/shared/types/papeis';
+
+
+import { PAPEL_ADMIN } from '@/shared/types/papeis';
 
 const TEMPO_EXPIRACAO_PADRAO = '1h';
 
@@ -26,6 +28,7 @@ export class ServicoAutenticacao {
     const usuariosAtivos = usuarios.filter((u) => u.ativo);
 
     if (usuariosAtivos.length === 0) {
+      console.debug(`[auth.service] Nenhum usuário ativo encontrado para o email: ${dadosLogin.email}. Total encontrados: ${usuarios.length}`);
       throw new Error('Credenciais inválidas.');
     }
 
@@ -49,6 +52,7 @@ export class ServicoAutenticacao {
     const match = validacoes.find((v) => v.senhaValida);
 
     if (!match) {
+      console.debug(`[auth.service] Senha inválida para o usuário: ${dadosLogin.email}`);
       throw new Error('Credenciais inválidas.');
     }
 
@@ -59,6 +63,7 @@ export class ServicoAutenticacao {
       nome: usuarioAutenticado.nome,
       email: usuarioAutenticado.email,
       role: usuarioAutenticado.role.descricao,
+      eAdminMestre: !!usuarioAutenticado.isAdminMestre,
     };
 
     const segredo = process.env.JWT_SEGREDO;
@@ -69,7 +74,9 @@ export class ServicoAutenticacao {
     const token = jwt.sign(
       {
         sub: usuarioAutenticado.uuid,
+        email: usuarioAutenticado.email,
         role: usuarioAutenticado.role.descricao,
+        isAdminMestre: !!usuarioAutenticado.isAdminMestre,
       },
       segredo,
       {

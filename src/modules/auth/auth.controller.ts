@@ -25,12 +25,15 @@ export class ControladorAutenticacao {
       const resultado = await servicoAutenticacao.autenticar({ email, senha });
 
       // Definir cookie HttpOnly com JWT
-      resposta.cookie('token', resultado.token, {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const configuracaoCookie: any = {
         httpOnly: true,
-        secure: true,
+        secure: process.env.NODE_ENV === 'production',
         sameSite: 'strict',
         maxAge: 24 * 60 * 60 * 1000, // 24h
-      });
+      };
+
+      resposta.cookie('token', resultado.token, configuracaoCookie);
 
       // Retornar token no corpo para facilitar integração com headers Authorization
       const respostaCorpo = {
@@ -44,5 +47,40 @@ export class ControladorAutenticacao {
       return RespostaPadrao.enviarErro(resposta, 401, mensagem);
     }
   }
-}
 
+  /**
+   * Retorna os dados do usuário autenticado a partir do token (reuso de sessão).
+   *
+   * @param requisicao Objeto da requisição contendo req.usuario.
+   * @param resposta Objeto da resposta HTTP.
+   */
+  public static async me(requisicao: Request, resposta: Response): Promise<Response> {
+    const { usuario } = requisicao;
+
+    if (!usuario) {
+      return RespostaPadrao.enviarErro(resposta, 401, 'Sessão inválida ou expirada.');
+    }
+
+    try {
+      // Buscar dados completos do usuário para retornar IUsuarioAutenticadoDto consistente
+      const usuarioBD = await di.repoUsuarios.buscarPorUuid(usuario.uuid);
+      
+      if (!usuarioBD) {
+        return RespostaPadrao.enviarErro(resposta, 401, 'Usuário não encontrado.');
+      }
+
+      return RespostaPadrao.enviarSucesso(resposta, 200, {
+        user: {
+          uuid: usuarioBD.uuid,
+          nome: usuarioBD.nome,
+          email: usuarioBD.email,
+          role: usuarioBD.role.descricao,
+          eAdminMestre: !!usuarioBD.isAdminMestre,
+        }
+      });
+    } catch (erro) {
+      const mensagem = RespostaPadrao.obterMensagemErro(erro, 'Erro ao recuperar dados da sessão.');
+      return RespostaPadrao.enviarErro(resposta, 500, mensagem);
+    }
+  }
+}

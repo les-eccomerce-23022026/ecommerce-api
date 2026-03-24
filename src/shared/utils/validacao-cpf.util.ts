@@ -18,21 +18,21 @@ export function validarCpf(cpf: string): boolean {
 
   // Validação do primeiro dígito
   let soma = 0;
-  for (let i = 0; i < 9; i++) {
-    soma += parseInt(numeros.charAt(i)) * (10 - i);
+  for (let i = 0; i < 9; i += 1) {
+    soma += parseInt(numeros.charAt(i), 10) * (10 - i);
   }
-  let resto = 11 - (soma % 11);
-  let digitoVerificador1 = resto === 10 || resto === 11 ? 0 : resto;
+  const resto1 = 11 - (soma % 11);
+  const digitoVerificador1 = resto1 === 10 || resto1 === 11 ? 0 : resto1;
 
-  if (digitoVerificador1 !== parseInt(numeros.charAt(9))) return false;
+  if (digitoVerificador1 !== parseInt(numeros.charAt(9), 10)) return false;
 
   // Validação do segundo dígito
   soma = 0;
-  for (let i = 0; i < 10; i++) {
-    soma += parseInt(numeros.charAt(i)) * (11 - i);
+  for (let i = 0; i < 10; i += 1) {
+    soma += parseInt(numeros.charAt(i), 10) * (11 - i);
   }
-  resto = 11 - (soma % 11);
-  let digitoVerificador2 = resto === 10 || resto === 11 ? 0 : resto;
+  const resto2 = 11 - (soma % 11);
+  const digitoVerificador2 = resto2 === 10 || resto2 === 11 ? 0 : resto2;
 
-  return digitoVerificador2 === parseInt(numeros.charAt(10));
+  return digitoVerificador2 === parseInt(numeros.charAt(10), 10);
 }

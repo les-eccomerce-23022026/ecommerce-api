@@ -37,6 +37,7 @@ CREATE TABLE IF NOT EXISTS usuarios (
     usu_genero          VARCHAR(20),
     usu_data_nascimento DATE,
     usu_ativo           BOOLEAN         NOT NULL    DEFAULT TRUE,
+    usu_is_admin_mestre BOOLEAN         NOT NULL    DEFAULT FALSE,
     usu_criado_em       TIMESTAMPTZ     NOT NULL    DEFAULT NOW(),
     usu_atualizado_em   TIMESTAMPTZ     NOT NULL    DEFAULT NOW(),
 

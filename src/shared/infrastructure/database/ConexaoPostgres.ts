@@ -1,4 +1,4 @@
-import { Pool, PoolClient } from 'pg';
+import { Pool } from 'pg';
 import { IConexaoBanco } from './IConexaoBanco';
 import { obterTipoBancoAtual, obterTransacaoAtual, contextoBanco, obterContextoAtual, definirTransacaoGlobalParaTestes } from './ContextoBanco';
 
@@ -95,6 +95,7 @@ export class ConexaoPostgres implements IConexaoBanco {
     });
   }
 
+  // eslint-disable-next-line class-methods-use-this
   public async confirmarTransacao(): Promise<void> {
     const cliente = obterTransacaoAtual();
     if (!cliente) {
@@ -113,10 +114,12 @@ export class ConexaoPostgres implements IConexaoBanco {
     }
   }
 
+  // eslint-disable-next-line class-methods-use-this
   public async reverterTransacao(): Promise<void> {
     const cliente = obterTransacaoAtual();
     const transacaoExistente = obterContextoAtual();
     if (!cliente) {
+      // eslint-disable-next-line no-console
       console.log('REVERTER FALHOU. ContextoAtual:', JSON.stringify(transacaoExistente));
       throw new Error('Nenhuma transação ativa para reverter.');
     }

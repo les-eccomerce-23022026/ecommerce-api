@@ -11,6 +11,7 @@ export interface IUsuario {
   idPapel: number;
   role: IPapelUsuario;
   ativo: boolean;
+  isAdminMestre?: boolean;
   genero?: string;
   dataNascimento?: Date;
   criadoEm?: Date;

@@ -363,11 +363,9 @@ export class ServicoClientes {
     if (alterandoCpf) payloadUsuario.cpf = dados.cpf;
     if (alterandoTelefone && dados.telefone) payloadUsuario.telefoneRapido = dados.telefone.numero;
 
-    let usuarioAtualizado = usuarioNoBanco;
     if (Object.keys(payloadUsuario).length > 0) {
       const resultado = await this.repositorioUsuarios.atualizarUsuario(uuid, payloadUsuario);
       if (!resultado) throw new Error('Erro ao atualizar dados básicos do usuário.');
-      usuarioAtualizado = resultado;
     }
 
     // 3. Atualizar perfil (gênero / dataNascimento)

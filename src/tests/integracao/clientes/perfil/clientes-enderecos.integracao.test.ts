@@ -92,7 +92,7 @@ describe('Integração - Clientes (Endereços)', () => {
         .get('/api/clientes/perfil')
         .set('Authorization', `Bearer ${token}`);
       
-      const enderecoRemovido = resPerfil.body.dados.enderecos.find((e: any) => e.uuid === uuidEndereco);
+      const enderecoRemovido = resPerfil.body.dados.enderecos.find((e: { uuid: string }) => e.uuid === uuidEndereco);
       expect(enderecoRemovido).toBeUndefined();
     });
 

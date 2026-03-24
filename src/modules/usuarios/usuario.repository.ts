@@ -35,6 +35,7 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
       },
       telefoneRapido: row.telefoneRapido as string,
       ativo: row.ativo as boolean,
+      isAdminMestre: row.isAdminMestre as boolean,
       genero: row.genero as string,
       dataNascimento: row.dataNascimento ? new Date(row.dataNascimento as string) : undefined,
       criadoEm: row.criadoEm ? new Date(row.criadoEm as string) : undefined,
@@ -47,7 +48,8 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
       SELECT u.usu_id AS "id", u.usu_uuid AS "uuid", u.usu_nome AS "nome", 
              u.usu_email AS "email", u.usu_cpf AS "cpf", u.usu_senha_hash AS "senhaHash", 
              u.pap_id AS "idPapel", u.usu_telefone_rapido AS "telefoneRapido", 
-             u.usu_ativo AS "ativo", u.usu_genero AS "genero", u.usu_data_nascimento AS "dataNascimento",
+             u.usu_ativo AS "ativo", u.usu_is_admin_mestre AS "isAdminMestre",
+             u.usu_genero AS "genero", u.usu_data_nascimento AS "dataNascimento",
              u.usu_criado_em AS "criadoEm", u.usu_atualizado_em AS "atualizadoEm",
              p.pap_descricao AS "papelDescricao"
       FROM usuarios u
@@ -60,19 +62,20 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
     const idPapel = role?.id ?? PAPEL_CLIENTE.id;
 
     const query = `
-      INSERT INTO usuarios (usu_nome, usu_email, usu_cpf, usu_senha_hash, pap_id)
-      VALUES ($1, $2, $3, $4, $5)
+      INSERT INTO usuarios (usu_nome, usu_email, usu_cpf, usu_senha_hash, pap_id, usu_is_admin_mestre)
+      VALUES ($1, $2, $3, $4, $5, $6)
       RETURNING usu_id AS "id", usu_uuid AS "uuid", usu_nome AS "nome", 
                 usu_email AS "email", usu_cpf AS "cpf", usu_senha_hash AS "senhaHash", 
                 pap_id AS "idPapel", usu_telefone_rapido AS "telefoneRapido", 
-                usu_ativo AS "ativo", usu_criado_em AS "criadoEm", usu_atualizado_em AS "atualizadoEm"
+                usu_ativo AS "ativo", usu_is_admin_mestre AS "isAdminMestre",
+                usu_criado_em AS "criadoEm", usu_atualizado_em AS "atualizadoEm"
     `;
 
-    const values = [nome, email, cpf, senhaHash, idPapel];
+    const values = [nome, email, cpf, senhaHash, idPapel, dados.isAdminMestre ?? false];
     const rows = await this.db.executar(query, values);
 
     // Como o INSERT RETURNING não traz o JOIN, buscamos o registro completo ou mapeamos manualmente
-    return this.buscarPorUuid(rows[0].uuid as string) as Promise<IUsuario>;
+    return this.buscarPorUuid((rows[0] as LinhaResultado).uuid as string) as Promise<IUsuario>;
   }
 
   public async buscarPorEmail(email: string): Promise<IUsuario | undefined> {
@@ -164,6 +167,11 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
       campos.push(`usu_ativo = $${contador}`);
       contador += 1;
       valores.push(dados.ativo);
+    }
+    if (dados.isAdminMestre !== undefined) {
+      campos.push(`usu_is_admin_mestre = $${contador}`);
+      contador += 1;
+      valores.push(dados.isAdminMestre);
     }
     if (dados.genero) {
       campos.push(`usu_genero = $${contador}`);

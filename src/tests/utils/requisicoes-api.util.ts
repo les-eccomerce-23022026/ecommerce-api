@@ -2,7 +2,7 @@ import request, { Response } from 'supertest';
 import { Application } from 'express';
 import bcrypt from 'bcryptjs';
 import { di } from '@/shared/infrastructure/di.container';
-import { PAPEL_ADMIN } from '@/shared/types/papeis';
+import { PAPEL_ADMIN, PAPEL_CLIENTE } from '@/shared/types/papeis';
 
 type DadosCadastroCliente = {
   nome?: string;
@@ -45,11 +45,40 @@ export async function realizarLogin(
 }
 
 export async function obterTokenCliente(app: Application): Promise<string> {
-  await registrarCliente(app);
-  const respostaLogin = await realizarLogin(app, 'cliente.teste@email.com', 'SenhaForte@123');
+  const repositorioUsuarios = di.repoUsuarios;
 
-  // Em ambiente de teste (JEST_WORKER_ID definido), o token é retornado no body
-  return respostaLogin.body?.dados?.token as string;
+  // Mesma abordagem de obterTokenAdmin: cria/atualiza via repositório diretamente
+  // para que o usuário fique visível dentro da transação de isolamento do teste.
+  const senhaHash = await bcrypt.hash('SenhaForte@123', 10);
+  const clienteExistente = await repositorioUsuarios.buscarPorEmail('cliente.teste@email.com');
+
+  if (!clienteExistente) {
+    await repositorioUsuarios.criarUsuario({
+      nome: 'Cliente Teste',
+      email: 'cliente.teste@email.com',
+      cpf: '123.456.789-10',
+      senhaHash,
+      role: PAPEL_CLIENTE,
+    });
+  } else {
+    await repositorioUsuarios.atualizarUsuario(clienteExistente.uuid, { senhaHash });
+  }
+
+  const maximoTentativas = 5;
+
+  for (let tentativa = 1; tentativa <= maximoTentativas; tentativa += 1) {
+    // eslint-disable-next-line no-await-in-loop
+    const respostaLogin = await realizarLogin(app, 'cliente.teste@email.com', 'SenhaForte@123');
+
+    if (respostaLogin.status === 200 && respostaLogin.body?.dados?.token) {
+      return respostaLogin.body.dados.token as string;
+    }
+
+    // eslint-disable-next-line no-await-in-loop
+    await new Promise((resolve) => { setTimeout(resolve, 50); });
+  }
+
+  throw new Error('Não foi possível obter token do cliente de teste.');
 }
 
 export async function obterTokenAdmin(app: Application): Promise<string> {
@@ -66,12 +95,16 @@ export async function obterTokenAdmin(app: Application): Promise<string> {
       cpf: '000.000.000-00',
       senhaHash: senhaHashAdmin,
       role: PAPEL_ADMIN,
+      isAdminMestre: true,
     });
   } else {
     // Atualiza o hash dentro da transação de isolamento para garantir que a senha
     // conhecida ('Admin@123') seja usada, independentemente do que foi seedado no banco.
     // A mudança é revertida ao final do teste junto com a transação.
-    await repositorioUsuarios.atualizarUsuario(adminExistente.uuid, { senhaHash: senhaHashAdmin });
+    await repositorioUsuarios.atualizarUsuario(adminExistente.uuid, { 
+      senhaHash: senhaHashAdmin,
+      isAdminMestre: true 
+    });
   }
 
   const maximoTentativas = 5;

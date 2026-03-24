@@ -59,7 +59,7 @@ export class ServicoCartoes {
 
     const cartao = await this.repositorioCartoes.criar({
       idUsuario,
-      idBandeira: idBandeira,
+      idBandeira,
       token: dados.token,
       final: dados.final,
       nomeImpresso: dados.nomeImpresso,
@@ -91,7 +91,7 @@ export class ServicoCartoes {
       await this.repositorioCartoes.definirComoPrincipal(uuid, cartaoExistente.idUsuario);
     }
 
-    const payloadRepositorio: any = { ...dados };
+    const payloadRepositorio: IAtualizarCartaoDto & { idBandeira?: number } = { ...dados };
 
     // Se houver uuidBandeira, buscar o id interno
     if (dados.uuidBandeira) {

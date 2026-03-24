@@ -135,6 +135,7 @@ export class ControladorAdmin {
           senhaHash: hash,
           idPapel: PAPEL_ADMIN.id,
           ativo: true,
+          isAdminMestre: true,
         });
         return RespostaPadrao.enviarSucesso(resposta, 200, { mensagem: 'Administrador de teste resetado e atualizado com sucesso.' });
       }
@@ -144,8 +145,8 @@ export class ControladorAdmin {
         email,
         cpf: '000.000.000-00',
         senhaHash: hash,
-        idPapel: PAPEL_ADMIN.id,
         role: PAPEL_ADMIN,
+        isAdminMestre: true,
       });
 
       return RespostaPadrao.enviarSucesso(resposta, 201, { mensagem: 'Administrador de teste criado com sucesso.' });
