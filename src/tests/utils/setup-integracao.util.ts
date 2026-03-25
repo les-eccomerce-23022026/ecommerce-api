@@ -14,8 +14,8 @@ import {
  */
 export function configurarTesteIntegracao(porTeste = true) {
   const contexto = {
-    app: (null as unknown) as Application,
-    escopo: (null as unknown) as EscopoIsolamentoIntegracao,
+    app: (null as unknown as Application),
+    escopo: (null as unknown as EscopoIsolamentoIntegracao),
   };
 
   beforeAll(async () => {

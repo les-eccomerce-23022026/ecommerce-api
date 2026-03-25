@@ -1,6 +1,7 @@
 import { IEnderecoUsuario } from '@/shared/types/IEnderecoUsuario';
 import { IRepositorioEnderecoUsuario } from '@/shared/types/IRepositorioEnderecoUsuario';
 import { IConexaoBanco } from '@/shared/infrastructure/database/IConexaoBanco';
+import { IRowEnderecoUsuario } from '@/shared/types/db-rows.types';
 
 export class RepositorioEnderecoUsuarioPostgres implements IRepositorioEnderecoUsuario {
   private db: IConexaoBanco;
@@ -9,7 +10,7 @@ export class RepositorioEnderecoUsuarioPostgres implements IRepositorioEnderecoU
     this.db = db;
   }
 
-  private static mapearParaEntidade(row: Record<string, unknown>): IEnderecoUsuario {
+  private static mapearParaEntidade(row: IRowEnderecoUsuario): IEnderecoUsuario {
     return {
       id: Number(row.id),
       uuid: row.uuid as string,
@@ -36,11 +37,11 @@ export class RepositorioEnderecoUsuarioPostgres implements IRepositorioEnderecoU
         usu_id, end_tipo, end_apelido, tre_id, log_id, end_numero, end_complemento,
         cid_id, bai_id, cep_id, pai_id, end_principal
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-      RETURNING end_id AS "id", end_uuid AS "uuid", 
-                usu_id AS "idUsuario", end_tipo AS "tipo", 
-                end_apelido AS "apelido", tre_id AS "idTipoResidencia", 
-                log_id AS "idLogradouro", end_numero AS "numero", end_complemento AS "complemento", 
-                cid_id AS "idCidade", bai_id AS "idBairro", cep_id AS "idCep", 
+      RETURNING end_id AS "id", end_uuid AS "uuid",
+                usu_id AS "idUsuario", end_tipo AS "tipo",
+                end_apelido AS "apelido", tre_id AS "idTipoResidencia",
+                log_id AS "idLogradouro", end_numero AS "numero", end_complemento AS "complemento",
+                cid_id AS "idCidade", bai_id AS "idBairro", cep_id AS "idCep",
                 pai_id AS "idPais", end_principal AS "principal"
     `;
     const rows = await this.db.executar(query, [
@@ -57,23 +58,23 @@ export class RepositorioEnderecoUsuarioPostgres implements IRepositorioEnderecoU
       endereco.idPais,
       endereco.principal,
     ]);
-    return RepositorioEnderecoUsuarioPostgres.mapearParaEntidade(rows[0] as Record<string, unknown>);
+    return RepositorioEnderecoUsuarioPostgres.mapearParaEntidade(rows[0] as IRowEnderecoUsuario);
   }
 
   public async buscarPorIdUsuario(idUsuario: number): Promise<IEnderecoUsuario[]> {
     const query = `
-      SELECT end_id AS "id", end_uuid AS "uuid", 
-             usu_id AS "idUsuario", end_tipo AS "tipo", 
-             end_apelido AS "apelido", tre_id AS "idTipoResidencia", 
-             log_id AS "idLogradouro", end_numero AS "numero", end_complemento AS "complemento", 
-             cid_id AS "idCidade", bai_id AS "idBairro", cep_id AS "idCep", 
+      SELECT end_id AS "id", end_uuid AS "uuid",
+             usu_id AS "idUsuario", end_tipo AS "tipo",
+             end_apelido AS "apelido", tre_id AS "idTipoResidencia",
+             log_id AS "idLogradouro", end_numero AS "numero", end_complemento AS "complemento",
+             cid_id AS "idCidade", bai_id AS "idBairro", cep_id AS "idCep",
              pai_id AS "idPais", end_principal AS "principal",
              end_criado_em AS "criadoEm", end_atualizado_em AS "atualizadoEm"
-      FROM enderecos 
+      FROM enderecos
       WHERE usu_id = $1
     `;
     const rows = await this.db.executar(query, [idUsuario]);
-    return rows.map((row) => RepositorioEnderecoUsuarioPostgres.mapearParaEntidade(row as Record<string, unknown>));
+    return rows.map((row) => RepositorioEnderecoUsuarioPostgres.mapearParaEntidade(row as IRowEnderecoUsuario));
   }
 
   public async atualizar(endereco: IEnderecoUsuario): Promise<void> {

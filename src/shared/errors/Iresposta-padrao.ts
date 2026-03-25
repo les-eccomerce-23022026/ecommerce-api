@@ -1,7 +1,10 @@
 import { Response } from 'express';
 
+/** Tipo para dados genéricos de resposta. */
+export type DadosResposta = Record<string, unknown>;
+
 /** Estrutura de resposta de sucesso na API. */
-export interface IRespostaSucessoJson<T = unknown> {
+export interface IRespostaSucessoJson<T = DadosResposta> {
   sucesso: true;
   dados: T;
 }
@@ -13,7 +16,7 @@ export interface IRespostaErroJson {
 }
 
 /** Tipo união das respostas padronizadas. */
-export type RespostaPadraoJson<T = unknown> = IRespostaSucessoJson<T> | IRespostaErroJson;
+export type RespostaPadraoJson<T = DadosResposta> = IRespostaSucessoJson<T> | IRespostaErroJson;
 
 /**
  * Classe utilitária para enviar respostas HTTP em JSON padronizado.

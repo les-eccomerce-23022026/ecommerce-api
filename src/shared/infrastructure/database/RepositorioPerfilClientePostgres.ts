@@ -1,6 +1,7 @@
 import { IPerfilCliente } from '@/shared/types/IPerfilCliente';
 import { IRepositorioPerfilCliente } from '@/shared/types/IRepositorioPerfilCliente';
 import { IConexaoBanco } from '@/shared/infrastructure/database/IConexaoBanco';
+import { IRowPerfilCliente } from '@/shared/types/db-rows.types';
 
 export class RepositorioPerfilClientePostgres implements IRepositorioPerfilCliente {
   private db: IConexaoBanco;
@@ -9,7 +10,7 @@ export class RepositorioPerfilClientePostgres implements IRepositorioPerfilClien
     this.db = db;
   }
 
-  private static mapearParaEntidade(row: Record<string, unknown>): IPerfilCliente {
+  private static mapearParaEntidade(row: IRowPerfilCliente): IPerfilCliente {
     return {
       id: Number(row.id),
       uuid: row.uuid as string,
@@ -32,16 +33,16 @@ export class RepositorioPerfilClientePostgres implements IRepositorioPerfilClien
 
   public async buscarPorIdUsuario(idUsuario: number): Promise<IPerfilCliente | null> {
     const query = `
-      SELECT cli_id AS "id", cli_uuid AS "uuid", 
-             usu_id AS "idUsuario", cli_genero AS "genero", cli_data_nascimento AS "dataNascimento", 
+      SELECT cli_id AS "id", cli_uuid AS "uuid",
+             usu_id AS "idUsuario", cli_genero AS "genero", cli_data_nascimento AS "dataNascimento",
              cli_ranking AS "ranking", cli_criado_em AS "criadoEm", cli_atualizado_em AS "atualizadoEm"
-      FROM clientes 
+      FROM clientes
       WHERE usu_id = $1
     `;
     const rows = await this.db.executar(query, [idUsuario]);
 
     if (rows.length === 0) return null;
-    return RepositorioPerfilClientePostgres.mapearParaEntidade(rows[0] as Record<string, unknown>);
+    return RepositorioPerfilClientePostgres.mapearParaEntidade(rows[0] as IRowPerfilCliente);
   }
 
   // eslint-disable-next-line class-methods-use-this

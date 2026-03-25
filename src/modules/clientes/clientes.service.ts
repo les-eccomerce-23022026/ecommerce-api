@@ -21,6 +21,15 @@ import { validarCpf } from '@/shared/utils/validacao-cpf.util';
 import { PAPEL_CLIENTE } from '@/shared/types/papeis';
 import { IConexaoBanco } from '@/shared/infrastructure/database/IConexaoBanco';
 import { IEnderecoUsuario } from '@/shared/types/IEnderecoUsuario';
+import {
+  IRowIdSimples,
+  IRowCidadeEstado,
+  IRowBairro,
+  IRowCep,
+  IRowPais,
+  IRowTipoResidencia,
+  IRowLogradouroTipo,
+} from '@/shared/types/db-rows.types';
 
 /**
  * Serviço responsável pelo fluxo de cadastro público de clientes.
@@ -104,13 +113,13 @@ export class ServicoClientes {
 
   private static async obterIdTipoResidencia(db: IConexaoBanco, descricao: string): Promise<number> {
     const query = `SELECT tre_id FROM tipos_residencias WHERE tre_descricao ILIKE $1 LIMIT 1`;
-    const result = (await db.executar(query, [descricao])) as Record<string, unknown>[];
+    const result = await db.executar<IRowIdSimples>(query, [descricao]);
     return result.length > 0 ? Number(result[0].tre_id) : 1; // Default Casa
   }
 
   private static async obterIdTipoLogradouro(db: IConexaoBanco, descricao: string): Promise<number> {
-    const query = `SELECT tlo_id FROM tipos_logradouros WHERE tlo_descricao ILIKE $1 LIMIT 1`;
-    const result = (await db.executar(query, [descricao])) as Record<string, unknown>[];
+    const query = `SELECT tlo_id FROM tipos_logradouros WHERE tre_descricao ILIKE $1 LIMIT 1`;
+    const result = await db.executar<IRowIdSimples>(query, [descricao]);
     return result.length > 0 ? Number(result[0].tlo_id) : 1; // Default Rua
   }
 
@@ -121,10 +130,10 @@ export class ServicoClientes {
       JOIN tipos_logradouros tl ON l.tlo_id = tl.tlo_id
       WHERE tl.tlo_descricao ILIKE $1 AND l.log_nome = $2
     `;
-    const existente = (await this.db.executar(queryBuscar, [
+    const existente = await this.db.executar<IRowIdSimples>(queryBuscar, [
       tipoLogradouro,
       nomeLogradouro,
-    ])) as Record<string, unknown>[];
+    ]);
     if (existente.length > 0) {
       return Number(existente[0].log_id);
     }
@@ -135,50 +144,50 @@ export class ServicoClientes {
       VALUES ($1, $2)
       RETURNING log_id
     `;
-    const novo = (await this.db.executar(queryInserir, [
+    const novo = await this.db.executar<IRowIdSimples>(queryInserir, [
       idTipoLogradouro,
       nomeLogradouro,
-    ])) as Record<string, unknown>[];
+    ]);
     return Number(novo[0].log_id);
   }
 
   private async obterOuCriarCidade(cidade: string, siglaEstado: string): Promise<number> {
     const queryEstado = `SELECT est_id FROM estados WHERE est_sigla = $1 LIMIT 1`;
-    const estadoResult = (await this.db.executar(queryEstado, [siglaEstado.toUpperCase().trim()])) as Record<string, unknown>[];
+    const estadoResult = await this.db.executar<IRowIdSimples>(queryEstado, [siglaEstado.toUpperCase().trim()]);
     const idEstado = estadoResult.length > 0 ? Number(estadoResult[0].est_id) : null;
 
     const query = `SELECT cid_id FROM cidades WHERE cid_nome_norm = UPPER(TRIM($1)) AND (est_id = $2 OR $2 IS NULL) LIMIT 1`;
-    const existente = (await this.db.executar(query, [cidade, idEstado])) as Record<string, unknown>[];
+    const existente = await this.db.executar<IRowIdSimples>(query, [cidade, idEstado]);
     if (existente.length > 0) {
       return Number(existente[0].cid_id);
     }
 
     const insertQuery = `INSERT INTO cidades (cid_nome, cid_nome_norm, est_id) VALUES ($1::varchar, UPPER(TRIM($1::varchar)), $2) RETURNING cid_id`;
-    const novo = (await this.db.executar(insertQuery, [cidade, idEstado])) as Record<string, unknown>[];
+    const novo = await this.db.executar<IRowIdSimples>(insertQuery, [cidade, idEstado]);
     return Number(novo[0].cid_id);
   }
 
   private async obterOuCriarBairro(bairro: string, idCidade: number): Promise<number> {
     const query = `SELECT bai_id FROM bairros WHERE bai_nome_norm = UPPER(TRIM($1)) AND cid_id = $2 LIMIT 1`;
-    const existente = (await this.db.executar(query, [bairro, idCidade])) as Record<string, unknown>[];
+    const existente = await this.db.executar<IRowIdSimples>(query, [bairro, idCidade]);
     if (existente.length > 0) {
       return Number(existente[0].bai_id);
     }
     const insertQuery = `INSERT INTO bairros (bai_nome, bai_nome_norm, cid_id) VALUES ($1::varchar, UPPER(TRIM($1::varchar)), $2) RETURNING bai_id`;
-    const novo = (await this.db.executar(insertQuery, [bairro, idCidade])) as Record<string, unknown>[];
+    const novo = await this.db.executar<IRowIdSimples>(insertQuery, [bairro, idCidade]);
     return Number(novo[0].bai_id);
   }
 
   private async obterOuCriarCep(cep: string, idCidade: number, idBairro: number): Promise<number> {
     const cepLimpo = cep.replace(/\D/g, '');
     const query = `SELECT cep_id FROM ceps WHERE cep_numero = $1 LIMIT 1`;
-    const existente = (await this.db.executar(query, [cepLimpo])) as Record<string, unknown>[];
+    const existente = await this.db.executar<IRowIdSimples>(query, [cepLimpo]);
     if (existente.length > 0) {
       return Number(existente[0].cep_id);
     }
     try {
       const insertQuery = `INSERT INTO ceps (cep_numero, cid_id, bai_id) VALUES ($1, $2, $3) RETURNING cep_id`;
-      const novo = (await this.db.executar(insertQuery, [cepLimpo, idCidade, idBairro])) as Record<string, unknown>[];
+      const novo = await this.db.executar<IRowIdSimples>(insertQuery, [cepLimpo, idCidade, idBairro]);
       return Number(novo[0].cep_id);
     } catch (err: unknown) {
       if (err && typeof err === 'object' && 'message' in err) {
@@ -186,7 +195,7 @@ export class ServicoClientes {
         // Se der erro de unicidade, buscar o que já existe
         if (error.message.includes('unique constraint') || error.code === '23505') {
           const queryRebusca = `SELECT cep_id FROM ceps WHERE cep_numero = $1 LIMIT 1`;
-          const rebuasca = (await this.db.executar(queryRebusca, [cepLimpo])) as Record<string, unknown>[];
+          const rebuasca = await this.db.executar<IRowIdSimples>(queryRebusca, [cepLimpo]);
           return Number(rebuasca[0].cep_id);
         }
       }
@@ -199,45 +208,45 @@ export class ServicoClientes {
     return 1;
   }
 
-  private async obterCidadePorId(idCidade: number): Promise<Record<string, unknown> | null> {
+  private async obterCidadePorId(idCidade: number): Promise<IRowCidadeEstado | null> {
     const query = `SELECT c.cid_nome as "dscCidade", e.est_sigla as "dscEstado"
                    FROM cidades c
                    JOIN estados e ON c.est_id = e.est_id
                    WHERE c.cid_id = $1`;
-    const result = (await this.db.executar(query, [idCidade])) as Record<string, unknown>[];
+    const result = await this.db.executar<IRowCidadeEstado>(query, [idCidade]);
     return result.length > 0 ? result[0] : null;
   }
 
-  private async obterBairroPorId(idBairro: number): Promise<Record<string, unknown> | null> {
+  private async obterBairroPorId(idBairro: number): Promise<IRowBairro | null> {
     const query = `SELECT bai_nome as "dscBairro" FROM bairros WHERE bai_id = $1`;
-    const result = (await this.db.executar(query, [idBairro])) as Record<string, unknown>[];
+    const result = await this.db.executar<IRowBairro>(query, [idBairro]);
     return result.length > 0 ? result[0] : null;
   }
 
-  private async obterCepPorId(idCep: number): Promise<Record<string, unknown> | null> {
+  private async obterCepPorId(idCep: number): Promise<IRowCep | null> {
     const query = `SELECT cep_numero as "numCep" FROM ceps WHERE cep_id = $1`;
-    const result = (await this.db.executar(query, [idCep])) as Record<string, unknown>[];
+    const result = await this.db.executar<IRowCep>(query, [idCep]);
     return result.length > 0 ? result[0] : null;
   }
 
-  private async obterPaisPorId(idPais: number): Promise<Record<string, unknown> | null> {
+  private async obterPaisPorId(idPais: number): Promise<IRowPais | null> {
     const query = `SELECT pai_nome as "dscPais" FROM paises WHERE pai_id = $1`;
-    const result = (await this.db.executar(query, [idPais])) as Record<string, unknown>[];
+    const result = await this.db.executar<IRowPais>(query, [idPais]);
     return result.length > 0 ? result[0] : null;
   }
 
-  private async obterTipoResidenciaPorId(idTipoResidencia: number): Promise<Record<string, unknown> | null> {
+  private async obterTipoResidenciaPorId(idTipoResidencia: number): Promise<IRowTipoResidencia | null> {
     const query = `SELECT tre_descricao as "dscTipoResidencia" FROM tipos_residencias WHERE tre_id = $1`;
-    const result = (await this.db.executar(query, [idTipoResidencia])) as Record<string, unknown>[];
+    const result = await this.db.executar<IRowTipoResidencia>(query, [idTipoResidencia]);
     return result.length > 0 ? result[0] : null;
   }
 
-  private async obterLogradouroPorId(idLogradouro: number): Promise<Record<string, unknown> | null> {
+  private async obterLogradouroPorId(idLogradouro: number): Promise<IRowLogradouroTipo | null> {
     const query = `SELECT l.log_nome as "dscLogradouro", tl.tlo_descricao as "tipoLogradouro"
                    FROM logradouros l
                    JOIN tipos_logradouros tl ON l.tlo_id = tl.tlo_id
                    WHERE l.log_id = $1`;
-    const result = (await this.db.executar(query, [idLogradouro])) as Record<string, unknown>[];
+    const result = await this.db.executar<IRowLogradouroTipo>(query, [idLogradouro]);
     return result.length > 0 ? result[0] : null;
   }
 
@@ -580,16 +589,16 @@ export class ServicoClientes {
         return {
           uuid: endereco.uuid,
           apelido: endereco.apelido || (endereco.principal ? 'Principal' : `Endereço ${endereco.id}`),
-          tipoResidencia: (tipoResidencia?.dscTipoResidencia as string) || 'Casa',
-          tipoLogradouro: (logradouro?.tipoLogradouro as string) || 'Rua',
-          logradouro: (logradouro?.dscLogradouro as string) || '',
+          tipoResidencia: tipoResidencia?.dscTipoResidencia || 'Casa',
+          tipoLogradouro: logradouro?.tipoLogradouro || 'Rua',
+          logradouro: logradouro?.dscLogradouro || '',
           numero: endereco.numero,
           complemento: endereco.complemento,
-          bairro: (bairro?.dscBairro as string) || '',
-          cep: (cep?.numCep as string) || '',
-          cidade: (cidade?.dscCidade as string) || '',
-          estado: (cidade?.dscEstado as string) || '',
-          pais: (pais?.dscPais as string) || 'Brasil',
+          bairro: bairro?.dscBairro || '',
+          cep: cep?.numCep || '',
+          cidade: cidade?.dscCidade || '',
+          estado: cidade?.dscEstado || '',
+          pais: pais?.dscPais || 'Brasil',
         };
       }),
     );

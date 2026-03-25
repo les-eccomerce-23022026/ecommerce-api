@@ -1,45 +1,43 @@
 /**
  * Converte recursivamente todas as chaves de um objeto de snake_case para camelCase.
- * 
+ *
  * @param obj Objeto a ser convertido.
  * @returns Novo objeto com chaves em camelCase.
  */
-export function snakeParaCamel(obj: unknown): unknown {
+export function snakeParaCamel<T = Record<string, unknown>>(obj: unknown): T {
   if (Array.isArray(obj)) {
-    return obj.map((v) => snakeParaCamel(v));
+    return obj.map((v) => snakeParaCamel(v)) as unknown as T;
   }
   if (obj !== null && obj !== undefined && typeof obj === 'object' && obj.constructor === Object) {
-    const objeto = obj as Record<string, unknown>;
-    return Object.keys(objeto).reduce(
+    return Object.keys(obj).reduce(
       (acc, key) => ({
         ...acc,
-        [key.replace(/(_\w)/g, (m) => m[1].toUpperCase())]: snakeParaCamel(objeto[key]),
+        [key.replace(/(_\w)/g, (m) => m[1].toUpperCase())]: snakeParaCamel((obj as Record<string, unknown>)[key]),
       }),
       {}
-    );
+    ) as T;
   }
-  return obj;
+  return obj as T;
 }
 
 /**
  * Converte recursivamente todas as chaves de um objeto de camelCase para snake_case.
- * 
+ *
  * @param obj Objeto a ser convertido.
  * @returns Novo objeto com chaves em snake_case.
  */
-export function camelParaSnake(obj: unknown): unknown {
+export function camelParaSnake<T = Record<string, unknown>>(obj: unknown): T {
   if (Array.isArray(obj)) {
-    return obj.map((v) => camelParaSnake(v));
+    return obj.map((v) => camelParaSnake(v)) as unknown as T;
   }
   if (obj !== null && obj !== undefined && typeof obj === 'object' && obj.constructor === Object) {
-    const objeto = obj as Record<string, unknown>;
-    return Object.keys(objeto).reduce(
+    return Object.keys(obj).reduce(
       (acc, key) => ({
         ...acc,
-        [key.replace(/[A-Z]/g, (m) => `_${m.toLowerCase()}`)]: camelParaSnake(objeto[key]),
+        [key.replace(/[A-Z]/g, (m) => `_${m.toLowerCase()}`)]: camelParaSnake((obj as Record<string, unknown>)[key]),
       }),
       {}
-    );
+    ) as T;
   }
-  return obj;
+  return obj as T;
 }

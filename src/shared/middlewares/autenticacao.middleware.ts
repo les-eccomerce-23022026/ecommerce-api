@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { di } from '@/shared/infrastructure/di.container';
+import { Logger } from '@/shared/utils/Logger.util';
 
 /**
  * Middleware para autenticação via JWT no header Authorization Bearer.
@@ -54,7 +55,7 @@ export async function autenticacaoMiddleware(
     // Buscar o usuário para obter o id
     const usuario = await di.repoUsuarios.buscarPorUuid(decodificado.sub);
     if (!usuario) {
-      console.error(`[auth] Usuário não encontrado no banco: ${decodificado.sub}`);
+      Logger.error(`[auth] Usuário não encontrado no banco: ${decodificado.sub}`);
       res.status(401).json({
         mensagem: 'Usuário não encontrado.',
         sucesso: false,
@@ -72,7 +73,7 @@ export async function autenticacaoMiddleware(
 
     next();
   } catch (erro) {
-    console.error('[auth] Erro na verificação do token:', erro);
+    Logger.error('[auth] Erro na verificação do token:', erro instanceof Error ? erro.message : String(erro));
     res.status(401).json({
       mensagem: 'Token inválido ou expirado.',
       sucesso: false,

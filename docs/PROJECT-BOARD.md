@@ -7,15 +7,16 @@
 
 ## Board Kanban
 
-| 📛 Todo (3)                                 | 🔄 In Progress (0)              | ✅ Done (20)                                          |
+| 📛 Todo (2)                                 | 🔄 In Progress (1)              | ✅ Done (21)                                          |
 | ------------------------------------------- | ------------------------------- | ----------------------------------------------------- |
-| B12 · [BACKEND] Implementar API de Livros   |                                 | B1 · [BACKEND] Setup Inicial e Arquitetura            |
-| B13 · [BACKEND] Módulo de Carrinho          |                                 | B2 · [BACKEND] Dockerização e Ambiente Dev            |
-| B14 · [BACKEND] Integração com Meio de Pgto |                                 | B3 · [BACKEND] Modelagem SQL e Normalização (14 tabs) |
+| B13 · [BACKEND] Módulo de Carrinho          | B26 · [VENDAS] Sprint 1: Base   | B1 · [BACKEND] Setup Inicial e Arquitetura            |
+| B14 · [BACKEND] Integração com Meio de Pgto |                                 | B2 · [BACKEND] Dockerização e Ambiente Dev            |
+|                                             |                                 | B3 · [BACKEND] Modelagem SQL e Normalização (14 tabs) |
 |                                             |                                 | B7 · [BACKEND] Testes de Integração e Fluxo           |
 |                                             |                                 | B8 · [BACKEND] Governança de Código e Linter          |
 |                                             |                                 | B9 · [BACKEND] Isolamento de Testes e Teardown        |
 |                                             |                                 | B10 · [BACKEND] Segurança de Identificadores (UUIDs)  |
+|                                             |                                 | B12 · [BACKEND] Implementar API de Livros            |
 |                                             |                                 | B15 · [BACKEND] Refino do CRUD de Clientes           |
 |                                             |                                 | B16 · [BACKEND] CRUD de Endereços/Cartões            |
 |                                             |                                 | B17 · [BACKEND] Consulta Administrativa              |
@@ -32,7 +33,9 @@
 
 ## Detalhamento dos Cards
 
-...
+| ID   | Área    | Card                                 | Status / Evidência                                                                                                                                                                                                                           |
+| :--- | :------ | :----------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| B26  | VENDAS  | Sprint 1: Base de Vendas             | **Iniciado:** Criada infraestrutura de vendas (Repositório, Serviço, Controlador, Rotas e Migração 010). Backend permite criar e consultar vendas. Frontend integrado ao botão "Concluir Pedido" via hook `useCheckout`. |
 | B21  | BACKEND | Gestão de Administradores            | **Implementado:** CRUD completo de administradores (listagem, criação, inativação/ativação) com trava de segurança de auto-inativação. |
 | B22  | BACKEND | Evolução de Papéis e Acesso Dual     | **Implementado:** Independência de registros por papel para o mesmo e-mail; opção de senha na promoção; extensão de papel (admin acessa cliente); perfil unificado (agregado); correção de bug de UUID em cartões. |
 | B23  | BACKEND | Hashing de Senhas (BCrypt)           | **Implementado:** Substituição de senhas em texto puro por hashes BCrypt (custo 10). Inclui script de seed para reset de usuários de teste. |

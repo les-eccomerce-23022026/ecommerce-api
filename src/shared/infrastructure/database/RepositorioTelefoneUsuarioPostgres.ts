@@ -1,6 +1,7 @@
 import { ITelefoneUsuario } from '@/shared/types/ITelefoneUsuario';
 import { IRepositorioTelefoneUsuario } from '@/shared/types/IRepositorioTelefoneUsuario';
 import { IConexaoBanco } from '@/shared/infrastructure/database/IConexaoBanco';
+import { IRowTelefoneUsuario } from '@/shared/types/db-rows.types';
 
 export class RepositorioTelefoneUsuarioPostgres implements IRepositorioTelefoneUsuario {
   private db: IConexaoBanco;
@@ -9,7 +10,7 @@ export class RepositorioTelefoneUsuarioPostgres implements IRepositorioTelefoneU
     this.db = db;
   }
 
-  private static mapearParaEntidade(row: Record<string, unknown>): ITelefoneUsuario {
+  private static mapearParaEntidade(row: IRowTelefoneUsuario): ITelefoneUsuario {
     return {
       id: Number(row.id),
       uuid: row.uuid as string,
@@ -39,15 +40,15 @@ export class RepositorioTelefoneUsuarioPostgres implements IRepositorioTelefoneU
 
   public async buscarPorIdUsuario(idUsuario: number): Promise<ITelefoneUsuario[]> {
     const query = `
-      SELECT tel_id AS "id", tel_uuid AS "uuid", 
-             usu_id AS "idUsuario", ttp_id AS "idTipoTelefone", 
+      SELECT tel_id AS "id", tel_uuid AS "uuid",
+             usu_id AS "idUsuario", ttp_id AS "idTipoTelefone",
              tel_ddd AS "ddd", tel_numero AS "numero", tel_principal AS "principal",
              tel_criado_em AS "criadoEm", tel_atualizado_em AS "atualizadoEm"
-      FROM telefones 
+      FROM telefones
       WHERE usu_id = $1
     `;
     const rows = await this.db.executar(query, [idUsuario]);
-    return rows.map((row) => RepositorioTelefoneUsuarioPostgres.mapearParaEntidade(row as Record<string, unknown>));
+    return rows.map((row) => RepositorioTelefoneUsuarioPostgres.mapearParaEntidade(row as IRowTelefoneUsuario));
   }
 
   public async atualizar(telefone: ITelefoneUsuario): Promise<void> {

@@ -1,4 +1,10 @@
 /**
+ * Tipo para parâmetros de consulta SQL.
+ * Representa os valores seguros que podem ser passados como parâmetros.
+ */
+export type DbParametro = string | number | boolean | Date | null | undefined;
+
+/**
  * Interface genérica para conexão com banco de dados.
  * Abstrai a implementação específica (Postgres, MySQL, etc).
  */
@@ -9,7 +15,7 @@ export interface IConexaoBanco {
    * @param parametros Array de parâmetros para substituir os placeholders
    * @returns Resultados da consulta
    */
-  executar<T = unknown>(sql: string, parametros?: unknown[]): Promise<T[]>;
+  executar<T = unknown>(sql: string, parametros?: DbParametro[]): Promise<T[]>;
 
   /**
    * Inicia uma transação.

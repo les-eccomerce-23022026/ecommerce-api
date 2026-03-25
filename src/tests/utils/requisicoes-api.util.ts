@@ -3,6 +3,7 @@ import { Application } from 'express';
 import bcrypt from 'bcryptjs';
 import { di } from '@/shared/infrastructure/di.container';
 import { PAPEL_ADMIN, PAPEL_CLIENTE } from '@/shared/types/papeis';
+import { ITelefoneDto, IEnderecoDto } from '@/modules/clientes/Iclientes.dto';
 
 type DadosCadastroCliente = {
   nome?: string;
@@ -10,11 +11,11 @@ type DadosCadastroCliente = {
   email?: string;
   genero?: string;
   dataNascimento?: string;
-  telefone?: unknown;
+  telefone?: ITelefoneDto;
   senha?: string;
   confirmacaoSenha?: string;
-  enderecoCobranca?: unknown;
-  enderecoEntrega?: unknown;
+  enderecoCobranca?: IEnderecoDto;
+  enderecoEntrega?: IEnderecoDto;
   enderecoEntregaIgualCobranca?: boolean;
 };
 

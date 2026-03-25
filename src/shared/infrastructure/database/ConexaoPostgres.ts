@@ -1,5 +1,5 @@
 import { Pool } from 'pg';
-import { IConexaoBanco } from './IConexaoBanco';
+import { IConexaoBanco, DbParametro } from './IConexaoBanco';
 import { obterTipoBancoAtual, obterTransacaoAtual, contextoBanco, obterContextoAtual, definirTransacaoGlobalParaTestes } from './ContextoBanco';
 
 /**
@@ -26,7 +26,7 @@ export class ConexaoPostgres implements IConexaoBanco {
 
   public static resetInstancia(): void {
     if (ConexaoPostgres.instancia) {
-      ConexaoPostgres.instancia = (null as unknown) as ConexaoPostgres;
+      ConexaoPostgres.instancia = null!;
     }
   }
 
@@ -69,7 +69,7 @@ export class ConexaoPostgres implements IConexaoBanco {
     return tipo === 'teste' ? this.obterPoolTeste() : this.poolProducao;
   }
 
-  public async executar<T = unknown>(sql: string, parametros?: unknown[]): Promise<T[]> {
+  public async executar<T = unknown>(sql: string, parametros?: DbParametro[]): Promise<T[]> {
     const transacao = obterTransacaoAtual();
     const executor = transacao || this.obterPoolAtivo();
     const { rows } = await executor.query(sql, parametros);

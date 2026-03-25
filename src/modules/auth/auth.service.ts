@@ -1,12 +1,13 @@
 import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
+import jwt, { SignOptions } from 'jsonwebtoken';
 import { IDadosLoginDto, IRespostaLoginDto, IUsuarioAutenticadoDto } from '@/modules/auth/Iauth.dto';
 import { IRepositorioUsuarios } from '@/modules/usuarios/IRepositorioUsuarios';
+import { Logger } from '@/shared/utils/Logger.util';
 
-
-import { PAPEL_ADMIN } from '@/shared/types/papeis';
-
-const TEMPO_EXPIRACAO_PADRAO = '1h';
+// Carrega o tempo de expiração do JWT diretamente das variáveis de ambiente.
+// Se ausente, mantém `null` e a execução abortará antes de assinar o token
+// com uma mensagem segura (LGPD) — NÃO deve haver fallback aqui.
+const TEMPO_EXPIRACAO_PADRAO: string | null = process.env.JWT_TEMPO_EXPIRACAO ?? null;
 
 /**
  * Serviço responsável pela autenticação de usuários.
@@ -28,7 +29,7 @@ export class ServicoAutenticacao {
     const usuariosAtivos = usuarios.filter((u) => u.ativo);
 
     if (usuariosAtivos.length === 0) {
-      console.debug(`[auth.service] Nenhum usuário ativo encontrado para o email: ${dadosLogin.email}. Total encontrados: ${usuarios.length}`);
+      Logger.debug(`[auth.service] Nenhum usuário ativo encontrado para o email: ${dadosLogin.email}. Total encontrados: ${usuarios.length}`);
       throw new Error('Credenciais inválidas.');
     }
 
@@ -52,7 +53,7 @@ export class ServicoAutenticacao {
     const match = validacoes.find((v) => v.senhaValida);
 
     if (!match) {
-      console.debug(`[auth.service] Senha inválida para o usuário: ${dadosLogin.email}`);
+      Logger.debug(`[auth.service] Senha inválida para o usuário: ${dadosLogin.email}`);
       throw new Error('Credenciais inválidas.');
     }
 
@@ -71,6 +72,12 @@ export class ServicoAutenticacao {
       throw new Error('Configuração de JWT ausente.');
     }
 
+    // Verifica se o tempo de expiração foi fornecido — sem fallback por segurança.
+    if (!TEMPO_EXPIRACAO_PADRAO) {
+      Logger.error('[auth.service] JWT_TEMPO_EXPIRACAO ausente; operação abortada. Mensagem segura: configuração de autenticação incompleta. Consulte o administrador. (LGPD: sem dados sensíveis)');
+      throw new Error('Configuração de autenticação incompleta. Consulte o administrador.');
+    }
+
     const token = jwt.sign(
       {
         sub: usuarioAutenticado.uuid,
@@ -78,9 +85,9 @@ export class ServicoAutenticacao {
         role: usuarioAutenticado.role.descricao,
         isAdminMestre: !!usuarioAutenticado.isAdminMestre,
       },
-      segredo,
+      segredo as string,
       {
-        expiresIn: TEMPO_EXPIRACAO_PADRAO,
+        expiresIn: TEMPO_EXPIRACAO_PADRAO as SignOptions['expiresIn'],
       },
     );
 

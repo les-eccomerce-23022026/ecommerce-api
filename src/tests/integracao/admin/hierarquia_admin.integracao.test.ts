@@ -79,7 +79,7 @@ describe('Integração - Hierarquia Administrativa (Mestre vs Comum)', () => {
 
   it('deve retornar eAdminMestre via /auth/me para sessão persistente', async () => {
     const respostaLogin = await realizarLogin(contexto.app, 'admin@livraria.com.br', 'Admin@123');
-    const token = respostaLogin.body.dados.token;
+    const { token } = respostaLogin.body.dados;
 
     const respostaMe = await request(contexto.app)
       .get('/api/auth/me')

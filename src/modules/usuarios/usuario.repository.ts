@@ -1,6 +1,6 @@
 import { IUsuario } from '@/modules/usuarios/Iusuario.entity';
 import { PAPEL_CLIENTE, PAPEL_ADMIN } from '@/shared/types/papeis';
-import { IConexaoBanco } from '@/shared/infrastructure/database/IConexaoBanco';
+import { IConexaoBanco, DbParametro } from '@/shared/infrastructure/database/IConexaoBanco';
 import { IRepositorioUsuarios, IDadosCriarUsuario, IFiltrosConsultaClientes } from './IRepositorioUsuarios';
 
 /** Tipo que representa uma linha bruta retornada pelo banco de dados */
@@ -126,7 +126,7 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
 
   public async atualizarUsuario(uuid: string, dados: Partial<IUsuario>): Promise<IUsuario | undefined> {
     const campos: string[] = [];
-    const valores: unknown[] = [];
+    const valores: DbParametro[] = [];
     let contador = 1;
 
     if (dados.nome) {
@@ -211,7 +211,7 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
     `;
 
     const papelBusca = idPapel ?? PAPEL_CLIENTE.id;
-    const valores: unknown[] = [papelBusca];
+    const valores: DbParametro[] = [papelBusca];
     let contador = 2;
 
     if (nome) {
@@ -243,7 +243,7 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
     const { nome, cpf, email } = filtros;
 
     let query = 'SELECT COUNT(*) as total FROM usuarios WHERE pap_id = $1';
-    const valores: unknown[] = [PAPEL_CLIENTE.id];
+    const valores: DbParametro[] = [PAPEL_CLIENTE.id];
     let contador = 2;
 
     if (nome) {

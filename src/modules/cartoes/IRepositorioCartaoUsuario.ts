@@ -1,5 +1,5 @@
 import { ICartaoUsuario } from '../../shared/types/ICartaoUsuario';
-import { IConexaoBanco } from '../../shared/infrastructure/database/IConexaoBanco';
+import { IConexaoBanco, DbParametro } from '../../shared/infrastructure/database/IConexaoBanco';
 
 /** Tipo que representa uma linha bruta do banco para cartões */
 type LinhaCartao = Record<string, unknown>;
@@ -112,7 +112,7 @@ export class RepositorioCartaoUsuario implements IRepositorioCartaoUsuario {
     dados: Partial<Omit<ICartaoUsuario, 'id' | 'uuid' | 'idUsuario'>>,
   ): Promise<ICartaoUsuario | null> {
     const campos: string[] = [];
-    const valores: unknown[] = [];
+    const valores: DbParametro[] = [];
     let contador = 1;
 
     if (dados.idBandeira !== undefined) {
