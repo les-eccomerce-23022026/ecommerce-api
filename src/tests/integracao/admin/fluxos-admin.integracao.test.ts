@@ -1,5 +1,5 @@
 import { configurarTesteIntegracao } from '@/tests/utils/setup-integracao.util';
-import { registrarCliente, realizarLogin, obterTokenAdmin } from '@/tests/utils/requisicoes-api.util';
+import { registrarCliente, realizarLogin, obterTokenAdmin, registrarAdmin } from '@/tests/utils/requisicoes-api.util';
 import request from 'supertest';
 
 // Testes de integração que simulam o fluxo completo do domínio admin,
@@ -15,16 +15,14 @@ describe('Integração - Fluxos completos do administrador', () => {
 
     // Cadastra um novo administrador usando o token de admin existente,
     // testando a funcionalidade de criação de contas administrativas por admins.
-    const respostaCadastroAdmin = await request(contexto.app)
-      .post('/api/admin/registro')
-      .set('Authorization', `Bearer ${tokenAdmin}`)
-      .send({
-        nome: 'Admin Fluxo',
-        cpf: '111.111.111-12',
-        email: 'admin.fluxo@email.com',
-        senha: 'AdminFluxo@123',
-        confirmacaoSenha: 'AdminFluxo@123',
-      });
+    const respostaCadastroAdmin = await registrarAdmin(contexto.app, tokenAdmin, {
+      nome: 'Admin Fluxo',
+      cpf: '111.111.111-12',
+      email: 'admin.fluxo@email.com',
+      senha: 'AdminFluxo@123',
+      confirmacaoSenha: 'AdminFluxo@123',
+      limparDados: true,
+    });
 
     expect(respostaCadastroAdmin.status).toBe(201);
 
@@ -42,6 +40,7 @@ describe('Integração - Fluxos completos do administrador', () => {
       email: 'cliente.promovido@email.com',
       senha: 'Cliente@123',
       confirmacaoSenha: 'Cliente@123',
+      limparDados: true,
     });
 
     const tokenAdmin = await obterTokenAdmin(contexto.app);

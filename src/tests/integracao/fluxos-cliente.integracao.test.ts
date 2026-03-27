@@ -13,10 +13,11 @@ describe('Integração - Fluxos completos do cliente', () => {
     // validando que o registro é bem-sucedido (status 201).
     const respostaRegistro = await registrarCliente(contexto.app, {
       nome: 'Fluxo Cliente Feliz',
-      cpf: '321.654.987-00',
+      cpf: '456.985.420-56',
       email: 'fluxo.feliz@email.com',
       senha: 'SenhaInicial@123',
       confirmacaoSenha: 'SenhaInicial@123',
+      limparDados: true,
     });
 
     expect(respostaRegistro.status).toBe(201);
@@ -77,10 +78,11 @@ describe('Integração - Fluxos completos do cliente', () => {
     // sem verificar o sucesso aqui, pois o foco é nos erros subsequentes.
     await registrarCliente(contexto.app, {
       nome: 'Fluxo Falha',
-      cpf: '654.987.321-00',
+      cpf: '111.444.777-35',
       email: 'fluxo.falha@email.com',
       senha: 'SenhaFalha@123',
       confirmacaoSenha: 'SenhaFalha@123',
+      limparDados: true,
     });
 
     const respostaLogin = await realizarLogin(contexto.app, 'fluxo.falha@email.com', 'SenhaFalha@123');
@@ -119,7 +121,7 @@ describe('Integração - Fluxos completos do cliente', () => {
     // validando unicidade de email no sistema.
     const respostaEmailDuplicado = await registrarCliente(contexto.app, {
       nome: 'Duplicado',
-      cpf: '777.888.999-00',
+      cpf: '123.456.789-09', // Valid CPF
       email: 'fluxo.falha@email.com',
       senha: 'SenhaDuplicada@123',
       confirmacaoSenha: 'SenhaDuplicada@123',

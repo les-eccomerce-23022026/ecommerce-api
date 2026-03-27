@@ -4,6 +4,7 @@ import cookieParser from 'cookie-parser';
 import { registrarRotasAutenticacao } from '@/modules/auth/auth.routes';
 import { registrarRotasClientes } from '@/modules/clientes/clientes.routes';
 import { registrarRotasCartoes } from '@/modules/cartoes/cartoes.routes';
+import { registrarRotasEntrega } from '@/modules/entrega/entrega.routes';
 import { registrarRotasPagamentos } from '@/modules/pagamentos/pagamentos.routes';
 import { registrarRotasAdmin } from '@/modules/admin/admin.routes';
 import { registrarRotasVendas } from '@/modules/vendas/vendas.routes';
@@ -22,13 +23,13 @@ export function criarAplicacao(): Application {
     credentials: true,
   }));
   app.use(cookieParser());
-registrarRotasPagamentos(apiRouter);
+  // Configura os middlewares globais ANTES das rotas.
   app.use(express.json());
-
-  // Middleware de troca de banco deve vir antes das rotas
   app.use(middlewareTrocaBanco);
 
-  // Registro de rotas no roteador da API
+  // Registro das rotas da API.
+  registrarRotasPagamentos(apiRouter);
+  registrarRotasEntrega(apiRouter);
   registrarRotasAutenticacao(apiRouter);
   registrarRotasClientes(apiRouter);
   registrarRotasCartoes(apiRouter);

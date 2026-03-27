@@ -23,7 +23,7 @@ export class RepositorioVendasPostgres implements IRepositorioVendas {
     const usuId = usuRes[0].usu_id;
 
     // 2. Obter ID do status 'EM PROCESSAMENTO'
-    const statusQuery = "SELECT stv_id FROM ecm_status_venda WHERE stv_descricao = 'EM PROCESSAMENTO'";
+    const statusQuery = "SELECT stv_id FROM status_vendas WHERE stv_descricao = 'EM PROCESSAMENTO'";
     const statusRes = await this.db.executar<{ stv_id: number }>(statusQuery);
     const statusId = statusRes[0].stv_id;
 
@@ -73,7 +73,7 @@ export class RepositorioVendasPostgres implements IRepositorioVendas {
       SELECT v.ven_uuid, v.ven_total_itens, v.ven_frete, v.ven_total_venda,
              v.ven_criado_em, s.stv_descricao as status, u.usu_uuid as "usuarioUuid"
       FROM ecm_venda v
-      JOIN ecm_status_venda s ON v.stv_id = s.stv_id
+      JOIN status_vendas s ON v.stv_id = s.stv_id
       JOIN usuarios u ON v.usu_id = u.usu_id
       WHERE v.ven_uuid = $1
     `;
@@ -113,5 +113,17 @@ export class RepositorioVendasPostgres implements IRepositorioVendas {
 
     const vendas = await Promise.all(rows.map((r) => this.obterPorUuid(r.ven_uuid)));
     return vendas.filter((v) => v !== null) as IVenda[];
+  }
+
+  public async atualizarStatus(vendaUuid: string, novoStatus: string): Promise<void> {
+    const queryEncontrarStatus = 'SELECT stv_id FROM status_vendas WHERE stv_descricao = $1';
+    const resStatus = await this.db.executar<{ stv_id: number }>(queryEncontrarStatus, [novoStatus]);
+    
+    if (resStatus.length === 0) throw new Error(`Status '${novoStatus}' não encontrado.`);
+
+    const stvId = resStatus[0].stv_id;
+
+    const queryUpdate = 'UPDATE ecm_venda SET stv_id = $1, ven_atualizado_em = NOW() WHERE ven_uuid = $2';
+    await this.db.executar(queryUpdate, [stvId, vendaUuid]);
   }
 }

@@ -5,11 +5,14 @@ const configuracao: Config = {
   roots: ['<rootDir>/src'],
   testMatch: ['**/*.test.ts'],
   transform: {
-    '^.+\\.ts$': ['ts-jest', { tsconfig: '<rootDir>/tsconfig.jest.json' }],
+    '^.+\\.[tj]sx?$': ['ts-jest', { tsconfig: '<rootDir>/tsconfig.jest.json' }],
   },
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
   },
+  transformIgnorePatterns: [
+    'node_modules/(?!uuid)',
+  ],
   setupFilesAfterEnv: ['<rootDir>/src/tests/setup/teste.setup.ts'],
   globalTeardown: '<rootDir>/src/tests/setup/global-teardown.ts',
   clearMocks: true,

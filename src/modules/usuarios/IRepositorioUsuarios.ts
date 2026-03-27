@@ -27,6 +27,8 @@ export interface IRepositorioUsuarios {
   criarUsuario(dados: IDadosCriarUsuario): Promise<IUsuario>;
   atualizarUsuario(uuid: string, dados: Partial<IUsuario>): Promise<IUsuario | undefined>;
   deletarPorEmail(email: string): Promise<void>;
+  deletarPorCpf(cpf: string): Promise<void>;
+  limparDadosUsuarioPorCpf(cpf: string): Promise<void>;
   buscarClientesComFiltros(filtros: IFiltrosConsultaClientes): Promise<IUsuario[]>;
   contarClientesComFiltros(filtros: Omit<IFiltrosConsultaClientes, 'offset' | 'limite'>): Promise<number>;
   buscarSenhaMestra(idPapel: number): Promise<string | undefined>;

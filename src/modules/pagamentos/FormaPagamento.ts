@@ -9,15 +9,16 @@ export enum TipoPagamento {
  */
 export class FormaPagamento {
   private readonly tipo: TipoPagamento;
+
   private readonly detalhes?: string; // Para cupons, código do cupom
 
   constructor(tipo: TipoPagamento, detalhes?: string) {
-    this.validarTipo(tipo);
+    FormaPagamento.validarTipo(tipo);
     this.tipo = tipo;
     this.detalhes = detalhes;
   }
 
-  private validarTipo(tipo: TipoPagamento): void {
+  private static validarTipo(tipo: TipoPagamento): void {
     const tiposValidos = Object.values(TipoPagamento);
     if (!tiposValidos.includes(tipo)) {
       throw new Error('Tipo de pagamento inválido');

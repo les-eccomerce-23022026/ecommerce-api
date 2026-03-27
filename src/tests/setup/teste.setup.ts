@@ -15,11 +15,11 @@ process.env.POSTGRES_HOST = 'localhost';
 const variaveisObrigatorias = [
   'DB_TYPE',
   'JWT_SEGREDO',
-  'POSTGRES_HOST',
-  'POSTGRES_PORT',
-  'POSTGRES_USER',
-  'POSTGRES_PASSWORD',
-  'POSTGRES_DB',
+  'POSTGRES_HOST_TEST',
+  'POSTGRES_PORT_TEST',
+  'POSTGRES_USER_TEST',
+  'POSTGRES_PASSWORD_TEST',
+  'POSTGRES_DB_TEST',
 ];
 
 const variavelFaltando = variaveisObrigatorias.find((variavel) => !process.env[variavel]);

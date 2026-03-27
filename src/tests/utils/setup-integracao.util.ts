@@ -1,4 +1,5 @@
 import { Application } from 'express';
+import { IConexaoBanco } from '@/shared/infrastructure/database/IConexaoBanco';
 import { criarAplicacao } from '@/shared/infrastructure/http/app';
 import {
   iniciarEscopoIsolamentoIntegracao,
@@ -16,6 +17,7 @@ export function configurarTesteIntegracao(porTeste = true) {
   const contexto = {
     app: (null as unknown as Application),
     escopo: (null as unknown as EscopoIsolamentoIntegracao),
+    get db(): IConexaoBanco | undefined { return this.escopo?.db; }
   };
 
   beforeAll(async () => {

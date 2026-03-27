@@ -7,7 +7,7 @@ describe('Integração - Clientes (Registro)', () => {
 
   describe('POST /api/clientes/registro', () => {
     it('deve registrar cliente com sucesso e persistir dados adicionais', async () => {
-      const resposta = await registrarCliente(contexto.app, {});
+      const resposta = await registrarCliente(contexto.app, { limparDados: true });
 
       expect(resposta.status).toBe(201);
       expect(resposta.body.sucesso).toBe(true);
@@ -46,7 +46,7 @@ describe('Integração - Clientes (Registro)', () => {
     });
 
     it('deve falhar no registro com email duplicado', async () => {
-      await registrarCliente(contexto.app, { email: 'duplicado@email.com' });
+      await registrarCliente(contexto.app, { email: 'duplicado@email.com', limparDados: true });
       const resposta = await registrarCliente(contexto.app, { email: 'duplicado@email.com', cpf: '222.333.444-55' });
 
       expect(resposta.status).toBe(400);
@@ -55,7 +55,7 @@ describe('Integração - Clientes (Registro)', () => {
     });
 
     it('deve falhar no registro com CPF duplicado', async () => {
-      await registrarCliente(contexto.app, { cpf: '111.222.333-44' });
+      await registrarCliente(contexto.app, { cpf: '111.222.333-44', limparDados: true });
       const resposta = await registrarCliente(contexto.app, { cpf: '111.222.333-44', email: 'outro@email.com' });
 
       expect(resposta.status).toBe(400);

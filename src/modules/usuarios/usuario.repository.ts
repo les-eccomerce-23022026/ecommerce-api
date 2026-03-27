@@ -1,6 +1,7 @@
 import { IUsuario } from '@/modules/usuarios/Iusuario.entity';
 import { PAPEL_CLIENTE, PAPEL_ADMIN } from '@/shared/types/papeis';
 import { IConexaoBanco, DbParametro } from '@/shared/infrastructure/database/IConexaoBanco';
+import { obterTipoBancoAtual } from '@/shared/infrastructure/database/ContextoBanco';
 import { IRepositorioUsuarios, IDadosCriarUsuario, IFiltrosConsultaClientes } from './IRepositorioUsuarios';
 
 /** Tipo que representa uma linha bruta retornada pelo banco de dados */
@@ -197,9 +198,45 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
     return this.buscarPorUuid(uuid);
   }
 
+  public async deletarPorCpf(cpf: string): Promise<void> {
+    const query = 'DELETE FROM usuarios WHERE usu_cpf = $1';
+    await this.db.executar(query, [cpf]);
+  }
+
   public async deletarPorEmail(email: string): Promise<void> {
     const query = 'DELETE FROM usuarios WHERE usu_email = $1';
     await this.db.executar(query, [email]);
+  }
+
+  public async limparDadosUsuarioPorCpf(cpf: string): Promise<void> {
+    const tipoBanco = obterTipoBancoAtual();
+    if (tipoBanco !== 'teste') {
+      throw new Error(`OPERACAO BLOQUEADA: Tentativa de limpeza de dados por CPF em banco de ${tipoBanco}. Esta operacao so eh permitida em ambiente de teste.`);
+    }
+
+    // 1. Encontrar o ID do usuário
+    const usuQuery = 'SELECT usu_id FROM usuarios WHERE usu_cpf = $1';
+    const usuRes = await this.db.executar<{ usu_id: number }>(usuQuery, [cpf]);
+
+    if (usuRes.length === 0) return; // Nada para limpar
+
+    const usuId = usuRes[0].usu_id;
+
+    // 2. Deletar em cascata na ordem reversa de dependência
+    // Itens de venda dependem de venda
+    await this.db.executar('DELETE FROM ecm_item_venda WHERE ven_id IN (SELECT ven_id FROM ecm_venda WHERE usu_id = $1)', [usuId]);
+    // Vendas dependem de usuário
+    await this.db.executar('DELETE FROM ecm_venda WHERE usu_id = $1', [usuId]);
+    // Cartões dependem de usuário
+    await this.db.executar('DELETE FROM cartoes WHERE usu_id = $1', [usuId]);
+    // Telefones dependem de usuário
+    await this.db.executar('DELETE FROM telefones WHERE usu_id = $1', [usuId]);
+    // Endereços dependem de usuário
+    await this.db.executar('DELETE FROM enderecos WHERE usu_id = $1', [usuId]);
+    // Perfil (tabela clientes) depende de usuário
+    await this.db.executar('DELETE FROM clientes WHERE usu_id = $1', [usuId]);
+    // Finalmente, o usuário
+    await this.db.executar('DELETE FROM usuarios WHERE usu_id = $1', [usuId]);
   }
 
   public async buscarClientesComFiltros(filtros: IFiltrosConsultaClientes): Promise<IUsuario[]> {

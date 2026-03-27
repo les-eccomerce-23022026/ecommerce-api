@@ -1,4 +1,4 @@
-import { CartaoCredito } from '../CartaoCredito';
+import { CartaoCredito } from '@/modules/pagamentos/CartaoCredito';
 
 describe('CartaoCredito', () => {
   it('deve criar cartão válido', () => {

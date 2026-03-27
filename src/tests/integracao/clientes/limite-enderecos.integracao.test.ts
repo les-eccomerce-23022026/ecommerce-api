@@ -14,6 +14,7 @@ describe('Integração - Restrição de Quantidade de Endereços', () => {
       email,
       senha: 'SenhaForte@123',
       confirmacaoSenha: 'SenhaForte@123',
+      limparDados: true,
       // Já cria 2 no registro (cobranca + entrega)
       enderecoCobranca: {
         apelido: 'Cobranca',

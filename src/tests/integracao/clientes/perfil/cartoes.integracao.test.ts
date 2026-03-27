@@ -6,9 +6,16 @@ describe('Integração - Cartões', () => {
   const contexto = configurarTesteIntegracao(false);
   let token: string;
   let uuidCartao: string;
+  let uuidBandeiraVisa: string;
 
   beforeAll(async () => {
-    token = await obterTokenCliente(contexto.app);
+    // Busca o UUID da bandeira Visa dinamicamente para evitar erro de FK em bancos com seeds diferentes
+    const resBandeira = await contexto.db!.executar<{ ban_uuid: string }>(
+      "SELECT ban_uuid FROM bandeiras_cartao WHERE ban_descricao = 'Visa' LIMIT 1"
+    );
+    uuidBandeiraVisa = resBandeira[0].ban_uuid;
+
+    token = await obterTokenCliente(contexto.app, 'cliente.cartao@email.com', '123.456.789-99', true);
   });
 
 
@@ -24,7 +31,7 @@ describe('Integração - Cartões', () => {
 
   it('deve adicionar um novo cartão', async () => {
     const novoCartao = {
-      uuidBandeira: 'ae91785d-a5a2-489f-b36f-5bb8d7cff87b', // Visa
+      uuidBandeira: uuidBandeiraVisa,
       token: 'tok_test_integration',
       final: '9999',
       nomeImpresso: 'Teste Integração',

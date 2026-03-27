@@ -6,7 +6,7 @@ import { contextoBanco, TipoAmbienteBanco, obterContextoAtual } from '../infrast
  * Verifica o cabeçalho 'x-use-test-db'. Se presente e for 'true', muda o contexto.
  */
 export const middlewareTrocaBanco = (req: Request, _res: Response, next: NextFunction): void => {
-  const usarBancoTeste = req.headers['x-use-test-db'] === 'true';
+  const usarBancoTeste = req.headers['x-use-test-db'] === 'true' || process.env.NODE_ENV === 'test';
   const ambiente: TipoAmbienteBanco = usarBancoTeste ? 'teste' : 'producao';
 
   const contextoExistente = obterContextoAtual();

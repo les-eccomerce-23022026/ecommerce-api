@@ -7,12 +7,15 @@
 
 ## Board Kanban
 
-| 📛 Todo (2)                                 | 🔄 In Progress (1)              | ✅ Done (21)                                          |
+| 📛 Todo (2)                                 | 🔄 In Progress (0)              | ✅ Done (24)                                          |
 | ------------------------------------------- | ------------------------------- | ----------------------------------------------------- |
-| B13 · [BACKEND] Módulo de Carrinho          | B26 · [VENDAS] Sprint 1: Base   | B1 · [BACKEND] Setup Inicial e Arquitetura            |
+| B13 · [BACKEND] Módulo de Carrinho          |                                 | B1 · [BACKEND] Setup Inicial e Arquitetura            |
 | B14 · [BACKEND] Integração com Meio de Pgto |                                 | B2 · [BACKEND] Dockerização e Ambiente Dev            |
+|                                             |                                 | B28 · [BACKEND] Módulo de Entrega e Logística         |
+|                                             |                                 | B26 · [VENDAS] Sprint 1: Base de Vendas               |
 |                                             |                                 | B3 · [BACKEND] Modelagem SQL e Normalização (14 tabs) |
 |                                             |                                 | B7 · [BACKEND] Testes de Integração e Fluxo           |
+|                                             |                                 | B27 · [BACKEND] Reorganização de Testes Unitários    |
 |                                             |                                 | B8 · [BACKEND] Governança de Código e Linter          |
 |                                             |                                 | B9 · [BACKEND] Isolamento de Testes e Teardown        |
 |                                             |                                 | B10 · [BACKEND] Segurança de Identificadores (UUIDs)  |
@@ -35,7 +38,8 @@
 
 | ID   | Área    | Card                                 | Status / Evidência                                                                                                                                                                                                                           |
 | :--- | :------ | :----------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| B26  | VENDAS  | Sprint 1: Base de Vendas             | **Iniciado:** Criada infraestrutura de vendas (Repositório, Serviço, Controlador, Rotas e Migração 010). Backend permite criar e consultar vendas. Frontend integrado ao botão "Concluir Pedido" via hook `useCheckout`. |
+| B26  | VENDAS  | Sprint 1: Base de Vendas             | **Concluído:** Criada infraestrutura de vendas (Repositório, Serviço, Controlador, Rotas e Migração 010). Backend permite criar e consultar vendas. |
+| B28  | BACKEND | Módulo de Entrega e Logística        | **Concluído:** Implementação do módulo (DTO, Repository, Service, Controller, Routes). Migration 013 para renomear tabelas; integração automática com alteração de status de venda para 'EM TRÂNSITO'. |
 | B21  | BACKEND | Gestão de Administradores            | **Implementado:** CRUD completo de administradores (listagem, criação, inativação/ativação) com trava de segurança de auto-inativação. |
 | B22  | BACKEND | Evolução de Papéis e Acesso Dual     | **Implementado:** Independência de registros por papel para o mesmo e-mail; opção de senha na promoção; extensão de papel (admin acessa cliente); perfil unificado (agregado); correção de bug de UUID em cartões. |
 | B23  | BACKEND | Hashing de Senhas (BCrypt)           | **Implementado:** Substituição de senhas em texto puro por hashes BCrypt (custo 10). Inclui script de seed para reset de usuários de teste. |
@@ -62,6 +66,7 @@
 | B18  | BACKEND | Testes Manuais CRUD Clientes        | **Implementado:** Testes completos via curl/http das rotas CRUD: registro; login JWT; perfil; cartões; inativação. |
 | B19  | BACKEND | Correção Violações Segurança        | **Implementado:** Correção crítica de 4 violações: JWT via HttpOnly; remoção de IDs internos; switch/case por Record; privacidade de CPF. |
 | B20  | BACKEND | Otimização de Disco Banco           | **Implementado:** Otimização de esquema reduzindo índices redundantes e redimensionando tipos VARCHAR. |
+| B27 | BACKEND | Reorganização de Testes Unitários    | **Concluído:** Centralização de testes de Value Objects (`entrega` e `pagamentos`) em `src/tests/unitarios` para alinhar com a pirâmide de testes. |
 | B21  | BACKEND | Gestão de Administradores            | **Implementado:** CRUD completo de administradores (listagem, criação, inativação/ativação) com trava de segurança de auto-inativação. |
 
 ---

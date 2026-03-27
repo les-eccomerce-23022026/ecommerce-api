@@ -21,7 +21,7 @@ type DadosCadastroCliente = {
 
 export async function registrarCliente(
   app: Application,
-  dados: DadosCadastroCliente = {},
+  dados: DadosCadastroCliente & { limparDados?: boolean } = {},
 ): Promise<Response> {
   const payloadPadrao = {
     nome: 'Cliente Teste',
@@ -31,10 +31,52 @@ export async function registrarCliente(
     confirmacaoSenha: 'SenhaForte@123',
   };
 
-  return request(app).post('/api/clientes/registro').send({
+  const finalCpf = dados.cpf || payloadPadrao.cpf;
+  const finalEmail = dados.email || payloadPadrao.email;
+
+  if (dados.limparDados) {
+    await di.repoUsuarios.limparDadosUsuarioPorCpf(finalCpf);
+    await di.repoUsuarios.deletarPorEmail(finalEmail);
+  }
+
+  const res = await request(app).post('/api/clientes/registro').send({
     ...payloadPadrao,
     ...dados,
   });
+  if (res.status !== 201) {
+    console.error(`[DEBUG] Erro no registro de cliente: ${res.status} - ${JSON.stringify(res.body)}`);
+  }
+  return res;
+}
+
+export async function registrarAdmin(
+  app: Application,
+  tokenAdmin: string,
+  dados: DadosCadastroCliente & { limparDados?: boolean } = {},
+): Promise<Response> {
+  const payloadPadrao = {
+    nome: 'Admin Teste',
+    cpf: '000.000.000-01',
+    email: 'admin.teste@email.com',
+    senha: 'SenhaAdmin@123',
+    confirmacaoSenha: 'SenhaAdmin@123',
+  };
+
+  const finalCpf = dados.cpf || payloadPadrao.cpf;
+  const finalEmail = dados.email || payloadPadrao.email;
+
+  if (dados.limparDados) {
+    await di.repoUsuarios.limparDadosUsuarioPorCpf(finalCpf);
+    await di.repoUsuarios.deletarPorEmail(finalEmail);
+  }
+
+  return request(app)
+    .post('/api/admin/registro')
+    .set('Authorization', `Bearer ${tokenAdmin}`)
+    .send({
+      ...payloadPadrao,
+      ...dados,
+    });
 }
 
 export async function realizarLogin(
@@ -45,23 +87,34 @@ export async function realizarLogin(
   return request(app).post('/api/auth/login').send({ email, senha });
 }
 
-export async function obterTokenCliente(app: Application): Promise<string> {
+export async function obterTokenCliente(
+  app: Application,
+  email = 'cliente.teste@email.com',
+  cpf = '123.456.789-10',
+  limparDados = false
+): Promise<string> {
   const repositorioUsuarios = di.repoUsuarios;
+
+  if (limparDados) {
+    await repositorioUsuarios.deletarPorCpf(cpf);
+    await repositorioUsuarios.deletarPorEmail(email);
+  }
 
   // Mesma abordagem de obterTokenAdmin: cria/atualiza via repositório diretamente
   // para que o usuário fique visível dentro da transação de isolamento do teste.
   const senhaHash = await bcrypt.hash('SenhaForte@123', 10);
-  const clienteExistente = await repositorioUsuarios.buscarPorEmail('cliente.teste@email.com');
+  const clienteExistente = await repositorioUsuarios.buscarPorEmail(email);
 
   if (!clienteExistente) {
     await repositorioUsuarios.criarUsuario({
       nome: 'Cliente Teste',
-      email: 'cliente.teste@email.com',
-      cpf: '123.456.789-10',
+      email,
+      cpf,
       senhaHash,
       role: PAPEL_CLIENTE,
     });
   } else {
+    // Garante que a senha é 'SenhaForte@123' na transação atual
     await repositorioUsuarios.atualizarUsuario(clienteExistente.uuid, { senhaHash });
   }
 
@@ -69,17 +122,21 @@ export async function obterTokenCliente(app: Application): Promise<string> {
 
   for (let tentativa = 1; tentativa <= maximoTentativas; tentativa += 1) {
     // eslint-disable-next-line no-await-in-loop
-    const respostaLogin = await realizarLogin(app, 'cliente.teste@email.com', 'SenhaForte@123');
+    const respostaLogin = await realizarLogin(app, email, 'SenhaForte@123');
 
     if (respostaLogin.status === 200 && respostaLogin.body?.dados?.token) {
       return respostaLogin.body.dados.token as string;
+    }
+
+    if (tentativa === maximoTentativas) {
+      console.error('[ERRO] Falha no login de teste:', respostaLogin.status, JSON.stringify(respostaLogin.body));
     }
 
     // eslint-disable-next-line no-await-in-loop
     await new Promise((resolve) => { setTimeout(resolve, 50); });
   }
 
-  throw new Error('Não foi possível obter token do cliente de teste.');
+  throw new Error(`Não foi possível obter token do cliente de teste (${email}).`);
 }
 
 export async function obterTokenAdmin(app: Application): Promise<string> {

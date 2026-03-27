@@ -1,7 +1,10 @@
 import { FabricaConexaoBanco } from '@/shared/infrastructure/database/FabricaConexaoBanco';
 import { contextoBanco, TipoAmbienteBanco } from '@/shared/infrastructure/database/ContextoBanco';
 
+import { IConexaoBanco } from '@/shared/infrastructure/database/IConexaoBanco';
+
 export type EscopoIsolamentoIntegracao = {
+  db: IConexaoBanco;
   finalizar: () => Promise<void>;
 };
 
@@ -19,6 +22,7 @@ export async function iniciarEscopoIsolamentoIntegracao(
   await db.iniciarTransacao();
 
   return {
+    db,
     finalizar: async () => {
       await db.reverterTransacao();
     },

@@ -1,8 +1,8 @@
 import { IConexaoBanco, DbParametro } from '@/shared/infrastructure/database/IConexaoBanco';
 import { IRepositorioPagamentos, IPagamento } from './IRepositorioPagamentos';
-import { FormaPagamento, TipoPagamento } from '../value-objects/FormaPagamento';
-import { CartaoCredito } from '../value-objects/CartaoCredito';
-import { StatusPagamento } from '../domain/IPagamento';
+import { FormaPagamento, TipoPagamento } from './FormaPagamento';
+import { CartaoCredito } from './CartaoCredito';
+import { StatusPagamento } from './IPagamento';
 
 /**
  * Implementação do repositório de pagamentos para PostgreSQL.
@@ -89,12 +89,12 @@ export class RepositorioPagamentosPostgres implements IRepositorioPagamentos {
 
     let cartao: CartaoCredito | undefined;
     if (r.crp_numero_tokenizado) {
-      // Simulação: criar objeto sem validação para leitura
-      cartao = Object.create(CartaoCredito.prototype);
-      cartao.numeroTokenizado = r.crp_numero_tokenizado;
-      cartao.nomeTitular = r.crp_nome_titular;
-      cartao.validade = r.crp_validade;
-      cartao.bandeira = r.crp_bandeira;
+      cartao = CartaoCredito.reconstituir(
+        r.crp_numero_tokenizado,
+        r.crp_nome_titular ?? '',
+        r.crp_validade ?? '',
+        r.crp_bandeira ?? ''
+      );
     }
 
     return {
@@ -130,6 +130,6 @@ export class RepositorioPagamentosPostgres implements IRepositorioPagamentos {
     const rows = await this.db.executar<{ pag_uuid: string }>(query, [vendaUuid]);
 
     const pagamentos = await Promise.all(rows.map(r => this.obterPorUuid(r.pag_uuid)));
-    return pagamentos.filter(p => p !== null) as IPagamento[];
+    return pagamentos.filter((p: IPagamento | null): p is IPagamento => p !== null);
   }
 }
