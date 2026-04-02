@@ -224,9 +224,9 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
 
     // 2. Deletar em cascata na ordem reversa de dependência
     // Itens de venda dependem de venda
-    await this.db.executar('DELETE FROM ecm_item_venda WHERE ven_id IN (SELECT ven_id FROM ecm_venda WHERE usu_id = $1)', [usuId]);
+    await this.db.executar('DELETE FROM itens_venda WHERE ven_id IN (SELECT ven_id FROM vendas WHERE usu_id = $1)', [usuId]);
     // Vendas dependem de usuário
-    await this.db.executar('DELETE FROM ecm_venda WHERE usu_id = $1', [usuId]);
+    await this.db.executar('DELETE FROM vendas WHERE usu_id = $1', [usuId]);
     // Cartões dependem de usuário
     await this.db.executar('DELETE FROM cartoes WHERE usu_id = $1', [usuId]);
     // Telefones dependem de usuário

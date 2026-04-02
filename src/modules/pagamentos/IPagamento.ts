@@ -18,9 +18,10 @@ export interface IPagamento {
 /**
  * Enum para status do pagamento.
  */
+/** Valores alinhados a `status_pagamento.stp_descricao` (migration 011). */
 export enum StatusPagamento {
-  PENDENTE = 'pendente',
-  APROVADO = 'aprovado',
-  RECUSADO = 'recusado',
-  CANCELADO = 'cancelado'
+  PENDENTE = 'PENDENTE',
+  APROVADO = 'APROVADO',
+  RECUSADO = 'RECUSADO',
+  CANCELADO = 'CANCELADO'
 }
