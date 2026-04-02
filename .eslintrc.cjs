@@ -52,6 +52,10 @@ module.exports = {
       files: ['**/*.ts', '**/*.tsx'],
       rules: {
         'no-undef': 'off',
+        // Airbnb usa as regras core, que não reconhecem parameter properties do TS.
+        'no-useless-constructor': 'off',
+        '@typescript-eslint/no-useless-constructor': 'error',
+        'no-empty-function': ['error', { allow: ['constructors'] }],
       },
     },
     {
