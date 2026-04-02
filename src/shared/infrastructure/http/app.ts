@@ -8,6 +8,8 @@ import { registrarRotasEntrega } from '@/modules/entrega/entrega.routes';
 import { registrarRotasPagamentos } from '@/modules/pagamentos/pagamentos.routes';
 import { registrarRotasAdmin } from '@/modules/admin/admin.routes';
 import { registrarRotasVendas } from '@/modules/vendas/vendas.routes';
+import { registrarRotasLivros } from '@/modules/livros/livros.routes';
+import { registrarRotasCarrinho } from '@/modules/carrinho/carrinho.routes';
 import { middlewareErro } from '@/shared/middlewares/erro.middleware';
 import { middlewareTrocaBanco } from '@/shared/middlewares/troca-banco.middleware';
 
@@ -35,6 +37,8 @@ export function criarAplicacao(): Application {
   registrarRotasCartoes(apiRouter);
   registrarRotasAdmin(apiRouter);
   registrarRotasVendas(apiRouter);
+  registrarRotasLivros(apiRouter);
+  registrarRotasCarrinho(apiRouter);
 
   // Aplica o prefixo configurável (default: /api)
   const prefixo = process.env.API_PREFIX ?? '/api';
