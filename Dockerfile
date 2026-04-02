@@ -2,7 +2,7 @@
 # Otimizado para produção com build eficiente e imagem leve
 
 # Stage 1: Builder - Instala dependências e compila o código
-FROM node:18-alpine AS builder
+FROM node:20-alpine AS builder
 
 # Definir diretório de trabalho
 WORKDIR /app
@@ -20,7 +20,7 @@ COPY . .
 RUN npm run build
 
 # Stage 2: Production - Imagem final otimizada
-FROM node:18-alpine AS production
+FROM node:20-alpine AS production
 
 # Definir diretório de trabalho
 WORKDIR /app
@@ -53,7 +53,7 @@ EXPOSE 3000
 CMD ["npm", "start"]
 
 # Stage 3: Development - Para desenvolvimento com hot reload
-FROM node:18-alpine AS development
+FROM node:20-alpine AS development
 
 # Definir diretório de trabalho
 WORKDIR /app

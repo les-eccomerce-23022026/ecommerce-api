@@ -43,8 +43,11 @@ export async function registrarCliente(
     ...payloadPadrao,
     ...dados,
   });
-  if (res.status !== 201) {
-    console.error(`[DEBUG] Erro no registro de cliente: ${res.status} - ${JSON.stringify(res.body)}`);
+
+  // Apenas log de debug para cenários de erro esperados nos testes
+  if (res.status !== 201 && process.env.NODE_ENV !== 'test') {
+    // eslint-disable-next-line no-console
+    console.debug(`[DEBUG] Erro no registro de cliente: ${res.status} - ${JSON.stringify(res.body)}`);
   }
   return res;
 }
@@ -129,7 +132,8 @@ export async function obterTokenCliente(
     }
 
     if (tentativa === maximoTentativas) {
-      console.error('[ERRO] Falha no login de teste:', respostaLogin.status, JSON.stringify(respostaLogin.body));
+      // eslint-disable-next-line no-console
+      console.debug('[DEBUG] Falha temporária no login de teste:', respostaLogin.status, JSON.stringify(respostaLogin.body));
     }
 
     // eslint-disable-next-line no-await-in-loop

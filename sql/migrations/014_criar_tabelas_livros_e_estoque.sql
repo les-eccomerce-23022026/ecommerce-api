@@ -6,7 +6,7 @@
 --   - Tabelas no plural, sem prefixo 'ecm_'
 --   - Prefixos de colunas: aut_ (autor), edi_ (editora), cat_ (categoria),
 --     liv_ (livro), lct_ (livro_categoria), gpr_ (grupo_precificacao),
---     est_ (estoque), hee_ (historico_entrada), for_ (fornecedor), avl_ (avaliacao)
+--     etq_ (estoque — evita colisão com estados.est_), hee_ (historico_entrada), for_ (fornecedor), avl_ (avaliacao)
 --
 -- Princípios:
 --   - 3NF: Separação de entidades (autores, editoras, categorias)
@@ -220,29 +220,29 @@ CREATE INDEX IF NOT EXISTS idx_livro_categorias_categoria ON livro_categorias(ca
 -- Tabela: estoques (Operação - Write-Heavy)
 -- =============================================================================
 CREATE TABLE IF NOT EXISTS estoques (
-    est_id                      BIGSERIAL       PRIMARY KEY,
-    est_uuid                    UUID            NOT NULL UNIQUE DEFAULT gen_random_uuid(),
+    etq_id                      BIGSERIAL       PRIMARY KEY,
+    etq_uuid                    UUID            NOT NULL UNIQUE DEFAULT gen_random_uuid(),
     liv_id                      BIGINT          NOT NULL UNIQUE REFERENCES livros(liv_id) ON DELETE CASCADE,
-    est_quantidade_disponivel   INTEGER         NOT NULL DEFAULT 0 CHECK (est_quantidade_disponivel >= 0),
-    est_quantidade_reservada    INTEGER         NOT NULL DEFAULT 0 CHECK (est_quantidade_reservada >= 0),
-    est_preco_venda             DECIMAL(10,2)   NOT NULL CHECK (est_preco_venda >= 0),
-    est_valor_custo_atual       DECIMAL(10,2)   CHECK (est_valor_custo_atual >= 0),
-    est_ultimo_custo_calculado  TIMESTAMPTZ,
-    est_ativo                   BOOLEAN         NOT NULL DEFAULT TRUE,
-    est_criado_em               TIMESTAMPTZ     DEFAULT CURRENT_TIMESTAMP,
-    est_atualizado_em           TIMESTAMPTZ     DEFAULT CURRENT_TIMESTAMP
+    etq_quantidade_disponivel   INTEGER         NOT NULL DEFAULT 0 CHECK (etq_quantidade_disponivel >= 0),
+    etq_quantidade_reservada    INTEGER         NOT NULL DEFAULT 0 CHECK (etq_quantidade_reservada >= 0),
+    etq_preco_venda             DECIMAL(10,2)   NOT NULL CHECK (etq_preco_venda >= 0),
+    etq_valor_custo_atual       DECIMAL(10,2)   CHECK (etq_valor_custo_atual >= 0),
+    etq_ultimo_custo_calculado  TIMESTAMPTZ,
+    etq_ativo                   BOOLEAN         NOT NULL DEFAULT TRUE,
+    etq_criado_em               TIMESTAMPTZ     DEFAULT CURRENT_TIMESTAMP,
+    etq_atualizado_em           TIMESTAMPTZ     DEFAULT CURRENT_TIMESTAMP
 );
 
 COMMENT ON TABLE estoques                         IS 'Controle de estoque e preços por livro (dados operacionais mutáveis).';
-COMMENT ON COLUMN estoques.est_id                 IS 'Identificador interno do estoque.';
-COMMENT ON COLUMN estoques.est_uuid               IS 'Identificador público UUID do estoque.';
+COMMENT ON COLUMN estoques.etq_id                 IS 'Identificador interno do estoque.';
+COMMENT ON COLUMN estoques.etq_uuid               IS 'Identificador público UUID do estoque.';
 COMMENT ON COLUMN estoques.liv_id                 IS 'FK única para livro (relacionamento 1:1).';
-COMMENT ON COLUMN estoques.est_quantidade_disponivel IS 'Quantidade disponível para venda.';
-COMMENT ON COLUMN estoques.est_quantidade_reservada  IS 'Quantidade reservada para pedidos em andamento.';
-COMMENT ON COLUMN estoques.est_preco_venda        IS 'Preço de venda atual (calculado via RN0013).';
-COMMENT ON COLUMN estoques.est_valor_custo_atual  IS 'Custo unitário atual do livro.';
-COMMENT ON COLUMN estoques.est_ultimo_custo_calculado IS 'Data do último cálculo de custo (média ponderada).';
-COMMENT ON COLUMN estoques.est_ativo              IS 'Flag indicando se registro de estoque está ativo.';
+COMMENT ON COLUMN estoques.etq_quantidade_disponivel IS 'Quantidade disponível para venda.';
+COMMENT ON COLUMN estoques.etq_quantidade_reservada  IS 'Quantidade reservada para pedidos em andamento.';
+COMMENT ON COLUMN estoques.etq_preco_venda        IS 'Preço de venda atual (calculado via RN0013).';
+COMMENT ON COLUMN estoques.etq_valor_custo_atual  IS 'Custo unitário atual do livro.';
+COMMENT ON COLUMN estoques.etq_ultimo_custo_calculado IS 'Data do último cálculo de custo (média ponderada).';
+COMMENT ON COLUMN estoques.etq_ativo              IS 'Flag indicando se registro de estoque está ativo.';
 
 CREATE INDEX IF NOT EXISTS idx_estoques_livro ON estoques(liv_id);
 
@@ -418,7 +418,7 @@ BEGIN
     IF TG_TABLE_NAME = 'autores' THEN NEW.aut_atualizado_em := NOW(); END IF;
     IF TG_TABLE_NAME = 'editoras' THEN NEW.edi_atualizado_em := NOW(); END IF;
     IF TG_TABLE_NAME = 'livros' THEN NEW.liv_atualizado_em := NOW(); END IF;
-    IF TG_TABLE_NAME = 'estoques' THEN NEW.est_atualizado_em := NOW(); END IF;
+    IF TG_TABLE_NAME = 'estoques' THEN NEW.etq_atualizado_em := NOW(); END IF;
     IF TG_TABLE_NAME = 'fornecedores' THEN NEW.for_atualizado_em := NOW(); END IF;
     IF TG_TABLE_NAME = 'avaliacoes_livro' THEN NEW.avl_atualizado_em := NOW(); END IF;
     RETURN NEW;

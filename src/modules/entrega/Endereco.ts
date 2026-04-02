@@ -2,7 +2,7 @@
  * Value Object para Endereço de Entrega conforme RN0023.
  */
 export class EnderecoEntrega {
-  private readonly _cep: string;
+  private readonly cepInterno: string;
 
   constructor(
     public readonly tipoResidencia: string,
@@ -17,8 +17,8 @@ export class EnderecoEntrega {
     public readonly complemento?: string,
   ) {
     this.validarCamposObrigatorios();
-    this._cep = this.formatarCep(cep);
-    this.validarCep(this._cep);
+    this.cepInterno = EnderecoEntrega.formatarCep(cep);
+    EnderecoEntrega.validarCep(this.cepInterno);
   }
 
   private validarCamposObrigatorios(): void {
@@ -32,11 +32,11 @@ export class EnderecoEntrega {
     if (!this.pais) throw new Error('Campo pais inválido');
   }
 
-  private formatarCep(cep: string): string {
+  private static formatarCep(cep: string): string {
     return cep.replace(/\D/g, '');
   }
 
-  private validarCep(cep: string): void {
+  private static validarCep(cep: string): void {
     if (cep.length !== 8) {
       throw new Error('CEP inválido');
     }
@@ -49,7 +49,7 @@ export class EnderecoEntrega {
       logradouro: this.logradouro,
       numero: this.numero,
       bairro: this.bairro,
-      cep: this._cep,
+      cep: this.cepInterno,
       cidade: this.cidade,
       estado: this.estado,
       pais: this.pais,

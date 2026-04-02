@@ -7,7 +7,10 @@
 export interface IRowIdSimples {
   tre_id?: string | number;
   tlo_id?: string | number;
+  /** ID de estado (tabela `estados`) */
   est_id?: string | number;
+  /** ID de estoque (tabela `estoques`) */
+  etq_id?: string | number;
   cid_id?: string | number;
   bai_id?: string | number;
   cep_id?: string | number;

@@ -70,7 +70,6 @@ export class ConexaoPostgres implements IConexaoBanco {
   }
 
   public async executar<T = unknown>(sql: string, parametros?: DbParametro[]): Promise<T[]> {
-    const tipo = obterTipoBancoAtual();
     const transacao = obterTransacaoAtual();
     const executor = transacao || this.obterPoolAtivo();
 

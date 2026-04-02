@@ -19,7 +19,7 @@ export class ControladorPagamentos {
    * Aqui retornamos uma resposta simplificada e segura para consumo do cliente.
    */
   // eslint-disable-next-line class-methods-use-this
-  public async obterPagamentoInfo(_req: Request, res: Response): Promise<void> {
+  public obterPagamentoInfo = async (_req: Request, res: Response): Promise<void> => {
     try {
       const resposta = {
         enderecosCliente: [],
@@ -39,12 +39,12 @@ export class ControladorPagamentos {
     } catch (erro) {
       res.status(500).json({ erro: (erro as Error).message });
     }
-  }
+  };
 
   /**
    * Seleciona forma de pagamento para uma venda.
    */
-  public async definirMetodoLiquidacao(req: Request, res: Response): Promise<void> {
+  public definirMetodoLiquidacao = async (req: Request, res: Response): Promise<void> => {
     try {
       const dados: IPagamentoInputDto = req.body;
       const pagamento = await this.servicoPagamentos.definirMetodoLiquidacao(dados);
@@ -72,12 +72,12 @@ export class ControladorPagamentos {
     } catch (erro) {
       res.status(400).json({ erro: (erro as Error).message });
     }
-  }
+  };
 
   /**
    * Processa o pagamento.
    */
-  public async solicitarAutorizacaoFinanceira(req: Request, res: Response): Promise<void> {
+  public solicitarAutorizacaoFinanceira = async (req: Request, res: Response): Promise<void> => {
     try {
       const { pagamentoUuid } = req.params;
       const pagamento = await this.servicoPagamentos.solicitarAutorizacaoFinanceira(pagamentoUuid);
@@ -105,14 +105,14 @@ export class ControladorPagamentos {
     } catch (erro) {
       res.status(400).json({ erro: (erro as Error).message });
     }
-  }
+  };
 
   /**
    * Endpoint compatível com frontend: recebe payload de finalização
    * e retorna um resultado simplificado de processamento (simulado).
    */
   // eslint-disable-next-line class-methods-use-this
-  public async solicitarAutorizacaoFinanceiraCheckout(req: Request, res: Response): Promise<void> {
+  public solicitarAutorizacaoFinanceiraCheckout = async (req: Request, res: Response): Promise<void> => {
     try {
       const payload = req.body as Record<string, unknown>;
 
@@ -140,12 +140,12 @@ export class ControladorPagamentos {
     } catch (erro) {
       res.status(500).json({ erro: (erro as Error).message });
     }
-  }
+  };
 
   /**
    * Consulta pagamento por UUID.
    */
-  public async consultarPagamento(req: Request, res: Response): Promise<void> {
+  public consultarPagamento = async (req: Request, res: Response): Promise<void> => {
     try {
       const { pagamentoUuid } = req.params;
       const pagamento = await this.servicoPagamentos.consultarPagamento(pagamentoUuid);
@@ -178,5 +178,5 @@ export class ControladorPagamentos {
     } catch (erro) {
       res.status(400).json({ erro: (erro as Error).message });
     }
-  }
+  };
 }

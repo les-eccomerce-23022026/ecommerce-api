@@ -1,6 +1,6 @@
+import { IEntregaInputDto, IEntregaOutputDto } from '@/modules/entrega/IEntrega.dto';
 import { IConexaoBanco, DbParametro } from '@/shared/infrastructure/database/IConexaoBanco';
 import { IRepositorioEntrega } from './IRepositorioEntrega';
-import { IEntregaInputDto, IEntregaOutputDto } from '@/modules/entrega/IEntrega.dto';
 
 /**
  * Implementação do repositório de entregas para PostgreSQL.
@@ -14,7 +14,7 @@ export class RepositorioEntregaPostgres implements IRepositorioEntrega {
 
   public async cadastrar(dados: IEntregaInputDto): Promise<IEntregaOutputDto> {
     // 1. Obter ven_id a partir do vendaUuid
-    const queryVenda = 'SELECT ven_id FROM ecm_venda WHERE ven_uuid = $1';
+    const queryVenda = 'SELECT ven_id FROM vendas WHERE ven_uuid = $1';
     const resVenda = await this.db.executar<{ ven_id: number }>(queryVenda, [dados.vendaUuid]);
     if (resVenda.length === 0) throw new Error('Venda não encontrada para cadastrar entrega.');
     const venId = resVenda[0].ven_id;
@@ -58,7 +58,7 @@ export class RepositorioEntregaPostgres implements IRepositorioEntrega {
       SELECT e.ent_uuid, e.ent_endereco_json, e.ent_custo, e.ent_entregador, e.ent_criado_em,
              v.ven_uuid as "vendaUuid", t.tfr_descricao as "tipoFrete"
       FROM entregas e
-      JOIN ecm_venda v ON e.ven_id = v.ven_id
+      JOIN vendas v ON e.ven_id = v.ven_id
       JOIN tipos_frete t ON e.tfr_id = t.tfr_id
       WHERE e.ent_uuid = $1
     `;
@@ -91,7 +91,7 @@ export class RepositorioEntregaPostgres implements IRepositorioEntrega {
       SELECT e.ent_uuid, e.ent_endereco_json, e.ent_custo, e.ent_entregador, e.ent_criado_em,
              v.ven_uuid as "vendaUuid", t.tfr_descricao as "tipoFrete"
       FROM entregas e
-      JOIN ecm_venda v ON e.ven_id = v.ven_id
+      JOIN vendas v ON e.ven_id = v.ven_id
       JOIN tipos_frete t ON e.tfr_id = t.tfr_id
       WHERE v.ven_uuid = $1
       ORDER BY e.ent_criado_em DESC

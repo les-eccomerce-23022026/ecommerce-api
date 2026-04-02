@@ -38,7 +38,7 @@ services:
     depends_on:
       - postgres
       - redis
-    command: npm run dev
+    command: sh -c "echo 'Iniciando instalacao de dependencias...' && npm install && echo 'Dependencias instaladas. Iniciando servidor...' && npm run dev"
 
 volumes:
   postgres_data:

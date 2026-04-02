@@ -29,7 +29,7 @@ export class RepositorioVendasPostgres implements IRepositorioVendas {
 
     // 3. Inserir a Venda
     const vendaQuery = `
-      INSERT INTO ecm_venda (usu_id, stv_id, ven_total_itens, ven_frete, ven_total_venda)
+      INSERT INTO vendas (usu_id, stv_id, ven_total_itens, ven_frete, ven_total_venda)
       VALUES ($1, $2, $3, $4, $5)
       RETURNING ven_id, ven_uuid, ven_criado_em
     `;
@@ -40,7 +40,7 @@ export class RepositorioVendasPostgres implements IRepositorioVendas {
     // 4. Inserir Itens
     const itensPromessas = dados.itens.map(async (item) => {
       const itemQuery = `
-        INSERT INTO ecm_item_venda (ven_id, liv_uuid, itv_quantidade, itv_preco_unitario)
+        INSERT INTO itens_venda (ven_id, liv_uuid, itv_quantidade, itv_preco_unitario)
         VALUES ($1, $2, $3, $4)
         RETURNING itv_uuid
       `;
@@ -72,7 +72,7 @@ export class RepositorioVendasPostgres implements IRepositorioVendas {
     const query = `
       SELECT v.ven_uuid, v.ven_total_itens, v.ven_frete, v.ven_total_venda,
              v.ven_criado_em, s.stv_descricao as status, u.usu_uuid as "usuarioUuid"
-      FROM ecm_venda v
+      FROM vendas v
       JOIN status_vendas s ON v.stv_id = s.stv_id
       JOIN usuarios u ON v.usu_id = u.usu_id
       WHERE v.ven_uuid = $1
@@ -85,8 +85,8 @@ export class RepositorioVendasPostgres implements IRepositorioVendas {
     // Buscar itens
     const itensQuery = `
       SELECT itv_uuid as id, liv_uuid as "livroUuid", itv_quantidade as quantidade, itv_preco_unitario as "precoUnitario"
-      FROM ecm_item_venda
-      WHERE ven_id = (SELECT ven_id FROM ecm_venda WHERE ven_uuid = $1)
+      FROM itens_venda
+      WHERE ven_id = (SELECT ven_id FROM vendas WHERE ven_uuid = $1)
     `;
     const itensRows = await this.db.executar<{ id: string; livroUuid: string; quantidade: number; precoUnitario: number }>(itensQuery, [uuid]);
 
@@ -108,7 +108,7 @@ export class RepositorioVendasPostgres implements IRepositorioVendas {
   }
 
   public async listarPorUsuario(usuarioUuid: string): Promise<IVenda[]> {
-    const queryIds = 'SELECT ven_uuid FROM ecm_venda v JOIN usuarios u ON v.usu_id = u.usu_id WHERE u.usu_uuid = $1 ORDER BY v.ven_criado_em DESC';
+    const queryIds = 'SELECT ven_uuid FROM vendas v JOIN usuarios u ON v.usu_id = u.usu_id WHERE u.usu_uuid = $1 ORDER BY v.ven_criado_em DESC';
     const rows = await this.db.executar<{ ven_uuid: string }>(queryIds, [usuarioUuid]);
 
     const vendas = await Promise.all(rows.map((r) => this.obterPorUuid(r.ven_uuid)));
@@ -123,7 +123,7 @@ export class RepositorioVendasPostgres implements IRepositorioVendas {
 
     const stvId = resStatus[0].stv_id;
 
-    const queryUpdate = 'UPDATE ecm_venda SET stv_id = $1, ven_atualizado_em = NOW() WHERE ven_uuid = $2';
+    const queryUpdate = 'UPDATE vendas SET stv_id = $1, ven_atualizado_em = NOW() WHERE ven_uuid = $2';
     await this.db.executar(queryUpdate, [stvId, vendaUuid]);
   }
 }

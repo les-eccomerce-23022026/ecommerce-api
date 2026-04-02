@@ -16,26 +16,26 @@ export class RepositorioPagamentosPostgres implements IRepositorioPagamentos {
 
   public async cadastrar(dados: IPagamento): Promise<IPagamento> {
     // Obter ID interno da venda
-    const vendaQuery = 'SELECT ven_id FROM ecm_venda WHERE ven_uuid = $1';
+    const vendaQuery = 'SELECT ven_id FROM vendas WHERE ven_uuid = $1';
     const vendaRes = await this.db.executar<{ ven_id: number }>(vendaQuery, [dados.vendaUuid]);
     if (vendaRes.length === 0) throw new Error('Venda não encontrada');
     const venId = vendaRes[0].ven_id;
 
     // Obter ID do tipo
-    const tipoQuery = 'SELECT tpg_id FROM ecm_tipo_pagamento WHERE tpg_descricao = $1';
+    const tipoQuery = 'SELECT tpg_id FROM tipo_pagamento WHERE tpg_descricao = $1';
     const tipoRes = await this.db.executar<{ tpg_id: number }>(tipoQuery, [dados.formaPagamento.getTipo()]);
     if (tipoRes.length === 0) throw new Error('Tipo de pagamento não encontrado');
     const tpgId = tipoRes[0].tpg_id;
 
     // Obter ID do status
-    const statusQuery = 'SELECT stp_id FROM ecm_status_pagamento WHERE stp_descricao = $1';
+    const statusQuery = 'SELECT stp_id FROM status_pagamento WHERE stp_descricao = $1';
     const statusRes = await this.db.executar<{ stp_id: number }>(statusQuery, [dados.status]);
     if (statusRes.length === 0) throw new Error('Status de pagamento não encontrado');
     const stpId = statusRes[0].stp_id;
 
     // Inserir pagamento
     const pagamentoQuery = `
-      INSERT INTO ecm_pagamento (ven_id, tpg_id, stp_id, pag_valor, pag_detalhes_cupom, pag_processado_em)
+      INSERT INTO pagamento (ven_id, tpg_id, stp_id, pag_valor, pag_detalhes_cupom, pag_processado_em)
       VALUES ($1, $2, $3, $4, $5, $6)
       RETURNING pag_id, pag_uuid, pag_criado_em
     `;
@@ -50,7 +50,7 @@ export class RepositorioPagamentosPostgres implements IRepositorioPagamentos {
     // Inserir cartão se existir
     if (dados.cartao) {
       const cartaoQuery = `
-        INSERT INTO ecm_cartao_pagamento (pag_id, crp_numero_tokenizado, crp_nome_titular, crp_validade, crp_bandeira)
+        INSERT INTO cartao_pagamento (pag_id, cpp_numero_tokenizado, cpp_nome_titular, cpp_validade, cpp_bandeira)
         VALUES ($1, $2, $3, $4, $5)
       `;
       await this.db.executar(cartaoQuery, [
@@ -66,20 +66,20 @@ export class RepositorioPagamentosPostgres implements IRepositorioPagamentos {
     const query = `
       SELECT p.pag_uuid, p.pag_valor, p.pag_detalhes_cupom, p.pag_criado_em, p.pag_processado_em,
              tp.tpg_descricao, sp.stp_descricao, v.ven_uuid,
-             c.crp_numero_tokenizado, c.crp_nome_titular, c.crp_validade, c.crp_bandeira
-      FROM ecm_pagamento p
-      JOIN ecm_tipo_pagamento tp ON p.tpg_id = tp.tpg_id
-      JOIN ecm_status_pagamento sp ON p.stp_id = sp.stp_id
-      JOIN ecm_venda v ON p.ven_id = v.ven_id
-      LEFT JOIN ecm_cartao_pagamento c ON p.pag_id = c.pag_id
+             c.cpp_numero_tokenizado, c.cpp_nome_titular, c.cpp_validade, c.cpp_bandeira
+      FROM pagamento p
+      JOIN tipo_pagamento tp ON p.tpg_id = tp.tpg_id
+      JOIN status_pagamento sp ON p.stp_id = sp.stp_id
+      JOIN vendas v ON p.ven_id = v.ven_id
+      LEFT JOIN cartao_pagamento c ON p.pag_id = c.pag_id
       WHERE p.pag_uuid = $1
     `;
     const rows = await this.db.executar<{
       pag_uuid: string; pag_valor: number; pag_detalhes_cupom: string | null;
       pag_criado_em: string; pag_processado_em: string | null;
       tpg_descricao: string; stp_descricao: string; ven_uuid: string;
-      crp_numero_tokenizado: string | null; crp_nome_titular: string | null;
-      crp_validade: string | null; crp_bandeira: string | null;
+      cpp_numero_tokenizado: string | null; cpp_nome_titular: string | null;
+      cpp_validade: string | null; cpp_bandeira: string | null;
     }>(query, [uuid]);
 
     if (rows.length === 0) return null;
@@ -88,12 +88,12 @@ export class RepositorioPagamentosPostgres implements IRepositorioPagamentos {
     const formaPagamento = new FormaPagamento(r.tpg_descricao as TipoPagamento, r.pag_detalhes_cupom || undefined);
 
     let cartao: CartaoCredito | undefined;
-    if (r.crp_numero_tokenizado) {
+    if (r.cpp_numero_tokenizado) {
       cartao = CartaoCredito.reconstituir(
-        r.crp_numero_tokenizado,
-        r.crp_nome_titular ?? '',
-        r.crp_validade ?? '',
-        r.crp_bandeira ?? ''
+        r.cpp_numero_tokenizado,
+        r.cpp_nome_titular ?? '',
+        r.cpp_validade ?? '',
+        r.cpp_bandeira ?? ''
       );
     }
 
@@ -110,23 +110,23 @@ export class RepositorioPagamentosPostgres implements IRepositorioPagamentos {
   }
 
   public async atualizar(uuid: string, dados: IPagamento): Promise<IPagamento> {
-    const idQuery = 'SELECT pag_id FROM ecm_pagamento WHERE pag_uuid = $1';
+    const idQuery = 'SELECT pag_id FROM pagamento WHERE pag_uuid = $1';
     const idRes = await this.db.executar<{ pag_id: number }>(idQuery, [uuid]);
     if (idRes.length === 0) throw new Error('Pagamento não encontrado');
     const pagId = idRes[0].pag_id;
 
-    const statusQuery = 'SELECT stp_id FROM ecm_status_pagamento WHERE stp_descricao = $1';
+    const statusQuery = 'SELECT stp_id FROM status_pagamento WHERE stp_descricao = $1';
     const statusRes = await this.db.executar<{ stp_id: number }>(statusQuery, [dados.status]);
     const stpId = statusRes[0].stp_id;
 
-    const updateQuery = 'UPDATE ecm_pagamento SET stp_id = $1, pag_processado_em = $2 WHERE pag_id = $3';
+    const updateQuery = 'UPDATE pagamento SET stp_id = $1, pag_processado_em = $2 WHERE pag_id = $3';
     await this.db.executar(updateQuery, [stpId, dados.processadoEm || null, pagId]);
 
     return dados;
   }
 
   public async listarPorVenda(vendaUuid: string): Promise<IPagamento[]> {
-    const query = 'SELECT p.pag_uuid FROM ecm_pagamento p JOIN ecm_venda v ON p.ven_id = v.ven_id WHERE v.ven_uuid = $1 ORDER BY p.pag_criado_em DESC';
+    const query = 'SELECT p.pag_uuid FROM pagamento p JOIN vendas v ON p.ven_id = v.ven_id WHERE v.ven_uuid = $1 ORDER BY p.pag_criado_em DESC';
     const rows = await this.db.executar<{ pag_uuid: string }>(query, [vendaUuid]);
 
     const pagamentos = await Promise.all(rows.map(r => this.obterPorUuid(r.pag_uuid)));

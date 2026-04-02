@@ -1,4 +1,4 @@
-import { TipoPagamento } from '../value-objects/FormaPagamento';
+import { TipoPagamento } from './FormaPagamento';
 
 /**
  * DTO para entrada de dados de pagamento.

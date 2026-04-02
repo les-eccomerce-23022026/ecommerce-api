@@ -1,5 +1,5 @@
-import { CartaoCredito } from '../value-objects/CartaoCredito';
-import { FormaPagamento } from '../value-objects/FormaPagamento';
+import { CartaoCredito } from './CartaoCredito';
+import { FormaPagamento } from './FormaPagamento';
 
 /**
  * Interface para a entidade Pagamento no domínio.

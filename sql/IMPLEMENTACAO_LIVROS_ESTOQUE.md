@@ -202,9 +202,9 @@ WHERE liv_titulo_norm ILIKE '%SENHOR DOS ANEIS%';
 -- Verificar estoque de um livro específico
 SELECT 
     l.liv_titulo,
-    e.est_quantidade_disponivel,
-    e.est_preco_venda,
-    e.est_valor_custo_atual
+    e.etq_quantidade_disponivel,
+    e.etq_preco_venda,
+    e.etq_valor_custo_atual
 FROM livros l
 JOIN estoques e ON l.liv_id = e.liv_id
 WHERE l.liv_titulo ILIKE '%harry potter%';

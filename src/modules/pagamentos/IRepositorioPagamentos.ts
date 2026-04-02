@@ -1,6 +1,6 @@
-import { IPagamento } from './domain/IPagamento';
+import { IPagamento } from './IPagamento';
 
-export { IPagamento } from './domain/IPagamento';
+export { IPagamento } from './IPagamento';
 
 /**
  * Interface do repositório de pagamentos.

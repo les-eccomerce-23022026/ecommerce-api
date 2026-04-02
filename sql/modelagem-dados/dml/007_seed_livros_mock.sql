@@ -441,10 +441,10 @@ WHERE
 
 INSERT INTO estoques (
     liv_id,
-    est_quantidade_disponivel,
-    est_quantidade_reservada,
-    est_preco_venda,
-    est_valor_custo_atual
+    etq_quantidade_disponivel,
+    etq_quantidade_reservada,
+    etq_preco_venda,
+    etq_valor_custo_atual
 )
 SELECT 
     l.liv_id,

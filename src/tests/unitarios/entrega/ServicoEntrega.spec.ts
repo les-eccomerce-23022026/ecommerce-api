@@ -1,6 +1,7 @@
 import { ServicoEntrega } from '@/modules/entrega/ServicoEntrega';
 import { IRepositorioEntrega } from '@/modules/entrega/IRepositorioEntrega';
-import { IRepositorioVendas } from '@/modules/vendas/repositories/IRepositorioVendas';
+import { IRepositorioVendas, IVenda } from '@/modules/vendas/repositories/IRepositorioVendas';
+import { IEntregaOutputDto } from '@/modules/entrega/IEntrega.dto';
 
 describe('ServicoEntrega', () => {
   let servico: ServicoEntrega;
@@ -9,6 +10,7 @@ describe('ServicoEntrega', () => {
 
   beforeEach(() => {
     mockRepoEntrega = {
+      cadastrar: jest.fn(),
       obterPorUuid: jest.fn(),
       listarPorVendaUuid: jest.fn(),
     } as unknown as jest.Mocked<IRepositorioEntrega>;
@@ -38,9 +40,9 @@ describe('ServicoEntrega', () => {
       };
 
       // Mock: Venda existe
-      mockRepoVendas.obterPorUuid.mockResolvedValue({ id: 'venda-123' } as unknown as any);
+      mockRepoVendas.obterPorUuid.mockResolvedValue({ id: 'venda-123' } as unknown as IVenda);
       // Mock: Cadastro bem sucedido
-      mockRepoEntrega.cadastrar.mockResolvedValue(entregaOutput);
+      mockRepoEntrega.cadastrar.mockResolvedValue(entregaOutput as IEntregaOutputDto);
 
       const resultado = await servico.agendarRemessa(dadosInput);
 
@@ -66,7 +68,7 @@ describe('ServicoEntrega', () => {
 
   describe('consultarEntrega', () => {
     it('deve retornar a entrega se ela existir', async () => {
-      const entrega = { uuid: 'e-1' } as unknown as any;
+      const entrega = { uuid: 'e-1' } as unknown as IEntregaOutputDto;
       mockRepoEntrega.obterPorUuid.mockResolvedValue(entrega);
 
       const resultado = await servico.consultarEntrega('e-1');
