@@ -19,13 +19,18 @@ describe('Integração - Pagamentos', () => {
   });
 
   async function criarVenda(total = 60) {
+    const valorFrete = 10;
+    const valorTotalItens = total - valorFrete;
+    if (valorTotalItens <= 0) {
+      throw new Error('criarVenda: total deve ser maior que o frete fixo de teste (10)');
+    }
     const res = await request(contexto.app)
       .post('/api/vendas')
       .set('Authorization', `Bearer ${token}`)
       .send({
-        itens: [{ livroUuid: LIVRO_UUID_TESTE, quantidade: 1, precoUnitario: 50 }],
-        valorTotalItens: 50,
-        valorFrete: 10,
+        itens: [{ livroUuid: LIVRO_UUID_TESTE, quantidade: 1, precoUnitario: valorTotalItens }],
+        valorTotalItens,
+        valorFrete,
         valorTotal: total,
       });
     expect(res.status).toBe(201);

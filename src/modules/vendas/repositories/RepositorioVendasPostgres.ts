@@ -12,7 +12,7 @@ export class RepositorioVendasPostgres implements IRepositorioVendas {
     this.db = db;
   }
 
-  public async cadastrar(dados: IVendaInputDto): Promise<IVenda> {
+  public async cadastrar(dados: IVendaInputDto): Promise<{ venda: IVenda; venId: number }> {
     // 1. Obter ID interno do usuário pelo UUID
     const usuQuery = 'SELECT usu_id FROM usuarios WHERE usu_uuid = $1';
     const usuRes = await this.db.executar<{ usu_id: number }>(usuQuery, [dados.usuarioUuid]);
@@ -29,11 +29,18 @@ export class RepositorioVendasPostgres implements IRepositorioVendas {
 
     // 3. Inserir a Venda
     const vendaQuery = `
-      INSERT INTO vendas (usu_id, stv_id, ven_total_itens, ven_frete, ven_total_venda)
-      VALUES ($1, $2, $3, $4, $5)
+      INSERT INTO vendas (usu_id, stv_id, ven_total_itens, ven_frete, ven_total_venda, cfr_id)
+      VALUES ($1, $2, $3, $4, $5, $6)
       RETURNING ven_id, ven_uuid, ven_criado_em
     `;
-    const vendaValues: DbParametro[] = [usuId, statusId, dados.valorTotalItens, dados.valorFrete, dados.valorTotal];
+    const vendaValues: DbParametro[] = [
+      usuId,
+      statusId,
+      dados.valorTotalItens,
+      dados.valorFrete,
+      dados.valorTotal,
+      dados.cfrId ?? null,
+    ];
     const vendaRows = await this.db.executar<{ ven_id: number; ven_uuid: string; ven_criado_em: string }>(vendaQuery, vendaValues);
     const vendaRow = vendaRows[0];
 
@@ -57,14 +64,17 @@ export class RepositorioVendasPostgres implements IRepositorioVendas {
     const itens = await Promise.all(itensPromessas);
 
     return {
-      id: vendaRow.ven_uuid as string,
-      usuarioUuid: dados.usuarioUuid,
-      status: 'EM PROCESSAMENTO',
-      totalItens: Number(dados.valorTotalItens),
-      frete: Number(dados.valorFrete),
-      totalVenda: Number(dados.valorTotal),
-      itens,
-      criadoEm: new Date(vendaRow.ven_criado_em as string),
+      venda: {
+        id: vendaRow.ven_uuid as string,
+        usuarioUuid: dados.usuarioUuid,
+        status: 'EM PROCESSAMENTO',
+        totalItens: Number(dados.valorTotalItens),
+        frete: Number(dados.valorFrete),
+        totalVenda: Number(dados.valorTotal),
+        itens,
+        criadoEm: new Date(vendaRow.ven_criado_em as string),
+      },
+      venId: vendaRow.ven_id,
     };
   }
 

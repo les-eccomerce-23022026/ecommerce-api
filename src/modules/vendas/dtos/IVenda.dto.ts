@@ -16,4 +16,8 @@ export interface IVendaInputDto {
   valorTotalItens: number;
   valorFrete: number;
   valorTotal: number;
+  /** UUID da cotação persistida no checkout (preferencial sobre valorFrete isolado). */
+  cotacaoUuid?: string;
+  /** Preenchido pelo serviço após resolver a cotação; usado na persistência. */
+  cfrId?: number;
 }

@@ -39,8 +39,11 @@ describe('ServicoEntrega', () => {
         criadoEm: new Date(),
       };
 
-      // Mock: Venda existe
-      mockRepoVendas.obterPorUuid.mockResolvedValue({ id: 'venda-123' } as unknown as IVenda);
+      // Mock: Venda existe (frete deve bater com custo informado)
+      mockRepoVendas.obterPorUuid.mockResolvedValue({
+        id: 'venda-123',
+        frete: 20,
+      } as unknown as IVenda);
       // Mock: Cadastro bem sucedido
       mockRepoEntrega.cadastrar.mockResolvedValue(entregaOutput as IEntregaOutputDto);
 

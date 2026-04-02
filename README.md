@@ -25,6 +25,12 @@ docker compose -f docker-compose.test.yml up -d
 
 Configure no `.env` os hosts/portas de teste (`POSTGRES_HOST_TEST`, etc.) conforme [`.env.example`](.env.example).
 
+### Migração de cotação de frete
+
+Execute no Postgres de dev/teste o script [`sql/migrations/020_cotacao_frete_transportadora.sql`](sql/migrations/020_cotacao_frete_transportadora.sql) (tabelas `cotacao_frete`, `cotacao_frete_simulada`, coluna `vendas.cfr_id`).
+
+No `.env` / `.env.test`, defina **`PROVEDOR_FRETE=simulado`** (obrigatório para subir a API). Opcionais: `FRETE_CEP_ORIGEM_PADRAO`, `FRETE_COTACAO_TTL_MINUTOS`, parâmetros de simulação (`FRETE_SIM_*`).
+
 ---
 
 ## 2. Iniciar a aplicação

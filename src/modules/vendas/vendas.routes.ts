@@ -4,6 +4,7 @@ import { autenticacaoMiddleware } from '@/shared/middlewares/autenticacao.middle
 import { ControladorVendas } from '@/modules/vendas/controllers/ControladorVendas';
 import { ServicoVendas } from '@/modules/vendas/services/ServicoVendas';
 import { RepositorioVendasPostgres } from '@/modules/vendas/repositories/RepositorioVendasPostgres';
+import { RepositorioCotacaoFretePostgres } from '@/modules/frete/cotacaoFrete/RepositorioCotacaoFretePostgres';
 
 /**
  * Registra rotas de vendas no roteador.
@@ -11,7 +12,8 @@ import { RepositorioVendasPostgres } from '@/modules/vendas/repositories/Reposit
 export function registrarRotasVendas(router: Router): void {
   const db = ConexaoPostgres.obterInstancia();
   const repo = new RepositorioVendasPostgres(db);
-  const servico = new ServicoVendas(repo);
+  const repoCotacao = new RepositorioCotacaoFretePostgres(db);
+  const servico = new ServicoVendas(repo, repoCotacao);
   const controller = new ControladorVendas(servico);
 
   router.post('/vendas', autenticacaoMiddleware, controller.registrarPedidoVenda);

@@ -74,12 +74,13 @@ export async function aprovarPagamentoDaVenda(
   return pagamentoUuid;
 }
 
-export function corpoAgendarEntrega(vendaUuid: string): Record<string, unknown> {
+/** `custo` deve coincidir com `ven_frete` da venda. */
+export function corpoAgendarEntrega(vendaUuid: string, custoFrete = 10): Record<string, unknown> {
   return {
     vendaUuid,
     tipoFrete: 'SEDEX',
     endereco: { logradouro: 'Rua Admin Fluxo', numero: '100', cidade: 'São Paulo' },
-    custo: 12.5,
+    custo: custoFrete,
     entregador: 'Transportadora Teste',
   };
 }

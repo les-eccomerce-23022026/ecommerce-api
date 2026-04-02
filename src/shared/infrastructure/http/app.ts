@@ -10,6 +10,7 @@ import { registrarRotasAdmin } from '@/modules/admin/admin.routes';
 import { registrarRotasVendas } from '@/modules/vendas/vendas.routes';
 import { registrarRotasLivros } from '@/modules/livros/livros.routes';
 import { registrarRotasCarrinho } from '@/modules/carrinho/carrinho.routes';
+import { registrarRotasFrete } from '@/modules/frete/frete.routes';
 import { middlewareErro } from '@/shared/middlewares/erro.middleware';
 import { middlewareTrocaBanco } from '@/shared/middlewares/troca-banco.middleware';
 
@@ -49,6 +50,7 @@ export function criarAplicacao(): Application {
 
   // Registro das rotas da API.
   registrarRotasPagamentos(apiRouter);
+  registrarRotasFrete(apiRouter);
   registrarRotasEntrega(apiRouter);
   registrarRotasAutenticacao(apiRouter);
   registrarRotasClientes(apiRouter);

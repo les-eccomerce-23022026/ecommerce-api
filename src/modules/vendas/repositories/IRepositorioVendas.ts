@@ -28,7 +28,7 @@ export interface IItemVenda {
  * Interface do repositório de vendas.
  */
 export interface IRepositorioVendas {
-  cadastrar(venda: IVendaInputDto): Promise<IVenda>;
+  cadastrar(venda: IVendaInputDto): Promise<{ venda: IVenda; venId: number }>;
   obterPorUuid(uuid: string): Promise<IVenda | null>;
   listarPorUsuario(usuarioUuid: string): Promise<IVenda[]>;
   atualizarStatus(vendaUuid: string, novoStatus: string): Promise<void>;

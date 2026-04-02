@@ -1,5 +1,9 @@
 import { IRepositorioVendas, IVenda } from '../repositories/IRepositorioVendas';
 import { IVendaInputDto } from '../dtos/IVenda.dto';
+import type { IRepositorioCotacaoFrete } from '@/modules/frete/cotacaoFrete/IRepositorioCotacaoFrete';
+import { EstadosCotacaoFrete } from '@/modules/frete/cotacaoFrete/EstadosCotacaoFrete';
+
+const TOLERANCIA_MOEDA = 0.02;
 
 /**
  * Serviço responsável pela lógica de negócios das vendas.
@@ -7,8 +11,14 @@ import { IVendaInputDto } from '../dtos/IVenda.dto';
 export class ServicoVendas {
   private readonly repositorioVendas: IRepositorioVendas;
 
-  constructor(repositorioVendas: IRepositorioVendas) {
+  private readonly repositorioCotacaoFrete: IRepositorioCotacaoFrete | null;
+
+  constructor(
+    repositorioVendas: IRepositorioVendas,
+    repositorioCotacaoFrete?: IRepositorioCotacaoFrete,
+  ) {
     this.repositorioVendas = repositorioVendas;
+    this.repositorioCotacaoFrete = repositorioCotacaoFrete ?? null;
   }
 
   /**
@@ -16,15 +26,52 @@ export class ServicoVendas {
    * RF0033, RF0037
    */
   public async registrarPedidoVenda(dados: IVendaInputDto): Promise<IVenda> {
-    // Validações básicas de negócio
     if (!dados.usuarioUuid) throw new Error('Usuário é obrigatório');
     if (dados.itens.length === 0) throw new Error('Venda deve possuir ao menos um item');
     if (dados.valorTotal <= 0) throw new Error('Valor total inválido');
 
-    // Validação de segurança: sanitização simples de campos
-    // (Poderia ser expandido com um Security-Reviewer)
-    
-    return this.repositorioVendas.cadastrar(dados);
+    let valorFreteFinal = Number(dados.valorFrete);
+    let cfrId: number | undefined;
+
+    const cotacaoUuid = typeof dados.cotacaoUuid === 'string' ? dados.cotacaoUuid.trim() : '';
+
+    if (cotacaoUuid) {
+      if (!this.repositorioCotacaoFrete) {
+        throw new Error('Cotação de frete não suportada nesta configuração');
+      }
+      const cot = await this.repositorioCotacaoFrete.obterPorUuid(cotacaoUuid);
+      if (!cot) throw new Error('Cotação de frete não encontrada');
+      if (cot.estado !== EstadosCotacaoFrete.CRIADA) {
+        throw new Error('Cotação de frete inválida ou já utilizada');
+      }
+      if (cot.expiraEm.getTime() < Date.now()) {
+        throw new Error('Cotação de frete expirada');
+      }
+      if (cot.venId != null) {
+        throw new Error('Cotação de frete já vinculada a uma venda');
+      }
+      valorFreteFinal = cot.valor;
+      cfrId = cot.cfrId;
+    }
+
+    const esperadoTotal = Number(dados.valorTotalItens) + valorFreteFinal;
+    if (Math.abs(esperadoTotal - dados.valorTotal) > TOLERANCIA_MOEDA) {
+      throw new Error('Valor total não confere com itens + frete');
+    }
+
+    const dadosInsert: IVendaInputDto = {
+      ...dados,
+      valorFrete: valorFreteFinal,
+      cfrId,
+    };
+
+    const { venda, venId } = await this.repositorioVendas.cadastrar(dadosInsert);
+
+    if (cotacaoUuid && this.repositorioCotacaoFrete) {
+      await this.repositorioCotacaoFrete.marcarConsumida(cotacaoUuid, venId);
+    }
+
+    return venda;
   }
 
   /**

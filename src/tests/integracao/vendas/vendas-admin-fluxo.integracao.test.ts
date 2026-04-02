@@ -69,7 +69,7 @@ describe('Integração — Vendas / fluxo administrativo', () => {
         const resEntrega = await request(app)
           .post('/api/entregas')
           .set('Authorization', `Bearer ${tokenAdminMestre}`)
-          .send(corpoAgendarEntrega(vendaUuid));
+          .send(corpoAgendarEntrega(vendaUuid, 8));
 
         expect(resEntrega.status).toBe(201);
         expect(resEntrega.body.vendaUuid).toBe(vendaUuid);
@@ -92,7 +92,7 @@ describe('Integração — Vendas / fluxo administrativo', () => {
         const resEntrega = await request(app)
           .post('/api/entregas')
           .set('Authorization', `Bearer ${tokenAdminComum}`)
-          .send(corpoAgendarEntrega(vendaUuid));
+          .send(corpoAgendarEntrega(vendaUuid, 5));
 
         expect(resEntrega.status).toBe(201);
 

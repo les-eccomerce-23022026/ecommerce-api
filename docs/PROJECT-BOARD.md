@@ -7,7 +7,7 @@
 
 ## Board Kanban
 
-| 📛 Todo (2)                                 | 🔄 In Progress (0)              | ✅ Done (25)                                          |
+| 📛 Todo (2)                                 | 🔄 In Progress (0)              | ✅ Done (26)                                          |
 | ------------------------------------------- | ------------------------------- | ----------------------------------------------------- |
 | B13 · [BACKEND] Módulo de Carrinho          |                                 | B1 · [BACKEND] Setup Inicial e Arquitetura            |
 | B14 · [BACKEND] Integração com Meio de Pgto |                                 | B2 · [BACKEND] Dockerização e Ambiente Dev            |
@@ -32,6 +32,7 @@
 |                                             |                                 | B24 · [BACKEND] Mascaramento de Dados (Privacidade)  |
 |                                             |                                 | B25 · [BACKEND] Banco de Teste Isolado e Middleware  |
 |                                             |                                 | B29 · [BACKEND] Intenções de Pagamento Persistidas e Rastreio |
+|                                             |                                 | B30 · [BACKEND] Módulo de Frete e Cotação (persistência + checkout) |
 
 ---
 
@@ -62,6 +63,7 @@
 | B13  | BACKEND | Módulo de Carrinho de Compras        | Manter estado do carrinho no Redis; sincronizar com banco se usuário logado; regras de estoque.                     |
 | B14  | BACKEND | Integração com Meio de Pagamento     | **Próximo:** gateway real (Stripe etc.), webhooks. **Já parcial:** simulação com intenção em PostgreSQL, HMAC do segredo, TTL, vínculo venda/`pagamento.inp_id` (ver B29). |
 | B29  | BACKEND | Intenções de Pagamento Persistidas e Rastreio | **Concluído (2026-04):** Tabelas `intencao_pagamento` (018), `pagamento.inp_id` (019); `SEGREDO_HMAC_INTENCAO` + `INTENCAO_PAGAMENTO_TTL_MINUTOS`; `PATCH /pagamentos/intencao-pagamento/:inpUuid/venda`; `POST /pagamento/processar` com `vendaUuid` opcional; testes em `pagamentos.integracao.test.ts`. Job em lote `EXPIRADA` opcional (método no repositório). |
+| B30  | BACKEND | Módulo de Frete e Cotação (persistência + checkout) | **Concluído (2026-04):** Migração 020 (`cotacao_frete`, `cotacao_frete_simulada`, `vendas.cfr_id`); `POST /api/frete/cotar`; `ServicoFrete`, `FabricaProvedorFrete`, `ProvedorFreteSimulado` / `ProvedorFreteStubExterno`; `GET /api/pagamento/info` delega cotação; `ServicoVendas` valida total + `cotacaoUuid`; `ServicoEntrega` exige custo alinhado a `ven_frete`; env `PROVEDOR_FRETE`; testes `frete.integracao.test.ts`, `ProvedorFreteSimulado.spec.ts`. |
 | B15  | BACKEND | Refino do CRUD de Clientes          | **Implementado:** Corrigidos gaps de validação (BCrypt custo 10), middlewares de autorização e segurança. |
 | B16  | BACKEND | CRUD de Endereços e Cartões         | **Implementado:** CRUD completo de cartões tokenizados e endereços mascarados. Inclui inclusão, remoção e alteração de perfil. |
 | B17  | BACKEND | Consulta Administrativa de Clientes | **Implementado:** Rota GET /api/clientes com filtros administrativos (nome, CPF, e-mail) e paginação para admins. |

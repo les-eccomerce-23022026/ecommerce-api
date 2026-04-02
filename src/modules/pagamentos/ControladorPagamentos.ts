@@ -2,6 +2,8 @@ import { Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { ServicoPagamentos } from './ServicoPagamentos';
 import { IPagamentoInputDto, IPagamentoOutputDto } from './IPagamento.dto';
+import type { ServicoFrete } from '@/modules/frete/ServicoFrete';
+import { cepOrigemPadrao, sanitizarCep8Digitos } from '@/modules/frete/freteCepUtil';
 
 /**
  * Controlador para operações de pagamentos.
@@ -9,8 +11,11 @@ import { IPagamentoInputDto, IPagamentoOutputDto } from './IPagamento.dto';
 export class ControladorPagamentos {
   private readonly servicoPagamentos: ServicoPagamentos;
 
-  constructor(servicoPagamentos: ServicoPagamentos) {
+  private readonly servicoFrete: ServicoFrete;
+
+  constructor(servicoPagamentos: ServicoPagamentos, servicoFrete: ServicoFrete) {
     this.servicoPagamentos = servicoPagamentos;
+    this.servicoFrete = servicoFrete;
   }
 
   /**
@@ -19,8 +24,37 @@ export class ControladorPagamentos {
    * Aqui retornamos uma resposta simplificada e segura para consumo do cliente.
    */
   // eslint-disable-next-line class-methods-use-this
-  public obterPagamentoInfo = async (_req: Request, res: Response): Promise<void> => {
+  public obterPagamentoInfo = async (req: Request, res: Response): Promise<void> => {
     try {
+      const cepQ = typeof req.query.cepDestino === 'string' ? req.query.cepDestino : '';
+      const pesoQ = req.query.pesoKg ?? req.query.peso;
+      const valorItensQ = req.query.valorTotalItens;
+      const pesoNum =
+        pesoQ !== undefined && String(pesoQ).length > 0 ? Number(pesoQ) : 1;
+      const valorItensNum =
+        valorItensQ !== undefined && String(valorItensQ).length > 0
+          ? Number(valorItensQ)
+          : undefined;
+
+      const cepDestino = cepQ.trim() || '01000000';
+      if (!Number.isFinite(pesoNum) || pesoNum <= 0) {
+        res.status(400).json({ erro: 'pesoKg inválido' });
+        return;
+      }
+      const opcoes = await this.servicoFrete.cotarEPersistir({
+        cepDestino,
+        pesoKg: pesoNum,
+        valorTotalItens:
+          valorItensNum !== undefined && Number.isFinite(valorItensNum) ? valorItensNum : undefined,
+      });
+      const freteOpcoes = opcoes.map((o) => ({
+        uuid: o.cotacaoUuid,
+        tipo: o.tipo,
+        valor: o.valor,
+        prazo: o.prazo,
+        selecionado: false,
+      }));
+
       const resposta = {
         enderecosCliente: [],
         cartoesCliente: [],
@@ -29,10 +63,13 @@ export class ControladorPagamentos {
           { uuid: uuidv4(), codigo: 'TROCA50', tipo: 'troca', valor: 50, descricao: 'Cupom de troca R$50 (simulado)' },
         ],
         bandeirasPermitidas: ['VISA', 'MASTERCARD'],
-        freteOpcoes: [
-          { uuid: uuidv4(), tipo: 'PAC', valor: 15.0, prazo: '5-7 dias' },
-          { uuid: uuidv4(), tipo: 'SEDEX', valor: 30.0, prazo: '1-2 dias' },
-        ],
+        freteOpcoes,
+        freteMeta: {
+          provedor: this.servicoFrete.getCodigoProvedorAtivo(),
+          cepOrigem: cepOrigemPadrao(),
+          cepDestino: cepQ.trim() ? sanitizarCep8Digitos(cepQ) : '01000000',
+          pesoKg: pesoNum,
+        },
       };
 
       res.status(200).json(resposta);

@@ -26,6 +26,11 @@ export class ServicoEntrega {
       throw new Error(`Venda com UUID ${dados.vendaUuid} não encontrada.`);
     }
 
+    const tol = 0.02;
+    if (Math.abs(Number(dados.custo) - Number(venda.frete)) > tol) {
+      throw new Error('Custo da entrega não confere com o frete registrado na venda.');
+    }
+
     // 2. Criar o registro de entrega logística
     const entrega = await this.repositorioEntrega.cadastrar(dados);
 
