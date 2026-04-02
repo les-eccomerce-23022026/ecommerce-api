@@ -1,0 +1,6 @@
+Migration 018: cria intencao_pagamento (núcleo), intencao_pagamento_simulado e intencao_pagamento_stripe.
+Executar o .sql correspondente no ambiente (dev/test/prod).
+
+Variáveis de ambiente relacionadas (aplicação):
+- SEGREDO_HMAC_INTENCAO (obrigatório)
+- INTENCAO_PAGAMENTO_TTL_MINUTOS (obrigatório, ex.: 15)

@@ -75,6 +75,43 @@ export class ControladorPagamentos {
   };
 
   /**
+   * Registra intenção de pagamento no provedor (valor travado para confirmação no checkout).
+   */
+  public registrarIntencaoPagamento = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const valorTotal = Number((req.body as { valorTotal?: unknown }).valorTotal);
+      if (!Number.isFinite(valorTotal) || valorTotal <= 0) {
+        res.status(400).json({ erro: 'valorTotal inválido' });
+        return;
+      }
+      const resultado = await this.servicoPagamentos.registrarIntencaoPagamento(valorTotal);
+      res.status(201).json(resultado);
+    } catch (erro) {
+      res.status(400).json({ erro: (erro as Error).message });
+    }
+  };
+
+  /**
+   * Vincula intenção de pagamento (CRIADA) à venda informada.
+   */
+  public vincularIntencaoVenda = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { inpUuid } = req.params;
+      const vendaUuid = typeof (req.body as { vendaUuid?: unknown }).vendaUuid === 'string'
+        ? (req.body as { vendaUuid: string }).vendaUuid.trim()
+        : '';
+      if (!vendaUuid) {
+        res.status(400).json({ erro: 'vendaUuid é obrigatório' });
+        return;
+      }
+      await this.servicoPagamentos.vincularIntencaoVenda(inpUuid ?? '', vendaUuid);
+      res.status(204).send();
+    } catch (erro) {
+      res.status(400).json({ erro: (erro as Error).message });
+    }
+  };
+
+  /**
    * Processa o pagamento.
    */
   public solicitarAutorizacaoFinanceira = async (req: Request, res: Response): Promise<void> => {
@@ -108,37 +145,25 @@ export class ControladorPagamentos {
   };
 
   /**
-   * Endpoint compatível com frontend: recebe payload de finalização
-   * e retorna um resultado simplificado de processamento (simulado).
+   * Endpoint compatível com frontend: confirma pagamento no provedor (intenção prévia obrigatória).
    */
-  // eslint-disable-next-line class-methods-use-this
   public solicitarAutorizacaoFinanceiraCheckout = async (req: Request, res: Response): Promise<void> => {
     try {
-      const payload = req.body as Record<string, unknown>;
-
-      // Validações mínimas
-      if (!payload || !Array.isArray(payload.pagamentosCartao)) {
-        res.status(400).json({ erro: 'Payload inválido' });
+      const corpo = req.body as Record<string, unknown>;
+      const resultado = await this.servicoPagamentos.confirmarAutorizacaoFinanceiraCheckout(corpo);
+      res.status(200).json({
+        sucesso: resultado.sucesso,
+        pedidoUuid: uuidv4(),
+        status: resultado.statusTexto,
+        ...(resultado.pagamentoUuid !== undefined ? { pagamentoUuid: resultado.pagamentoUuid } : {})
+      });
+    } catch (erro) {
+      const mensagem = (erro as Error).message;
+      if (mensagem.includes('Stripe ainda não implementado')) {
+        res.status(501).json({ erro: mensagem });
         return;
       }
-
-      const somaCartoes = (payload.pagamentosCartao as Array<{ valor: number | string }>).reduce(
-        (acc: number, p: { valor: number | string }) => acc + (Number(p.valor) || 0),
-        0
-      );
-
-      // Simulação: aprova se soma <= 1000
-      const aprovado = somaCartoes <= 1000;
-
-      const resposta = {
-        sucesso: aprovado,
-        pedidoUuid: uuidv4(),
-        status: aprovado ? 'APROVADA' : 'REPROVADA',
-      };
-
-      res.status(200).json(resposta);
-    } catch (erro) {
-      res.status(500).json({ erro: (erro as Error).message });
+      res.status(400).json({ erro: mensagem });
     }
   };
 

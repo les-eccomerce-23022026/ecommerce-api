@@ -14,7 +14,15 @@ export class RepositorioPagamentosPostgres implements IRepositorioPagamentos {
     this.db = db;
   }
 
-  public async cadastrar(dados: IPagamento): Promise<IPagamento> {
+  public async obterVenIdPorVendaUuid(vendaUuid: string): Promise<number | null> {
+    const rows = await this.db.executar<{ ven_id: number }>(
+      'SELECT ven_id FROM vendas WHERE ven_uuid = $1',
+      [vendaUuid]
+    );
+    return rows[0]?.ven_id ?? null;
+  }
+
+  public async cadastrar(dados: IPagamento, opcoes?: { inpIdIntencao?: number }): Promise<IPagamento> {
     // Obter ID interno da venda
     const vendaQuery = 'SELECT ven_id FROM vendas WHERE ven_uuid = $1';
     const vendaRes = await this.db.executar<{ ven_id: number }>(vendaQuery, [dados.vendaUuid]);
@@ -33,14 +41,16 @@ export class RepositorioPagamentosPostgres implements IRepositorioPagamentos {
     if (statusRes.length === 0) throw new Error('Status de pagamento não encontrado');
     const stpId = statusRes[0].stp_id;
 
+    const inpId = opcoes?.inpIdIntencao;
+
     // Inserir pagamento
     const pagamentoQuery = `
-      INSERT INTO pagamento (ven_id, tpg_id, stp_id, pag_valor, pag_detalhes_cupom, pag_processado_em)
-      VALUES ($1, $2, $3, $4, $5, $6)
+      INSERT INTO pagamento (ven_id, tpg_id, stp_id, pag_valor, pag_detalhes_cupom, pag_processado_em, inp_id)
+      VALUES ($1, $2, $3, $4, $5, $6, $7)
       RETURNING pag_id, pag_uuid, pag_criado_em
     `;
     const pagamentoValues: DbParametro[] = [
-      venId, tpgId, stpId, dados.valor, dados.formaPagamento.getDetalhes(), dados.processadoEm || null
+      venId, tpgId, stpId, dados.valor, dados.formaPagamento.getDetalhes(), dados.processadoEm || null, inpId ?? null
     ];
     const pagamentoRows = await this.db.executar<{
       pag_id: number; pag_uuid: string; pag_criado_em: string;
