@@ -130,4 +130,14 @@ describe('Integração - Cartões', () => {
     expect(resposta.body.sucesso).toBe(true);
     expect(resposta.body.dados).toEqual([]);
   });
+
+  it('falha ao atualizar cartão inexistente (UUID desconhecido)', async () => {
+    const resposta = await request(contexto.app)
+      .patch('/api/clientes/perfil/cartoes/00000000-0000-0000-0000-00000000dead')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ nomeImpresso: 'Inexistente' });
+
+    expect(resposta.status).toBe(400);
+    expect(resposta.body.sucesso).toBe(false);
+  });
 });

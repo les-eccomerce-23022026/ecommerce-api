@@ -17,6 +17,14 @@ const configuracao: Config = {
   globalTeardown: '<rootDir>/src/tests/setup/global-teardown.ts',
   clearMocks: true,
   maxWorkers: 1, // Executa testes sequencialmente
+  collectCoverageFrom: [
+    'src/**/*.ts',
+    '!src/**/*.d.ts',
+    '!src/tests/**',
+    '!src/server.ts',
+  ],
+  coverageDirectory: 'coverage',
+  coverageReporters: ['text', 'text-summary', 'html'],
 };
 
 export default configuracao;

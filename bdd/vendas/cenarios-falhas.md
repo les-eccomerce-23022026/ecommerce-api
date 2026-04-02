@@ -1,5 +1,7 @@
 # Cenários BDD – Vendas e Pagamentos – Falhas
 
+> **Nota:** Alguns cenários abaixo refletem **RN do documento LES** (ex.: RN0031 estoque, RN0034 split mínimo). Se a API ainda não aplicar a regra, trate como especificação alvo ou implemente a validação antes de automatizar o teste em CI.
+
 ## Endpoints
 
 - `POST /vendas`

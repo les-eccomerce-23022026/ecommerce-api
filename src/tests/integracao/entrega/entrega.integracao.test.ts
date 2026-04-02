@@ -1,6 +1,7 @@
 import request from 'supertest';
 import { configurarTesteIntegracao } from '@/tests/utils/setup-integracao.util';
 import { obterTokenCliente } from '@/tests/utils/requisicoes-api.util';
+import { LIVRO_UUID_TESTE } from '@/tests/helpers/pedido-venda.helper';
 
 describe('Integração - Módulo de Entrega', () => {
   const contexto = configurarTesteIntegracao();
@@ -16,7 +17,7 @@ describe('Integração - Módulo de Entrega', () => {
       .post('/api/vendas')
       .set('Authorization', `Bearer ${token}`)
       .send({
-        itens: [{ livroUuid: '550e8400-e29b-41d4-a716-446655440000', quantidade: 1, precoUnitario: 50.0 }],
+        itens: [{ livroUuid: LIVRO_UUID_TESTE, quantidade: 1, precoUnitario: 50.0 }],
         valorTotalItens: 50.0,
         valorFrete: 10.0,
         valorTotal: 60.0,
@@ -63,7 +64,7 @@ describe('Integração - Módulo de Entrega', () => {
       .post('/api/vendas')
       .set('Authorization', `Bearer ${token}`)
       .send({
-        itens: [{ livroUuid: '550e8400-e29b-41d4-a716-446655440000', quantidade: 2, precoUnitario: 30.0 }],
+        itens: [{ livroUuid: LIVRO_UUID_TESTE, quantidade: 2, precoUnitario: 30.0 }],
         valorTotalItens: 60.0,
         valorFrete: 15.0,
         valorTotal: 75.0,

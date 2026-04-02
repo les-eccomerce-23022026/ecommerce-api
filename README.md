@@ -1,159 +1,108 @@
-# Backend — LES Livraria (E-Commerce)
+# Backend — API LES (Livraria)
 
-Este diretório contém a API Node.js/TypeScript para o sistema de e-commerce de livros.
-
----
-
-## 🔑 Credenciais de Teste (Ambiente de Dev/Test)
-
-Estes usuários são criados automaticamente pelo script de seed (`sql/modelagem-dados/dml/005_seed_usuarios_teste.sql`).
-
-| Papel   | E-mail                  | Senha Padrão    |
-|---------|-------------------------|-----------------|
-| **Admin**   | `admintest@email.com`   | `@asdfJKLÇ123`  |
-| **Cliente** | `clientetest@email.com` | `@asdfJKLÇ123`  |
+API Node.js/TypeScript (Express, PostgreSQL, Redis, JWT).
 
 ---
 
-## 🔓 Senhas Mestras (Bypass de Autenticação)
+## 1. Banco de dados e Redis (desenvolvimento)
 
-Para facilitar o desenvolvimento e testes, o sistema suporta **Senhas Mestras**. Elas permitem logar em **qualquer conta ativa** do respectivo papel sem precisar da senha real do usuário.
-
-Os hashes estão armazenados na tabela `configuracoes_app` (`sql/modelagem-dados/dml/006_seed_configuracoes.sql`).
-
-| Tipo de Senha Master | Senha Master        | Chave na Tabela `configuracoes_app` |
-|----------------------|---------------------|--------------------------------------|
-| **Master Geral**     | `@asdfJKLÇ123`      | `SENHA_MESTRA_ADMIN_HASH` / `SENHA_MESTRA_CLIENTE_HASH` |
-
-> **Nota:** Em produção, estas configurações devem ser removidas ou protegidas.
-
----
-
-## 🚀 Testando o Login (Curl)
-
-Substitua o e-mail pelo usuário que deseja testar.
-
-### Login com Senha Master (Admin)
-```bash
-curl -X POST http://localhost:3000/api/auth/login \
--H "Content-Type: application/json" \
--d '{
-  "email": "admintest@email.com",
-  "senha": "@asdfJKLÇ123"
-}'
-```
-
-### Login com Senha Master (Cliente)
-```bash
-curl -X POST http://localhost:3000/api/auth/login \
--H "Content-Type: application/json" \
--d '{
-  "email": "clientetest@email.com",
-  "senha": "@asdfJKLÇ123"
-}'
-```
-
----
-
-## 🛠️ Comandos Úteis
-
-- `npm run dev`: Inicia o servidor em modo de desenvolvimento.
-- `npm test`: Executa os testes automatizados.
-- `./scripts/setup-db.sh`: Reinicializa a estrutura e seeds do banco de dados.
-- `./scripts/reset-db.sh`: Limpa os volumes do Docker e reinicia o banco do zero.
-
----
-
-## 🏗️ Infraestrutura e Banco de Dados
-
-**Visão geral**
-- A aplicação usa containers com `docker compose` para Postgres, Redis e o próprio app (veja [backend/docker-compose.yml](backend/docker-compose.yml)).
-- Imagem PostgreSQL usada: `postgres:16-alpine` (compatível com PostgreSQL 15+ conforme `sql/README.md`).
-- Redis: `redis:7-alpine`.
-
-**Arquivos relevantes**
-- Compose (dev): [backend/docker-compose.yml](backend/docker-compose.yml)
-- Compose (test): [backend/docker-compose.test.yml](backend/docker-compose.test.yml)
-- Dockerfile multi-stage: [backend/Dockerfile](backend/Dockerfile)
-- Scripts de setup: [backend/scripts/setup-db.sh](backend/scripts/setup-db.sh) e [backend/scripts/setup-test-db.sh](backend/scripts/setup-test-db.sh)
-- SQL (DDL/DML/migrations/diagramas): [backend/sql/README.md](backend/sql/README.md)
-
-**Serviços (resumo)**
-- postgres: `5432:5432` (dev) — banco `ecm_livraria` por padrão.
-- redis: `6379:6379` (dev).
-- app: expõe `3000:3000` (aplicação Node/TypeScript).
-- No ambiente de testes, `docker-compose.test.yml` mapeia Postgres para a porta `5433` e Redis para `6380` para não conflitar com o dev.
-
-**Como levantar o ambiente de desenvolvimento**
-1. Construa e suba containers (modo dev monta código e usa hot-reload):
+Na pasta `backend`:
 
 ```bash
-# a partir de /backend
 docker compose up -d
-# ou use o script localmente se preferir rodar sem compose
-npm run dev
-```
-
-2. Aplique a estrutura e seeds (se necessário):
-
-```bash
-# aguarda o banco e aplica DDL/DML/migrations
 ./scripts/setup-db.sh
 ```
 
-**Como preparar ambiente de testes isolado**
-```bash
-# limpa e sobe os containers de teste
-docker compose -f docker-compose.test.yml down -v
-docker compose -f docker-compose.test.yml up -d
+- Postgres: `localhost:5432` — banco `ecm_livraria` (usuário/senha padrão do `docker-compose.yml`: `ecm_user` / `ecm_senha`).
+- Redis: `localhost:6379`.
 
-# executa populate na instância de teste (porta 5433)
+**Ambiente de testes isolado** (Postgres `5433`, Redis `6380`):
+
+```bash
+docker compose -f docker-compose.test.yml up -d
 ./scripts/setup-test-db.sh
 ```
 
-**Variáveis de ambiente importantes**
-- `PORTA_HTTP` (padrão `3000`)
-- `JWT_SEGREDO` (segredo do JWT)
-- `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` (use `.env` ou `.env.test` conforme ambiente)
-- `REDIS_URL` (opcional — padrão `redis://localhost:6379`)
-
-Veja o modelo em [backend/.env.example](backend/.env.example).
-
-**Banco de dados — organização**
-- Estrutura SQL organizada em `sql/` com subpastas para `ddl/`, `dml/` (seeds) e `migrations/`.
-- Scripts são idempotentes e há um diagrama ER em `sql/schema_ecm.puml`.
-- Recomendação: executar os arquivos DDL na ordem numérica e depois os seeds (conforme `sql/README.md`).
-
-**Observações de segurança e operação**
-- As seeds iniciais incluem um usuário admin com senha em hash (não armazene senhas em texto).
-- Remova ou proteja quaisquer senhas mestras em produção (veja seção "Senhas Mestras" acima).
-- Em CI, use o `docker-compose.test.yml` e `./scripts/setup-test-db.sh` para criar um ambiente isolado para os testes.
+Configure no `.env` os hosts/portas de teste (`POSTGRES_HOST_TEST`, etc.) conforme [`.env.example`](.env.example).
 
 ---
 
-## 📚 Stacks e Tecnologias
+## 2. Iniciar a aplicação
 
-**Backend**
-- **Runtime/Language:** Node.js com TypeScript (`typescript`, `ts-node-dev`, `tsc`).
-- **Framework:** Express (`express`).
-- **Banco de dados / cache:** PostgreSQL (`pg`) e Redis (`ioredis`).
-- **Autenticação:** JWT (`jsonwebtoken`) e bcrypt (`bcrypt`, `bcryptjs`).
-- **HTTP / utilitários:** `cors`, `cookie-parser`, `dotenv`.
-- **Testes:** Jest + Supertest (`jest`, `supertest`, `ts-jest`).
-- **Qualidade/CI:** ESLint, Prettier, Husky, lint-staged.
-- **Containerização / infra:** Docker / docker-compose.
+```bash
+npm install
+npm run dev
+```
 
-Fonte: [backend/package.json](backend/package.json)
+A API sobe em `http://localhost:${PORTA_HTTP:-3000}` (prefixo `/api`). Variáveis: copie [`.env.example`](.env.example) para `.env` e defina pelo menos `JWT_SEGREDO` e `JWT_TEMPO_EXPIRACAO` (ex.: `1h`).
 
-**Frontend (resumo do protótipo/web)**
-- **Framework/Language:** React (v19) com TypeScript.
-- **Bundler / dev server:** Vite (`vite`, `@vitejs/plugin-react`).
-- **Estado:** Redux Toolkit + `react-redux` (`@reduxjs/toolkit`).
-- **Roteamento:** `react-router-dom`.
-- **UI / gráficos:** `lucide-react`, `chart.js`, `react-chartjs-2`.
-- **E2E / testes:** Cypress.
-- **Qualidade:** ESLint e plugins relacionados.
-
-Fonte: [web/package.json](../web/package.json)
+**Só com Docker (app + banco):** `docker compose up -d` (o serviço `app` usa o `.env`).
 
 ---
+
+## 3. Credenciais de administrador
+
+| Perfil | E-mail | Senha | Observação |
+|--------|--------|-------|------------|
+| **Administrador mestre** | `admin@livraria.com.br` | `Admin@123` | Criado pelo seed SQL (`002_seed_usuario_admin_inicial.sql`). `isAdminMestre: true`. |
+| **Outro administrador** | `admintest@email.com` | `@asdfJKLÇ123` | Seed de testes (`005_seed_usuarios_teste.sql`). Admin comum (sem mestre). |
+
+**Bootstrap só para testes** (com header `x-use-test-db: true`): `POST /api/admin/bootstrap` — recria/atualiza o mestre `admin@livraria.com.br` com senha `Admin@123`.
+
+**Cliente de teste (seed):** `clientetest@email.com` / `@asdfJKLÇ123`.
+
+---
+
+## 4. CPFs válidos para testes (dígitos verificadores)
+
+A API valida CPF em cadastro de cliente (ambiente não-test). Use CPFs distintos por cadastro. Lista com **dígitos verificadores corretos**:
+
+1. `245.699.622-46`
+2. `019.364.721-47`
+3. `747.200.643-29`
+4. `371.568.753-37`
+5. `497.592.260-65`
+6. `283.323.987-46`
+7. `206.903.522-04`
+8. `824.477.504-12`
+9. `989.888.819-90`
+10. `267.905.031-29`
+11. `684.262.887-31`
+12. `802.563.243-10`
+13. `087.098.018-12`
+14. `707.848.056-28`
+15. `952.426.835-38`
+
+---
+
+## 5. Testes e cobertura
+
+```bash
+npm test
+npm run test:coverage
+```
+
+- Relatório texto no terminal; HTML em `backend/coverage/index.html` (abra no navegador).
+- Cenários em linguagem de negócio: [`bdd/README.md`](bdd/README.md) (especificação; a automação está em `src/tests/**`, com pastas por domínio em `integracao/`).
+- Detalhes de SQL e modelagem: [`sql/README.md`](sql/README.md).
+
+---
+
+## 6. Scripts úteis
+
+| Comando | Descrição |
+|---------|-----------|
+| `npm run dev` | Servidor com hot-reload |
+| `npm run build` / `npm start` | Build e produção |
+| `npm test` | Testes Jest |
+| `npm run test:coverage` | Testes + cobertura |
+| `./scripts/setup-db.sh` | DDL/DML/migrations no Postgres dev |
+| `./scripts/reset-db.sh` | Limpa volumes Docker e recria banco (ver script) |
+
+---
+
+## 7. Referências
+
+- Rotas HTTP de exemplo: pasta `http/`.
+- BDD (cenários): pasta `bdd/`.
+- Scripts curl (fluxos): `scripts/curl-*-bdd.sh`.

@@ -17,8 +17,8 @@
 - **E** existem itens disponíveis no estoque para os livros selecionados
 - **Quando** é enviado `POST /vendas` com corpo contendo `itens` (uuid, quantidade, preco), `valorTotalItens`, `valorFrete` e `valorTotal`
 - **Então** a resposta tem status `201`
-- **E** o corpo é JSON contendo o `uuid` da venda criada e os dados confirmados
-- **E** o status inicial da venda é `"EM PROCESSAMENTO"`
+- **E** o corpo é JSON contendo o **`id`** (UUID público) da venda criada e os dados confirmados *(alinhado à API; o documento acadêmico fala em “compra”/pedido)*
+- **E** o status inicial da venda é **`EM PROCESSAMENTO`** *(RF0037)*
 
 ### Seleção de forma de pagamento com cartão de crédito
 
