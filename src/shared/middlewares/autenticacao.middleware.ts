@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { di } from '@/shared/infrastructure/di.container';
 import { Logger } from '@/shared/utils/Logger.util';
+import { obterNomeCookieAuth } from '@/shared/constants/auth-cookie';
 
 /**
  * Middleware para autenticação via JWT no header Authorization Bearer.
@@ -13,22 +14,20 @@ export async function autenticacaoMiddleware(
   next: NextFunction,
 ): Promise<void> {
   const { authorization } = req.headers;
-  const tokenCookie = req.cookies?.token;
+  const nomeCookie = obterNomeCookieAuth();
 
   let token: string | undefined;
+  const tokenDoCookie = req.cookies?.[nomeCookie];
+  if (typeof tokenDoCookie === 'string' && tokenDoCookie.length > 0) {
+    token = tokenDoCookie;
+  }
 
-  // Verificar primeiro no header Authorization Bearer
-  if (authorization) {
+  if (!token && authorization) {
     const [schema, tokenFromHeader] = authorization.split(' ');
 
     if (tokenFromHeader && schema === 'Bearer') {
       token = tokenFromHeader;
     }
-  }
-
-  // Se não encontrou no header, verificar no cookie
-  if (!token && tokenCookie) {
-    token = tokenCookie;
   }
 
   if (!token) {
@@ -45,14 +44,13 @@ export async function autenticacaoMiddleware(
       throw new Error('Configuração de JWT ausente.');
     }
 
-    const decodificado = jwt.verify(token, segredo) as { 
-      sub: string; 
-      email: string; 
+    const decodificado = jwt.verify(token, segredo) as {
+      sub: string;
+      email: string;
       role: string;
       isAdminMestre?: boolean;
     };
 
-    // Buscar o usuário para obter o id
     const usuario = await di.repoUsuarios.buscarPorUuid(decodificado.sub);
     if (!usuario) {
       Logger.error(`[auth] Usuário não encontrado no banco: ${decodificado.sub}`);

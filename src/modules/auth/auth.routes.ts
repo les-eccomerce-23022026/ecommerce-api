@@ -11,6 +11,10 @@ export function registrarRotasAutenticacao(app: IRouter): void {
     ControladorAutenticacao.realizarLogin(requisicao, resposta),
   );
 
+  app.post('/auth/logout', (requisicao, resposta) =>
+    ControladorAutenticacao.encerrarSessao(requisicao, resposta),
+  );
+
   app.get('/auth/me', autenticacaoMiddleware, (requisicao, resposta) =>
     ControladorAutenticacao.me(requisicao, resposta),
   );

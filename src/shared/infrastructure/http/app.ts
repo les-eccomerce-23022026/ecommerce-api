@@ -16,15 +16,33 @@ import { middlewareTrocaBanco } from '@/shared/middlewares/troca-banco.middlewar
 /**
  * Cria e configura a aplicação Express principal.
  */
+const origensCorsPermitidas = (): string[] =>
+  (process.env.CORS_ORIGIN || 'http://localhost:5173,http://127.0.0.1:5173')
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean);
+
 export function criarAplicacao(): Application {
   const app = express();
   const apiRouter = Router();
 
-  app.use(cors({
-    origin: true,
-    credentials: true,
-  }));
   app.use(cookieParser());
+  app.use(
+    cors({
+      origin: (origin, callback) => {
+        if (!origin) {
+          callback(null, true);
+          return;
+        }
+        if (origensCorsPermitidas().includes(origin)) {
+          callback(null, true);
+          return;
+        }
+        callback(null, false);
+      },
+      credentials: true,
+    }),
+  );
   // Configura os middlewares globais ANTES das rotas.
   app.use(express.json());
   app.use(middlewareTrocaBanco);

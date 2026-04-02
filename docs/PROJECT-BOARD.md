@@ -50,7 +50,7 @@
 | B2   | BACKEND | Dockerização e Ambiente Dev          | Criar Dockerfile multi-stage; configurar docker-compose com Node.js + Postgres + Redis; hot reload com ts-node-dev. |
 | B3   | BACKEND | Modelagem SQL e Normalização         | Criar 14 tabelas normalizadas (DDR/DML); triggers de atualização; diagramas ER PlantUML.    |
 | B4   | BACKEND | Infraestrutura de Repositórios PG    | Implementar Pool de conexões, Transações seguras e Repositórios para Usuários, Endereços, Perfis e Telefones.       |
-| B5   | BACKEND | Auth com JWT e Cookies HttpOnly      | **Implementado:** Sistema de autenticação completo com login seguro e proteção de rotas via middlewares. |
+| B5   | BACKEND | Auth com JWT (Bearer)                | **Implementado:** Sistema de autenticação completo com login seguro e proteção de rotas via middlewares (JWT no header Authorization). |
 | B6   | BACKEND | Módulo de Usuários e Perfis          | **Implementado:** Gestão completa de perfis de clientes, incluindo cadastro inicial, edição, inativação e alteração de senha. |
 | B7   | BACKEND | Testes de Integração e Fluxo         | **Implementado:** Cobertura abrangente de testes automatizados (25 testes passando) para validar fluxos de autenticação e clientes. |
 | B8   | BACKEND | Governança de Código e Linter        | Configurar ESLint (Airbnb) e Prettier; proibir switch/case via AGENTS.md; comentários em Português.    |
@@ -64,7 +64,7 @@
 | B16  | BACKEND | CRUD de Endereços e Cartões         | **Implementado:** CRUD completo de cartões tokenizados e endereços mascarados. Inclui inclusão, remoção e alteração de perfil. |
 | B17  | BACKEND | Consulta Administrativa de Clientes | **Implementado:** Rota GET /api/clientes com filtros administrativos (nome, CPF, e-mail) e paginação para admins. |
 | B18  | BACKEND | Testes Manuais CRUD Clientes        | **Implementado:** Testes completos via curl/http das rotas CRUD: registro; login JWT; perfil; cartões; inativação. |
-| B19  | BACKEND | Correção Violações Segurança        | **Implementado:** Correção crítica de 4 violações: JWT via HttpOnly; remoção de IDs internos; switch/case por Record; privacidade de CPF. |
+| B19  | BACKEND | Correção Violações Segurança        | **Implementado:** Correção crítica de 4 violações: transporte seguro de JWT; remoção de IDs internos; switch/case por Record; privacidade de CPF. |
 | B20  | BACKEND | Otimização de Disco Banco           | **Implementado:** Otimização de esquema reduzindo índices redundantes e redimensionando tipos VARCHAR. |
 | B27 | BACKEND | Reorganização de Testes Unitários    | **Concluído:** Centralização de testes de Value Objects (`entrega` e `pagamentos`) em `src/tests/unitarios` para alinhar com a pirâmide de testes. |
 | B21  | BACKEND | Gestão de Administradores            | **Implementado:** CRUD completo de administradores (listagem, criação, inativação/ativação) com trava de segurança de auto-inativação. |

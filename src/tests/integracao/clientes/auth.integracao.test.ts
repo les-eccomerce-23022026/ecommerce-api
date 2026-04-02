@@ -66,4 +66,28 @@ describe('Integração - Auth (rotas individuais)', () => {
     expect(respostaLoginAposInativacao.body.sucesso).toBe(false);
     expect(respostaLoginAposInativacao.body.mensagem).toBe('Credenciais inválidas.');
   });
+
+  it('deve aceitar GET /auth/me com sessão via cookie HttpOnly após login', async () => {
+    await registrarCliente(contexto.app, {
+      nome: 'Cliente Cookie HttpOnly',
+      cpf: '245.699.622-46',
+      email: 'cliente.cookie.http@email.com',
+      senha: 'SenhaForte@123',
+      confirmacaoSenha: 'SenhaForte@123',
+    });
+
+    const agent = request.agent(contexto.app);
+    const login = await agent.post('/api/auth/login').send({
+      email: 'cliente.cookie.http@email.com',
+      senha: 'SenhaForte@123',
+    });
+
+    expect(login.status).toBe(200);
+    expect(login.headers['set-cookie']).toBeDefined();
+
+    const me = await agent.get('/api/auth/me');
+    expect(me.status).toBe(200);
+    expect(me.body.sucesso).toBe(true);
+    expect(me.body.dados.user.email).toBe('cliente.cookie.http@email.com');
+  });
 });

@@ -34,7 +34,14 @@ npm install
 npm run dev
 ```
 
-A API sobe em `http://localhost:${PORTA_HTTP:-3000}` (prefixo `/api`). Variáveis: copie [`.env.example`](.env.example) para `.env` e defina pelo menos `JWT_SEGREDO` e `JWT_TEMPO_EXPIRACAO` (ex.: `1h`).
+A API sobe em `http://localhost:${PORTA_HTTP:-3000}` (prefixo `/api`). Variáveis: copie [`.env.example`](.env.example) para `.env` e defina pelo menos `JWT_SEGREDO`, `JWT_TEMPO_EXPIRACAO` (ex.: `1h`) e `CORS_ORIGIN` (origens do frontend com credenciais, ex.: `http://localhost:5173,http://127.0.0.1:5173`).
+
+### Sessão (JWT + cookie HttpOnly)
+
+- `POST /api/auth/login` define cookie `les_token` (HttpOnly, `SameSite=Lax`; nome configurável com `AUTH_COOKIE_NAME`). Em produção o corpo **não** inclui o JWT; em `NODE_ENV=test` o token também vem em `dados.token` para supertest.
+- `POST /api/auth/logout` remove o cookie.
+- `GET /api/auth/me` aceita o JWT pelo cookie **ou** pelo header `Authorization: Bearer` (útil em testes).
+- CORS usa `credentials: true`; a origem precisa estar em `CORS_ORIGIN`.
 
 **Só com Docker (app + banco):** `docker compose up -d` (o serviço `app` usa o `.env`).
 

@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { di } from '@/shared/infrastructure/di.container';
 import { RespostaPadrao } from '@/shared/errors/Iresposta-padrao';
+import { obterNomeCookieAuth } from '@/shared/constants/auth-cookie';
 
 const { servicoAutenticacao } = di;
 
@@ -24,22 +25,18 @@ export class ControladorAutenticacao {
 
       const resultado = await servicoAutenticacao.autenticar({ email, senha });
 
-      // Definir cookie HttpOnly com JWT
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const configuracaoCookie: any = {
+      const nomeCookie = obterNomeCookieAuth();
+      resposta.cookie(nomeCookie, resultado.token, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
-        sameSite: 'strict',
-        maxAge: 24 * 60 * 60 * 1000, // 24h
-      };
+        sameSite: 'lax',
+        path: '/',
+      });
 
-      resposta.cookie('token', resultado.token, configuracaoCookie);
-
-      // Retornar token no corpo para facilitar integração com headers Authorization
-      const respostaCorpo = {
-        token: resultado.token,
-        user: resultado.user
-      };
+      const incluirTokenNoCorpo = process.env.NODE_ENV === 'test';
+      const respostaCorpo = incluirTokenNoCorpo
+        ? { token: resultado.token, user: resultado.user }
+        : { user: resultado.user };
 
       return RespostaPadrao.enviarSucesso(resposta, 200, respostaCorpo);
     } catch (erro) {
@@ -82,5 +79,15 @@ export class ControladorAutenticacao {
       const mensagem = RespostaPadrao.obterMensagemErro(erro, 'Erro ao recuperar dados da sessão.');
       return RespostaPadrao.enviarErro(resposta, 500, mensagem);
     }
+  }
+
+  /**
+   * Encerra a sessão no cliente (remove cookie HttpOnly).
+   * Não exige autenticação: sempre limpa o cookie para evitar sessão órfã.
+   */
+  public static async encerrarSessao(_requisicao: Request, resposta: Response): Promise<Response> {
+    const nomeCookie = obterNomeCookieAuth();
+    resposta.clearCookie(nomeCookie, { path: '/' });
+    return RespostaPadrao.enviarSucesso(resposta, 200, { ok: true });
   }
 }
