@@ -44,10 +44,10 @@ export class ControladorPagamentos {
   /**
    * Seleciona forma de pagamento para uma venda.
    */
-  public async selecionarFormaPagamento(req: Request, res: Response): Promise<void> {
+  public async definirMetodoLiquidacao(req: Request, res: Response): Promise<void> {
     try {
       const dados: IPagamentoInputDto = req.body;
-      const pagamento = await this.servicoPagamentos.selecionarFormaPagamento(dados);
+      const pagamento = await this.servicoPagamentos.definirMetodoLiquidacao(dados);
 
       const resposta: IPagamentoOutputDto = {
         id: pagamento.id,
@@ -77,10 +77,10 @@ export class ControladorPagamentos {
   /**
    * Processa o pagamento.
    */
-  public async processarPagamento(req: Request, res: Response): Promise<void> {
+  public async solicitarAutorizacaoFinanceira(req: Request, res: Response): Promise<void> {
     try {
       const { pagamentoUuid } = req.params;
-      const pagamento = await this.servicoPagamentos.processarPagamento(pagamentoUuid);
+      const pagamento = await this.servicoPagamentos.solicitarAutorizacaoFinanceira(pagamentoUuid);
 
       const resposta: IPagamentoOutputDto = {
         id: pagamento.id,
@@ -112,7 +112,7 @@ export class ControladorPagamentos {
    * e retorna um resultado simplificado de processamento (simulado).
    */
   // eslint-disable-next-line class-methods-use-this
-  public async processarPagamentoFront(req: Request, res: Response): Promise<void> {
+  public async solicitarAutorizacaoFinanceiraCheckout(req: Request, res: Response): Promise<void> {
     try {
       const payload = req.body as Record<string, unknown>;
 

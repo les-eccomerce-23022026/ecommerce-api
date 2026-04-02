@@ -4,7 +4,7 @@ import { ICartaoUsuario } from '../../shared/types/ICartaoUsuario';
 export interface ICriarCartaoDto {
   uuidBandeira: string;
   token: string;
-  final: string;
+  ultimosDigitosCartao: string;
   nomeImpresso: string;
   validade: Date;
   cvv?: string; // Adicionado para validação
@@ -14,7 +14,7 @@ export interface ICriarCartaoDto {
 export interface IAtualizarCartaoDto {
   uuidBandeira?: string;
   token?: string;
-  final?: string;
+  ultimosDigitosCartao?: string;
   nomeImpresso?: string;
   validade?: Date;
   cvv?: string; // Adicionado para validação
@@ -61,7 +61,7 @@ export class ServicoCartoes {
       idUsuario,
       idBandeira,
       token: dados.token,
-      final: dados.final,
+      ultimosDigitosCartao: dados.ultimosDigitosCartao,
       nomeImpresso: dados.nomeImpresso,
       validade: dados.validade,
       principal: dados.principal || false

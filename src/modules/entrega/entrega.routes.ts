@@ -16,7 +16,7 @@ export function registrarRotasEntrega(router: Router): void {
   const servico = new ServicoEntrega(repoEntrega, repoVendas);
   const controller = new ControladorEntrega(servico);
 
-  router.post('/entregas', autenticacaoMiddleware, controller.cadastrarEntrega.bind(controller));
+  router.post('/entregas', autenticacaoMiddleware, controller.agendarRemessa.bind(controller));
   router.get('/entregas/:entregaUuid', autenticacaoMiddleware, controller.consultarEntrega.bind(controller));
   router.get('/entregas', autenticacaoMiddleware, controller.listarPorVenda.bind(controller));
 }

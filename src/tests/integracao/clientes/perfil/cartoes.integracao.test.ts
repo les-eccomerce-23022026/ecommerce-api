@@ -33,7 +33,7 @@ describe('Integração - Cartões', () => {
     const novoCartao = {
       uuidBandeira: uuidBandeiraVisa,
       token: 'tok_test_integration',
-      final: '9999',
+      ultimosDigitosCartao: '9999',
       nomeImpresso: 'Teste Integração',
       validade: '2026-12-01',
       principal: false,
@@ -47,7 +47,7 @@ describe('Integração - Cartões', () => {
 
     expect(resposta.body.sucesso).toBe(true);
     expect(resposta.body.dados).toHaveProperty('uuid');
-    expect(resposta.body.dados.final).toBe('9999');
+    expect(resposta.body.dados.ultimosDigitosCartao).toBe('9999');
     expect(resposta.body.dados.nomeImpresso).toBe('Teste Integração');
     expect(resposta.body.dados.bandeira).toBe('Visa');
     expect(resposta.body.dados.principal).toBe(false);

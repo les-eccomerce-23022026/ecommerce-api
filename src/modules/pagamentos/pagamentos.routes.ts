@@ -15,11 +15,11 @@ export function registrarRotasPagamentos(router: Router): void {
   const controller = new ControladorPagamentos(servico);
 
   // Endpoints tradicionais (DDD) para gerenciamento de pagamento
-  router.post('/pagamentos/selecionar', autenticacaoMiddleware, controller.selecionarFormaPagamento);
-  router.post('/pagamentos/:pagamentoUuid/processar', autenticacaoMiddleware, controller.processarPagamento);
+  router.post('/pagamentos/selecionar', autenticacaoMiddleware, controller.definirMetodoLiquidacao);
+  router.post('/pagamentos/:pagamentoUuid/processar', autenticacaoMiddleware, controller.solicitarAutorizacaoFinanceira);
   router.get('/pagamentos/:pagamentoUuid', autenticacaoMiddleware, controller.consultarPagamento);
 
   // Endpoints compatíveis com frontend atual (contratos simplificados)
   router.get('/pagamento/info', autenticacaoMiddleware, controller.obterPagamentoInfo);
-  router.post('/pagamento/processar', autenticacaoMiddleware, controller.processarPagamentoFront);
+  router.post('/pagamento/processar', autenticacaoMiddleware, controller.solicitarAutorizacaoFinanceiraCheckout);
 }

@@ -34,7 +34,7 @@ import {
 /**
  * Serviço responsável pelo fluxo de cadastro público de clientes.
  */
-export class ServicoClientes {
+export class GestaoIdentidadeCliente {
   private readonly repositorioUsuarios: IRepositorioUsuarios;
 
   private readonly repositorioPerfil: IRepositorioPerfilCliente;
@@ -81,7 +81,7 @@ export class ServicoClientes {
   }
 
   private static mascararCpf(cpf: string): string {
-    const cpfSomenteDigitos = ServicoClientes.normalizarDigitos(cpf);
+    const cpfSomenteDigitos = GestaoIdentidadeCliente.normalizarDigitos(cpf);
 
     if (cpfSomenteDigitos.length !== 11) {
       return cpf;
@@ -91,7 +91,7 @@ export class ServicoClientes {
   }
 
   private static mascararNumeroTelefone(numero: string): string {
-    const numeroSomenteDigitos = ServicoClientes.normalizarDigitos(numero);
+    const numeroSomenteDigitos = GestaoIdentidadeCliente.normalizarDigitos(numero);
 
     if (numeroSomenteDigitos.length <= 4) {
       return numeroSomenteDigitos;
@@ -138,7 +138,7 @@ export class ServicoClientes {
       return Number(existente[0].log_id);
     }
 
-    const idTipoLogradouro = await ServicoClientes.obterIdTipoLogradouro(this.db, tipoLogradouro);
+    const idTipoLogradouro = await GestaoIdentidadeCliente.obterIdTipoLogradouro(this.db, tipoLogradouro);
     const queryInserir = `
       INSERT INTO logradouros (tlo_id, log_nome)
       VALUES ($1, $2)
@@ -151,7 +151,7 @@ export class ServicoClientes {
     return Number(novo[0].log_id);
   }
 
-  private async obterOuCriarCidade(cidade: string, siglaEstado: string): Promise<number> {
+  private async garantirLocalidade(cidade: string, siglaEstado: string): Promise<number> {
     const queryEstado = `SELECT est_id FROM estados WHERE est_sigla = $1 LIMIT 1`;
     const estadoResult = await this.db.executar<IRowIdSimples>(queryEstado, [siglaEstado.toUpperCase().trim()]);
     const idEstado = estadoResult.length > 0 ? Number(estadoResult[0].est_id) : null;
@@ -256,15 +256,15 @@ export class ServicoClientes {
     tipo: 'cobranca' | 'entrega',
     principal: boolean = false,
   ): Promise<IEnderecoDto> {
-    const idTipoResidencia = await ServicoClientes.obterIdTipoResidencia(this.db, enderecoDto.tipoResidencia || 'Casa');
+    const idTipoResidencia = await GestaoIdentidadeCliente.obterIdTipoResidencia(this.db, enderecoDto.tipoResidencia || 'Casa');
     const idLogradouro = await this.obterOuCriarLogradouro(
       enderecoDto.tipoLogradouro || 'Rua',
       enderecoDto.logradouro,
     );
-    const idCidade = await this.obterOuCriarCidade(enderecoDto.cidade, enderecoDto.estado);
+    const idCidade = await this.garantirLocalidade(enderecoDto.cidade, enderecoDto.estado);
     const idBairro = await this.obterOuCriarBairro(enderecoDto.bairro, idCidade);
     const idCep = await this.obterOuCriarCep(enderecoDto.cep, idCidade, idBairro);
-    const idPais = ServicoClientes.obterOuCriarPais(enderecoDto.pais || 'Brasil');
+    const idPais = GestaoIdentidadeCliente.obterOuCriarPais(enderecoDto.pais || 'Brasil');
 
     const enderecosAtuais = await this.repositorioEndereco.buscarPorIdUsuario(idUsuario);
     if (enderecosAtuais.length >= 5) {
@@ -395,8 +395,8 @@ export class ServicoClientes {
 
     // 4. Atualizar telefone (cirúrgico)
     if (alterandoTelefone && dados.telefone) {
-      const dddNormalizado = ServicoClientes.normalizarDigitos(dados.telefone.ddd);
-      const numeroNormalizado = ServicoClientes.normalizarDigitos(dados.telefone.numero);
+      const dddNormalizado = GestaoIdentidadeCliente.normalizarDigitos(dados.telefone.ddd);
+      const numeroNormalizado = GestaoIdentidadeCliente.normalizarDigitos(dados.telefone.numero);
 
       if (dddNormalizado.length !== 2) {
         throw new Error('DDD deve conter exatamente 2 dígitos numéricos.');
@@ -408,14 +408,14 @@ export class ServicoClientes {
       if (telefonePrincipal && telefonePrincipal.uuid) {
         await this.repositorioTelefone.atualizar({
           ...telefonePrincipal,
-          idTipoTelefone: ServicoClientes.mapearTipoTelefone(dados.telefone.tipo),
+          idTipoTelefone: GestaoIdentidadeCliente.mapearTipoTelefone(dados.telefone.tipo),
           ddd: dddNormalizado,
           numero: numeroNormalizado,
         });
       } else {
         await this.repositorioTelefone.criar({
           idUsuario: usuarioNoBanco.id,
-          idTipoTelefone: ServicoClientes.mapearTipoTelefone(dados.telefone.tipo),
+          idTipoTelefone: GestaoIdentidadeCliente.mapearTipoTelefone(dados.telefone.tipo),
           ddd: dddNormalizado,
           numero: numeroNormalizado,
           principal: true,
@@ -478,7 +478,7 @@ export class ServicoClientes {
    *
    * @param uuid Identificador único do cliente.
    */
-  public async inativarCliente(uuid: string): Promise<void> {
+  public async suspenderAcessoCliente(uuid: string): Promise<void> {
     const usuario = await this.repositorioUsuarios.buscarPorUuid(uuid);
     if (!usuario) {
       throw new Error('Usuário não encontrado.');
@@ -530,7 +530,7 @@ export class ServicoClientes {
     const cartoesUsuario = await this.repositorioCartoes.buscarPorUsuario(usuario.id);
     const cartoesDto: ICartaoDto[] = cartoesUsuario.map((c) => ({
       uuid: c.uuid,
-      final: c.final,
+      ultimosDigitosCartao: c.ultimosDigitosCartao,
       nomeImpresso: c.nomeImpresso,
       bandeira: c.bandeira || 'Outra',
       validade: c.validade.toISOString().substring(0, 7),
@@ -541,12 +541,12 @@ export class ServicoClientes {
       uuid: usuario.uuid,
       nome: usuario.nome,
       email: usuario.email,
-      emailMascarado: ServicoClientes.mascararEmail(usuario.email),
+      emailMascarado: GestaoIdentidadeCliente.mascararEmail(usuario.email),
       cpf: usuario.cpf,
-      cpfMascarado: ServicoClientes.mascararCpf(usuario.cpf),
+      cpfMascarado: GestaoIdentidadeCliente.mascararCpf(usuario.cpf),
       genero: perfil?.genero,
       dataNascimento: perfil?.dataNascimento ? perfil.dataNascimento.toISOString().split('T')[0] : undefined, // Formato YYYY-MM-DD
-      telefone: telefonePrincipal ? ServicoClientes.converterTelefoneParaDto(telefonePrincipal) : undefined,
+      telefone: telefonePrincipal ? GestaoIdentidadeCliente.converterTelefoneParaDto(telefonePrincipal) : undefined,
       enderecos: enderecosDto,
       cartoes: cartoesDto,
     };
@@ -566,7 +566,7 @@ export class ServicoClientes {
       tipo: tipos[telefone.idTipoTelefone] || 'Celular',
       ddd: telefone.ddd,
       numero: telefone.numero,
-      numeroMascarado: ServicoClientes.mascararNumeroTelefone(telefone.numero),
+      numeroMascarado: GestaoIdentidadeCliente.mascararNumeroTelefone(telefone.numero),
     };
   }
 
@@ -604,7 +604,7 @@ export class ServicoClientes {
     );
   }
 
-  public async registrarCliente(dados: ICriarClienteDto) {
+  public async realizarCadastroPublico(dados: ICriarClienteDto) {
     if (dados.senha !== dados.confirmacaoSenha) {
       throw new Error('Senha e confirmação de senha não conferem.');
     }
@@ -652,7 +652,7 @@ export class ServicoClientes {
     if ('telefone' in dados && dados.telefone) {
       await this.repositorioTelefone.criar({
         idUsuario: usuario.id,
-        idTipoTelefone: ServicoClientes.mapearTipoTelefone(dados.telefone.tipo),
+        idTipoTelefone: GestaoIdentidadeCliente.mapearTipoTelefone(dados.telefone.tipo),
         ddd: dados.telefone.ddd,
         numero: dados.telefone.numero,
         principal: true,
@@ -704,7 +704,7 @@ export class ServicoClientes {
     if (dados.cidade !== undefined || dados.estado !== undefined) {
       const cidade = dados.cidade || dtoAtual.cidade;
       const estado = dados.estado || dtoAtual.estado;
-      enderecoExistente.idCidade = await this.obterOuCriarCidade(cidade, estado);
+      enderecoExistente.idCidade = await this.garantirLocalidade(cidade, estado);
     }
 
     if (dados.bairro !== undefined) {
@@ -726,11 +726,11 @@ export class ServicoClientes {
     if (dados.complemento !== undefined) enderecoExistente.complemento = dados.complemento;
     
     if (dados.pais !== undefined) {
-      enderecoExistente.idPais = ServicoClientes.obterOuCriarPais(dados.pais);
+      enderecoExistente.idPais = GestaoIdentidadeCliente.obterOuCriarPais(dados.pais);
     }
 
     if (dados.tipoResidencia !== undefined) {
-      enderecoExistente.idTipoResidencia = await ServicoClientes.obterIdTipoResidencia(this.db, dados.tipoResidencia);
+      enderecoExistente.idTipoResidencia = await GestaoIdentidadeCliente.obterIdTipoResidencia(this.db, dados.tipoResidencia);
     }
 
     await this.repositorioEndereco.atualizar(enderecoExistente);

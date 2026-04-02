@@ -14,7 +14,7 @@ export function registrarRotasVendas(router: Router): void {
   const servico = new ServicoVendas(repo);
   const controller = new ControladorVendas(servico);
 
-  router.post('/vendas', autenticacaoMiddleware, controller.cadastrarVenda);
-  router.get('/vendas/:uuid', autenticacaoMiddleware, controller.consultarVenda);
+  router.post('/vendas', autenticacaoMiddleware, controller.registrarPedidoVenda);
+  router.get('/vendas/:uuid', autenticacaoMiddleware, controller.visualizarDetalhesVenda);
   router.get('/minhas-vendas', autenticacaoMiddleware, controller.listarVendasCliente);
 }

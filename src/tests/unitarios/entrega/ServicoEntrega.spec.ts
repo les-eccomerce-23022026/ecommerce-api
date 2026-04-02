@@ -21,7 +21,7 @@ describe('ServicoEntrega', () => {
     servico = new ServicoEntrega(mockRepoEntrega, mockRepoVendas);
   });
 
-  describe('cadastrarEntrega', () => {
+  describe('agendarRemessa', () => {
     it('deve cadastrar uma entrega com sucesso e atualizar status da venda', async () => {
       const dadosInput = {
         vendaUuid: 'venda-123',
@@ -42,7 +42,7 @@ describe('ServicoEntrega', () => {
       // Mock: Cadastro bem sucedido
       mockRepoEntrega.cadastrar.mockResolvedValue(entregaOutput);
 
-      const resultado = await servico.cadastrarEntrega(dadosInput);
+      const resultado = await servico.agendarRemessa(dadosInput);
 
       expect(resultado).toEqual(entregaOutput);
       expect(mockRepoVendas.obterPorUuid).toHaveBeenCalledWith('venda-123');
@@ -54,7 +54,7 @@ describe('ServicoEntrega', () => {
       mockRepoVendas.obterPorUuid.mockResolvedValue(null);
 
       await expect(
-        servico.cadastrarEntrega({
+        servico.agendarRemessa({
           vendaUuid: 'invalida',
           tipoFrete: 'PAC',
           endereco: {},

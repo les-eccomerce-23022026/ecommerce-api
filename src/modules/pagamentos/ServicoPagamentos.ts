@@ -18,7 +18,7 @@ export class ServicoPagamentos {
   /**
    * Seleciona e valida forma de pagamento para uma venda.
    */
-  public async selecionarFormaPagamento(dados: IPagamentoInputDto): Promise<IPagamento> {
+  public async definirMetodoLiquidacao(dados: IPagamentoInputDto): Promise<IPagamento> {
     ServicoPagamentos.validarDadosPagamento(dados);
 
     const formaPagamento = new FormaPagamento(dados.tipoPagamento, dados.detalhesCupom);
@@ -55,7 +55,7 @@ export class ServicoPagamentos {
   /**
    * Processa o pagamento (simulação de gateway).
    */
-  public async processarPagamento(pagamentoUuid: string): Promise<IPagamento> {
+  public async solicitarAutorizacaoFinanceira(pagamentoUuid: string): Promise<IPagamento> {
     const pagamento = await this.repositorioPagamentos.obterPorUuid(pagamentoUuid);
     if (!pagamento) {
       throw new Error('Pagamento não encontrado');

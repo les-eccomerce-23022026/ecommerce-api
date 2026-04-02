@@ -15,7 +15,7 @@ export class ServicoVendas {
    * Realiza o cadastro de uma nova venda.
    * RF0033, RF0037
    */
-  public async cadastrarVenda(dados: IVendaInputDto): Promise<IVenda> {
+  public async registrarPedidoVenda(dados: IVendaInputDto): Promise<IVenda> {
     // Validações básicas de negócio
     if (!dados.usuarioUuid) throw new Error('Usuário é obrigatório');
     if (dados.itens.length === 0) throw new Error('Venda deve possuir ao menos um item');
@@ -30,7 +30,7 @@ export class ServicoVendas {
   /**
    * Consulta uma venda completa pelo UUID.
    */
-  public async consultarVenda(vendaUuid: string): Promise<IVenda> {
+  public async visualizarDetalhesVenda(vendaUuid: string): Promise<IVenda> {
     const venda = await this.repositorioVendas.obterPorUuid(vendaUuid);
     if (!venda) throw new Error('Venda não encontrada');
     return venda;

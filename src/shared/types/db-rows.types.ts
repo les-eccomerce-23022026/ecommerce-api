@@ -117,7 +117,7 @@ export interface IRowCartaoUsuario {
   id?: string | number;
   uuid?: string;
   idUsuario?: string | number;
-  final?: string;
+  ultimosDigitosCartao?: string;
   nomeImpresso?: string;
   bandeira?: string;
   validade?: string | Date;

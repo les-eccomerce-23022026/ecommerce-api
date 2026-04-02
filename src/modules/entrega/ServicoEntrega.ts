@@ -16,10 +16,10 @@ export class ServicoEntrega {
   }
 
   /**
-   * Cadastra uma nova entrega e atualiza o status da venda para 'EM TRÂNSITO'.
+   * Agenda remessa e atualiza o status da venda para 'EM TRÂNSITO'.
    * @param dados Dados da entrega.
    */
-  public async cadastrarEntrega(dados: IEntregaInputDto): Promise<IEntregaOutputDto> {
+  public async agendarRemessa(dados: IEntregaInputDto): Promise<IEntregaOutputDto> {
     // 1. Validar se a venda existe
     const venda = await this.repositorioVendas.obterPorUuid(dados.vendaUuid);
     if (!venda) {
@@ -54,10 +54,10 @@ export class ServicoEntrega {
   }
 
   /**
-   * Finaliza a entrega, atualizando o status da venda para 'ENTREGUE'.
-   * @param entregaUuid UUID da entrega a ser finalizada.
+   * Confirma recebimento, atualizando o status da venda para 'ENTREGUE'.
+   * @param entregaUuid UUID da entrega.
    */
-  public async finalizarEntrega(entregaUuid: string): Promise<void> {
+  public async confirmarRecebimento(entregaUuid: string): Promise<void> {
     const entrega = await this.repositorioEntrega.obterPorUuid(entregaUuid);
     if (!entrega) {
       throw new Error('Entrega não encontrada para finalização.');

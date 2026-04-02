@@ -12,7 +12,7 @@
 -- Decisões de modelagem:
 --   • Relação 1:1 com usuarios via UNIQUE na FK usu_id.
 --   • Só existirá uma linha aqui se o usuário tiver pap_id correspondente a 'cliente'.
---     A integridade é responsabilidade da camada de serviço (ServicoClientes).
+--     A integridade é responsabilidade da camada de serviço (GestaoIdentidadeCliente).
 --   • Campos opcionais (cli_genero, cli_data_nascimento) admitem NULL: o cadastro
 --     mínimo do cliente não obriga esses campos (ICriarClienteMinimoDto).
 --   • cli_uuid segue o mesmo contrato de id + uuid das demais tabelas.

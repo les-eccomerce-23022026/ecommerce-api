@@ -24,7 +24,7 @@ export class ControladorCartoes {
       // Formatar resposta para o frontend (sem dados sensíveis)
       const cartoesFormatados = cartoes.map(cartao => ({
         uuid: cartao.uuid,
-        final: cartao.final,
+        ultimosDigitosCartao: cartao.ultimosDigitosCartao,
         nomeImpresso: cartao.nomeImpresso,
         bandeira: cartao.bandeira || 'Outra',
         validade: cartao.validade.toISOString().substring(0, 7), // YYYY-MM
@@ -51,12 +51,12 @@ export class ControladorCartoes {
       const dados: ICriarCartaoDto = requisicao.body;
 
       // Validações básicas
-      const { uuidBandeira, token, final, nomeImpresso, validade } = dados;
-      if (!uuidBandeira || !token || !final || !nomeImpresso || !validade) {
+      const { uuidBandeira, token, ultimosDigitosCartao, nomeImpresso, validade } = dados;
+      if (!uuidBandeira || !token || !ultimosDigitosCartao || !nomeImpresso || !validade) {
         const faltando = [];
         if (!uuidBandeira) faltando.push('uuidBandeira');
         if (!token) faltando.push('token');
-        if (!final) faltando.push('final');
+        if (!ultimosDigitosCartao) faltando.push('ultimosDigitosCartao');
         if (!nomeImpresso) faltando.push('nomeImpresso');
         if (!validade) faltando.push('validade');
         return RespostaPadrao.enviarErro(
@@ -70,7 +70,7 @@ export class ControladorCartoes {
 
       const cartaoFormatado = {
         uuid: cartao.uuid,
-        final: cartao.final,
+        ultimosDigitosCartao: cartao.ultimosDigitosCartao,
         nomeImpresso: cartao.nomeImpresso,
         bandeira: cartao.bandeira || 'Outra',
         validade: cartao.validade.toISOString().substring(0, 7),
@@ -99,7 +99,7 @@ export class ControladorCartoes {
 
       const cartaoFormatado = {
         uuid: cartao.uuid,
-        final: cartao.final,
+        ultimosDigitosCartao: cartao.ultimosDigitosCartao,
         nomeImpresso: cartao.nomeImpresso,
         bandeira: cartao.bandeira || 'Outra',
         validade: cartao.validade.toISOString().substring(0, 7),

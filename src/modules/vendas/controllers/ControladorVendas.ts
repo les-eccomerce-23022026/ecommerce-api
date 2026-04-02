@@ -14,7 +14,7 @@ export class ControladorVendas {
   /**
    * Endpoint para criar uma venda: POST /vendas
    */
-  public cadastrarVenda = async (req: Request, res: Response) => {
+  public registrarPedidoVenda = async (req: Request, res: Response) => {
     try {
       // Extrai o UUID do usuário do token JWT (anexado pelo middleware de autenticação)
       const { usuarioUuid } = req.body;
@@ -24,7 +24,7 @@ export class ControladorVendas {
         usuarioUuid: usuarioUuid || req.usuario?.uuid,
       };
 
-      const venda = await this.servicoVendas.cadastrarVenda(vInput);
+      const venda = await this.servicoVendas.registrarPedidoVenda(vInput);
       res.status(201).json(venda);
     } catch (err: unknown) {
       const mensagem = err instanceof Error ? err.message : 'Erro desconhecido';
@@ -35,10 +35,10 @@ export class ControladorVendas {
   /**
    * Endpoint para consultar venda: GET /vendas/:uuid
    */
-  public consultarVenda = async (req: Request, res: Response) => {
+  public visualizarDetalhesVenda = async (req: Request, res: Response) => {
     try {
       const { uuid } = req.params;
-      const venda = await this.servicoVendas.consultarVenda(uuid);
+      const venda = await this.servicoVendas.visualizarDetalhesVenda(uuid);
       res.json(venda);
     } catch (err: unknown) {
       const mensagem = err instanceof Error ? err.message : 'Erro desconhecido';

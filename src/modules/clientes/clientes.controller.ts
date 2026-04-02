@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import { di } from '@/shared/infrastructure/di.container';
 import { RespostaPadrao } from '@/shared/errors/Iresposta-padrao';
 
-const { servicoClientes } = di;
+const { gestaoIdentidadeCliente } = di;
 
 /**
  * Controller responsável pelo cadastro público de clientes.
@@ -22,7 +22,7 @@ export class ControladorClientes {
         return RespostaPadrao.enviarErro(resposta, 401, 'Usuário não autenticado.');
       }
 
-      const perfil = await servicoClientes.obterPerfil(uuid);
+      const perfil = await gestaoIdentidadeCliente.obterPerfil(uuid);
 
       return RespostaPadrao.enviarSucesso(resposta, 200, perfil);
     } catch (erro) {
@@ -38,7 +38,7 @@ export class ControladorClientes {
    * @param requisicao Objeto da requisição HTTP.
    * @param resposta Objeto da resposta HTTP.
    */
-  public static async registrarCliente(requisicao: Request, resposta: Response): Promise<Response> {
+  public static async realizarCadastroPublico(requisicao: Request, resposta: Response): Promise<Response> {
     try {
       const dados = requisicao.body ?? {};
 
@@ -88,7 +88,7 @@ export class ControladorClientes {
         }
       }
 
-      const clienteCriado = await servicoClientes.registrarCliente(dados);
+      const clienteCriado = await gestaoIdentidadeCliente.realizarCadastroPublico(dados);
 
       return RespostaPadrao.enviarSucesso(resposta, 201, clienteCriado);
     } catch (erro) {
@@ -114,7 +114,7 @@ export class ControladorClientes {
         return RespostaPadrao.enviarErro(resposta, 401, 'Identificador de usuário não encontrado.');
       }
 
-      const clienteAtualizado = await servicoClientes.atualizarCliente(uuid, dados);
+      const clienteAtualizado = await gestaoIdentidadeCliente.atualizarCliente(uuid, dados);
 
       return RespostaPadrao.enviarSucesso(resposta, 200, clienteAtualizado);
     } catch (erro) {
@@ -135,7 +135,7 @@ export class ControladorClientes {
         return RespostaPadrao.enviarErro(resposta, 401, 'Usuário não autenticado.');
       }
 
-      const novoEndereco = await servicoClientes.adicionarEndereco(uuid, dados);
+      const novoEndereco = await gestaoIdentidadeCliente.adicionarEndereco(uuid, dados);
       return RespostaPadrao.enviarSucesso(resposta, 201, novoEndereco);
     } catch (erro) {
       const mensagem = RespostaPadrao.obterMensagemErro(erro, 'Erro ao adicionar endereço.');
@@ -155,7 +155,7 @@ export class ControladorClientes {
         return RespostaPadrao.enviarErro(resposta, 401, 'Parâmetros insuficientes.');
       }
 
-      await servicoClientes.removerEndereco(uuid, uuidEndereco);
+      await gestaoIdentidadeCliente.removerEndereco(uuid, uuidEndereco);
       return RespostaPadrao.enviarSucesso(resposta, 200, { mensagem: 'Endereço removido com sucesso.' });
     } catch (erro) {
       const mensagem = RespostaPadrao.obterMensagemErro(erro, 'Erro ao remover endereço.');
@@ -179,7 +179,7 @@ export class ControladorClientes {
         return RespostaPadrao.enviarErro(resposta, 401, 'Usuário não autenticado.');
       }
 
-      await servicoClientes.alterarSenha(uuid, {
+      await gestaoIdentidadeCliente.alterarSenha(uuid, {
         senhaAtual,
         novaSenha,
         confirmacaoNovaSenha,
@@ -200,7 +200,7 @@ export class ControladorClientes {
    * @param requisicao Objeto da requisição.
    * @param resposta Resposta HTTP.
    */
-  public static async inativarCliente(requisicao: Request, resposta: Response): Promise<Response> {
+  public static async suspenderAcessoCliente(requisicao: Request, resposta: Response): Promise<Response> {
     try {
       const uuid = requisicao.params.uuid || requisicao.usuario?.uuid;
 
@@ -208,7 +208,7 @@ export class ControladorClientes {
         return RespostaPadrao.enviarErro(resposta, 401, 'Usuário não autenticado.');
       }
 
-      await servicoClientes.inativarCliente(uuid);
+      await gestaoIdentidadeCliente.suspenderAcessoCliente(uuid);
 
       return RespostaPadrao.enviarSucesso(resposta, 200, {
         mensagem: 'Cadastro inativado com sucesso.',
@@ -232,7 +232,7 @@ export class ControladorClientes {
         return RespostaPadrao.enviarErro(resposta, 401, 'Parâmetros insuficientes.');
       }
 
-      const enderecosAtualizados = await servicoClientes.editarEndereco(uuidUsuario, uuidEndereco, dados);
+      const enderecosAtualizados = await gestaoIdentidadeCliente.editarEndereco(uuidUsuario, uuidEndereco, dados);
       return RespostaPadrao.enviarSucesso(resposta, 200, enderecosAtualizados);
     } catch (erro) {
       const mensagem = RespostaPadrao.obterMensagemErro(erro, 'Erro ao editar endereço.');

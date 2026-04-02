@@ -10,7 +10,7 @@ import { adminOnlyMiddleware, clienteOnlyMiddleware } from '@/shared/middlewares
 export function registrarRotasClientes(app: IRouter): void {
   // Rota pública de registro
   app.post('/clientes/registro', (requisicao, resposta) =>
-    ControladorClientes.registrarCliente(requisicao, resposta),
+    ControladorClientes.realizarCadastroPublico(requisicao, resposta),
   );
 
   // Rota protegida para obter perfil próprio
@@ -43,7 +43,7 @@ export function registrarRotasClientes(app: IRouter): void {
 
   // Rota de inativação (soft delete) (RF0023)
   app.delete('/clientes/perfil', autenticacaoMiddleware, (req, res) =>
-    ControladorClientes.inativarCliente(req, res),
+    ControladorClientes.suspenderAcessoCliente(req, res),
   );
 
   // Rota de consulta administrativa de clientes (RF0024)

@@ -12,12 +12,12 @@ export class ControladorEntrega {
   }
 
   /**
-   * Endpoint para criar uma entrega: POST /entregas
+   * Agenda remessa (entrega): POST /entregas
    */
-  public async cadastrarEntrega(req: Request, res: Response): Promise<void> {
+  public async agendarRemessa(req: Request, res: Response): Promise<void> {
     try {
       const { vendaUuid, tipoFrete, endereco, custo, entregador } = req.body;
-      const entrega = await this.servicoEntrega.cadastrarEntrega({
+      const entrega = await this.servicoEntrega.agendarRemessa({
         vendaUuid,
         tipoFrete,
         endereco,

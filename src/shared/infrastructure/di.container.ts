@@ -1,6 +1,6 @@
 import { FabricaConexaoBanco } from '@/shared/infrastructure/database/FabricaConexaoBanco';
 import { RepositorioUsuarios } from '@/modules/usuarios/usuario.repository';
-import { ServicoClientes } from '@/modules/clientes/clientes.service';
+import { GestaoIdentidadeCliente } from '@/modules/clientes/clientes.service';
 import { ServicoConsultaClientes } from '@/modules/clientes/consulta-clientes.service';
 import { ServicoCartoes } from '@/modules/cartoes/cartoes.service';
 import { RepositorioCartaoUsuario } from '@/modules/cartoes/IRepositorioCartaoUsuario';
@@ -29,7 +29,7 @@ class ContainerDI {
   public static readonly repoCartoes = new RepositorioCartaoUsuario(ContainerDI.db);
 
   // Serviços
-  public static readonly servicoClientes = new ServicoClientes(
+  public static readonly gestaoIdentidadeCliente = new GestaoIdentidadeCliente(
     ContainerDI.repoUsuarios,
     ContainerDI.repoPerfil,
     ContainerDI.repoTelefone,

@@ -5,7 +5,7 @@ export interface ICartaoUsuario {
   idBandeira: number;
   bandeira?: string;
   token: string;
-  final: string;
+  ultimosDigitosCartao: string;
   nomeImpresso: string;
   validade: Date;
   principal: boolean;

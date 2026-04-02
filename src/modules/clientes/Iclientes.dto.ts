@@ -62,7 +62,7 @@ export interface IAlterarSenhaDto {
 
 export interface ICartaoDto {
   uuid: string;
-  final: string;
+  ultimosDigitosCartao: string;
   nomeImpresso: string;
   bandeira: string;
   validade: string;

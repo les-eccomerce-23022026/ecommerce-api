@@ -29,7 +29,7 @@ export class RepositorioCartaoUsuario implements IRepositorioCartaoUsuario {
       idBandeira: Number(linha.idBandeira),
       bandeira: linha.bandeira as string | undefined,
       token: linha.token as string,
-      final: linha.final as string,
+      ultimosDigitosCartao: linha.ultimosDigitosCartao as string,
       nomeImpresso: linha.nomeImpresso as string,
       validade: new Date(linha.validade as string),
       principal: linha.principal as boolean,
@@ -48,7 +48,7 @@ export class RepositorioCartaoUsuario implements IRepositorioCartaoUsuario {
                 ban_id AS "idBandeira",
                 (SELECT ban_descricao FROM bandeiras_cartao WHERE ban_id = cartoes.ban_id) AS "bandeira",
                 crt_token AS "token",
-                crt_final AS "final", crt_nome_impresso AS "nomeImpresso",
+                crt_final AS "ultimosDigitosCartao", crt_nome_impresso AS "nomeImpresso",
                 crt_validade AS "validade", crt_principal AS "principal"
     `;
 
@@ -56,7 +56,7 @@ export class RepositorioCartaoUsuario implements IRepositorioCartaoUsuario {
       cartao.idUsuario,
       cartao.idBandeira,
       cartao.token,
-      cartao.final,
+      cartao.ultimosDigitosCartao,
       cartao.nomeImpresso,
       cartao.validade,
       cartao.principal,
@@ -70,7 +70,7 @@ export class RepositorioCartaoUsuario implements IRepositorioCartaoUsuario {
     const query = `
       SELECT c.crt_id AS "id", c.crt_uuid AS "uuid", c.usu_id AS "idUsuario",
              c.ban_id AS "idBandeira", b.ban_descricao AS "bandeira",
-             c.crt_token AS "token", c.crt_final AS "final", 
+             c.crt_token AS "token", c.crt_final AS "ultimosDigitosCartao", 
              c.crt_nome_impresso AS "nomeImpresso", c.crt_validade AS "validade", 
              c.crt_principal AS "principal", c.crt_criado_em AS "criadoEm", 
              c.crt_atualizado_em AS "atualizadoEm"
@@ -87,7 +87,7 @@ export class RepositorioCartaoUsuario implements IRepositorioCartaoUsuario {
     const query = `
       SELECT c.crt_id AS "id", c.crt_uuid AS "uuid", c.usu_id AS "idUsuario",
              c.ban_id AS "idBandeira", b.ban_descricao AS "bandeira",
-             c.crt_token AS "token", c.crt_final AS "final", 
+             c.crt_token AS "token", c.crt_final AS "ultimosDigitosCartao", 
              c.crt_nome_impresso AS "nomeImpresso", c.crt_validade AS "validade", 
              c.crt_principal AS "principal", c.crt_criado_em AS "criadoEm", 
              c.crt_atualizado_em AS "atualizadoEm"
@@ -125,9 +125,9 @@ export class RepositorioCartaoUsuario implements IRepositorioCartaoUsuario {
       valores.push(dados.token);
       contador += 1;
     }
-    if (dados.final !== undefined) {
+    if (dados.ultimosDigitosCartao !== undefined) {
       campos.push(`crt_final = $${contador}`);
-      valores.push(dados.final);
+      valores.push(dados.ultimosDigitosCartao);
       contador += 1;
     }
     if (dados.nomeImpresso !== undefined) {
