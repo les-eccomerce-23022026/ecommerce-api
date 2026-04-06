@@ -31,6 +31,15 @@ Execute no Postgres de dev/teste o script [`sql/migrations/020_cotacao_frete_tra
 
 No `.env` / `.env.test`, defina **`PROVEDOR_FRETE=simulado`** (obrigatório para subir a API). Opcionais: `FRETE_CEP_ORIGEM_PADRAO`, `FRETE_COTACAO_TTL_MINUTOS`, parâmetros de simulação (`FRETE_SIM_*`).
 
+### PIX simulado (checkout)
+
+Execute [`sql/migrations/024_cobranca_pix_simulada.sql`](sql/migrations/024_cobranca_pix_simulada.sql): tabela `pagamento_pix_simulado`, status de venda `AGUARDANDO PAGAMENTO`.
+
+- `POST /api/pagamentos/selecionar` com `tipoPagamento: pix` devolve `pixCobranca` (copia-e-cola, QR base64, expiração, segredo para testes).
+- `POST /api/pagamentos/:uuid/processar` **não** liquida PIX — use `POST /api/webhooks/pagamento-pix-simulado` com `{ pagamentoUuid, segredoConfirmacao }`.
+- `GET /api/pagamentos/venda/:vendaUuid/resumo` (autenticado) para polling no frontend.
+- Opcional: `PIX_COBRANCA_TTL_MINUTOS` (padrão 30).
+
 ---
 
 ## 2. Iniciar a aplicação
@@ -126,7 +135,15 @@ npm run test:coverage
 
 ---
 
-## 8. Referências
+## 8. Documentação (SSoT e quadro local)
+
+- Especificação e ADRs: [`../documentacao-exigida/README.md`](../documentacao-exigida/README.md)
+- Kanban backend: [`docs/PROJECT-BOARD.md`](docs/PROJECT-BOARD.md)
+- Protocolo SQL/migrations: [`sql/AGENTS.md`](sql/AGENTS.md)
+
+---
+
+## 9. Referências
 
 - Rotas HTTP de exemplo: pasta `http/`.
 - BDD (cenários): pasta `bdd/`.

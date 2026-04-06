@@ -5,7 +5,7 @@ export interface DadosConfirmacaoProvedor {
   /** Valor total acordado (intenção ou pagamento persistido). */
   valorTotal: number;
   /** Parcelas por cartão no checkout; soma deve coincidir com valorTotal quando informado. */
-  pagamentosCartao?: Array<{ valor: number }>;
+  pagamentosCartao?: Array<{ valor: number; parcelasCartao?: number }>;
   /** Referência retornada em registrarIntencaoPagamento. */
   idIntencao?: string;
   segredoConfirmacao?: string;

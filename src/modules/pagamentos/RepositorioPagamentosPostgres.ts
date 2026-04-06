@@ -22,6 +22,14 @@ export class RepositorioPagamentosPostgres implements IRepositorioPagamentos {
     return rows[0]?.ven_id ?? null;
   }
 
+  public async obterPagIdInternoPorUuid(pagUuid: string): Promise<number | null> {
+    const rows = await this.db.executar<{ pag_id: number }>(
+      'SELECT pag_id FROM pagamento WHERE pag_uuid = $1',
+      [pagUuid]
+    );
+    return rows[0]?.pag_id ?? null;
+  }
+
   public async cadastrar(dados: IPagamento, opcoes?: { inpIdIntencao?: number }): Promise<IPagamento> {
     // Obter ID interno da venda
     const vendaQuery = 'SELECT ven_id FROM vendas WHERE ven_uuid = $1';
@@ -136,10 +144,60 @@ export class RepositorioPagamentosPostgres implements IRepositorioPagamentos {
   }
 
   public async listarPorVenda(vendaUuid: string): Promise<IPagamento[]> {
-    const query = 'SELECT p.pag_uuid FROM pagamento p JOIN vendas v ON p.ven_id = v.ven_id WHERE v.ven_uuid = $1 ORDER BY p.pag_criado_em DESC';
+    const query = 'SELECT p.pag_uuid FROM pagamento p JOIN vendas v ON p.ven_id = v.ven_id WHERE v.ven_uuid = $1 ORDER BY p.pag_criado_em ASC';
     const rows = await this.db.executar<{ pag_uuid: string }>(query, [vendaUuid]);
 
     const pagamentos = await Promise.all(rows.map(r => this.obterPorUuid(r.pag_uuid)));
     return pagamentos.filter((p: IPagamento | null): p is IPagamento => p !== null);
+  }
+
+  public async inserirPixSimulado(
+    pagId: number,
+    dados: {
+      copiaCola: string;
+      qrBase64: string | null;
+      expiraEm: Date;
+      segredoConfirmacao: string;
+    }
+  ): Promise<void> {
+    const q = `
+      INSERT INTO pagamento_pix_simulado (pag_id, ppx_copia_cola, ppx_qr_base64, ppx_expira_em, ppx_segredo_confirmacao)
+      VALUES ($1, $2, $3, $4, $5)
+    `;
+    await this.db.executar(q, [
+      pagId,
+      dados.copiaCola,
+      dados.qrBase64,
+      dados.expiraEm,
+      dados.segredoConfirmacao
+    ]);
+  }
+
+  public async obterPixSimuladoPorPagUuid(pagUuid: string): Promise<{
+    copiaCola: string;
+    qrBase64: string | null;
+    expiraEm: Date;
+    segredoConfirmacao: string;
+  } | null> {
+    const query = `
+      SELECT ppx.ppx_copia_cola, ppx.ppx_qr_base64, ppx.ppx_expira_em, ppx.ppx_segredo_confirmacao
+      FROM pagamento_pix_simulado ppx
+      JOIN pagamento p ON ppx.pag_id = p.pag_id
+      WHERE p.pag_uuid = $1
+    `;
+    const rows = await this.db.executar<{
+      ppx_copia_cola: string;
+      ppx_qr_base64: string | null;
+      ppx_expira_em: string;
+      ppx_segredo_confirmacao: string;
+    }>(query, [pagUuid]);
+    if (rows.length === 0) return null;
+    const r = rows[0];
+    return {
+      copiaCola: r.ppx_copia_cola,
+      qrBase64: r.ppx_qr_base64,
+      expiraEm: new Date(r.ppx_expira_em),
+      segredoConfirmacao: r.ppx_segredo_confirmacao
+    };
   }
 }

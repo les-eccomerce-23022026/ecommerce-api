@@ -1,5 +1,12 @@
 import { IRouter } from 'express';
 import { ControladorAdmin } from '@/modules/admin/admin.controller';
+import { ControladorAdminPainel } from '@/modules/admin/controlador-admin-painel';
+import { ServicoDashboardAdmin } from '@/modules/admin/servico-dashboard-admin';
+import { ServicoPedidosAdmin } from '@/modules/admin/servico-pedidos-admin';
+import { ConexaoPostgres } from '@/shared/infrastructure/database/ConexaoPostgres';
+import { RepositorioVendasPostgres } from '@/modules/vendas/repositories/RepositorioVendasPostgres';
+import { RepositorioEntregaPostgres } from '@/modules/entrega/RepositorioEntregaPostgres';
+import { ServicoEntrega } from '@/modules/entrega/ServicoEntrega';
 import { autenticacaoMiddleware } from '@/shared/middlewares/autenticacao.middleware';
 import { 
   adminOnlyMiddleware, 
@@ -11,6 +18,42 @@ import {
  * Todas as rotas deste grupo requerem autenticação e papel de administrador.
  */
 export function registrarRotasAdmin(app: IRouter): void {
+  const db = ConexaoPostgres.obterInstancia();
+  const repoVendas = new RepositorioVendasPostgres(db);
+  const repoEntrega = new RepositorioEntregaPostgres(db);
+  const servicoEntrega = new ServicoEntrega(repoEntrega, repoVendas);
+  const servicoPedidosAdmin = new ServicoPedidosAdmin(repoVendas, servicoEntrega);
+  const servicoDashboardAdmin = new ServicoDashboardAdmin(db);
+  const controladorPainel = new ControladorAdminPainel(servicoDashboardAdmin, servicoPedidosAdmin);
+
+  app.get(
+    '/admin/dashboard',
+    autenticacaoMiddleware,
+    adminOnlyMiddleware,
+    controladorPainel.obterDashboard,
+  );
+
+  app.get(
+    '/admin/pedidos',
+    autenticacaoMiddleware,
+    adminOnlyMiddleware,
+    controladorPainel.listarPedidosAdmin,
+  );
+
+  app.put(
+    '/admin/pedidos/:uuid/despachar',
+    autenticacaoMiddleware,
+    adminOnlyMiddleware,
+    controladorPainel.despacharPedido,
+  );
+
+  app.put(
+    '/admin/pedidos/:uuid/entrega',
+    autenticacaoMiddleware,
+    adminOnlyMiddleware,
+    controladorPainel.confirmarEntregaPedido,
+  );
+
   // Listagem de administradores
   app.get(
     '/admin/administradores',

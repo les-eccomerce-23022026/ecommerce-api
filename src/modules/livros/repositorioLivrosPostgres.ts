@@ -1,5 +1,10 @@
 import { IConexaoBanco, DbParametro } from '@/shared/infrastructure/database/IConexaoBanco';
 import type { ILivroCatalogoDto } from '@/modules/livros/ILivroCatalogo.dto';
+import type {
+  ICategoriaMenuDto,
+  IListagemCatalogoLivros,
+  OrdenacaoCatalogo,
+} from '@/modules/livros/ICatalogoLivros.dto';
 
 type RowLivro = {
   liv_uuid: string;
@@ -31,8 +36,71 @@ function mapRow(r: RowLivro): ILivroCatalogoDto {
 export class RepositorioLivrosPostgres {
   constructor(private readonly db: IConexaoBanco) {}
 
-  async listarDestaques(limite: number): Promise<ILivroCatalogoDto[]> {
+  async listarCategoriasComLivrosNoCatalogo(): Promise<ICategoriaMenuDto[]> {
     const sql = `
+      SELECT DISTINCT c.cat_slug AS slug, c.cat_nome AS nome
+      FROM categorias c
+      INNER JOIN livro_categorias lc ON lc.cat_id = c.cat_id
+      INNER JOIN livros l ON l.liv_id = lc.liv_id AND l.liv_ativo = TRUE
+      INNER JOIN estoques e ON e.liv_id = l.liv_id AND e.etq_ativo = TRUE AND e.etq_quantidade_disponivel > 0
+      WHERE c.cat_ativo = TRUE AND c.cat_slug IS NOT NULL AND btrim(c.cat_slug) <> ''
+      ORDER BY c.cat_nome ASC
+    `;
+    const rows = await this.db.executar<{ slug: string; nome: string }>(sql, []);
+    return rows.map((r) => ({ slug: r.slug, nome: r.nome }));
+  }
+
+  async listarCatalogo(opcoes: {
+    pagina: number;
+    itensPorPagina: number;
+    categoriaSlug?: string;
+    ordenacao: OrdenacaoCatalogo;
+  }): Promise<IListagemCatalogoLivros> {
+    const { pagina, itensPorPagina, categoriaSlug, ordenacao } = opcoes;
+    const offset = (pagina - 1) * itensPorPagina;
+
+    const filtroCategoria = categoriaSlug
+      ? `AND EXISTS (
+          SELECT 1 FROM livro_categorias lc
+          INNER JOIN categorias c ON c.cat_id = lc.cat_id AND c.cat_ativo = TRUE
+          WHERE lc.liv_id = l.liv_id AND c.cat_slug = $1
+        )`
+      : '';
+
+    const paramsCount: DbParametro[] = categoriaSlug ? [categoriaSlug] : [];
+    const sqlCount = `
+      SELECT COUNT(DISTINCT l.liv_id)::text AS c
+      FROM livros l
+      INNER JOIN estoques e ON e.liv_id = l.liv_id
+      WHERE l.liv_ativo = TRUE AND e.etq_ativo = TRUE AND e.etq_quantidade_disponivel > 0
+      ${filtroCategoria}
+    `;
+    const countRows = await this.db.executar<{ c: string }>(sqlCount, paramsCount);
+    const total = countRows.length ? Number(countRows[0].c) : 0;
+
+    const joinVendas =
+      ordenacao === 'mais-vendidos'
+        ? `LEFT JOIN (
+            SELECT liv_id, SUM(itv_quantidade)::numeric AS qtd_vendida
+            FROM itens_venda
+            GROUP BY liv_id
+          ) vendas_agg ON vendas_agg.liv_id = l.liv_id`
+        : '';
+
+    const orderBy =
+      ordenacao === 'mais-vendidos'
+        ? 'ORDER BY COALESCE(vendas_agg.qtd_vendida, 0) DESC, l.liv_criado_em DESC NULLS LAST'
+        : 'ORDER BY l.liv_criado_em DESC NULLS LAST';
+
+    const paramsList: DbParametro[] = categoriaSlug
+      ? [categoriaSlug, itensPorPagina, offset]
+      : [itensPorPagina, offset];
+
+    const filtroIdx = categoriaSlug ? '$1' : '';
+    const limitIdx = categoriaSlug ? '$2' : '$1';
+    const offsetIdx = categoriaSlug ? '$3' : '$2';
+
+    const sqlList = `
       SELECT
         l.liv_uuid,
         l.liv_titulo,
@@ -46,12 +114,25 @@ export class RepositorioLivrosPostgres {
       FROM livros l
       INNER JOIN autores a ON l.aut_id = a.aut_id
       INNER JOIN estoques e ON e.liv_id = l.liv_id
+      ${joinVendas}
       WHERE l.liv_ativo = TRUE AND e.etq_ativo = TRUE AND e.etq_quantidade_disponivel > 0
-      ORDER BY l.liv_criado_em DESC
-      LIMIT $1
+      ${categoriaSlug ? `AND EXISTS (
+          SELECT 1 FROM livro_categorias lc
+          INNER JOIN categorias c ON c.cat_id = lc.cat_id AND c.cat_ativo = TRUE
+          WHERE lc.liv_id = l.liv_id AND c.cat_slug = ${filtroIdx}
+        )` : ''}
+      ${orderBy}
+      LIMIT ${limitIdx} OFFSET ${offsetIdx}
     `;
-    const rows = await this.db.executar<RowLivro>(sql, [limite] as DbParametro[]);
-    return rows.map(mapRow);
+
+    const rows = await this.db.executar<RowLivro>(sqlList, paramsList);
+
+    return {
+      livros: rows.map(mapRow),
+      total,
+      pagina,
+      itensPorPagina,
+    };
   }
 
   async obterPorUuid(livUuid: string): Promise<ILivroCatalogoDto | null> {

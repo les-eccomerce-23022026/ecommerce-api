@@ -2,11 +2,13 @@
  * Extração e validação de payload do checkout (POST /pagamento/processar).
  */
 
+import { PARCELAS_CARTAO_MAX } from './IPagamento.dto';
+
 export interface CheckoutPagamentoExtraido {
   idIntencao: string;
   segredoConfirmacao: string;
   valorTotal: number;
-  pagamentosCartao: Array<{ valor: number }>;
+  pagamentosCartao: Array<{ valor: number; parcelasCartao?: number }>;
   vendaUuid?: string;
 }
 
@@ -31,22 +33,39 @@ function extrairValorTotalCheckout(corpo: Record<string, unknown>): number {
   return valorTotal;
 }
 
-function mapearPagamentosCartao(pagamentosBrutos: unknown[]): Array<{ valor: number }> {
+function normalizarParcelasCartao(bruto: unknown, indice: number): number | undefined {
+  if (bruto === undefined || bruto === null) {
+    return undefined;
+  }
+  const n = Number(bruto);
+  if (!Number.isInteger(n) || n < 1 || n > PARCELAS_CARTAO_MAX) {
+    throw new Error(
+      `parcelasCartao inválido (índice ${indice}); use inteiro entre 1 e ${PARCELAS_CARTAO_MAX}`,
+    );
+  }
+  return n;
+}
+
+function mapearPagamentosCartao(
+  pagamentosBrutos: unknown[],
+): Array<{ valor: number; parcelasCartao?: number }> {
   return pagamentosBrutos.map((item, indice) => {
     if (!item || typeof item !== 'object') {
       throw new Error(`Item de pagamento com cartão inválido (índice ${indice})`);
     }
-    const v = Number((item as { valor?: unknown }).valor);
+    const raw = item as { valor?: unknown; parcelasCartao?: unknown };
+    const v = Number(raw.valor);
     if (!Number.isFinite(v)) {
       throw new Error('Valor de cartão inválido');
     }
-    return { valor: v };
+    const parcelasCartao = normalizarParcelasCartao(raw.parcelasCartao, indice);
+    return parcelasCartao !== undefined ? { valor: v, parcelasCartao } : { valor: v };
   });
 }
 
 function garantirSomaIgualTotal(
-  pagamentosCartao: Array<{ valor: number }>,
-  valorTotal: number
+  pagamentosCartao: Array<{ valor: number; parcelasCartao?: number }>,
+  valorTotal: number,
 ): void {
   const soma = pagamentosCartao.reduce((acc, p) => acc + p.valor, 0);
   if (Math.abs(soma - valorTotal) > 0.01) {

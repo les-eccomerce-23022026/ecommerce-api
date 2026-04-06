@@ -1,7 +1,8 @@
 export enum TipoPagamento {
   CARTAO_CREDITO = 'cartao_credito',
   CUPOM_TROCA = 'cupom_troca',
-  CUPOM_PROMOCIONAL = 'cupom_promocional'
+  CUPOM_PROMOCIONAL = 'cupom_promocional',
+  PIX = 'pix',
 }
 
 /**
@@ -35,6 +36,10 @@ export class FormaPagamento {
 
   public isCartao(): boolean {
     return this.tipo === TipoPagamento.CARTAO_CREDITO;
+  }
+
+  public isPix(): boolean {
+    return this.tipo === TipoPagamento.PIX;
   }
 
   public isCupomTroca(): boolean {

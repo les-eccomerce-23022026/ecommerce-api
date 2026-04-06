@@ -125,6 +125,18 @@ export class RepositorioVendasPostgres implements IRepositorioVendas {
     return vendas.filter((v) => v !== null) as IVenda[];
   }
 
+  public async listarTodas(limite = 500): Promise<IVenda[]> {
+    const queryIds = `
+      SELECT ven_uuid
+      FROM vendas
+      ORDER BY ven_criado_em DESC
+      LIMIT $1
+    `;
+    const rows = await this.db.executar<{ ven_uuid: string }>(queryIds, [limite]);
+    const vendas = await Promise.all(rows.map((r) => this.obterPorUuid(r.ven_uuid)));
+    return vendas.filter((v) => v !== null) as IVenda[];
+  }
+
   public async atualizarStatus(vendaUuid: string, novoStatus: string): Promise<void> {
     const queryEncontrarStatus = 'SELECT stv_id FROM status_vendas WHERE stv_descricao = $1';
     const resStatus = await this.db.executar<{ stv_id: number }>(queryEncontrarStatus, [novoStatus]);

@@ -5,6 +5,14 @@ import { IPagamentoInputDto, IPagamentoOutputDto } from './IPagamento.dto';
 import type { ServicoFrete } from '@/modules/frete/ServicoFrete';
 import { cepOrigemPadrao, sanitizarCep8Digitos } from '@/modules/frete/freteCepUtil';
 import type { GestaoIdentidadeCliente } from '@/modules/clientes/clientes.service';
+import { Logger } from '@/shared/utils/Logger.util';
+import { PARCELAS_CARTAO_MAX } from './IPagamento.dto';
+
+/** Política de parcelamento no cartão exposta ao checkout (linguagem ubíqua do domínio de pagamentos). */
+const POLITICA_PARCELAMENTO_CARTAO_PADRAO = {
+  parcelasMaximas: PARCELAS_CARTAO_MAX,
+  parcelasSemJuros: 6,
+} as const;
 
 /**
  * Controlador para operações de pagamentos.
@@ -109,13 +117,17 @@ export class ControladorPagamentos {
             principal: c.principal,
           }));
         }
-      } catch {
-        // Mantém listas vazias (ex.: perfil incompleto)
+      } catch (erro) {
+        Logger.error(
+          '[pagamentos.obterPagamentoInfo] Falha ao obter perfil do cliente; endereços e cartões ficam vazios.',
+          erro instanceof Error ? erro.message : String(erro),
+        );
       }
 
       const resposta = {
         enderecosCliente,
         cartoesCliente,
+        politicaParcelamentoCartao: { ...POLITICA_PARCELAMENTO_CARTAO_PADRAO },
         cuponsDisponiveis: [
           { uuid: uuidv4(), codigo: 'DESCONTO10', tipo: 'promocional', valor: 10, descricao: '10% de desconto (simulado)' },
           { uuid: uuidv4(), codigo: 'TROCA50', tipo: 'troca', valor: 50, descricao: 'Cupom de troca R$50 (simulado)' },
@@ -142,7 +154,8 @@ export class ControladorPagamentos {
   public definirMetodoLiquidacao = async (req: Request, res: Response): Promise<void> => {
     try {
       const dados: IPagamentoInputDto = req.body;
-      const pagamento = await this.servicoPagamentos.definirMetodoLiquidacao(dados);
+      const resultado = await this.servicoPagamentos.definirMetodoLiquidacao(dados);
+      const { pagamento, pixCobranca } = resultado;
 
       const resposta: IPagamentoOutputDto = {
         id: pagamento.id,
@@ -160,12 +173,66 @@ export class ControladorPagamentos {
         } : undefined,
         status: pagamento.status,
         criadoEm: pagamento.criadoEm,
-        processadoEm: pagamento.processadoEm
+        processadoEm: pagamento.processadoEm,
+        ...(pixCobranca
+          ? {
+              pixCobranca: {
+                copiaCola: pixCobranca.copiaCola,
+                qrCodeBase64: pixCobranca.qrCodeBase64,
+                expiraEm: pixCobranca.expiraEm.toISOString(),
+                segredoConfirmacao: pixCobranca.segredoConfirmacao
+              }
+            }
+          : {})
       };
 
       res.status(201).json(resposta);
     } catch (erro) {
       res.status(400).json({ erro: (erro as Error).message });
+    }
+  };
+
+  /**
+   * Polling: status da venda e pagamentos (PIX pendente).
+   */
+  public obterResumoPagamentosVenda = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { vendaUuid } = req.params;
+      const uid = req.usuario?.uuid;
+      if (!uid) {
+        res.status(401).json({ erro: 'Não autenticado' });
+        return;
+      }
+      const resumo = await this.servicoPagamentos.obterResumoPagamentosVenda(vendaUuid ?? '', uid);
+      res.status(200).json(resumo);
+    } catch (erro) {
+      res.status(400).json({ erro: (erro as Error).message });
+    }
+  };
+
+  /**
+   * Webhook simulado do PSP — confirma liquidação PIX (sem JWT; valida segredo).
+   */
+  public webhookPagamentoPixSimulado = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const body = req.body as { pagamentoUuid?: unknown; segredoConfirmacao?: unknown };
+      const pagamentoUuid =
+        typeof body.pagamentoUuid === 'string' ? body.pagamentoUuid.trim() : '';
+      const segredo =
+        typeof body.segredoConfirmacao === 'string' ? body.segredoConfirmacao.trim() : '';
+      if (!pagamentoUuid || !segredo) {
+        res.status(400).json({ erro: 'pagamentoUuid e segredoConfirmacao são obrigatórios' });
+        return;
+      }
+      await this.servicoPagamentos.confirmarPagamentoPixWebhook(pagamentoUuid, segredo);
+      res.status(200).json({ sucesso: true, mensagem: 'PIX confirmado' });
+    } catch (erro) {
+      const msg = (erro as Error).message;
+      if (msg.includes('expirada')) {
+        res.status(410).json({ erro: msg });
+        return;
+      }
+      res.status(400).json({ erro: msg });
     }
   };
 
@@ -246,9 +313,13 @@ export class ControladorPagamentos {
     try {
       const corpo = req.body as Record<string, unknown>;
       const resultado = await this.servicoPagamentos.confirmarAutorizacaoFinanceiraCheckout(corpo);
+      const vendaUuid =
+        typeof corpo.vendaUuid === 'string' && corpo.vendaUuid.trim().length > 0
+          ? corpo.vendaUuid.trim()
+          : uuidv4();
       res.status(200).json({
         sucesso: resultado.sucesso,
-        pedidoUuid: uuidv4(),
+        pedidoUuid: vendaUuid,
         status: resultado.statusTexto,
         ...(resultado.pagamentoUuid !== undefined ? { pagamentoUuid: resultado.pagamentoUuid } : {})
       });

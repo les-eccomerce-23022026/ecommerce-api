@@ -31,5 +31,7 @@ export interface IRepositorioVendas {
   cadastrar(venda: IVendaInputDto): Promise<{ venda: IVenda; venId: number }>;
   obterPorUuid(uuid: string): Promise<IVenda | null>;
   listarPorUsuario(usuarioUuid: string): Promise<IVenda[]>;
+  /** Listagem administrativa (todas as vendas), mais recentes primeiro. */
+  listarTodas(limite?: number): Promise<IVenda[]>;
   atualizarStatus(vendaUuid: string, novoStatus: string): Promise<void>;
 }

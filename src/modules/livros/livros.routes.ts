@@ -12,7 +12,8 @@ export function registrarRotasLivros(router: Router): void {
   const servico = new ServicoLivros(repo);
   const controller = new ControladorLivros(servico);
 
-  router.get('/livros/destaques', controller.destaques.bind(controller));
+  router.get('/categorias/catalogo', controller.categoriasCatalogo.bind(controller));
+  router.get('/livros', controller.listarCatalogo.bind(controller));
   router.get('/livros/:uuid', controller.detalhes.bind(controller));
 
   router.get(

@@ -18,6 +18,27 @@ describe('Integração - Pagamentos', () => {
     token = await obterTokenCliente(contexto.app);
   });
 
+  beforeEach(async () => {
+    if (contexto.db) {
+      await contexto.db.executar(
+        `INSERT INTO tipo_pagamento (tpg_descricao) VALUES ('pix') ON CONFLICT (tpg_descricao) DO NOTHING`
+      );
+      await contexto.db.executar(
+        `INSERT INTO status_vendas (stv_descricao) VALUES ('AGUARDANDO PAGAMENTO') ON CONFLICT (stv_descricao) DO NOTHING`
+      );
+      await contexto.db.executar(`
+        CREATE TABLE IF NOT EXISTS pagamento_pix_simulado (
+          ppx_id BIGSERIAL PRIMARY KEY,
+          pag_id BIGINT NOT NULL UNIQUE REFERENCES pagamento(pag_id) ON DELETE CASCADE,
+          ppx_copia_cola TEXT NOT NULL,
+          ppx_qr_base64 TEXT,
+          ppx_expira_em TIMESTAMPTZ NOT NULL,
+          ppx_segredo_confirmacao VARCHAR(128) NOT NULL
+        );
+      `);
+    }
+  });
+
   async function criarVenda(total = 60) {
     const valorFrete = 10;
     const valorTotalItens = total - valorFrete;
@@ -55,6 +76,10 @@ describe('Integração - Pagamentos', () => {
     expect(Array.isArray(res.body.cuponsDisponiveis)).toBe(true);
     expect(Array.isArray(res.body.freteOpcoes)).toBe(true);
     expect(res.body.bandeirasPermitidas).toBeDefined();
+    expect(res.body.politicaParcelamentoCartao).toEqual({
+      parcelasMaximas: 12,
+      parcelasSemJuros: 6,
+    });
   });
 
   it('POST /pagamentos/intencao-pagamento retorna id e segredo', async () => {
@@ -318,5 +343,220 @@ describe('Integração - Pagamentos', () => {
 
     expect(res.status).toBe(400);
     expect(res.body.erro).toContain('não encontrado');
+  });
+
+  it('POST /pagamentos/selecionar aceita PIX simulado sem cartão', async () => {
+    const vendaUuid = await criarVenda(90);
+
+    const res = await request(contexto.app)
+      .post('/api/pagamentos/selecionar')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        vendaUuid,
+        valor: 30,
+        tipoPagamento: 'pix',
+      });
+
+    expect(res.status).toBe(201);
+    expect(res.body.formaPagamento.tipo).toBe('pix');
+    expect(res.body.formaPagamento.detalhes).toMatch(/^PIX-/);
+    expect(res.body.cartao).toBeUndefined();
+    expect(res.body.pixCobranca).toBeDefined();
+    expect(res.body.pixCobranca.copiaCola).toContain('br.gov.bcb.pix');
+    expect(res.body.pixCobranca.segredoConfirmacao).toBeDefined();
+    expect(res.body.pixCobranca.expiraEm).toBeDefined();
+  });
+
+  it('POST /pagamentos/:uuid/processar retorna 400 para PIX (aguarda webhook)', async () => {
+    const vendaUuid = await criarVenda(50);
+    const sel = await request(contexto.app)
+      .post('/api/pagamentos/selecionar')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        vendaUuid,
+        valor: 40,
+        tipoPagamento: 'pix',
+      });
+    expect(sel.status).toBe(201);
+    const pagUuid = sel.body.id as string;
+
+    const proc = await request(contexto.app)
+      .post(`/api/pagamentos/${pagUuid}/processar`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({});
+
+    expect(proc.status).toBe(400);
+    expect(proc.body.erro).toMatch(/webhook|PIX/i);
+  });
+
+  it('POST /webhooks/pagamento-pix-simulado confirma PIX e GET /pagamentos/venda/:uuid/resumo reflete APROVADA', async () => {
+    const vendaUuid = await criarVenda(50);
+    const sel = await request(contexto.app)
+      .post('/api/pagamentos/selecionar')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        vendaUuid,
+        valor: 40,
+        tipoPagamento: 'pix',
+      });
+    expect(sel.status).toBe(201);
+    const pagUuid = sel.body.id as string;
+    const segredo = sel.body.pixCobranca.segredoConfirmacao as string;
+
+    const resAntes = await request(contexto.app)
+      .get(`/api/pagamentos/venda/${vendaUuid}/resumo`)
+      .set('Authorization', `Bearer ${token}`);
+    expect(resAntes.status).toBe(200);
+    expect(resAntes.body.aguardandoPix).toBe(true);
+    expect(resAntes.body.vendaStatus).toBe('AGUARDANDO PAGAMENTO');
+
+    const wh = await request(contexto.app).post('/api/webhooks/pagamento-pix-simulado').send({
+      pagamentoUuid: pagUuid,
+      segredoConfirmacao: segredo,
+    });
+    expect(wh.status).toBe(200);
+
+    const resDepois = await request(contexto.app)
+      .get(`/api/pagamentos/venda/${vendaUuid}/resumo`)
+      .set('Authorization', `Bearer ${token}`);
+    expect(resDepois.status).toBe(200);
+    expect(resDepois.body.aguardandoPix).toBe(false);
+    expect(resDepois.body.vendaStatus).toBe('APROVADA');
+
+    const pg = await request(contexto.app)
+      .get(`/api/pagamentos/${pagUuid}`)
+      .set('Authorization', `Bearer ${token}`);
+    expect(pg.body.status).toBe('APROVADO');
+  });
+
+  it('POST /pagamentos/selecionar retorna 400 PIX com valor abaixo de R$ 10', async () => {
+    const vendaUuid = await criarVenda(60);
+
+    const res = await request(contexto.app)
+      .post('/api/pagamentos/selecionar')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        vendaUuid,
+        valor: 5,
+        tipoPagamento: 'pix',
+      });
+
+    expect(res.status).toBe(400);
+    expect(res.body.erro).toContain('PIX');
+  });
+
+  it('POST /pagamentos/selecionar split: dois cartões + PIX na mesma venda', async () => {
+    const vendaUuid = await criarVenda(90);
+
+    const r1 = await request(contexto.app)
+      .post('/api/pagamentos/selecionar')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        vendaUuid,
+        valor: 30,
+        tipoPagamento: 'cartao_credito',
+        cartao: cartaoValido,
+      });
+    expect(r1.status).toBe(201);
+
+    const r2 = await request(contexto.app)
+      .post('/api/pagamentos/selecionar')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        vendaUuid,
+        valor: 30,
+        tipoPagamento: 'cartao_credito',
+        cartao: {
+          ...cartaoValido,
+          numero: '5500000000000004',
+          bandeira: 'Mastercard',
+        },
+      });
+    expect(r2.status).toBe(201);
+
+    const r3 = await request(contexto.app)
+      .post('/api/pagamentos/selecionar')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        vendaUuid,
+        valor: 30,
+        tipoPagamento: 'pix',
+      });
+    expect(r3.status).toBe(201);
+    expect(r3.body.formaPagamento.tipo).toBe('pix');
+  });
+
+  it('POST /pagamentos/selecionar aceita parcelasCartao e reflete em formaPagamento.detalhes', async () => {
+    const vendaUuid = await criarVenda(60);
+
+    const res = await request(contexto.app)
+      .post('/api/pagamentos/selecionar')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        vendaUuid,
+        valor: 60,
+        tipoPagamento: 'cartao_credito',
+        parcelasCartao: 6,
+        cartao: cartaoValido,
+      });
+
+    expect(res.status).toBe(201);
+    expect(res.body.formaPagamento.detalhes).toBe('parcelas:6');
+  });
+
+  it('POST /pagamentos/selecionar retorna 400 se parcelasCartao com PIX', async () => {
+    const vendaUuid = await criarVenda(60);
+
+    const res = await request(contexto.app)
+      .post('/api/pagamentos/selecionar')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        vendaUuid,
+        valor: 30,
+        tipoPagamento: 'pix',
+        parcelasCartao: 3,
+      });
+
+    expect(res.status).toBe(400);
+    expect(res.body.erro).toMatch(/parcelasCartao/i);
+  });
+
+  it('POST /pagamento/processar aceita parcelasCartao nos itens', async () => {
+    const valorTotal = 150;
+    const intencao = await registrarIntencao(valorTotal);
+
+    const res = await request(contexto.app)
+      .post('/api/pagamento/processar')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        valorTotal,
+        idIntencao: intencao.idIntencao,
+        segredoConfirmacao: intencao.segredoConfirmacao,
+        pagamentosCartao: [
+          { valor: 100, parcelasCartao: 3 },
+          { valor: 50, parcelasCartao: 1 },
+        ],
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body.sucesso).toBe(true);
+  });
+
+  it('POST /pagamento/processar retorna 400 quando parcelasCartao inválido', async () => {
+    const valorTotal = 60;
+    const intencao = await registrarIntencao(valorTotal);
+
+    const res = await request(contexto.app)
+      .post('/api/pagamento/processar')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        valorTotal,
+        idIntencao: intencao.idIntencao,
+        segredoConfirmacao: intencao.segredoConfirmacao,
+        pagamentosCartao: [{ valor: 60, parcelasCartao: 99 }],
+      });
+
+    expect(res.status).toBe(400);
+    expect(res.body.erro).toMatch(/parcelasCartao/i);
   });
 });
