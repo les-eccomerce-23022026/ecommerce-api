@@ -12,3 +12,6 @@ ALTER TABLE IF EXISTS tipo_frete RENAME TO tipos_frete;
 -- Tabela de Entregas: ecm_entrega ou entrega -> entregas
 ALTER TABLE IF EXISTS ecm_entrega RENAME TO entregas;
 ALTER TABLE IF EXISTS entrega RENAME TO entregas;
+
+-- Estado legado: status já como status_venda (singular) antes desta migração — alinha a status_vendas
+ALTER TABLE IF EXISTS status_venda RENAME TO status_vendas;

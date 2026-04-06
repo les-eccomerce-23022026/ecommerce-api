@@ -74,27 +74,34 @@ AND iv.liv_id IS NULL;
 -- Nota: A migration 011 criou FK para ecm_venda(ven_id)
 -- Precisamos recriar a FK apontando para vendas(ven_id)
 
--- Drop da FK antiga (se existir)
-ALTER TABLE pagamento 
-DROP CONSTRAINT IF EXISTS pagamento_ven_id_fkey;
+-- Drop da FK antiga (se existir) e recriar apontando para vendas(ven_id)
+ALTER TABLE pagamento DROP CONSTRAINT IF EXISTS pagamento_ven_id_fkey;
+ALTER TABLE pagamento DROP CONSTRAINT IF EXISTS fk_pagamento_vendas;
 
--- Recriar FK apontando para nova tabela
 ALTER TABLE pagamento
-ADD CONSTRAINT fk_pagamento_vendas 
+ADD CONSTRAINT fk_pagamento_vendas
 FOREIGN KEY (ven_id) REFERENCES vendas(ven_id) ON DELETE CASCADE;
 
 
--- Atualizar FK em entrega (ecm_venda -> vendas)
--- Nota: A migration 012 criou FK para ecm_venda(ven_id)
+-- Atualizar FK em entrega ou entregas (ecm_venda -> vendas)
+-- Nota: A migration 012 criou FK para ecm_venda(ven_id). A 013 pode já ter renomeado entrega -> entregas.
 
--- Drop da FK antiga (se existir)
-ALTER TABLE entrega 
-DROP CONSTRAINT IF EXISTS entrega_ven_id_fkey;
-
--- Recriar FK apontando para nova tabela
-ALTER TABLE entrega
-ADD CONSTRAINT fk_entrega_vendas 
-FOREIGN KEY (ven_id) REFERENCES vendas(ven_id) ON DELETE CASCADE;
+DO $$
+BEGIN
+  IF to_regclass('public.entrega') IS NOT NULL THEN
+    ALTER TABLE entrega DROP CONSTRAINT IF EXISTS entrega_ven_id_fkey;
+    ALTER TABLE entrega DROP CONSTRAINT IF EXISTS fk_entrega_vendas;
+    ALTER TABLE entrega
+      ADD CONSTRAINT fk_entrega_vendas
+      FOREIGN KEY (ven_id) REFERENCES vendas(ven_id) ON DELETE CASCADE;
+  ELSIF to_regclass('public.entregas') IS NOT NULL THEN
+    ALTER TABLE entregas DROP CONSTRAINT IF EXISTS entrega_ven_id_fkey;
+    ALTER TABLE entregas DROP CONSTRAINT IF EXISTS fk_entrega_vendas;
+    ALTER TABLE entregas
+      ADD CONSTRAINT fk_entrega_vendas
+      FOREIGN KEY (ven_id) REFERENCES vendas(ven_id) ON DELETE CASCADE;
+  END IF;
+END $$;
 
 
 -- =============================================================================

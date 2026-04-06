@@ -8,6 +8,7 @@ Eles **não são executados** automaticamente como steps Gherkin; a verificaçã
 
 - Integração: `src/tests/integracao/**/*.integracao.test.ts` (organização sugerida por domínio)
   - `vendas/pedido-venda` — pedido do cliente (`POST/GET /vendas`, `minhas-vendas`)
+  - `vendas/fluxo-cotacao-cupons` — `POST /frete/cotar` + `POST /vendas` com `cotacaoUuid` + cupons e dois cartões via `/pagamentos/selecionar` (BDD em `bdd/vendas/checkout-cotacao-cupons/`)
   - `vendas/vendas-admin-fluxo` — RF0024 (`GET /clientes`) e RF0038 (`POST/GET /entregas`) com token admin
   - `pagamentos/` — checkout e liquidação
   - `admin/admin-mestre-gestao` — mestre (lista admins, registro, inativar/ativar)

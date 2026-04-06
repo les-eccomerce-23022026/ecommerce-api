@@ -4,6 +4,7 @@ import { ServicoPagamentos } from './ServicoPagamentos';
 import { IPagamentoInputDto, IPagamentoOutputDto } from './IPagamento.dto';
 import type { ServicoFrete } from '@/modules/frete/ServicoFrete';
 import { cepOrigemPadrao, sanitizarCep8Digitos } from '@/modules/frete/freteCepUtil';
+import type { GestaoIdentidadeCliente } from '@/modules/clientes/clientes.service';
 
 /**
  * Controlador para operações de pagamentos.
@@ -13,9 +14,16 @@ export class ControladorPagamentos {
 
   private readonly servicoFrete: ServicoFrete;
 
-  constructor(servicoPagamentos: ServicoPagamentos, servicoFrete: ServicoFrete) {
+  private readonly gestaoCliente?: GestaoIdentidadeCliente;
+
+  constructor(
+    servicoPagamentos: ServicoPagamentos,
+    servicoFrete: ServicoFrete,
+    gestaoCliente?: GestaoIdentidadeCliente,
+  ) {
     this.servicoPagamentos = servicoPagamentos;
     this.servicoFrete = servicoFrete;
+    this.gestaoCliente = gestaoCliente;
   }
 
   /**
@@ -55,14 +63,64 @@ export class ControladorPagamentos {
         selecionado: false,
       }));
 
+      let enderecosCliente: Array<{
+        uuid: string;
+        logradouro: string;
+        numero: string;
+        complemento: string;
+        bairro: string;
+        cep: string;
+        cidade: string;
+        estado: string;
+        tipo: 'cobranca' | 'entrega' | 'ambos';
+      }> = [];
+
+      let cartoesCliente: Array<{
+        uuid: string;
+        ultimosDigitosCartao: string;
+        nomeCliente: string;
+        nomeImpresso: string;
+        bandeira: string;
+        validade: string;
+        principal: boolean;
+      }> = [];
+
+      try {
+        if (this.gestaoCliente && req.usuario?.uuid) {
+          const perfil = await this.gestaoCliente.obterPerfil(req.usuario.uuid);
+          enderecosCliente = (perfil.enderecos ?? []).map((e) => ({
+            uuid: e.uuid ?? '',
+            logradouro: e.logradouro,
+            numero: e.numero,
+            complemento: e.complemento ?? '',
+            bairro: e.bairro,
+            cep: e.cep,
+            cidade: e.cidade,
+            estado: e.estado,
+            tipo: 'ambos' as const,
+          }));
+          cartoesCliente = (perfil.cartoes ?? []).map((c) => ({
+            uuid: c.uuid,
+            ultimosDigitosCartao: c.ultimosDigitosCartao,
+            nomeCliente: c.nomeImpresso,
+            nomeImpresso: c.nomeImpresso,
+            bandeira: c.bandeira,
+            validade: c.validade,
+            principal: c.principal,
+          }));
+        }
+      } catch {
+        // Mantém listas vazias (ex.: perfil incompleto)
+      }
+
       const resposta = {
-        enderecosCliente: [],
-        cartoesCliente: [],
+        enderecosCliente,
+        cartoesCliente,
         cuponsDisponiveis: [
           { uuid: uuidv4(), codigo: 'DESCONTO10', tipo: 'promocional', valor: 10, descricao: '10% de desconto (simulado)' },
           { uuid: uuidv4(), codigo: 'TROCA50', tipo: 'troca', valor: 50, descricao: 'Cupom de troca R$50 (simulado)' },
         ],
-        bandeirasPermitidas: ['VISA', 'MASTERCARD'],
+        bandeirasPermitidas: ['Visa', 'Mastercard', 'Elo', 'American Express', 'Hipercard'],
         freteOpcoes,
         freteMeta: {
           provedor: this.servicoFrete.getCodigoProvedorAtivo(),

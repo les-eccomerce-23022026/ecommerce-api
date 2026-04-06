@@ -9,6 +9,7 @@ import { RepositorioIntencaoPagamentoPostgres } from '@/modules/pagamentos/inten
 import { FabricaProvedorFrete } from '@/modules/frete/provedoresFrete/FabricaProvedorFrete';
 import { RepositorioCotacaoFretePostgres } from '@/modules/frete/cotacaoFrete/RepositorioCotacaoFretePostgres';
 import { ServicoFrete } from '@/modules/frete/ServicoFrete';
+import { di } from '@/shared/infrastructure/di.container';
 
 /**
  * Registra rotas de pagamentos no roteador.
@@ -22,7 +23,7 @@ export function registrarRotasPagamentos(router: Router): void {
   const repoCotacaoFrete = new RepositorioCotacaoFretePostgres(db);
   const provedorFrete = FabricaProvedorFrete.criar();
   const servicoFrete = new ServicoFrete(provedorFrete, repoCotacaoFrete);
-  const controller = new ControladorPagamentos(servico, servicoFrete);
+  const controller = new ControladorPagamentos(servico, servicoFrete, di.gestaoIdentidadeCliente);
 
   // Endpoints tradicionais (DDD) para gerenciamento de pagamento
   router.post('/pagamentos/selecionar', autenticacaoMiddleware, controller.definirMetodoLiquidacao);

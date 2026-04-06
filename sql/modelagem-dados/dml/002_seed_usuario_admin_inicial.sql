@@ -32,6 +32,11 @@ BEGIN
         RAISE EXCEPTION 'Papel "admin" não encontrado. Execute 001_seeds_tipos_referencia.sql antes deste script.';
     END IF;
 
+    INSERT INTO usuarios (
+        usu_uuid,
+        usu_nome,
+        usu_email,
+        usu_cpf,
         usu_senha_hash,
         pap_id,
         usu_ativo,

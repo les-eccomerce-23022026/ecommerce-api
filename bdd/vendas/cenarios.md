@@ -15,7 +15,7 @@ O documento oficial do projeto (**não editar o conteúdo**) está em
 
 | Ator | O que o documento cobre (resumo) | Onde está no BDD hoje |
 |------|----------------------------------|------------------------|
-| **Cliente** | Carrinho (RF0031–32), compra, frete, endereço, pagamento, finalizar **EM PROCESSAMENTO** (RF0033–37); consulta de transações / pedidos (RF0025) | Principalmente em [cenarios-felizes.md](./cenarios-felizes.md) e [cenarios-falhas.md](./cenarios-falhas.md) (`POST /vendas`, pagamentos, `GET /minhas-vendas`, entrega). |
+| **Cliente** | Carrinho (RF0031–32), compra, frete, endereço, pagamento, finalizar **EM PROCESSAMENTO** (RF0033–37); consulta de transações / pedidos (RF0025) | [cenarios-felizes.md](./cenarios-felizes.md), [cenarios-falhas.md](./cenarios-falhas.md); fluxo **cotação + cupons + cartões**: [checkout-cotacao-cupons/](./checkout-cotacao-cupons/cenarios.md). |
 | **Administrador** | Despachar / **EM TRÂNSITO** (RF0038), confirmar **ENTREGUE** (RF0039), trocas (RF0041–44), listagem de clientes (RF0024) | **[cenarios-admin-felizes.md](./cenarios-admin-felizes.md)** e **[cenarios-admin-falhas.md](./cenarios-admin-falhas.md)** — cada RF traz **(requisito doc)** e **(implementação atual)**; ENTREGUE e trocas estão marcados onde a API ainda não expõe rota. Detalhes em [alinhamento-doc-requisitos.md](./alinhamento-doc-requisitos.md). |
 
 ---
@@ -24,6 +24,7 @@ O documento oficial do projeto (**não editar o conteúdo**) está em
 
 - **[Cenários de sucesso (felizes)](./cenarios-felizes.md)** — fluxos 2xx (venda, pagamento, entrega, histórico) — **lado cliente**.
 - **[Cenários de falha](./cenarios-falhas.md)** — 4xx (validações; alguns dependem de RN ainda não aplicadas na API) — **lado cliente**.
+- **[Checkout: `cotacaoUuid` + cupons + cartões](./checkout-cotacao-cupons/cenarios.md)** — frete cotado na venda, `DESCONTO10` / `TROCA50` via `/pagamentos/selecionar`, múltiplos cartões; felizes e falhas dedicados.
 - **[Cenários admin – sucesso](./cenarios-admin-felizes.md)** — RF0038–RF0039, RF0041–RF0044, apoio `GET /clientes` (RF0024).
 - **[Cenários admin – falhas](./cenarios-admin-falhas.md)** — acesso negado a rotas administrativas, erros de entrega, especificação futura para trocas/ENTREGUE.
 
@@ -31,6 +32,7 @@ O documento oficial do projeto (**não editar o conteúdo**) está em
 
 **Cliente / fluxo de compra**
 
+- `POST /frete/cotar` (cotação persistida; uso opcional com `cotacaoUuid` em `POST /vendas`)
 - `POST /vendas`
 - `GET /vendas/:uuid`
 - `POST /pagamentos/selecionar`

@@ -88,7 +88,19 @@ A API valida CPF em cadastro de cliente (ambiente não-test). Use CPFs distintos
 
 ---
 
-## 5. Testes e cobertura
+## 5. Números de cartão para testes (Luhn)
+
+A validação de cartão na API usa comprimento (13–19 dígitos) e **algoritmo de Luhn**. Os números abaixo são **apenas para desenvolvimento** (não são cartões reais); qualquer CVV de 3 dígitos e validade futura (`MM/AA`) costuma bastar onde o fluxo exigir.
+
+| Bandeira (exemplo) | Número (16 dígitos) |
+|----------------------|---------------------|
+| Visa | `4111111111111111` |
+| Visa | `4242424242424242` |
+| Mastercard | `5555555555554444` |
+
+---
+
+## 6. Testes e cobertura
 
 ```bash
 npm test
@@ -101,7 +113,7 @@ npm run test:coverage
 
 ---
 
-## 6. Scripts úteis
+## 7. Scripts úteis
 
 | Comando | Descrição |
 |---------|-----------|
@@ -114,7 +126,7 @@ npm run test:coverage
 
 ---
 
-## 7. Referências
+## 8. Referências
 
 - Rotas HTTP de exemplo: pasta `http/`.
 - BDD (cenários): pasta `bdd/`.
