@@ -4,6 +4,9 @@ import { configurarTesteIntegracao } from '@/tests/utils/setup-integracao.util';
 import { obterTokenCliente } from '@/tests/utils/requisicoes-api.util';
 import { LIVRO_UUID_TESTE, payloadPedidoValido } from '@/tests/helpers/pedido-venda.helper';
 
+const EMAIL_CLIENTE_B = 'cliente.b.pedido@email.com';
+const CPF_CLIENTE_B = '111.222.333-44';
+
 /**
  * Pedido de venda (cliente autenticado): POST /vendas, GET /vendas/:uuid, GET /minhas-vendas.
  * Organizado em cenários felizes e de falha (alinhado aos bdd/vendas).
@@ -16,6 +19,12 @@ describe('Integração — Vendas / pedido do cliente', () => {
   beforeAll(async () => {
     app = contexto.app;
     tokenCliente = await obterTokenCliente(app);
+  });
+
+  let tokenClienteB: string;
+
+  beforeAll(async () => {
+    tokenClienteB = await obterTokenCliente(app, EMAIL_CLIENTE_B, CPF_CLIENTE_B);
   });
 
   describe('POST /api/vendas', () => {
@@ -91,6 +100,26 @@ describe('Integração — Vendas / pedido do cliente', () => {
         expect(res.status).toBe(400);
         expect(res.body.erro).toMatch(/Valor total/i);
       });
+
+    });
+  });
+
+  describe('GET /api/vendas/:uuid — isolamento entre clientes', () => {
+    it('cliente B recebe 404 ao tentar acessar pedido do cliente A', async () => {
+      const criado = await request(app)
+        .post('/api/vendas')
+        .set('Authorization', `Bearer ${tokenCliente}`)
+        .send(payloadPedidoValido({ precoUnitario: 20, quantidade: 1, valorFrete: 5 }));
+
+      expect(criado.status).toBe(201);
+      const vendaUuid = criado.body.id as string;
+
+      const res = await request(app)
+        .get(`/api/vendas/${vendaUuid}`)
+        .set('Authorization', `Bearer ${tokenClienteB}`);
+
+      expect(res.status).toBe(404);
+      expect(res.body.erro).toMatch(/não encontrada/i);
     });
   });
 

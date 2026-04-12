@@ -76,10 +76,21 @@ export class ServicoVendas {
 
   /**
    * Consulta uma venda completa pelo UUID.
+   * Administradores podem ver qualquer venda; clientes apenas a própria.
+   * Retorna a mesma mensagem para "não existe" e "não é dono" para evitar
+   * enumeração de UUIDs alheios (OWASP: evitar oráculo de existência).
    */
-  public async visualizarDetalhesVenda(vendaUuid: string): Promise<IVenda> {
+  public async visualizarDetalhesVenda(
+    vendaUuid: string,
+    requisitante: { uuid: string; ehAdmin: boolean },
+  ): Promise<IVenda> {
     const venda = await this.repositorioVendas.obterPorUuid(vendaUuid);
     if (!venda) throw new Error('Venda não encontrada');
+
+    if (!requisitante.ehAdmin && venda.usuarioUuid !== requisitante.uuid) {
+      throw new Error('Venda não encontrada');
+    }
+
     return venda;
   }
 

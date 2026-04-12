@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { ServicoVendas } from '@/modules/vendas/services/ServicoVendas';
+import { PAPEL_ADMIN } from '@/shared/types/papeis';
 
 /**
  * Controlador para requisições de vendas.
@@ -38,7 +39,17 @@ export class ControladorVendas {
   public visualizarDetalhesVenda = async (req: Request, res: Response) => {
     try {
       const { uuid } = req.params;
-      const venda = await this.servicoVendas.visualizarDetalhesVenda(uuid);
+      const usuario = req.usuario;
+      if (!usuario?.uuid) {
+        res.status(401).json({ erro: 'Usuário não identificado.' });
+        return;
+      }
+
+      const ehAdmin = usuario.role === PAPEL_ADMIN.descricao;
+      const venda = await this.servicoVendas.visualizarDetalhesVenda(uuid, {
+        uuid: usuario.uuid,
+        ehAdmin,
+      });
       res.json(venda);
     } catch (err: unknown) {
       const mensagem = err instanceof Error ? err.message : 'Erro desconhecido';

@@ -207,6 +207,7 @@ describe('Integração — Checkout: cotação de frete + cupons + cartões', ()
       expect(res.status).toBe(400);
       expect(res.body.erro).toMatch(/não confere/i);
     });
+
   });
 
   describe('cenários de falha — POST /api/pagamentos/selecionar (cupons)', () => {
