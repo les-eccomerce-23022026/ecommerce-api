@@ -25,7 +25,7 @@ export function registrarRotasPagamentos(router: Router): void {
   const repoCotacaoFrete = new RepositorioCotacaoFretePostgres(db);
   const provedorFrete = FabricaProvedorFrete.criar();
   const servicoFrete = new ServicoFrete(provedorFrete, repoCotacaoFrete);
-  const controller = new ControladorPagamentos(servico, servicoFrete, di.gestaoIdentidadeCliente);
+  const controller = new ControladorPagamentos(servico, servicoFrete, repo, di.gestaoIdentidadeCliente);
 
   router.post('/webhooks/pagamento-pix-simulado', controller.webhookPagamentoPixSimulado);
 

@@ -279,20 +279,54 @@ export class ServicoPagamentos {
    * Confirma autorização financeira no fluxo de checkout.
    */
   public async confirmarAutorizacaoFinanceiraCheckout(corpo: Record<string, unknown>) {
-    const { idIntencao, segredoConfirmacao, valorTotal, pagamentosCartao, vendaUuid } = extrairCheckoutPagamento(corpo);
-    const registroIntencao = await this.repositorioIntencao.obterPorUuid(idIntencao);
+    const { idIntencao, segredoConfirmacao, valorTotal, pagamentosCartao, cuponsAplicados, vendaUuid } = extrairCheckoutPagamento(corpo);
+    
+    let registroIntencao = null;
+    if (idIntencao !== 'CUPOM-ONLY') {
+      registroIntencao = await this.repositorioIntencao.obterPorUuid(idIntencao);
+      if (registroIntencao === null) throw new Error('Intenção de pagamento não encontrada');
+      ServicoPagamentos.validarVinculoVendaCheckout(registroIntencao, vendaUuid);
+    }
 
-    if (registroIntencao === null) throw new Error('Intenção de pagamento não encontrada');
-    ServicoPagamentos.validarVinculoVendaCheckout(registroIntencao, vendaUuid);
-
-    const resultado = await this.provedorPagamento.confirmarPagamento({ valorTotal, pagamentosCartao, idIntencao, segredoConfirmacao });
-    const pagamentoUuid = await this.persistirPagamentoCheckoutAprovado({ resultado, vendaUuid, valorTotal, registroIntencao, pagamentosCartao });
-
+    let resultado = { sucesso: true, status: 'APROVADO' };
+    if (valorTotal > 0) {
+      resultado = await this.provedorPagamento.confirmarPagamento({ valorTotal, pagamentosCartao, idIntencao, segredoConfirmacao });
+    }
+    
+    let pagamentosUuids: string[] = [];
     if (resultado.sucesso && vendaUuid?.trim()) {
+      pagamentosUuids = await this.persistirPagamentosCheckoutAprovados({
+        vendaUuid: vendaUuid.trim(),
+        registroIntencao,
+        pagamentosCartao,
+        cuponsAplicados
+      });
+      
+      if (cuponsAplicados && cuponsAplicados.length > 0) {
+        await this.processarSaldosCuponsTroca(cuponsAplicados);
+      }
+
       await this.sincronizarStatusVendaAposPagamentos(vendaUuid.trim());
     }
 
-    return { sucesso: resultado.sucesso, statusTexto: resultado.sucesso ? 'APROVADA' : 'REPROVADA' as const, pagamentoUuid };
+    return {
+      sucesso: resultado.sucesso,
+      statusTexto: resultado.sucesso ? 'APROVADA' : 'REPROVADA' as const,
+      pagamentoUuid: pagamentosUuids[0],
+      pagamentosUuids
+    };
+  }
+
+  private async processarSaldosCuponsTroca(cupons: any[]): Promise<void> {
+    for (const c of cupons) {
+      if (c.tipo !== 'troca') continue;
+      
+      const cupomReal = await this.repositorioPagamentos.obterCupomTrocaPorCodigo(c.codigo);
+      if (!cupomReal) continue;
+
+      const novoSaldo = cupomReal.valorAtual - c.valor;
+      await this.repositorioPagamentos.atualizarSaldoCupomTroca(cupomReal.id, Math.max(0, novoSaldo));
+    }
   }
 
   private static validarVinculoVendaCheckout(registro: IntencaoPagamentoPersistida, vendaUuid?: string): void {
@@ -301,23 +335,51 @@ export class ServicoPagamentos {
     if (registro.vendaUuid !== vendaUuid) throw new Error('vendaUuid não confere');
   }
 
-  private async persistirPagamentoCheckoutAprovado(dados: any): Promise<string | undefined> {
-    if (!dados.resultado.sucesso || !dados.vendaUuid) return undefined;
-    const venExiste = await this.repositorioPagamentos.obterVenIdPorVendaUuid(dados.vendaUuid);
-    if (venExiste === null) throw new Error('Venda não encontrada');
+  private async persistirPagamentosCheckoutAprovados(dados: {
+    vendaUuid: string;
+    registroIntencao: IntencaoPagamentoPersistida | null;
+    pagamentosCartao: any[];
+    cuponsAplicados?: any[];
+  }): Promise<string[]> {
+    const venId = await this.repositorioPagamentos.obterVenIdPorVendaUuid(dados.vendaUuid);
+    if (venId === null) throw new Error('Venda não encontrada');
 
-    const parcelas = (dados.pagamentosCartao ?? []).map((p: any) => p.parcelasCartao ?? 1).join('|') || '1';
-    const pagamento: IPagamento = {
-      id: uuidv4(),
-      vendaUuid: dados.vendaUuid,
-      valor: dados.valorTotal,
-      formaPagamento: new FormaPagamento(TipoPagamento.CARTAO_CREDITO, `parcelas:${parcelas}`),
-      status: StatusPagamento.APROVADO,
-      criadoEm: new Date(),
-      processadoEm: new Date()
-    };
-    const salvo = await this.repositorioPagamentos.cadastrar(pagamento, { inpIdIntencao: dados.registroIntencao.inpId });
-    return salvo.id;
+    const ids: string[] = [];
+
+    // 1. Persistir Cupons
+    if (dados.cuponsAplicados) {
+      for (const c of dados.cuponsAplicados) {
+        const tipo = c.tipo === 'troca' ? TipoPagamento.CUPOM_TROCA : TipoPagamento.CUPOM_PROMOCIONAL;
+        const pagamento: IPagamento = {
+          id: uuidv4(),
+          vendaUuid: dados.vendaUuid,
+          valor: c.valor,
+          formaPagamento: new FormaPagamento(tipo, c.codigo),
+          status: StatusPagamento.APROVADO,
+          criadoEm: new Date(),
+          processadoEm: new Date(),
+        };
+        const salvo = await this.repositorioPagamentos.cadastrar(pagamento);
+        ids.push(salvo.id);
+      }
+    }
+
+    // 2. Persistir Cartões
+    for (const p of dados.pagamentosCartao) {
+      const pagamento: IPagamento = {
+        id: uuidv4(),
+        vendaUuid: dados.vendaUuid,
+        valor: p.valor,
+        formaPagamento: new FormaPagamento(TipoPagamento.CARTAO_CREDITO, `parcelas:${p.parcelasCartao ?? 1}`),
+        status: StatusPagamento.APROVADO,
+        criadoEm: new Date(),
+        processadoEm: new Date(),
+      };
+      const salvo = await this.repositorioPagamentos.cadastrar(pagamento, { inpIdIntencao: dados.registroIntencao?.inpId });
+      ids.push(salvo.id);
+    }
+
+    return ids;
   }
 
   public async consultarPagamento(pagamentoUuid: string): Promise<IPagamento> {
@@ -346,7 +408,12 @@ export class ServicoPagamentos {
 
     if (forma.isCupomTroca()) {
       const codigo = forma.getDetalhes();
-      if (!codigo || !this.validarCupomTroca(codigo, valor)) throw new Error('Cupom de troca inválido');
+      if (!codigo) throw new Error('Código do cupom de troca é obrigatório');
+      
+      const cupom = await this.repositorioPagamentos.obterCupomTrocaPorCodigo(codigo);
+      if (!cupom || !cupom.ativo || cupom.valorAtual < valor) {
+        throw new Error('Cupom de troca inválido ou saldo insuficiente');
+      }
     }
 
     if (forma.isPix() && valor < 10) throw new Error('Valor mínimo por linha PIX é R$ 10,00');
@@ -354,9 +421,5 @@ export class ServicoPagamentos {
 
   private validarCupomPromocional(codigo: string, valor: number): boolean {
     return codigo === 'DESCONTO10' && valor > 0;
-  }
-
-  private validarCupomTroca(codigo: string, valor: number): boolean {
-    return codigo === 'TROCA50' && valor <= 50;
   }
 }

@@ -518,7 +518,7 @@ describe('Integração - Pagamentos', () => {
       });
 
     expect(res.status).toBe(400);
-    expect(res.body.erro).toMatch(/parcelasCartao/i);
+    expect(res.body.erro).toMatch(/Parcelas/i);
   });
 
   it('POST /pagamento/processar aceita parcelasCartao nos itens', async () => {
@@ -557,6 +557,6 @@ describe('Integração - Pagamentos', () => {
       });
 
     expect(res.status).toBe(400);
-    expect(res.body.erro).toMatch(/parcelasCartao/i);
+    expect(res.body.erro).toMatch(/Parcelas/i);
   });
 });

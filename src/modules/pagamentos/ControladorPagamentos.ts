@@ -8,6 +8,8 @@ import type { GestaoIdentidadeCliente } from '@/modules/clientes/clientes.servic
 import { Logger } from '@/shared/utils/Logger.util';
 import { PARCELAS_CARTAO_MAX } from './IPagamento.dto';
 
+import type { IRepositorioPagamentos } from './IRepositorioPagamentos';
+
 /** Política de parcelamento no cartão exposta ao checkout (linguagem ubíqua do domínio de pagamentos). */
 const POLITICA_PARCELAMENTO_CARTAO_PADRAO = {
   parcelasMaximas: PARCELAS_CARTAO_MAX,
@@ -18,21 +20,12 @@ const POLITICA_PARCELAMENTO_CARTAO_PADRAO = {
  * Controlador para operações de pagamentos.
  */
 export class ControladorPagamentos {
-  private readonly servicoPagamentos: ServicoPagamentos;
-
-  private readonly servicoFrete: ServicoFrete;
-
-  private readonly gestaoCliente?: GestaoIdentidadeCliente;
-
   constructor(
-    servicoPagamentos: ServicoPagamentos,
-    servicoFrete: ServicoFrete,
-    gestaoCliente?: GestaoIdentidadeCliente,
-  ) {
-    this.servicoPagamentos = servicoPagamentos;
-    this.servicoFrete = servicoFrete;
-    this.gestaoCliente = gestaoCliente;
-  }
+    private readonly servicoPagamentos: ServicoPagamentos,
+    private readonly servicoFrete: ServicoFrete,
+    private readonly repoPagamentos: IRepositorioPagamentos,
+    private readonly gestaoCliente?: GestaoIdentidadeCliente,
+  ) {}
 
   /**
    * Fornece informações necessárias ao frontend para seleção de pagamento
@@ -93,9 +86,31 @@ export class ControladorPagamentos {
         principal: boolean;
       }> = [];
 
+      let cuponsTroca: Array<{
+        codigo: string;
+        valor: number;
+        tipo: 'troca';
+        descricao: string;
+      }> = [];
+
       try {
         if (this.gestaoCliente && req.usuario?.uuid) {
           const perfil = await this.gestaoCliente.obterPerfil(req.usuario.uuid);
+          
+          // Buscar ID interno do usuário para os cupons
+          const usuIdRes = await (this.repoPagamentos as any).db.executar('SELECT usu_id FROM usuarios WHERE usu_uuid = $1', [req.usuario.uuid]);
+          if (usuIdRes.length > 0) {
+            const realCupons = await this.repoPagamentos.listarCuponsTrocaPorUsuario(usuIdRes[0].usu_id);
+            cuponsTroca = realCupons
+              .filter(c => c.ativo && c.valorAtual > 0)
+              .map(c => ({
+                codigo: c.codigo,
+                valor: c.valorAtual,
+                tipo: 'troca' as const,
+                descricao: `Saldo de troca: R$ ${c.valorAtual.toFixed(2)}`
+              }));
+          }
+
           enderecosCliente = (perfil.enderecos ?? []).map((e) => ({
             uuid: e.uuid ?? '',
             logradouro: e.logradouro,
@@ -130,7 +145,7 @@ export class ControladorPagamentos {
         politicaParcelamentoCartao: { ...POLITICA_PARCELAMENTO_CARTAO_PADRAO },
         cuponsDisponiveis: [
           { uuid: uuidv4(), codigo: 'DESCONTO10', tipo: 'promocional', valor: 10, descricao: '10% de desconto (simulado)' },
-          { uuid: uuidv4(), codigo: 'TROCA50', tipo: 'troca', valor: 50, descricao: 'Cupom de troca R$50 (simulado)' },
+          ...cuponsTroca
         ],
         bandeirasPermitidas: ['Visa', 'Mastercard', 'Elo', 'American Express', 'Hipercard'],
         freteOpcoes,

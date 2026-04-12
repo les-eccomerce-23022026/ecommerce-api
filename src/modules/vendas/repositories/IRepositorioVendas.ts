@@ -12,6 +12,7 @@ export interface IVenda {
   usuarioUuid: string;
   itens: IItemVenda[];
   criadoEm: Date;
+  motivoTroca?: string;
 }
 
 /**
@@ -22,6 +23,7 @@ export interface IItemVenda {
   livroUuid: string;
   quantidade: number;
   precoUnitario: number;
+  emTroca?: boolean;
 }
 
 /**
@@ -34,4 +36,10 @@ export interface IRepositorioVendas {
   /** Listagem administrativa (todas as vendas), mais recentes primeiro. */
   listarTodas(limite?: number): Promise<IVenda[]>;
   atualizarStatus(vendaUuid: string, novoStatus: string): Promise<void>;
+  
+  /** 
+   * Registra solicitação de troca na venda e marca itens.
+   * Altera status da venda para 'EM TROCA'.
+   */
+  registrarSolicitacaoTroca(vendaUuid: string, motivo: string, itensUuids: string[]): Promise<void>;
 }

@@ -81,24 +81,34 @@ export class RepositorioVendasPostgres implements IRepositorioVendas {
   public async obterPorUuid(uuid: string): Promise<IVenda | null> {
     const query = `
       SELECT v.ven_uuid, v.ven_total_itens, v.ven_frete, v.ven_total_venda,
-             v.ven_criado_em, s.stv_descricao as status, u.usu_uuid as "usuarioUuid"
+             v.ven_criado_em, s.stv_descricao as status, u.usu_uuid as "usuarioUuid",
+             v.ven_motivo_troca as "motivoTroca"
       FROM vendas v
       JOIN status_vendas s ON v.stv_id = s.stv_id
       JOIN usuarios u ON v.usu_id = u.usu_id
       WHERE v.ven_uuid = $1
     `;
-    const rows = await this.db.executar<{ ven_uuid: string; ven_total_itens: number; ven_frete: number; ven_total_venda: number; ven_criado_em: string; status: string; usuarioUuid: string }>(query, [uuid]);
+    const rows = await this.db.executar<{ 
+      ven_uuid: string; ven_total_itens: number; ven_frete: number; 
+      ven_total_venda: number; ven_criado_em: string; status: string; 
+      usuarioUuid: string; motivoTroca: string | null 
+    }>(query, [uuid]);
+    
     if (rows.length === 0) return null;
 
     const v = rows[0];
 
     // Buscar itens
     const itensQuery = `
-      SELECT itv_uuid as id, liv_uuid as "livroUuid", itv_quantidade as quantidade, itv_preco_unitario as "precoUnitario"
+      SELECT itv_uuid as id, liv_uuid as "livroUuid", itv_quantidade as quantidade, 
+             itv_preco_unitario as "precoUnitario", itv_em_troca as "emTroca"
       FROM itens_venda
       WHERE ven_id = (SELECT ven_id FROM vendas WHERE ven_uuid = $1)
     `;
-    const itensRows = await this.db.executar<{ id: string; livroUuid: string; quantidade: number; precoUnitario: number }>(itensQuery, [uuid]);
+    const itensRows = await this.db.executar<{ 
+      id: string; livroUuid: string; quantidade: number; 
+      precoUnitario: number; emTroca: boolean 
+    }>(itensQuery, [uuid]);
 
     return {
       id: v.ven_uuid,
@@ -108,13 +118,35 @@ export class RepositorioVendasPostgres implements IRepositorioVendas {
       frete: Number(v.ven_frete),
       totalVenda: Number(v.ven_total_venda),
       criadoEm: new Date(v.ven_criado_em),
+      motivoTroca: v.motivoTroca || undefined,
       itens: itensRows.map((i) => ({
         id: i.id,
         livroUuid: i.livroUuid,
         quantidade: Number(i.quantidade),
         precoUnitario: Number(i.precoUnitario),
+        emTroca: i.emTroca
       })),
     };
+  }
+
+  public async registrarSolicitacaoTroca(vendaUuid: string, motivo: string, itensUuids: string[]): Promise<void> {
+    const queryUpdateVenda = `
+      UPDATE vendas 
+      SET ven_motivo_troca = $1, 
+          stv_id = (SELECT stv_id FROM status_vendas WHERE stv_descricao = 'EM TROCA'),
+          ven_atualizado_em = NOW()
+      WHERE ven_uuid = $2
+    `;
+    await this.db.executar(queryUpdateVenda, [motivo, vendaUuid]);
+
+    if (itensUuids.length > 0) {
+      const queryUpdateItens = `
+        UPDATE itens_venda
+        SET itv_em_troca = TRUE, itv_atualizado_em = NOW()
+        WHERE itv_uuid = ANY($1::uuid[])
+      `;
+      await this.db.executar(queryUpdateItens, [itensUuids]);
+    }
   }
 
   public async listarPorUsuario(usuarioUuid: string): Promise<IVenda[]> {

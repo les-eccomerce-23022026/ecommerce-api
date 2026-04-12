@@ -27,4 +27,26 @@ export interface IRepositorioPagamentos {
     expiraEm: Date;
     segredoConfirmacao: string;
   } | null>;
+
+  obterCupomTrocaPorCodigo(codigo: string): Promise<{
+    id: number;
+    codigo: string;
+    valorAtual: number;
+    usuarioId: number;
+    ativo: boolean;
+  } | null>;
+
+  atualizarSaldoCupomTroca(id: number, novoSaldo: number): Promise<void>;
+
+  criarCupomTroca(dados: {
+    usuarioId: number;
+    codigo: string;
+    valor: number;
+  }): Promise<string>;
+
+  listarCuponsTrocaPorUsuario(usuarioId: number): Promise<Array<{
+    codigo: string;
+    valorAtual: number;
+    ativo: boolean;
+  }>>;
 }

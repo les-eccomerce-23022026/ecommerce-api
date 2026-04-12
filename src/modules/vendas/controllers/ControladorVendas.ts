@@ -1,15 +1,18 @@
 import { Request, Response } from 'express';
 import { ServicoVendas } from '@/modules/vendas/services/ServicoVendas';
 import { PAPEL_ADMIN } from '@/shared/types/papeis';
+import type { IRepositorioPagamentos } from '@/modules/pagamentos/IRepositorioPagamentos';
 
 /**
  * Controlador para requisições de vendas.
  */
 export class ControladorVendas {
   private readonly servicoVendas: ServicoVendas;
+  private readonly repoPagamentos: IRepositorioPagamentos;
 
-  constructor(servicoVendas: ServicoVendas) {
+  constructor(servicoVendas: ServicoVendas, repoPagamentos: IRepositorioPagamentos) {
     this.servicoVendas = servicoVendas;
+    this.repoPagamentos = repoPagamentos;
   }
 
   /**
@@ -70,6 +73,95 @@ export class ControladorVendas {
     } catch (err: unknown) {
       const mensagem = err instanceof Error ? err.message : 'Erro desconhecido';
       res.status(401).json({ erro: mensagem });
+    }
+  };
+
+  /**
+   * Solicitar troca: POST /vendas/:uuid/troca
+   */
+  public solicitarTroca = async (req: Request, res: Response) => {
+    try {
+      const { uuid } = req.params;
+      const { motivo, itensUuids } = req.body;
+      const usuarioUuid = req.usuario?.uuid;
+      if (!usuarioUuid) throw new Error('Não autenticado');
+
+      const venda = await this.servicoVendas.solicitarTroca(uuid, usuarioUuid, motivo, itensUuids);
+      res.json(venda);
+    } catch (err: unknown) {
+      res.status(400).json({ erro: (err as Error).message });
+    }
+  };
+
+  /**
+   * Listar trocas pendentes: GET /admin/pedidos/trocas
+   */
+  public listarTrocasPendentes = async (_req: Request, res: Response) => {
+    try {
+      const trocas = await this.servicoVendas.listarTrocasPendentes();
+      res.json(trocas);
+    } catch (err: unknown) {
+      res.status(400).json({ erro: (err as Error).message });
+    }
+  };
+
+  /**
+   * Autorizar troca: PUT /admin/pedidos/:uuid/autorizar-troca
+   */
+  public autorizarTroca = async (req: Request, res: Response) => {
+    try {
+      const { uuid } = req.params;
+      const venda = await this.servicoVendas.autorizarTroca(uuid);
+      res.json(venda);
+    } catch (err: unknown) {
+      res.status(400).json({ erro: (err as Error).message });
+    }
+  };
+
+  /**
+   * Rejeitar troca: PUT /admin/pedidos/:uuid/rejeitar-troca
+   */
+  public rejeitarTroca = async (req: Request, res: Response) => {
+    try {
+      const { uuid } = req.params;
+      const { motivo } = req.body;
+      const venda = await this.servicoVendas.rejeitarTroca(uuid, motivo);
+      res.json(venda);
+    } catch (err: unknown) {
+      res.status(400).json({ erro: (err as Error).message });
+    }
+  };
+
+  /**
+   * Confirmar recebimento: PUT /admin/pedidos/:uuid/confirmar-recebimento
+   */
+  public confirmarRecebimentoTroca = async (req: Request, res: Response) => {
+    try {
+      const { uuid } = req.params;
+      const { retornarEstoque } = req.body;
+
+      const resultado = await this.servicoVendas.confirmarRecebimentoTroca(uuid, retornarEstoque, this.repoPagamentos);
+      
+      const vendaCompleta = await this.servicoVendas.visualizarDetalhesVenda(uuid, { ehAdmin: true });
+      
+      const usuIdRes = await (this.repoPagamentos as any).db.executar('SELECT usu_id FROM usuarios WHERE usu_uuid = $1', [vendaCompleta.usuarioUuid]);
+      const usuId = usuIdRes[0].usu_id;
+
+      const valorCupom = vendaCompleta.itens
+        .filter(i => i.emTroca)
+        .reduce((acc, cur) => acc + (cur.precoUnitario * cur.quantidade), 0);
+      
+      const valorFinal = valorCupom > 0 ? valorCupom : vendaCompleta.totalVenda;
+
+      await this.repoPagamentos.criarCupomTroca({
+        usuarioId: usuId,
+        codigo: resultado.cupom,
+        valor: valorFinal
+      });
+
+      res.json({ pedido: resultado.venda, cupomGerado: { codigo: resultado.cupom, valor: valorFinal } });
+    } catch (err: unknown) {
+      res.status(400).json({ erro: (err as Error).message });
     }
   };
 }

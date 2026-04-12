@@ -200,4 +200,49 @@ export class RepositorioPagamentosPostgres implements IRepositorioPagamentos {
       segredoConfirmacao: r.ppx_segredo_confirmacao
     };
   }
+
+  public async obterCupomTrocaPorCodigo(codigo: string): Promise<{
+    id: number;
+    codigo: string;
+    valorAtual: number;
+    usuarioId: number;
+    ativo: boolean;
+  } | null> {
+    const query = 'SELECT ctr_id as id, ctr_codigo as codigo, ctr_valor_atual as "valorAtual", usu_id as "usuarioId", ctr_ativo as ativo FROM cupons_troca WHERE ctr_codigo = $1';
+    const rows = await this.db.executar<{ id: number; codigo: string; valorAtual: number; usuarioId: number; ativo: boolean }>(query, [codigo]);
+    return rows[0] ?? null;
+  }
+
+  public async atualizarSaldoCupomTroca(id: number, novoSaldo: number): Promise<void> {
+    const query = 'UPDATE cupons_troca SET ctr_valor_atual = $1, ctr_atualizado_em = NOW(), ctr_ativo = $2 WHERE ctr_id = $3';
+    await this.db.executar(query, [novoSaldo, novoSaldo > 0, id]);
+  }
+
+  public async criarCupomTroca(dados: {
+    usuarioId: number;
+    codigo: string;
+    valor: number;
+  }): Promise<string> {
+    const query = `
+      INSERT INTO cupons_troca (usu_id, ctr_codigo, ctr_valor_original, ctr_valor_atual)
+      VALUES ($1, $2, $3, $3)
+      RETURNING ctr_uuid
+    `;
+    const rows = await this.db.executar<{ ctr_uuid: string }>(query, [dados.usuarioId, dados.codigo, dados.valor]);
+    return rows[0].ctr_uuid;
+  }
+
+  public async listarCuponsTrocaPorUsuario(usuarioId: number): Promise<Array<{
+    codigo: string;
+    valorAtual: number;
+    ativo: boolean;
+  }>> {
+    const query = 'SELECT ctr_codigo as codigo, ctr_valor_atual as "valorAtual", ctr_ativo as ativo FROM cupons_troca WHERE usu_id = $1';
+    const rows = await this.db.executar<{ codigo: string; valorAtual: number; ativo: boolean }>(query, [usuarioId]);
+    return rows.map(r => ({
+      codigo: r.codigo,
+      valorAtual: Number(r.valorAtual),
+      ativo: r.ativo
+    }));
+  }
 }
