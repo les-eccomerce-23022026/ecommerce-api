@@ -388,7 +388,8 @@ export class GestaoIdentidadeCliente {
 
       if (perfilExistente) {
         await this.repositorioPerfil.atualizar(perfilAtualizado);
-      } else {
+      }
+      if (!perfilExistente) {
         await this.repositorioPerfil.criar(perfilAtualizado);
       }
     }
@@ -412,7 +413,8 @@ export class GestaoIdentidadeCliente {
           ddd: dddNormalizado,
           numero: numeroNormalizado,
         });
-      } else {
+      }
+      if (!telefonePrincipal || !telefonePrincipal.uuid) {
         await this.repositorioTelefone.criar({
           idUsuario: usuarioNoBanco.id,
           idTipoTelefone: GestaoIdentidadeCliente.mapearTipoTelefone(dados.telefone.tipo),
@@ -665,7 +667,8 @@ export class GestaoIdentidadeCliente {
 
       if (dados.enderecoEntregaIgualCobranca) {
         await this.criarEndereco(usuario.id, dados.enderecoCobranca, 'entrega', false);
-      } else if (dados.enderecoEntrega) {
+      }
+      if (!dados.enderecoEntregaIgualCobranca && dados.enderecoEntrega) {
         await this.criarEndereco(usuario.id, dados.enderecoEntrega, 'entrega', false);
       }
     }

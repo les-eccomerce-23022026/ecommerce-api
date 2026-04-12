@@ -141,19 +141,19 @@ export class ProvedorPagamentoSimulado implements IProvedorPagamento {
   ): Promise<ResultadoConfirmacaoPagamento> {
     const aprovado = valorTotal <= teto;
     const agoraDate = new Date();
+
     if (aprovado) {
       await this.repositorioIntencao.atualizarEstado(idIntencao, EstadosIntencaoPagamento.CONFIRMADA, {
         confirmadoEm: agoraDate
       });
-    } else {
-      await this.repositorioIntencao.atualizarEstado(idIntencao, EstadosIntencaoPagamento.RECUSADA, {
-        recusadoEm: agoraDate
-      });
+      return { sucesso: true, status: 'APROVADO' };
     }
-    return {
-      sucesso: aprovado,
-      status: aprovado ? 'APROVADO' : 'RECUSADO'
-    };
+
+    await this.repositorioIntencao.atualizarEstado(idIntencao, EstadosIntencaoPagamento.RECUSADA, {
+      recusadoEm: agoraDate
+    });
+
+    return { sucesso: false, status: 'RECUSADO' };
   }
 
   private static faltaIdentificadores(

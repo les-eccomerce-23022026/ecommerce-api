@@ -155,15 +155,14 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
       contador += 1;
       valores.push(dados.senhaHash);
     }
-    if (dados.idPapel) {
+    
+    const papId = dados.idPapel || dados.role?.id;
+    if (papId) {
       campos.push(`pap_id = $${contador}`);
       contador += 1;
-      valores.push(dados.idPapel);
-    } else if (dados.role) {
-      campos.push(`pap_id = $${contador}`);
-      contador += 1;
-      valores.push(dados.role.id);
+      valores.push(papId);
     }
+
     if (dados.ativo !== undefined) {
       campos.push(`usu_ativo = $${contador}`);
       contador += 1;
