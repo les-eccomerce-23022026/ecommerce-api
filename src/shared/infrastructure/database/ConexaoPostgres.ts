@@ -31,9 +31,12 @@ export class ConexaoPostgres implements IConexaoBanco {
   }
 
   private static criarPoolProducao(): Pool {
+    const schema = process.env.POSTGRES_SCHEMA ?? 'les';
+    const options = `-c search_path=${schema},public`;
+
     const urlConfigurada = process.env.POSTGRES_URL;
     if (urlConfigurada) {
-      return new Pool({ connectionString: urlConfigurada });
+      return new Pool({ connectionString: urlConfigurada, options });
     }
 
     const host = process.env.POSTGRES_HOST ?? 'localhost';
@@ -43,11 +46,14 @@ export class ConexaoPostgres implements IConexaoBanco {
     const banco = process.env.POSTGRES_DB ?? 'ecm_livraria';
 
     const connectionString = `postgresql://${usuario}:${senha}@${host}:${porta}/${banco}`;
-    return new Pool({ connectionString });
+    return new Pool({ connectionString, options });
   }
 
   private obterPoolTeste(): Pool {
     if (!this.poolTeste) {
+      const schema = process.env.POSTGRES_SCHEMA ?? 'les';
+      const options = `-c search_path=${schema},public`;
+
       // Configurações via variáveis de ambiente para a instância de teste
       const host = process.env.POSTGRES_HOST_TEST ?? '172.17.0.1';
       const porta = process.env.POSTGRES_PORT_TEST ?? '5433';
@@ -56,7 +62,7 @@ export class ConexaoPostgres implements IConexaoBanco {
       const banco = process.env.POSTGRES_DB_TEST ?? 'ecm_livraria_test';
 
       const connectionString = `postgresql://${usuario}:${senha}@${host}:${porta}/${banco}`;
-      this.poolTeste = new Pool({ connectionString });
+      this.poolTeste = new Pool({ connectionString, options });
     }
     return this.poolTeste;
   }
@@ -69,10 +75,40 @@ export class ConexaoPostgres implements IConexaoBanco {
     return tipo === 'teste' ? this.obterPoolTeste() : this.poolProducao;
   }
 
-  public async executar<T = unknown>(sql: string, parametros?: DbParametro[]): Promise<T[]> {
-    const transacao = obterTransacaoAtual();
-    const executor = transacao || this.obterPoolAtivo();
+  private obterSchemaPadrao(): string {
+    return process.env.POSTGRES_SCHEMA ?? 'les';
+  }
 
+  public async executar<T = unknown>(sql: string, parametros?: DbParametro[], opcoes?: { searchPath?: string }): Promise<T[]> {
+    const transacao = obterTransacaoAtual();
+    const pool = this.obterPoolAtivo();
+
+    if (opcoes?.searchPath) {
+      // Validação básica contra SQL injection no nome do schema
+      if (!/^[a-z0-9_, ]+$/i.test(opcoes.searchPath)) {
+        throw new Error(`searchPath inválido: ${opcoes.searchPath}`);
+      }
+
+      const schemaPadrao = this.obterSchemaPadrao();
+      const pathFull = `${opcoes.searchPath}, ${schemaPadrao}, public`;
+
+      if (transacao) {
+        await transacao.query(`SET LOCAL search_path = ${pathFull}`);
+        const { rows } = await transacao.query(sql, parametros);
+        return rows as T[];
+      }
+
+      const cliente = await pool.connect();
+      try {
+        await cliente.query(`SET LOCAL search_path = ${pathFull}`);
+        const { rows } = await cliente.query(sql, parametros);
+        return rows as T[];
+      } finally {
+        cliente.release();
+      }
+    }
+
+    const executor = transacao || pool;
     const { rows } = await executor.query(sql, parametros);
     return rows as T[];
   }

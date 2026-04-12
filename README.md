@@ -148,3 +148,48 @@ npm run test:coverage
 - Rotas HTTP de exemplo: pasta `http/`.
 - BDD (cenários): pasta `bdd/`.
 - Scripts curl (fluxos): `scripts/curl-*-bdd.sh`.
+
+---
+
+## 10. Operações de Banco de Dados (Schema `les` e Índices)
+
+### Schema de aplicação (`les`)
+
+A partir da versão 1.0.1, o banco de dados utiliza o schema **`les`** para objetos de negócio (tabelas, triggers, funções). Extensões como `pg_trgm` e `unaccent` permanecem no schema `public`.
+
+A aplicação configura automaticamente o `search_path=les,public` via pool de conexão (variável `POSTGRES_SCHEMA`).
+
+### Scripts de Banco
+
+| Script | Quando usar |
+|--------|-------------|
+| `./scripts/setup-db.sh` | **Estrutura + Seeds**: Reconstrói o banco a partir dos arquivos SQL (DDL, DML e Migrations). Ideal para novos ambientes ou reset total. |
+| `./scripts/setup-test-db.sh` | **Ambiente de Teste**: Equivalente ao `setup-db.sh` mas direcionado ao banco de testes (`:5433`). |
+| `./scripts/sync-db-test.sh` | **Espelhamento**: Realiza um clone lógico dos dados do banco de desenvolvimento para o banco de testes. Útil para debugar falhas com massa de dados real. |
+
+### Backup e Restauração
+
+Para gerar um backup compactado do schema `les`:
+
+```bash
+docker exec ecm_postgres pg_dump -U ecm_user -d ecm_livraria -n les -Fc > backup_les_$(date +%Y%m%d).dump
+```
+
+Para restaurar:
+
+```bash
+docker exec -i ecm_postgres pg_restore -U ecm_user -d ecm_livraria --clean --if-exists < backup_les_...dump
+```
+
+### Análise de Índices e Performance
+
+Query para listar o tamanho dos índices e identificar candidatos a otimização:
+
+```sql
+SELECT indexrelid::regclass AS indice,
+       pg_size_pretty(pg_relation_size(indexrelid)) AS tamanho
+FROM pg_stat_user_indexes
+ORDER BY pg_relation_size(indexrelid) DESC
+LIMIT 30;
+```
+

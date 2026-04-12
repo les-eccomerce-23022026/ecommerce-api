@@ -13,9 +13,10 @@ export interface IConexaoBanco {
    * Executa uma consulta no banco de dados.
    * @param sql A string SQL com placeholders (ex: $1, $2 ou ?, ?)
    * @param parametros Array de parâmetros para substituir os placeholders
+   * @param opcoes Opções extras, como searchPath (ex: "les, public")
    * @returns Resultados da consulta
    */
-  executar<T = unknown>(sql: string, parametros?: DbParametro[]): Promise<T[]>;
+  executar<T = unknown>(sql: string, parametros?: DbParametro[], opcoes?: { searchPath?: string }): Promise<T[]>;
 
   /**
    * Inicia uma transação.
