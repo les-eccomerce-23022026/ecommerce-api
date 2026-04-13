@@ -1,20 +1,11 @@
 import { Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
-import { ServicoPagamentos } from './ServicoPagamentos';
-import { IPagamentoInputDto, IPagamentoOutputDto } from './IPagamento.dto';
 import type { ServicoFrete } from '@/modules/frete/ServicoFrete';
-import { cepOrigemPadrao, sanitizarCep8Digitos } from '@/modules/frete/freteCepUtil';
 import type { GestaoIdentidadeCliente } from '@/modules/clientes/clientes.service';
-import { Logger } from '@/shared/utils/Logger.util';
-import { PARCELAS_CARTAO_MAX } from './IPagamento.dto';
-
+import { executarObterPagamentoInfo } from '@/modules/pagamentos/controlador-pagamentos-obter-info.handler';
+import { IPagamentoInputDto, IPagamentoOutputDto } from './IPagamento.dto';
+import { ServicoPagamentos } from './ServicoPagamentos';
 import type { IRepositorioPagamentos } from './IRepositorioPagamentos';
-
-/** Política de parcelamento no cartão exposta ao checkout (linguagem ubíqua do domínio de pagamentos). */
-const POLITICA_PARCELAMENTO_CARTAO_PADRAO = {
-  parcelasMaximas: PARCELAS_CARTAO_MAX,
-  parcelasSemJuros: 6,
-} as const;
 
 /**
  * Controlador para operações de pagamentos.
@@ -27,139 +18,12 @@ export class ControladorPagamentos {
     private readonly gestaoCliente?: GestaoIdentidadeCliente,
   ) {}
 
-  /**
-   * Fornece informações necessárias ao frontend para seleção de pagamento
-   * (endereços do cliente, cartões salvos, cupons e opções de frete).
-   * Aqui retornamos uma resposta simplificada e segura para consumo do cliente.
-   */
-  // eslint-disable-next-line class-methods-use-this
   public obterPagamentoInfo = async (req: Request, res: Response): Promise<void> => {
-    try {
-      const cepQ = typeof req.query.cepDestino === 'string' ? req.query.cepDestino : '';
-      const pesoQ = req.query.pesoKg ?? req.query.peso;
-      const valorItensQ = req.query.valorTotalItens;
-      const pesoNum =
-        pesoQ !== undefined && String(pesoQ).length > 0 ? Number(pesoQ) : 1;
-      const valorItensNum =
-        valorItensQ !== undefined && String(valorItensQ).length > 0
-          ? Number(valorItensQ)
-          : undefined;
-
-      const cepDestino = cepQ.trim() || '01000000';
-      if (!Number.isFinite(pesoNum) || pesoNum <= 0) {
-        res.status(400).json({ erro: 'pesoKg inválido' });
-        return;
-      }
-      const opcoes = await this.servicoFrete.cotarEPersistir({
-        cepDestino,
-        pesoKg: pesoNum,
-        valorTotalItens:
-          valorItensNum !== undefined && Number.isFinite(valorItensNum) ? valorItensNum : undefined,
-      });
-      const freteOpcoes = opcoes.map((o) => ({
-        uuid: o.cotacaoUuid,
-        tipo: o.tipo,
-        valor: o.valor,
-        prazo: o.prazo,
-        selecionado: false,
-      }));
-
-      let enderecosCliente: Array<{
-        uuid: string;
-        logradouro: string;
-        numero: string;
-        complemento: string;
-        bairro: string;
-        cep: string;
-        cidade: string;
-        estado: string;
-        tipo: 'cobranca' | 'entrega' | 'ambos';
-      }> = [];
-
-      let cartoesCliente: Array<{
-        uuid: string;
-        ultimosDigitosCartao: string;
-        nomeCliente: string;
-        nomeImpresso: string;
-        bandeira: string;
-        validade: string;
-        principal: boolean;
-      }> = [];
-
-      let cuponsTroca: Array<{
-        codigo: string;
-        valor: number;
-        tipo: 'troca';
-        descricao: string;
-      }> = [];
-
-      try {
-        if (this.gestaoCliente && req.usuario?.uuid) {
-          const perfil = await this.gestaoCliente.obterPerfil(req.usuario.uuid);
-
-          const usuId = await this.repoPagamentos.obterUsuarioIdInternoPorUuid(req.usuario.uuid);
-          if (usuId !== null) {
-            const realCupons = await this.repoPagamentos.listarCuponsTrocaPorUsuario(usuId);
-            cuponsTroca = realCupons
-              .filter((c) => c.ativo && c.valorAtual > 0)
-              .map((c) => ({
-                codigo: c.codigo,
-                valor: c.valorAtual,
-                tipo: 'troca' as const,
-                descricao: `Saldo de troca: R$ ${c.valorAtual.toFixed(2)}`,
-              }));
-          }
-
-          enderecosCliente = (perfil.enderecos ?? []).map((e) => ({
-            uuid: e.uuid ?? '',
-            logradouro: e.logradouro,
-            numero: e.numero,
-            complemento: e.complemento ?? '',
-            bairro: e.bairro,
-            cep: e.cep,
-            cidade: e.cidade,
-            estado: e.estado,
-            tipo: 'ambos' as const,
-          }));
-          cartoesCliente = (perfil.cartoes ?? []).map((c) => ({
-            uuid: c.uuid,
-            ultimosDigitosCartao: c.ultimosDigitosCartao,
-            nomeCliente: c.nomeImpresso,
-            nomeImpresso: c.nomeImpresso,
-            bandeira: c.bandeira,
-            validade: c.validade,
-            principal: c.principal,
-          }));
-        }
-      } catch (erro) {
-        Logger.error(
-          '[pagamentos.obterPagamentoInfo] Falha ao obter perfil do cliente; endereços e cartões ficam vazios.',
-          erro instanceof Error ? erro.message : String(erro),
-        );
-      }
-
-      const resposta = {
-        enderecosCliente,
-        cartoesCliente,
-        politicaParcelamentoCartao: { ...POLITICA_PARCELAMENTO_CARTAO_PADRAO },
-        cuponsDisponiveis: [
-          { uuid: uuidv4(), codigo: 'DESCONTO10', tipo: 'promocional', valor: 10, descricao: '10% de desconto (simulado)' },
-          ...cuponsTroca
-        ],
-        bandeirasPermitidas: ['Visa', 'Mastercard', 'Elo', 'American Express', 'Hipercard'],
-        freteOpcoes,
-        freteMeta: {
-          provedor: this.servicoFrete.getCodigoProvedorAtivo(),
-          cepOrigem: cepOrigemPadrao(),
-          cepDestino: cepQ.trim() ? sanitizarCep8Digitos(cepQ) : '01000000',
-          pesoKg: pesoNum,
-        },
-      };
-
-      res.status(200).json(resposta);
-    } catch (erro) {
-      res.status(500).json({ erro: (erro as Error).message });
-    }
+    await executarObterPagamentoInfo(req, res, {
+      servicoFrete: this.servicoFrete,
+      repoPagamentos: this.repoPagamentos,
+      gestaoCliente: this.gestaoCliente,
+    });
   };
 
   /**

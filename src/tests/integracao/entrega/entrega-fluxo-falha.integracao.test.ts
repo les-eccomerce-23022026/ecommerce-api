@@ -2,7 +2,6 @@ import request from 'supertest';
 import { configurarTesteIntegracao } from '@/tests/utils/setup-integracao.util';
 import { obterTokenCliente } from '@/tests/utils/requisicoes-api.util';
 import { LIVRO_UUID_TESTE } from '@/tests/helpers/pedido-venda.helper';
-import { ServicoNotificacaoEmail } from '@/modules/entrega/adapters/ServicoNotificacaoEmail';
 
 describe('Integração - Fluxo de Falha e Reagendamento de Entrega (Sprint 3)', () => {
   const contexto = configurarTesteIntegracao();

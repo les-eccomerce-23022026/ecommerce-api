@@ -14,6 +14,17 @@ export class ServicoAdmin {
     this.repositorioUsuarios = repositorioUsuarios;
   }
 
+  private static validarSenhaCadastroAdministrador(dados: ICriarAdminDto): void {
+    if (dados.senha !== dados.confirmacaoSenha) {
+      throw new Error('Senha e confirmação de senha não conferem.');
+    }
+    if (!verificarForcaSenha(dados.senha)) {
+      throw new Error(
+        'Senha fraca. É necessário pelo menos 8 caracteres, incluindo maiúsculas, minúsculas e caractere especial.',
+      );
+    }
+  }
+
   /**
    * Lista todos os administradores cadastrados.
    */
@@ -73,15 +84,7 @@ export class ServicoAdmin {
    * @param dados Dados para criação do administrador.
    */
   public async registrarNovoAdministrador(dados: ICriarAdminDto): Promise<IRespostaAdminCriadoDto> {
-    if (dados.senha !== dados.confirmacaoSenha) {
-      throw new Error('Senha e confirmação de senha não conferem.');
-    }
-
-    if (!verificarForcaSenha(dados.senha)) {
-      throw new Error(
-        'Senha fraca. É necessário pelo menos 8 caracteres, incluindo maiúsculas, minúsculas e caractere especial.',
-      );
-    }
+    ServicoAdmin.validarSenhaCadastroAdministrador(dados);
 
     const existenteAdminPorEmail = await this.repositorioUsuarios.buscarPorEmailPapel(
       dados.email,

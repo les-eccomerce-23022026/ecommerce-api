@@ -31,25 +31,28 @@ export class ServicoCartoes {
     this.repositorioCartoes = repositorioCartoes;
   }
 
+  private static validarCvvOpcional(cvv: string | undefined): void {
+    if (!cvv) return;
+    const cvvLimpo = cvv.replace(/\D/g, '');
+    if (cvvLimpo.length !== 3) {
+      throw new Error('O CVV deve conter exatamente 3 dígitos numéricos.');
+    }
+  }
+
+  private static validarMesValidadeCartao(validade: Date | undefined): void {
+    if (!validade || !(validade instanceof Date)) return;
+    const mes = validade.getMonth() + 1;
+    if (mes < 1 || mes > 12) {
+      throw new Error('O mês de validade deve ser entre 01 e 12.');
+    }
+  }
+
   /**
    * Cadastra um novo cartão para um usuário.
    */
   async cadastrarCartao(idUsuario: number, dados: ICriarCartaoDto): Promise<ICartaoUsuario> {
-    // Validação de CVV (RN0027 - Apenas 3 dígitos numéricos)
-    if (dados.cvv) {
-      const cvvLimpo = dados.cvv.replace(/\D/g, '');
-      if (cvvLimpo.length !== 3) {
-        throw new Error('O CVV deve conter exatamente 3 dígitos numéricos.');
-      }
-    }
-
-    // Validação de Validade (MM/AAAA - Apenas mês e ano)
-    if (dados.validade && (dados.validade instanceof Date)) {
-      const mes = dados.validade.getMonth() + 1;
-      if (mes < 1 || mes > 12) {
-        throw new Error('O mês de validade deve ser entre 01 e 12.');
-      }
-    }
+    ServicoCartoes.validarCvvOpcional(dados.cvv);
+    ServicoCartoes.validarMesValidadeCartao(dados.validade);
 
     // Buscar ID interno da bandeira pelo UUID público
     const idBandeira = await this.repositorioCartoes.buscarIdBandeiraPorUuid(dados.uuidBandeira);

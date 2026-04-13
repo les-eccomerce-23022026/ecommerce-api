@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { ServicoCarrinho } from '@/modules/carrinho/servicoCarrinho';
+import { parseSincronizarItemCarrinho } from '@/modules/carrinho/controladorCarrinho-parse.util';
 
 export class ControladorCarrinho {
   constructor(private readonly servico: ServicoCarrinho) {}
@@ -26,17 +27,12 @@ export class ControladorCarrinho {
         res.status(401).json({ mensagem: 'Não autenticado.', sucesso: false });
         return;
       }
-      const { livroUuid, quantidade } = req.body as { livroUuid?: string; quantidade?: unknown };
-      if (!livroUuid || typeof livroUuid !== 'string') {
-        res.status(400).json({ erro: 'livroUuid é obrigatório' });
+      const parsed = parseSincronizarItemCarrinho(req);
+      if (!parsed.ok) {
+        res.status(parsed.status).json({ erro: parsed.mensagem });
         return;
       }
-      const q = Number(quantidade);
-      if (!Number.isFinite(q) || q < 0 || !Number.isInteger(q)) {
-        res.status(400).json({ erro: 'quantidade deve ser um inteiro >= 0' });
-        return;
-      }
-      const dados = await this.servico.alterarItem(usuUuid, livroUuid, q);
+      const dados = await this.servico.alterarItem(usuUuid, parsed.livroUuid, parsed.quantidade);
       res.status(200).json(dados);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Erro ao atualizar carrinho';

@@ -10,7 +10,8 @@ export class ProvedorFreteStubExterno implements IProvedorFrete {
   private readonly delegado = new ProvedorFreteSimulado();
 
   public getCodigo(): string {
-    return 'externo_stub';
+    const motorInterno = this.delegado.getCodigo();
+    return motorInterno === 'simulado' ? 'externo_stub' : 'externo_stub';
   }
 
   public async calcularOpcoes(entrada: ICotacaoFreteEntrada): Promise<IOpcaoFreteCalculada[]> {

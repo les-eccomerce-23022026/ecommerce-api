@@ -99,7 +99,7 @@ describe('Integração - Troca e Devolução (Sprint 2)', () => {
       .get('/api/pagamento/info') // O endpoint correto é /api/pagamento/info
       .set('Authorization', `Bearer ${tokenCliente}`);
     
-    const cupom = resCupom.body.cuponsDisponiveis.find((c: any) => c.codigo === resConfirmar.body.cupomGerado.codigo);
+    const cupom = resCupom.body.cuponsDisponiveis.find((c: { codigo: string }) => c.codigo === resConfirmar.body.cupomGerado.codigo);
     expect(cupom).toBeDefined();
     expect(cupom.valor).toBe(100);
   });

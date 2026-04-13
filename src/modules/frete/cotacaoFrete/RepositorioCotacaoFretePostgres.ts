@@ -7,41 +7,37 @@ export class RepositorioCotacaoFretePostgres implements IRepositorioCotacaoFrete
   constructor(private readonly db: IConexaoBanco) {}
 
   public async inserirLinhas(linhas: InserirCotacaoLinha[]): Promise<{ cfrUuid: string; cfrId: number }[]> {
-    const resultados: { cfrUuid: string; cfrId: number }[] = [];
-
-    for (const linha of linhas) {
-      const qInsert = `
+    return Promise.all(
+      linhas.map(async (linha) => {
+        const qInsert = `
         INSERT INTO cotacao_frete (
           cfr_provedor, cfr_estado, cfr_cep_origem, cfr_cep_destino, cfr_peso_kg, cfr_valor_itens,
           cfr_tipo_servico, cfr_valor, cfr_prazo_texto, cfr_expira_em
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
         RETURNING cfr_id, cfr_uuid
       `;
-      const vals: DbParametro[] = [
-        linha.provedor,
-        linha.estado,
-        linha.cepOrigem,
-        linha.cepDestino,
-        linha.pesoKg,
-        linha.valorItens,
-        linha.tipoServico,
-        linha.valor,
-        linha.prazoTexto,
-        linha.expiraEm,
-      ];
-      const rows = await this.db.executar<{ cfr_id: number; cfr_uuid: string }>(qInsert, vals);
-      const row = rows[0];
-
-      const qExt = `
+        const vals: DbParametro[] = [
+          linha.provedor,
+          linha.estado,
+          linha.cepOrigem,
+          linha.cepDestino,
+          linha.pesoKg,
+          linha.valorItens,
+          linha.tipoServico,
+          linha.valor,
+          linha.prazoTexto,
+          linha.expiraEm,
+        ];
+        const rows = await this.db.executar<{ cfr_id: number; cfr_uuid: string }>(qInsert, vals);
+        const row = rows[0];
+        const qExt = `
         INSERT INTO cotacao_frete_simulada (cfr_id, cfs_fator_regiao, cfs_peso_arredondado)
         VALUES ($1, $2, $3)
       `;
-      await this.db.executar(qExt, [row.cfr_id, linha.metaSimulada.fatorRegiao, linha.metaSimulada.pesoArredondado]);
-
-      resultados.push({ cfrId: row.cfr_id, cfrUuid: row.cfr_uuid });
-    }
-
-    return resultados;
+        await this.db.executar(qExt, [row.cfr_id, linha.metaSimulada.fatorRegiao, linha.metaSimulada.pesoArredondado]);
+        return { cfrId: row.cfr_id, cfrUuid: row.cfr_uuid };
+      }),
+    );
   }
 
   public async obterPorUuid(cfrUuid: string): Promise<ICotacaoFretePersistida | null> {

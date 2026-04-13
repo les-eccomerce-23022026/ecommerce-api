@@ -1,4 +1,5 @@
 import { IUsuario } from '@/modules/usuarios/Iusuario.entity';
+import { montarClausulasAtualizacaoUsuario } from '@/modules/usuarios/usuario-repository-atualizacao.util';
 import { PAPEL_CLIENTE, PAPEL_ADMIN } from '@/shared/types/papeis';
 import { IConexaoBanco, DbParametro } from '@/shared/infrastructure/database/IConexaoBanco';
 import { obterTipoBancoAtual } from '@/shared/infrastructure/database/ContextoBanco';
@@ -126,71 +127,15 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
   }
 
   public async atualizarUsuario(uuid: string, dados: Partial<IUsuario>): Promise<IUsuario | undefined> {
-    const campos: string[] = [];
-    const valores: DbParametro[] = [];
-    let contador = 1;
-
-    if (dados.nome) {
-      campos.push(`usu_nome = $${contador}`);
-      contador += 1;
-      valores.push(dados.nome);
-    }
-    if (dados.email) {
-      campos.push(`usu_email = $${contador}`);
-      contador += 1;
-      valores.push(dados.email);
-    }
-    if (dados.cpf) {
-      campos.push(`usu_cpf = $${contador}`);
-      contador += 1;
-      valores.push(dados.cpf);
-    }
-    if (dados.telefoneRapido) {
-      campos.push(`usu_telefone_rapido = $${contador}`);
-      contador += 1;
-      valores.push(dados.telefoneRapido);
-    }
-    if (dados.senhaHash) {
-      campos.push(`usu_senha_hash = $${contador}`);
-      contador += 1;
-      valores.push(dados.senhaHash);
-    }
-    
-    const papId = dados.idPapel || dados.role?.id;
-    if (papId) {
-      campos.push(`pap_id = $${contador}`);
-      contador += 1;
-      valores.push(papId);
-    }
-
-    if (dados.ativo !== undefined) {
-      campos.push(`usu_ativo = $${contador}`);
-      contador += 1;
-      valores.push(dados.ativo);
-    }
-    if (dados.isAdminMestre !== undefined) {
-      campos.push(`usu_is_admin_mestre = $${contador}`);
-      contador += 1;
-      valores.push(dados.isAdminMestre);
-    }
-    if (dados.genero) {
-      campos.push(`usu_genero = $${contador}`);
-      contador += 1;
-      valores.push(dados.genero);
-    }
-    if (dados.dataNascimento) {
-      campos.push(`usu_data_nascimento = $${contador}`);
-      contador += 1;
-      valores.push(dados.dataNascimento);
-    }
-
+    const { campos, valores } = montarClausulasAtualizacaoUsuario(dados);
     if (campos.length === 0) return this.buscarPorUuid(uuid);
 
     valores.push(uuid);
+    const idxUuid = valores.length;
     const query = `
       UPDATE usuarios 
       SET ${campos.join(', ')} 
-      WHERE usu_uuid = $${contador}
+      WHERE usu_uuid = $${idxUuid}
     `;
 
     await this.db.executar(query, valores);

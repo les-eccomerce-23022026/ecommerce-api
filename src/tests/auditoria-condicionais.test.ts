@@ -19,16 +19,18 @@ describe('Auditoria de Condicionais (LES SSoT)', () => {
         const output = execSync(command).toString().trim();
         
         if (output) {
+          // eslint-disable-next-line no-console
           console.log('Violações U1 encontradas no Frontend:\n', output);
           // Falha o teste se houver saída (ocorrências de else)
           throw new Error(`Regra U1 violada: 'else' encontrado no frontend.\n${output}`);
         }
-      } catch (error: any) {
-        if (error.message.includes('Regra U1 violada')) {
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        if (errorMessage.includes('Regra U1 violada')) {
           throw error;
         }
         // Se o grep falhar por outros motivos (ex: pasta não existe), o teste falha
-        throw new Error(`Falha ao executar auditoria no frontend: ${error.message}`);
+        throw new Error(`Falha ao executar auditoria no frontend: ${errorMessage}`);
       }
     });
   });
@@ -40,14 +42,16 @@ describe('Auditoria de Condicionais (LES SSoT)', () => {
         const output = execSync(command).toString().trim();
         
         if (output) {
+          // eslint-disable-next-line no-console
           console.log('Violações U2 encontradas no Backend:\n', output);
           throw new Error(`Regra U2 violada: 'switch' encontrado no backend.\n${output}`);
         }
-      } catch (error: any) {
-        if (error.message.includes('Regra U2 violada')) {
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        if (errorMessage.includes('Regra U2 violada')) {
           throw error;
         }
-        throw new Error(`Falha ao executar auditoria no backend: ${error.message}`);
+        throw new Error(`Falha ao executar auditoria no backend: ${errorMessage}`);
       }
     });
 
@@ -59,11 +63,12 @@ describe('Auditoria de Condicionais (LES SSoT)', () => {
         const output = execSync(command).toString().trim();
         
         if (output) {
+          // eslint-disable-next-line no-console
           console.warn('Sugestões de revisão de Early Return no Backend:\n', output);
           // Não falha necessariamente o teste a menos que queiramos ser rígidos, 
           // mas o plano diz "exclusões SQL/testes" e "coding-style §2".
         }
-      } catch (error) {
+      } catch {
         // ignora erros de busca
       }
     });

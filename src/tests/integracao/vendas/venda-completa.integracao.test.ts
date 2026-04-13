@@ -55,6 +55,7 @@ describe('Integração - Venda Completa (Sprint 1)', () => {
         ],
       });
 
+    // eslint-disable-next-line no-console
     if (res.status !== 200) console.log('Error Body:', JSON.stringify(res.body));
     expect(res.status).toBe(200);
     expect(res.body.sucesso).toBe(true);
@@ -102,7 +103,7 @@ describe('Integração - Venda Completa (Sprint 1)', () => {
       .get(`/api/pagamentos/venda/${vendaUuid}/resumo`)
       .set('Authorization', `Bearer ${token}`);
 
-    const aprovados = resResumo.body.pagamentos.filter((p: any) => p.status === 'aprovado');
+    const aprovados = resResumo.body.pagamentos.filter((p: { status: string }) => p.status === 'aprovado');
     expect(aprovados).toHaveLength(0);
   });
 
@@ -137,6 +138,7 @@ describe('Integração - Venda Completa (Sprint 1)', () => {
         ]
       });
 
+    // eslint-disable-next-line no-console
     if (res.status !== 200) console.log('S1-C Error Body:', JSON.stringify(res.body));
     expect(res.status).toBe(200);
     expect(res.body.sucesso).toBe(true);

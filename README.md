@@ -4,6 +4,14 @@ API Node.js/TypeScript (Express, PostgreSQL, Redis, JWT).
 
 ---
 
+## Contexto no monorepo
+
+- Visão geral do projeto: [`../README.md`](../README.md)
+- Frontend consumidor da API: [`../web/README.md`](../web/README.md)
+- Requisitos e ADRs (SSoT): [`../documentacao-exigida/README.md`](../documentacao-exigida/README.md)
+
+---
+
 ## 1. Banco de dados e Redis (desenvolvimento)
 
 Na pasta `backend`:
@@ -59,6 +67,13 @@ A API sobe em `http://localhost:${PORTA_HTTP:-3000}` (prefixo `/api`). Variávei
 - CORS usa `credentials: true`; a origem precisa estar em `CORS_ORIGIN`.
 
 **Só com Docker (app + banco):** `docker compose up -d` (o serviço `app` usa o `.env`).
+
+### Contrato com frontend
+
+- Base de API consumida pelo frontend: `/api`.
+- Sessão principal via cookie HttpOnly (`les_token` por padrão).
+- Para desenvolvimento local, o frontend usa proxy Vite (`localhost:5173 -> localhost:3000`).
+- Para detalhes do cliente web e variáveis `VITE_*`: consulte [`../web/README.md`](../web/README.md).
 
 ---
 

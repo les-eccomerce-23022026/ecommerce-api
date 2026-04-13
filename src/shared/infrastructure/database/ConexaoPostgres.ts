@@ -82,7 +82,7 @@ export class ConexaoPostgres implements IConexaoBanco {
     return tipo === 'teste' ? this.obterPoolTeste() : this.poolProducao;
   }
 
-  private obterSchemaPadrao(): string {
+  private static obterSchemaPadrao(): string {
     return process.env.POSTGRES_SCHEMA ?? 'les';
   }
 
@@ -96,7 +96,7 @@ export class ConexaoPostgres implements IConexaoBanco {
         throw new Error(`searchPath inválido: ${opcoes.searchPath}`);
       }
 
-      const schemaPadrao = this.obterSchemaPadrao();
+      const schemaPadrao = ConexaoPostgres.obterSchemaPadrao();
       const pathFull = `${opcoes.searchPath}, ${schemaPadrao}, public`;
 
       if (transacao) {

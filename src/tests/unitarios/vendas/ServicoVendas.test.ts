@@ -58,6 +58,8 @@ describe('ServicoVendas — registrarPedidoVenda', () => {
       listarPorUsuario: jest.fn(),
       listarTodas: jest.fn(),
       atualizarStatus: jest.fn(),
+      registrarSolicitacaoTroca: jest.fn(),
+      obterEmailUsuarioPorVenda: jest.fn(),
     } as jest.Mocked<IRepositorioVendas>;
 
     mockRepoCotacao = {
@@ -191,6 +193,8 @@ describe('ServicoVendas — visualizarDetalhesVenda', () => {
       listarPorUsuario: jest.fn(),
       listarTodas: jest.fn(),
       atualizarStatus: jest.fn(),
+      registrarSolicitacaoTroca: jest.fn(),
+      obterEmailUsuarioPorVenda: jest.fn(),
     } as jest.Mocked<IRepositorioVendas>;
   });
 
@@ -242,6 +246,8 @@ describe('ServicoVendas — listarVendasCliente', () => {
       listarPorUsuario: jest.fn().mockResolvedValue([vendaResultado()]),
       listarTodas: jest.fn(),
       atualizarStatus: jest.fn(),
+      registrarSolicitacaoTroca: jest.fn(),
+      obterEmailUsuarioPorVenda: jest.fn(),
     } as jest.Mocked<IRepositorioVendas>;
 
     const servico = new ServicoVendas(mockRepoVendas);

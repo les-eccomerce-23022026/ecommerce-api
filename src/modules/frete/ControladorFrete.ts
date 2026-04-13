@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { ServicoFrete } from '@/modules/frete/ServicoFrete';
 import { cepOrigemPadrao, sanitizarCep8Digitos } from '@/modules/frete/freteCepUtil';
+import { parseCorpoCotacaoFrete } from '@/modules/frete/controlador-frete-parse.util';
 
 /**
  * HTTP: cotação de frete persistida (uso pelo checkout e por integrações).
@@ -14,16 +15,9 @@ export class ControladorFrete {
    */
   public cotar = async (req: Request, res: Response): Promise<void> => {
     try {
-      const body = req.body as Record<string, unknown>;
-      const cepDestino = typeof body.cepDestino === 'string' ? body.cepDestino : '';
-      const pesoBruto = body.pesoKg ?? body.peso;
-      const pesoKg = pesoBruto !== undefined && pesoBruto !== null ? Number(pesoBruto) : 1;
-      const valorItens =
-        body.valorTotalItens !== undefined && body.valorTotalItens !== null
-          ? Number(body.valorTotalItens)
-          : undefined;
-      const cepOrigem = typeof body.cepOrigem === 'string' ? body.cepOrigem : undefined;
-
+      const { cepDestino, pesoKg, valorItens, cepOrigem } = parseCorpoCotacaoFrete(
+        req.body as Record<string, unknown>,
+      );
       if (!cepDestino.trim()) {
         res.status(400).json({ erro: 'cepDestino é obrigatório' });
         return;
@@ -32,7 +26,6 @@ export class ControladorFrete {
         res.status(400).json({ erro: 'pesoKg inválido' });
         return;
       }
-
       const opcoes = await this.servicoFrete.cotarEPersistir({
         cepDestino,
         cepOrigem,

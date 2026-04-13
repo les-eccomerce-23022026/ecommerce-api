@@ -2,11 +2,17 @@ import { GestaoIdentidadeCliente } from '@/modules/clientes/clientes.service';
 
 describe('GestaoIdentidadeCliente', () => {
   let servico: GestaoIdentidadeCliente;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let mockRepositorioUsuarios: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let mockRepositorioPerfil: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let mockRepositorioTelefone: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let mockRepositorioEndereco: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let mockRepositorioCartoes: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let mockDb: any;
 
   beforeEach(() => {

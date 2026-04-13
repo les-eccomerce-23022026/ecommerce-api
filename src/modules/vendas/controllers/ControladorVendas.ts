@@ -8,6 +8,7 @@ import type { IRepositorioPagamentos } from '@/modules/pagamentos/IRepositorioPa
  */
 export class ControladorVendas {
   private readonly servicoVendas: ServicoVendas;
+
   private readonly repoPagamentos: IRepositorioPagamentos;
 
   constructor(servicoVendas: ServicoVendas, repoPagamentos: IRepositorioPagamentos) {
@@ -42,7 +43,7 @@ export class ControladorVendas {
   public visualizarDetalhesVenda = async (req: Request, res: Response) => {
     try {
       const { uuid } = req.params;
-      const usuario = req.usuario;
+      const { usuario } = req;
       if (!usuario?.uuid) {
         res.status(401).json({ erro: 'Usuário não identificado.' });
         return;

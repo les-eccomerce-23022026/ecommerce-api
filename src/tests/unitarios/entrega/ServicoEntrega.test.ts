@@ -2,6 +2,7 @@ import { ServicoEntrega } from '@/modules/entrega/ServicoEntrega';
 import { IRepositorioEntrega } from '@/modules/entrega/IRepositorioEntrega';
 import { IRepositorioVendas, IVenda } from '@/modules/vendas/repositories/IRepositorioVendas';
 import { IEntregaOutputDto } from '@/modules/entrega/IEntrega.dto';
+import { IServicoNotificacao } from '@/modules/entrega/ports/IServicoNotificacao';
 
 describe('ServicoEntrega', () => {
   let servico: ServicoEntrega;
@@ -26,7 +27,7 @@ describe('ServicoEntrega', () => {
       enviarNotificacaoRastreio: jest.fn(),
     };
 
-    servico = new ServicoEntrega(mockRepoEntrega, mockRepoVendas, mockServicoNotificacao as any);
+    servico = new ServicoEntrega(mockRepoEntrega, mockRepoVendas, mockServicoNotificacao as unknown as IServicoNotificacao);
   });
 
   describe('agendarRemessa', () => {

@@ -1,7 +1,7 @@
-import { IRepositorioVendas, IVenda } from '../repositories/IRepositorioVendas';
-import { IVendaInputDto } from '../dtos/IVenda.dto';
 import type { IRepositorioCotacaoFrete } from '@/modules/frete/cotacaoFrete/IRepositorioCotacaoFrete';
 import { EstadosCotacaoFrete } from '@/modules/frete/cotacaoFrete/EstadosCotacaoFrete';
+import { IVendaInputDto } from '../dtos/IVenda.dto';
+import { IRepositorioVendas, IVenda } from '../repositories/IRepositorioVendas';
 
 const TOLERANCIA_MOEDA = 0.02;
 
@@ -21,37 +21,45 @@ export class ServicoVendas {
     this.repositorioCotacaoFrete = repositorioCotacaoFrete ?? null;
   }
 
+  private static validarEntradaBasicaPedido(dados: IVendaInputDto): void {
+    if (!dados.usuarioUuid) throw new Error('Usuário é obrigatório');
+    if (dados.itens.length === 0) throw new Error('Venda deve possuir ao menos um item');
+    if (dados.valorTotal <= 0) throw new Error('Valor total inválido');
+  }
+
+  private async resolverFretePorCotacao(cotacaoUuid: string): Promise<{ valorFrete: number; cfrId: number }> {
+    if (!this.repositorioCotacaoFrete) {
+      throw new Error('Cotação de frete não suportada nesta configuração');
+    }
+    const cot = await this.repositorioCotacaoFrete.obterPorUuid(cotacaoUuid);
+    if (!cot) throw new Error('Cotação de frete não encontrada');
+    if (cot.estado !== EstadosCotacaoFrete.CRIADA) {
+      throw new Error('Cotação de frete inválida ou já utilizada');
+    }
+    if (cot.expiraEm.getTime() < Date.now()) {
+      throw new Error('Cotação de frete expirada');
+    }
+    if (cot.venId != null) {
+      throw new Error('Cotação de frete já vinculada a uma venda');
+    }
+    return { valorFrete: cot.valor, cfrId: cot.cfrId };
+  }
+
   /**
    * Realiza o cadastro de uma nova venda.
    * RF0033, RF0037
    */
   public async registrarPedidoVenda(dados: IVendaInputDto): Promise<IVenda> {
-    if (!dados.usuarioUuid) throw new Error('Usuário é obrigatório');
-    if (dados.itens.length === 0) throw new Error('Venda deve possuir ao menos um item');
-    if (dados.valorTotal <= 0) throw new Error('Valor total inválido');
+    ServicoVendas.validarEntradaBasicaPedido(dados);
 
+    const cotacaoUuid = typeof dados.cotacaoUuid === 'string' ? dados.cotacaoUuid.trim() : '';
     let valorFreteFinal = Number(dados.valorFrete);
     let cfrId: number | undefined;
 
-    const cotacaoUuid = typeof dados.cotacaoUuid === 'string' ? dados.cotacaoUuid.trim() : '';
-
     if (cotacaoUuid) {
-      if (!this.repositorioCotacaoFrete) {
-        throw new Error('Cotação de frete não suportada nesta configuração');
-      }
-      const cot = await this.repositorioCotacaoFrete.obterPorUuid(cotacaoUuid);
-      if (!cot) throw new Error('Cotação de frete não encontrada');
-      if (cot.estado !== EstadosCotacaoFrete.CRIADA) {
-        throw new Error('Cotação de frete inválida ou já utilizada');
-      }
-      if (cot.expiraEm.getTime() < Date.now()) {
-        throw new Error('Cotação de frete expirada');
-      }
-      if (cot.venId != null) {
-        throw new Error('Cotação de frete já vinculada a uma venda');
-      }
-      valorFreteFinal = cot.valor;
-      cfrId = cot.cfrId;
+      const freteCotacao = await this.resolverFretePorCotacao(cotacaoUuid);
+      valorFreteFinal = freteCotacao.valorFrete;
+      cfrId = freteCotacao.cfrId;
     }
 
     const esperadoTotal = Number(dados.valorTotalItens) + valorFreteFinal;
@@ -151,7 +159,7 @@ export class ServicoVendas {
   /**
    * Rejeita uma troca (Admin).
    */
-  public async rejeitarTroca(vendaUuid: string, motivo: string): Promise<IVenda> {
+  public async rejeitarTroca(vendaUuid: string, _motivo: string): Promise<IVenda> {
     const venda = await this.repositorioVendas.obterPorUuid(vendaUuid);
     if (!venda) throw new Error('Venda não encontrada');
     if (venda.status !== 'EM TROCA') throw new Error('Pedido não está em fase de solicitação de troca');

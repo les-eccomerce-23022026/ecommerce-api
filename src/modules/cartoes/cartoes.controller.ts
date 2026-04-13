@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import { listarCamposObrigatoriosCartaoFaltantes } from '@/modules/cartoes/cartoes-controller-validacao.util';
 import { di } from '../../shared/infrastructure/di.container';
 import { RespostaPadrao } from '../../shared/errors/Iresposta-padrao';
 import { ICriarCartaoDto, IAtualizarCartaoDto } from './cartoes.service';
@@ -49,16 +50,8 @@ export class ControladorCartoes {
       }
 
       const dados: ICriarCartaoDto = requisicao.body;
-
-      // Validações básicas
-      const { uuidBandeira, token, ultimosDigitosCartao, nomeImpresso, validade } = dados;
-      if (!uuidBandeira || !token || !ultimosDigitosCartao || !nomeImpresso || !validade) {
-        const faltando = [];
-        if (!uuidBandeira) faltando.push('uuidBandeira');
-        if (!token) faltando.push('token');
-        if (!ultimosDigitosCartao) faltando.push('ultimosDigitosCartao');
-        if (!nomeImpresso) faltando.push('nomeImpresso');
-        if (!validade) faltando.push('validade');
+      const faltando = listarCamposObrigatoriosCartaoFaltantes(dados);
+      if (faltando.length > 0) {
         return RespostaPadrao.enviarErro(
           resposta,
           400,

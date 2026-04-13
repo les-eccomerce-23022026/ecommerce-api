@@ -13,6 +13,16 @@ export interface CheckoutPagamentoExtraido {
   vendaUuid?: string;
 }
 
+function credenciaisIntencaoCupomSomente(
+  idIntencao: string,
+  segredoConfirmacao: string,
+): { idIntencao: string; segredoConfirmacao: string } {
+  return {
+    idIntencao: idIntencao || 'CUPOM-ONLY',
+    segredoConfirmacao: segredoConfirmacao || 'CUPOM-ONLY',
+  };
+}
+
 function extrairCredenciaisIntencao(corpo: Record<string, unknown>, is100PercentCoupon: boolean): {
   idIntencao: string;
   segredoConfirmacao: string;
@@ -20,14 +30,9 @@ function extrairCredenciaisIntencao(corpo: Record<string, unknown>, is100Percent
   const idIntencao = typeof corpo.idIntencao === 'string' ? corpo.idIntencao.trim() : '';
   const segredoConfirmacao =
     typeof corpo.segredoConfirmacao === 'string' ? corpo.segredoConfirmacao.trim() : '';
-  
   if (is100PercentCoupon && (!idIntencao || !segredoConfirmacao)) {
-    return { 
-      idIntencao: idIntencao || 'CUPOM-ONLY', 
-      segredoConfirmacao: segredoConfirmacao || 'CUPOM-ONLY' 
-    };
+    return credenciaisIntencaoCupomSomente(idIntencao, segredoConfirmacao);
   }
-
   if (!idIntencao || !segredoConfirmacao) {
     throw new Error('Intenção de pagamento ausente ou inválida');
   }

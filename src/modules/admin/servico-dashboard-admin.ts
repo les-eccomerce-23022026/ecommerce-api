@@ -1,5 +1,11 @@
 import { IConexaoBanco, DbParametro } from '@/shared/infrastructure/database/IConexaoBanco';
 import { PAPEL_CLIENTE } from '@/shared/types/papeis';
+import {
+  percentualCrescimento,
+  indicesUltimosMeses,
+  inicioFimMes,
+} from '@/modules/admin/servico-dashboard-admin-helpers';
+import { DashboardAdminConsultas } from '@/modules/admin/servico-dashboard-admin-consultas';
 
 export type IDashboardAdminJson = Record<string, unknown>;
 
@@ -7,7 +13,11 @@ export type IDashboardAdminJson = Record<string, unknown>;
  * Monta o payload do dashboard administrativo no formato esperado pelo frontend (`IDashboardAdminInfo`).
  */
 export class ServicoDashboardAdmin {
-  constructor(private readonly db: IConexaoBanco) {}
+  private readonly consultas: DashboardAdminConsultas;
+
+  constructor(private readonly db: IConexaoBanco) {
+    this.consultas = new DashboardAdminConsultas(db);
+  }
 
   async obterDashboard(): Promise<IDashboardAdminJson> {
     const agora = new Date();
@@ -18,33 +28,28 @@ export class ServicoDashboardAdmin {
     const inicioMesAnterior = new Date(ano, agora.getMonth() - 1, 1);
     const fimMesAnterior = new Date(ano, agora.getMonth(), 0, 23, 59, 59, 999);
 
-    const totalVendasMes = await this.obterScalar(
+    const totalVendasMes = await this.consultas.obterScalar(
       `SELECT COALESCE(SUM(ven_total_venda), 0)::numeric AS v
        FROM vendas
        WHERE ven_criado_em >= $1 AND ven_criado_em <= $2`,
       [inicioMes, fimMes],
     );
 
-    const totalVendasMesAnterior = await this.obterScalar(
+    const totalVendasMesAnterior = await this.consultas.obterScalar(
       `SELECT COALESCE(SUM(ven_total_venda), 0)::numeric AS v
        FROM vendas
        WHERE ven_criado_em >= $1 AND ven_criado_em <= $2`,
       [inicioMesAnterior, fimMesAnterior],
     );
 
-    const percentualCrescimento =
-      totalVendasMesAnterior > 0
-        ? Math.round((totalVendasMes / totalVendasMesAnterior - 1) * 100)
-        : totalVendasMes > 0
-          ? 100
-          : 0;
+    const pctCrescimentoVendas = percentualCrescimento(totalVendasMes, totalVendasMesAnterior);
 
-    const ticketMedio = await this.obterScalar(
+    const ticketMedio = await this.consultas.obterScalar(
       `SELECT COALESCE(AVG(ven_total_venda), 0)::numeric AS v FROM vendas`,
       [],
     );
 
-    const ticketMedioMesAnterior = await this.obterScalar(
+    const ticketMedioMesAnterior = await this.consultas.obterScalar(
       `SELECT COALESCE(AVG(ven_total_venda), 0)::numeric AS v
        FROM vendas
        WHERE ven_criado_em >= $1 AND ven_criado_em <= $2`,
@@ -56,7 +61,7 @@ export class ServicoDashboardAdmin {
         ? Math.round((ticketMedio / ticketMedioMesAnterior - 1) * 100 * 10) / 10
         : 0;
 
-    const pedidosPendentes = await this.obterScalarInt(
+    const pedidosPendentes = await this.consultas.obterScalarInt(
       `SELECT COUNT(*)::int AS c
        FROM vendas v
        JOIN status_vendas s ON v.stv_id = s.stv_id
@@ -64,7 +69,7 @@ export class ServicoDashboardAdmin {
       [],
     );
 
-    const trocasSolicitadas = await this.obterScalarInt(
+    const trocasSolicitadas = await this.consultas.obterScalarInt(
       `SELECT COUNT(*)::int AS c
        FROM vendas v
        JOIN status_vendas s ON v.stv_id = s.stv_id
@@ -72,35 +77,30 @@ export class ServicoDashboardAdmin {
       [],
     );
 
-    const clientesAtivos = await this.obterScalarInt(
+    const clientesAtivos = await this.consultas.obterScalarInt(
       `SELECT COUNT(*)::int AS c
        FROM usuarios
        WHERE pap_id = $1 AND usu_ativo = TRUE`,
       [PAPEL_CLIENTE.id] as DbParametro[],
     );
 
-    const novosClientesMes = await this.obterScalarInt(
+    const novosClientesMes = await this.consultas.obterScalarInt(
       `SELECT COUNT(*)::int AS c
        FROM usuarios
        WHERE pap_id = $1 AND usu_criado_em >= $2 AND usu_criado_em <= $3`,
       [PAPEL_CLIENTE.id, inicioMes, fimMes] as DbParametro[],
     );
 
-    const novosClientesMesAnterior = await this.obterScalarInt(
+    const novosClientesMesAnterior = await this.consultas.obterScalarInt(
       `SELECT COUNT(*)::int AS c
        FROM usuarios
        WHERE pap_id = $1 AND usu_criado_em >= $2 AND usu_criado_em <= $3`,
       [PAPEL_CLIENTE.id, inicioMesAnterior, fimMesAnterior] as DbParametro[],
     );
 
-    const percentualCrescimentoClientes =
-      novosClientesMesAnterior > 0
-        ? Math.round((novosClientesMes / novosClientesMesAnterior - 1) * 100)
-        : novosClientesMes > 0
-          ? 100
-          : 0;
+    const pctCrescimentoClientes = percentualCrescimento(novosClientesMes, novosClientesMesAnterior);
 
-    const livrosBaixoEstoque = await this.obterScalarInt(
+    const livrosBaixoEstoque = await this.consultas.obterScalarInt(
       `SELECT COUNT(*)::int AS c
        FROM estoques e
        WHERE e.etq_ativo = TRUE
@@ -109,11 +109,11 @@ export class ServicoDashboardAdmin {
     );
 
     const statusLabels = ['Entregues', 'Em Trânsito', 'Preparando', 'Pendentes', 'Devoluções'];
-    const cntEntregue = await this.contarPorStatus('ENTREGUE');
-    const cntTransito = await this.contarPorStatus('EM TRÂNSITO');
-    const cntPreparando = await this.contarPorStatus('APROVADA');
-    const cntPendentes = await this.contarPorStatus('EM PROCESSAMENTO');
-    const cntDevolucoes = await this.obterScalarInt(
+    const cntEntregue = await this.consultas.contarPorStatus('ENTREGUE');
+    const cntTransito = await this.consultas.contarPorStatus('EM TRÂNSITO');
+    const cntPreparando = await this.consultas.contarPorStatus('APROVADA');
+    const cntPendentes = await this.consultas.contarPorStatus('EM PROCESSAMENTO');
+    const cntDevolucoes = await this.consultas.obterScalarInt(
       `SELECT COUNT(*)::int AS c
        FROM vendas v
        JOIN status_vendas s ON v.stv_id = s.stv_id
@@ -122,60 +122,60 @@ export class ServicoDashboardAdmin {
     );
     const statusData = [cntEntregue, cntTransito, cntPreparando, cntPendentes, cntDevolucoes];
 
-    const labelsMeses: string[] = [];
-    const receitaMensal: number[] = [];
-    for (let i = 2; i >= 0; i--) {
-      const d = new Date(agora.getFullYear(), agora.getMonth() - i, 1);
-      const label = d.toLocaleString('pt-BR', { month: 'short' });
-      labelsMeses.push(label.charAt(0).toUpperCase() + label.slice(1));
+    const mesesReceita = await Promise.all(
+      indicesUltimosMeses(3).map(async (i) => {
+        const d = new Date(agora.getFullYear(), agora.getMonth() - i, 1);
+        const label = d.toLocaleString('pt-BR', { month: 'short' });
+        const labelFmt = label.charAt(0).toUpperCase() + label.slice(1);
+        const { ini, fim } = inicioFimMes(d.getFullYear(), d.getMonth());
+        const r = await this.consultas.obterScalar(
+          `SELECT COALESCE(SUM(ven_total_venda), 0)::numeric AS v
+           FROM vendas
+           WHERE ven_criado_em >= $1 AND ven_criado_em <= $2`,
+          [ini, fim],
+        );
+        return { labelFmt, valor: Number(r) };
+      }),
+    );
+    const labelsMeses = mesesReceita.map((m) => m.labelFmt);
+    const receitaMensal = mesesReceita.map((m) => m.valor);
 
-      const ini = new Date(d.getFullYear(), d.getMonth(), 1);
-      const fim = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999);
-      const r = await this.obterScalar(
-        `SELECT COALESCE(SUM(ven_total_venda), 0)::numeric AS v
-         FROM vendas
-         WHERE ven_criado_em >= $1 AND ven_criado_em <= $2`,
-        [ini, fim],
-      );
-      receitaMensal.push(Number(r));
-    }
-
-    const categoriasTop = await this.obterDuasCategorias();
+    const categoriasTop = await this.consultas.obterDuasCategorias();
     const datasetsCategoria = await Promise.all(
       categoriasTop.map(async (catNome, idx) => {
         const borderColor = idx === 0 ? 'rgb(15, 76, 58)' : 'rgb(210, 180, 140)';
         const backgroundColor = idx === 0 ? 'rgba(15, 76, 58, 0.5)' : 'rgba(210, 180, 140, 0.5)';
-        const data: number[] = [];
-        for (let j = 2; j >= 0; j--) {
-          const d = new Date(agora.getFullYear(), agora.getMonth() - j, 1);
-          const q = await this.contarItensVendidosPorCategoriaMes(
-            catNome,
-            d.getFullYear(),
-            d.getMonth() + 1,
-          );
-          data.push(q);
-        }
+        const contagens = await Promise.all(
+          indicesUltimosMeses(3).map(async (j) => {
+            const d = new Date(agora.getFullYear(), agora.getMonth() - j, 1);
+            return this.consultas.contarItensVendidosPorCategoriaMes(
+              catNome,
+              d.getFullYear(),
+              d.getMonth() + 1,
+            );
+          }),
+        );
         return {
           label: catNome,
-          data,
+          data: contagens,
           borderColor,
           backgroundColor,
         };
       }),
     );
 
-    const atividadesRecentes = await this.obterAtividadesRecentes();
+    const atividadesRecentes = await this.consultas.obterAtividadesRecentes();
 
     return {
       metricas: {
         totalVendasMes: Number(totalVendasMes),
-        percentualCrescimento,
+        percentualCrescimento: pctCrescimentoVendas,
         pedidosPendentes,
         trocasSolicitadas,
         ticketMedio: Number(ticketMedio),
         percentualCrescimentoTicket,
         clientesAtivos,
-        percentualCrescimentoClientes,
+        percentualCrescimentoClientes: pctCrescimentoClientes,
         livrosBaixoEstoque,
       },
       graficoVendasPorCategoria: {
@@ -213,89 +213,5 @@ export class ServicoDashboardAdmin {
       },
       atividadesRecentes,
     };
-  }
-
-  private async contarPorStatus(descricao: string): Promise<number> {
-    return this.obterScalarInt(
-      `SELECT COUNT(*)::int AS c
-       FROM vendas v
-       JOIN status_vendas s ON v.stv_id = s.stv_id
-       WHERE s.stv_descricao = $1`,
-      [descricao],
-    );
-  }
-
-  private async obterDuasCategorias(): Promise<string[]> {
-    const rows = await this.db.executar<{ cat_nome: string }>(
-      `SELECT cat_nome FROM categorias WHERE cat_ativo = TRUE ORDER BY cat_nome ASC LIMIT 2`,
-      [],
-    );
-    if (rows.length >= 2) {
-      return [rows[0].cat_nome, rows[1].cat_nome];
-    }
-    if (rows.length === 1) {
-      return [rows[0].cat_nome, 'Outros'];
-    }
-    return ['Catálogo', 'Outros'];
-  }
-
-  private async contarItensVendidosPorCategoriaMes(
-    catNome: string,
-    anoRef: number,
-    mesRef: number,
-  ): Promise<number> {
-    if (catNome === 'Outros' || catNome === 'Catálogo') {
-      return 0;
-    }
-    const rows = await this.db.executar<{ c: number }>(
-      `SELECT COALESCE(SUM(iv.itv_quantidade), 0)::int AS c
-       FROM itens_venda iv
-       INNER JOIN vendas ven ON iv.ven_id = ven.ven_id
-       INNER JOIN livros l ON l.liv_uuid = iv.liv_uuid
-       INNER JOIN livro_categorias lc ON lc.liv_id = l.liv_id
-       INNER JOIN categorias cat ON cat.cat_id = lc.cat_id
-       WHERE cat.cat_nome = $1
-         AND EXTRACT(YEAR FROM ven.ven_criado_em) = $2
-         AND EXTRACT(MONTH FROM ven.ven_criado_em) = $3`,
-      [catNome, anoRef, mesRef] as DbParametro[],
-    );
-    return rows[0]?.c ?? 0;
-  }
-
-  private async obterAtividadesRecentes(): Promise<Record<string, unknown>[]> {
-    const rows = await this.db.executar<{
-      ven_uuid: string;
-      ven_total_venda: string;
-      ven_criado_em: string;
-    }>(
-      `SELECT ven_uuid, ven_total_venda::text, ven_criado_em::text
-       FROM vendas
-       ORDER BY ven_criado_em DESC
-       LIMIT 5`,
-      [],
-    );
-
-    return rows.map((r) => {
-      const part = r.ven_uuid.split('-')[1] ?? r.ven_uuid;
-      const total = Number(r.ven_total_venda);
-      const dataFmt = new Date(r.ven_criado_em).toLocaleString('pt-BR');
-      return {
-        uuid: r.ven_uuid,
-        tipo: 'Venda',
-        descricao: `Pedido #${part.toUpperCase()} — Total R$ ${total.toFixed(2)}`,
-        data: dataFmt,
-        sucesso: true,
-      };
-    });
-  }
-
-  private async obterScalar(sql: string, params: DbParametro[]): Promise<number> {
-    const rows = await this.db.executar<{ v: string }>(sql, params);
-    return Number(rows[0]?.v ?? 0);
-  }
-
-  private async obterScalarInt(sql: string, params: DbParametro[]): Promise<number> {
-    const rows = await this.db.executar<{ c: number }>(sql, params);
-    return Number(rows[0]?.c ?? 0);
   }
 }

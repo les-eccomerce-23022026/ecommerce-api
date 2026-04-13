@@ -1,3 +1,4 @@
+import { Logger } from '@/shared/utils/Logger.util';
 import { IServicoNotificacao } from '../ports/IServicoNotificacao';
 
 /**
@@ -9,7 +10,9 @@ export class ServicoNotificacaoEmail implements IServicoNotificacao {
     codigoRastreio: string,
     vendaUuid: string
   ): Promise<void> {
-    // Simula disparo de e-mail (log em dev)
-    console.log(`[NOTIFICAÇÃO] E-mail enviado para ${email}: Seu código de rastreio para a venda ${vendaUuid} é ${codigoRastreio}`);
+    const ctx = this.constructor.name;
+    Logger.info(
+      `[NOTIFICAÇÃO] E-mail simulado (${ctx}) para ${email}: rastreio da venda ${vendaUuid} = ${codigoRastreio}`,
+    );
   }
 }

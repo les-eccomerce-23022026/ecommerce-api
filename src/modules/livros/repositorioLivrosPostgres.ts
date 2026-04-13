@@ -5,6 +5,7 @@ import type {
   IListagemCatalogoLivros,
   OrdenacaoCatalogo,
 } from '@/modules/livros/ICatalogoLivros.dto';
+import { montarPartesSqlCatalogo } from '@/modules/livros/repositorioLivrosCatalogoSql';
 
 type RowLivro = {
   liv_uuid: string;
@@ -56,18 +57,17 @@ export class RepositorioLivrosPostgres {
     categoriaSlug?: string;
     ordenacao: OrdenacaoCatalogo;
   }): Promise<IListagemCatalogoLivros> {
-    const { pagina, itensPorPagina, categoriaSlug, ordenacao } = opcoes;
-    const offset = (pagina - 1) * itensPorPagina;
+    const { pagina, itensPorPagina } = opcoes;
+    const {
+      filtroCategoria,
+      joinVendas,
+      orderBy,
+      paramsCount,
+      paramsList,
+      limitIdx,
+      offsetIdx,
+    } = montarPartesSqlCatalogo(opcoes);
 
-    const filtroCategoria = categoriaSlug
-      ? `AND EXISTS (
-          SELECT 1 FROM livro_categorias lc
-          INNER JOIN categorias c ON c.cat_id = lc.cat_id AND c.cat_ativo = TRUE
-          WHERE lc.liv_id = l.liv_id AND c.cat_slug = $1
-        )`
-      : '';
-
-    const paramsCount: DbParametro[] = categoriaSlug ? [categoriaSlug] : [];
     const sqlCount = `
       SELECT COUNT(DISTINCT l.liv_id)::text AS c
       FROM livros l
@@ -77,28 +77,6 @@ export class RepositorioLivrosPostgres {
     `;
     const countRows = await this.db.executar<{ c: string }>(sqlCount, paramsCount);
     const total = countRows.length ? Number(countRows[0].c) : 0;
-
-    const joinVendas =
-      ordenacao === 'mais-vendidos'
-        ? `LEFT JOIN (
-            SELECT liv_id, SUM(itv_quantidade)::numeric AS qtd_vendida
-            FROM itens_venda
-            GROUP BY liv_id
-          ) vendas_agg ON vendas_agg.liv_id = l.liv_id`
-        : '';
-
-    const orderBy =
-      ordenacao === 'mais-vendidos'
-        ? 'ORDER BY COALESCE(vendas_agg.qtd_vendida, 0) DESC, l.liv_criado_em DESC NULLS LAST'
-        : 'ORDER BY l.liv_criado_em DESC NULLS LAST';
-
-    const paramsList: DbParametro[] = categoriaSlug
-      ? [categoriaSlug, itensPorPagina, offset]
-      : [itensPorPagina, offset];
-
-    const filtroIdx = categoriaSlug ? '$1' : '';
-    const limitIdx = categoriaSlug ? '$2' : '$1';
-    const offsetIdx = categoriaSlug ? '$3' : '$2';
 
     const sqlList = `
       SELECT
@@ -116,11 +94,7 @@ export class RepositorioLivrosPostgres {
       INNER JOIN estoques e ON e.liv_id = l.liv_id
       ${joinVendas}
       WHERE l.liv_ativo = TRUE AND e.etq_ativo = TRUE AND e.etq_quantidade_disponivel > 0
-      ${categoriaSlug ? `AND EXISTS (
-          SELECT 1 FROM livro_categorias lc
-          INNER JOIN categorias c ON c.cat_id = lc.cat_id AND c.cat_ativo = TRUE
-          WHERE lc.liv_id = l.liv_id AND c.cat_slug = ${filtroIdx}
-        )` : ''}
+      ${filtroCategoria}
       ${orderBy}
       LIMIT ${limitIdx} OFFSET ${offsetIdx}
     `;

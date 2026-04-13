@@ -68,5 +68,17 @@ module.exports = {
         'import/no-extraneous-dependencies': 'off',
       },
     },
+    {
+      files: ['src/modules/clientes/gestao-identidade-cliente-endereco.service.ts'],
+      rules: {
+        'no-param-reassign': [
+          'error',
+          {
+            props: true,
+            ignorePropertyModificationsFor: ['ref'],
+          },
+        ],
+      },
+    },
   ],
 };

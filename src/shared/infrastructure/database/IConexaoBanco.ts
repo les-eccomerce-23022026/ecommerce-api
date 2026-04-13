@@ -2,7 +2,8 @@
  * Tipo para parâmetros de consulta SQL.
  * Representa os valores seguros que podem ser passados como parâmetros.
  */
-export type DbParametro = string | number | boolean | Date | null | undefined;
+/** Inclui `string[]` para binds do Postgres (ex.: `ANY($1::uuid[])`). */
+export type DbParametro = string | number | boolean | Date | null | undefined | readonly string[];
 
 /**
  * Interface genérica para conexão com banco de dados.
