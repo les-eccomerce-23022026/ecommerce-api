@@ -27,8 +27,10 @@ export class ServicoPedidosAdmin {
     if (!venda) {
       throw new Error('Pedido não encontrado.');
     }
-    if (venda.status !== 'EM PROCESSAMENTO') {
-      throw new Error('Somente pedidos em processamento podem ser despachados.');
+    const statusAtual = venda.status.trim().toUpperCase();
+    const statusPermitidos = new Set(['EM PROCESSAMENTO', 'APROVADA']);
+    if (!statusPermitidos.has(statusAtual)) {
+      throw new Error('Somente pedidos em processamento ou aprovados podem ser despachados.');
     }
 
     await this.servicoEntrega.agendarRemessa({

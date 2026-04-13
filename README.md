@@ -164,6 +164,18 @@ npm run test:coverage
   - SAST (`semgrep` + lint)
   - config lint (`yamllint`, `shellcheck`, `hadolint`)
   - testes backend/frontend
+- Política de gate incremental:
+  - checks rodam por escopo alterado (`backend/**`, `web/**`, `.github/**`);
+  - lint e SAST focam arquivos alterados no PR para não bloquear por dívida histórica fora do diff;
+  - E2E Cypress não entra no gate padrão neste estágio (somente unit/integration + segurança).
+- Validação operacional no GitHub:
+  - rode o workflow `security-ci` por `workflow_dispatch` com `full_gate=true` para execução completa (sem filtro incremental);
+  - mantenha `check_secrets=true` para validar os secrets obrigatórios antes de promover mudanças para `main/master`;
+  - use o modo incremental no dia a dia e o `full_gate` como checklist de release/hardening.
+- Secrets obrigatórios no repositório remoto (Settings → Secrets and variables → Actions):
+  - `TEST_BOOTSTRAP_KEY`
+  - `CYPRESS_ADMIN_EMAIL`, `CYPRESS_ADMIN_SENHA`
+  - `CYPRESS_CLIENTE_EMAIL`, `CYPRESS_CLIENTE_SENHA`
 
 ---
 
