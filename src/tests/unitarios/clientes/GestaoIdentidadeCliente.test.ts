@@ -1,4 +1,4 @@
-import { GestaoIdentidadeCliente } from './clientes.service';
+import { GestaoIdentidadeCliente } from '@/modules/clientes/clientes.service';
 
 describe('GestaoIdentidadeCliente', () => {
   let servico: GestaoIdentidadeCliente;
@@ -11,11 +11,11 @@ describe('GestaoIdentidadeCliente', () => {
 
   beforeEach(() => {
     mockRepositorioUsuarios = {
-      buscarPorUuid: jest.fn().mockResolvedValue({ 
-        id: 1, 
-        uuid: 'uuid-123', 
+      buscarPorUuid: jest.fn().mockResolvedValue({
+        id: 1,
+        uuid: 'uuid-123',
         email: 'teste@teste.com',
-        cpf: '12345678901'
+        cpf: '12345678901',
       }),
       atualizarUsuario: jest.fn(),
     };
@@ -45,25 +45,25 @@ describe('GestaoIdentidadeCliente', () => {
       mockRepositorioTelefone,
       mockRepositorioEndereco,
       mockRepositorioCartoes,
-      mockDb
+      mockDb,
     );
   });
 
   describe('atualizarCliente', () => {
     it('deve atualizar perfil se ele já existir', async () => {
       mockRepositorioPerfil.buscarPorIdUsuario.mockResolvedValue({ idUsuario: 1 });
-      
+
       await servico.atualizarCliente('uuid-123', { genero: 'Masculino' });
-      
+
       expect(mockRepositorioPerfil.atualizar).toHaveBeenCalled();
       expect(mockRepositorioPerfil.criar).not.toHaveBeenCalled();
     });
 
     it('deve criar perfil se ele não existir', async () => {
       mockRepositorioPerfil.buscarPorIdUsuario.mockResolvedValue(null);
-      
+
       await servico.atualizarCliente('uuid-123', { genero: 'Feminino' });
-      
+
       expect(mockRepositorioPerfil.criar).toHaveBeenCalled();
       expect(mockRepositorioPerfil.atualizar).not.toHaveBeenCalled();
     });

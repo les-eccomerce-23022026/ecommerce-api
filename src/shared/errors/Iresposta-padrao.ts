@@ -57,7 +57,8 @@ export class RespostaPadrao {
    */
   public static obterMensagemErro(erro: unknown, mensagemPadrao: string): string {
     if (erro instanceof Error) {
-      return erro.message;
+      const mensagem = (erro.message || '').trim();
+      return mensagem.length > 0 ? mensagem : mensagemPadrao;
     }
     return mensagemPadrao;
   }

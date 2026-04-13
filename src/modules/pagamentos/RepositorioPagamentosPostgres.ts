@@ -245,4 +245,12 @@ export class RepositorioPagamentosPostgres implements IRepositorioPagamentos {
       ativo: r.ativo
     }));
   }
+
+  public async obterUsuarioIdInternoPorUuid(usuarioUuid: string): Promise<number | null> {
+    const rows = await this.db.executar<{ usu_id: number }>(
+      'SELECT usu_id FROM usuarios WHERE usu_uuid = $1',
+      [usuarioUuid],
+    );
+    return rows[0]?.usu_id ?? null;
+  }
 }

@@ -24,14 +24,16 @@ describe('Integração - Troca e Devolução (Sprint 2)', () => {
         valorFrete: 10,
         valorTotal: 110,
       });
-    const vendaUuid = resVenda.body.id;
+    const vendaUuid = resVenda.body.id as string;
 
-    // 2. Mudar para ENTREGUE via Banco para facilitar setup
-    await contexto.db!.executar(`
-      UPDATE vendas 
-      SET stv_id = (SELECT stv_id FROM status_vendas WHERE stv_descricao = 'ENTREGUE')
-      WHERE ven_uuid = $1
-    `, [vendaUuid]);
+    // 2. Mudar para ENTREGUE e registrar data de entrega (necessário para o prazo de 7 dias — RN0043)
+    await contexto.db!.executar(
+      `UPDATE vendas
+       SET stv_id = (SELECT stv_id FROM status_vendas WHERE stv_descricao = 'ENTREGUE'),
+           ven_data_hora_entrega = NOW()
+       WHERE ven_uuid = $1`,
+      [vendaUuid],
+    );
 
     return vendaUuid;
   }
@@ -125,15 +127,15 @@ describe('Integração - Troca e Devolução (Sprint 2)', () => {
     expect(resRejeitar.body.status).toBe('TROCA REJEITADA');
   });
 
-  it('S2-D: Prazo de arrependimento (7 dias)', async () => {
+  it('S2-D: Prazo de arrependimento (7 dias) — bloqueio após janela de entrega expirada', async () => {
     const vendaUuid = await criarPedidoEntregue();
 
-    // Retroceder data da venda para 8 dias atrás
-    await contexto.db!.executar(`
-      UPDATE vendas SET ven_criado_em = NOW() - INTERVAL '8 days' WHERE ven_uuid = $1
-    `, [vendaUuid]);
+    // Retroceder a data de entrega para 8 dias atrás — simula janela de 7 dias vencida (RN0043)
+    await contexto.db!.executar(
+      `UPDATE vendas SET ven_data_hora_entrega = NOW() - INTERVAL '8 days' WHERE ven_uuid = $1`,
+      [vendaUuid],
+    );
 
-    // Tentar solicitar troca
     const resTroca = await request(contexto.app)
       .post(`/api/vendas/${vendaUuid}/troca`)
       .set('Authorization', `Bearer ${tokenCliente}`)

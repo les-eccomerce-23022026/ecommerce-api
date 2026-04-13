@@ -1,32 +1,31 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { ServicoPagamentos } from './ServicoPagamentos';
-import { TipoPagamento } from './FormaPagamento';
-import { StatusPagamento } from './IPagamento';
+import { ServicoPagamentos } from '@/modules/pagamentos/ServicoPagamentos';
+import { TipoPagamento } from '@/modules/pagamentos/FormaPagamento';
+import { StatusPagamento } from '@/modules/pagamentos/IPagamento';
 
 describe('ServicoPagamentos (TDD)', () => {
   let servico: ServicoPagamentos;
-  let repositórioPagamentosMock: any;
+  let repositorioPagamentosMock: any;
   let provedorPagamentoMock: any;
-  let repositórioIntencaoMock: any;
-  let repositórioVendasMock: any;
+  let repositorioIntencaoMock: any;
+  let repositorioVendasMock: any;
 
   beforeEach(() => {
-    repositórioPagamentosMock = {
-      cadastrar: vi.fn(),
-      listarPorVenda: vi.fn(),
-      obterVenIdPorVendaUuid: vi.fn(),
-      obterPagIdInternoPorUuid: vi.fn(),
-      inserirPixSimulado: vi.fn()
+    repositorioPagamentosMock = {
+      cadastrar: jest.fn(),
+      listarPorVenda: jest.fn(),
+      obterVenIdPorVendaUuid: jest.fn(),
+      obterPagIdInternoPorUuid: jest.fn(),
+      inserirPixSimulado: jest.fn(),
     };
-    provedorPagamentoMock = { registrarIntencaoPagamento: vi.fn(), confirmarPagamento: vi.fn() };
-    repositórioIntencaoMock = { vincularVenda: vi.fn(), obterPorUuid: vi.fn() };
-    repositórioVendasMock = { obterPorUuid: vi.fn(), atualizarStatus: vi.fn() };
+    provedorPagamentoMock = { registrarIntencaoPagamento: jest.fn(), confirmarPagamento: jest.fn() };
+    repositorioIntencaoMock = { vincularVenda: jest.fn(), obterPorUuid: jest.fn() };
+    repositorioVendasMock = { obterPorUuid: jest.fn(), atualizarStatus: jest.fn() };
 
     servico = new ServicoPagamentos(
-      repositórioPagamentosMock,
+      repositorioPagamentosMock,
       provedorPagamentoMock,
-      repositórioIntencaoMock,
-      repositórioVendasMock
+      repositorioIntencaoMock,
+      repositorioVendasMock,
     );
   });
 
@@ -34,7 +33,7 @@ describe('ServicoPagamentos (TDD)', () => {
     it('deve considerar CUPOM_PROMOCIONAL satisfeito se PENDENTE ou APROVADO', () => {
       const satisfeito = (servico as any).pagamentoSatisfeitoParaVenda({
         formaPagamento: { getTipo: () => TipoPagamento.CUPOM_PROMOCIONAL },
-        status: StatusPagamento.PENDENTE
+        status: StatusPagamento.PENDENTE,
       });
       expect(satisfeito).toBe(true);
     });
@@ -42,13 +41,13 @@ describe('ServicoPagamentos (TDD)', () => {
     it('deve considerar PIX satisfeito apenas se APROVADO', () => {
       const satisfeito = (servico as any).pagamentoSatisfeitoParaVenda({
         formaPagamento: { getTipo: () => TipoPagamento.PIX },
-        status: StatusPagamento.APROVADO
+        status: StatusPagamento.APROVADO,
       });
       expect(satisfeito).toBe(true);
 
       const pendente = (servico as any).pagamentoSatisfeitoParaVenda({
         formaPagamento: { getTipo: () => TipoPagamento.PIX },
-        status: StatusPagamento.PENDENTE
+        status: StatusPagamento.PENDENTE,
       });
       expect(pendente).toBe(false);
     });
@@ -56,14 +55,16 @@ describe('ServicoPagamentos (TDD)', () => {
 
   describe('validarRegrasNegocio (Privado)', () => {
     it('deve exigir valor mínimo de R$ 10,00 para PIX', async () => {
-      const formaPix = { 
-        isPix: () => true, 
-        isCupomPromocional: () => false, 
+      const formaPix = {
+        isPix: () => true,
+        isCupomPromocional: () => false,
         isCupomTroca: () => false,
-        getDetalhes: () => ''
+        getDetalhes: () => '',
       };
       await expect((servico as any).validarRegrasNegocio(formaPix, 10)).resolves.not.toThrow();
-      await expect((servico as any).validarRegrasNegocio(formaPix, 9.99)).rejects.toThrow('Valor mínimo por linha PIX é R$ 10,00');
+      await expect((servico as any).validarRegrasNegocio(formaPix, 9.99)).rejects.toThrow(
+        'Valor mínimo por linha PIX é R$ 10,00',
+      );
     });
   });
 });

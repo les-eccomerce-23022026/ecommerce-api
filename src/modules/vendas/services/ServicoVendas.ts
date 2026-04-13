@@ -103,6 +103,7 @@ export class ServicoVendas {
 
   /**
    * Solicita troca de itens de uma venda.
+   * RN0043: prazo de 7 dias contados a partir da data de entrega confirmada.
    */
   public async solicitarTroca(vendaUuid: string, usuarioUuid: string, motivo: string, itensUuids: string[]): Promise<IVenda> {
     const venda = await this.repositorioVendas.obterPorUuid(vendaUuid);
@@ -110,9 +111,13 @@ export class ServicoVendas {
     if (venda.usuarioUuid !== usuarioUuid) throw new Error('Acesso negado');
     if (venda.status !== 'ENTREGUE') throw new Error('Apenas pedidos entregues podem ser trocados');
 
-    // RN: Prazo de arrependimento (7 dias)
-    const seteDiasEmMs = 7 * 24 * 60 * 60 * 1000;
-    const dataLimite = new Date(venda.criadoEm.getTime() + seteDiasEmMs);
+    if (!venda.dataHoraEntrega) {
+      throw new Error('Data de entrega não registrada; não é possível validar o prazo de troca');
+    }
+
+    // RN0043: Prazo de arrependimento — 7 dias a partir da data de entrega confirmada
+    const SETE_DIAS_EM_MS = 7 * 24 * 60 * 60 * 1000;
+    const dataLimite = new Date(venda.dataHoraEntrega.getTime() + SETE_DIAS_EM_MS);
     if (new Date() > dataLimite) {
       throw new Error('Prazo de 7 dias para troca expirado');
     }
@@ -159,44 +164,23 @@ export class ServicoVendas {
   }
 
   /**
-   * Confirma recebimento da troca e gera cupom (Admin).
+   * Confirma recebimento da troca (Admin).
+   * Atualiza status para 'CONCLUÍDA' e retorna o código do cupom a ser criado pelo controlador.
+   * RF0054: retorno ao estoque fica a critério do controlador (parâmetro informativo).
    */
-  public async confirmarRecebimentoTroca(vendaUuid: string, retornarEstoque: boolean, repositorioPagamentos: any): Promise<{ venda: IVenda, cupom: string }> {
+  public async confirmarRecebimentoTroca(
+    vendaUuid: string,
+    _retornarEstoque: boolean,
+  ): Promise<{ venda: IVenda; cupom: string }> {
     const venda = await this.repositorioVendas.obterPorUuid(vendaUuid);
     if (!venda) throw new Error('Venda não encontrada');
     if (venda.status !== 'TROCA AUTORIZADA') throw new Error('Troca precisa estar autorizada para confirmar recebimento');
 
-    // 1. Atualizar status para CONCLUÍDA
     await this.repositorioVendas.atualizarStatus(vendaUuid, 'CONCLUÍDA');
 
-    // 2. Gerar Cupom de Troca (Valor total da venda para simplificar, ou apenas itens marcados?)
-    // O BDD diz "gerar um cupom de troca no valor do item". 
-    // Como estamos fazendo no nível da venda, vou somar os itens que estão em troca.
-    const valorTroca = venda.itens
-      .filter(i => i.emTroca)
-      .reduce((acc, cur) => acc + (cur.precoUnitario * cur.quantidade), 0);
-
-    // Se nenhum item marcado (caso fallback), usa o total da venda.
-    const valorFinal = valorTroca > 0 ? valorTroca : venda.totalVenda;
-
-    // Obter ID do usuário (interno) para o cupom.
-    // Precisamos de um jeito de pegar o usu_id.
-    // Vou assumir que o repositório de pagamentos tem acesso a isso ou adicionar no repo vendas.
-    const vRef = await this.repositorioVendas.listarPorUsuario(venda.usuarioUuid);
-    // Infelizmente o IVenda não tem usu_id interno.
-    // Vou buscar no banco diretamente se necessário ou estender.
-    // Para agilizar, vou usar o codigo do cupom baseado no UUID da venda.
+    // Código único do cupom vinculado ao UUID da venda (primeiros 8 caracteres).
     const codigoCupom = `TROCA-${venda.id.split('-')[0].toUpperCase()}`;
-    
-    // Precisamos do usuId interno. Vou buscar pelo uuid.
-    // (Poderia estar injetado o RepositorioUsuarios aqui)
-    // Vou simular chamando um método que vamos adicionar ao RepositorioVendas ou Pagamentos.
-    
-    // Vou assumir que injetamos o RepositorioPagamentos aqui.
-    // Mas para isso preciso mudar o construtor.
-    
-    // Vou deixar a lógica do cupom para ser chamada pelo controlador que tem acesso aos repos.
-    
+
     const atualizada = (await this.repositorioVendas.obterPorUuid(vendaUuid))!;
     return { venda: atualizada, cupom: codigoCupom };
   }

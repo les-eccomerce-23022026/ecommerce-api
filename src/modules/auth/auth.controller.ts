@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { di } from '@/shared/infrastructure/di.container';
 import { RespostaPadrao } from '@/shared/errors/Iresposta-padrao';
 import { obterNomeCookieAuth } from '@/shared/constants/auth-cookie';
+import { Logger } from '@/shared/utils/Logger.util';
 
 const { servicoAutenticacao } = di;
 
@@ -41,7 +42,15 @@ export class ControladorAutenticacao {
       return RespostaPadrao.enviarSucesso(resposta, 200, respostaCorpo);
     } catch (erro) {
       const mensagem = RespostaPadrao.obterMensagemErro(erro, 'Erro ao autenticar usuário.');
-      return RespostaPadrao.enviarErro(resposta, 401, mensagem);
+      const status = mensagem === 'Credenciais inválidas.' ? 401 : 500;
+
+      if (status === 500) {
+        Logger.error('[auth.controller] Falha de infraestrutura/configuracao durante login', {
+          mensagem,
+        });
+      }
+
+      return RespostaPadrao.enviarErro(resposta, status, mensagem);
     }
   }
 

@@ -13,6 +13,8 @@ export interface IVenda {
   itens: IItemVenda[];
   criadoEm: Date;
   motivoTroca?: string;
+  /** Data e hora em que a entrega foi confirmada. Usada para calcular o prazo de 7 dias para troca (RN0043). */
+  dataHoraEntrega?: Date;
 }
 
 /**
@@ -42,4 +44,9 @@ export interface IRepositorioVendas {
    * Altera status da venda para 'EM TROCA'.
    */
   registrarSolicitacaoTroca(vendaUuid: string, motivo: string, itensUuids: string[]): Promise<void>;
+
+  /**
+   * Obtém o e-mail do usuário vinculado a uma venda.
+   */
+  obterEmailUsuarioPorVenda(vendaUuid: string): Promise<string | null>;
 }

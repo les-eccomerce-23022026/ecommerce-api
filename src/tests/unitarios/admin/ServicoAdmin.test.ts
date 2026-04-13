@@ -1,6 +1,5 @@
-import { ServicoAdmin } from './admin.service';
-import { PAPEL_ADMIN, PAPEL_CLIENTE } from '@/shared/types/papeis';
-import bcrypt from 'bcryptjs';
+import { ServicoAdmin } from '@/modules/admin/admin.service';
+import { PAPEL_ADMIN } from '@/shared/types/papeis';
 
 describe('ServicoAdmin', () => {
   let servicoAdmin: ServicoAdmin;
@@ -46,8 +45,6 @@ describe('ServicoAdmin', () => {
 
     it('deve promover um cliente existente para administrador', async () => {
       const clienteExistente = { uuid: 'uuid-cliente', email: 'admin@teste.com', senhaHash: 'hash-antigo' };
-      // Primeira chamada (admin por email) -> null
-      // Segunda chamada (cliente por email) -> clienteExistente
       mockRepositorioUsuarios.buscarPorEmailPapel
         .mockResolvedValueOnce(null)
         .mockResolvedValueOnce(clienteExistente);
@@ -64,10 +61,13 @@ describe('ServicoAdmin', () => {
         usarMesmaSenha: true,
       });
 
-      expect(mockRepositorioUsuarios.atualizarUsuario).toHaveBeenCalledWith('uuid-cliente', expect.objectContaining({
-        idPapel: PAPEL_ADMIN.id,
-        senhaHash: 'hash-antigo',
-      }));
+      expect(mockRepositorioUsuarios.atualizarUsuario).toHaveBeenCalledWith(
+        'uuid-cliente',
+        expect.objectContaining({
+          idPapel: PAPEL_ADMIN.id,
+          senhaHash: 'hash-antigo',
+        }),
+      );
       expect(resultado.uuid).toBe('uuid-cliente');
     });
   });

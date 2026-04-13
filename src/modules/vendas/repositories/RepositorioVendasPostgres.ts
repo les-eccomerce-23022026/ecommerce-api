@@ -81,33 +81,33 @@ export class RepositorioVendasPostgres implements IRepositorioVendas {
   public async obterPorUuid(uuid: string): Promise<IVenda | null> {
     const query = `
       SELECT v.ven_uuid, v.ven_total_itens, v.ven_frete, v.ven_total_venda,
-             v.ven_criado_em, s.stv_descricao as status, u.usu_uuid as "usuarioUuid",
-             v.ven_motivo_troca as "motivoTroca"
+             v.ven_criado_em, v.ven_data_hora_entrega, s.stv_descricao as status,
+             u.usu_uuid as "usuarioUuid", v.ven_motivo_troca as "motivoTroca"
       FROM vendas v
       JOIN status_vendas s ON v.stv_id = s.stv_id
       JOIN usuarios u ON v.usu_id = u.usu_id
       WHERE v.ven_uuid = $1
     `;
-    const rows = await this.db.executar<{ 
-      ven_uuid: string; ven_total_itens: number; ven_frete: number; 
-      ven_total_venda: number; ven_criado_em: string; status: string; 
-      usuarioUuid: string; motivoTroca: string | null 
+    const rows = await this.db.executar<{
+      ven_uuid: string; ven_total_itens: number; ven_frete: number;
+      ven_total_venda: number; ven_criado_em: string; ven_data_hora_entrega: string | null;
+      status: string; usuarioUuid: string; motivoTroca: string | null;
     }>(query, [uuid]);
-    
+
     if (rows.length === 0) return null;
 
     const v = rows[0];
 
     // Buscar itens
     const itensQuery = `
-      SELECT itv_uuid as id, liv_uuid as "livroUuid", itv_quantidade as quantidade, 
+      SELECT itv_uuid as id, liv_uuid as "livroUuid", itv_quantidade as quantidade,
              itv_preco_unitario as "precoUnitario", itv_em_troca as "emTroca"
       FROM itens_venda
       WHERE ven_id = (SELECT ven_id FROM vendas WHERE ven_uuid = $1)
     `;
-    const itensRows = await this.db.executar<{ 
-      id: string; livroUuid: string; quantidade: number; 
-      precoUnitario: number; emTroca: boolean 
+    const itensRows = await this.db.executar<{
+      id: string; livroUuid: string; quantidade: number;
+      precoUnitario: number; emTroca: boolean;
     }>(itensQuery, [uuid]);
 
     return {
@@ -118,13 +118,14 @@ export class RepositorioVendasPostgres implements IRepositorioVendas {
       frete: Number(v.ven_frete),
       totalVenda: Number(v.ven_total_venda),
       criadoEm: new Date(v.ven_criado_em),
+      dataHoraEntrega: v.ven_data_hora_entrega ? new Date(v.ven_data_hora_entrega) : undefined,
       motivoTroca: v.motivoTroca || undefined,
       itens: itensRows.map((i) => ({
         id: i.id,
         livroUuid: i.livroUuid,
         quantidade: Number(i.quantidade),
         precoUnitario: Number(i.precoUnitario),
-        emTroca: i.emTroca
+        emTroca: i.emTroca,
       })),
     };
   }
@@ -172,12 +173,28 @@ export class RepositorioVendasPostgres implements IRepositorioVendas {
   public async atualizarStatus(vendaUuid: string, novoStatus: string): Promise<void> {
     const queryEncontrarStatus = 'SELECT stv_id FROM status_vendas WHERE stv_descricao = $1';
     const resStatus = await this.db.executar<{ stv_id: number }>(queryEncontrarStatus, [novoStatus]);
-    
+
     if (resStatus.length === 0) throw new Error(`Status '${novoStatus}' não encontrado.`);
 
     const stvId = resStatus[0].stv_id;
 
-    const queryUpdate = 'UPDATE vendas SET stv_id = $1, ven_atualizado_em = NOW() WHERE ven_uuid = $2';
+    // Registra data/hora de entrega ao confirmar recebimento (RN0043: prazo de 7 dias para troca).
+    const queryUpdate =
+      novoStatus === 'ENTREGUE'
+        ? 'UPDATE vendas SET stv_id = $1, ven_atualizado_em = NOW(), ven_data_hora_entrega = NOW() WHERE ven_uuid = $2'
+        : 'UPDATE vendas SET stv_id = $1, ven_atualizado_em = NOW() WHERE ven_uuid = $2';
+
     await this.db.executar(queryUpdate, [stvId, vendaUuid]);
+  }
+
+  public async obterEmailUsuarioPorVenda(vendaUuid: string): Promise<string | null> {
+    const query = `
+      SELECT u.usu_email as email
+      FROM vendas v
+      JOIN usuarios u ON v.usu_id = u.usu_id
+      WHERE v.ven_uuid = $1
+    `;
+    const rows = await this.db.executar<{ email: string }>(query, [vendaUuid]);
+    return rows.length > 0 ? rows[0].email : null;
   }
 }

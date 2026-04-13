@@ -49,4 +49,7 @@ export interface IRepositorioPagamentos {
     valorAtual: number;
     ativo: boolean;
   }>>;
+
+  /** Retorna o ID interno (BIGSERIAL) do usuário pelo UUID público. */
+  obterUsuarioIdInternoPorUuid(usuarioUuid: string): Promise<number | null>;
 }

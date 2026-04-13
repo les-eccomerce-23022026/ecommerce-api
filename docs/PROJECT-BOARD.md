@@ -7,10 +7,11 @@
 
 ## Board Kanban
 
-| 📛 Todo (2)                                 | 🔄 In Progress (0)              | ✅ Done (26)                                          |
+| 📛 Todo (2)                                 | 🔄 In Progress (0)              | ✅ Done (27)                                          |
 | ------------------------------------------- | ------------------------------- | ----------------------------------------------------- |
 | B13 · [BACKEND] Módulo de Carrinho          |                                 | B1 · [BACKEND] Setup Inicial e Arquitetura            |
 | B14 · [BACKEND] Integração com Meio de Pgto |                                 | B2 · [BACKEND] Dockerização e Ambiente Dev            |
+|                                             |                                 | B31 · [VENDAS] Sprint 2: Trocas e Devoluções          |
 |                                             |                                 | B28 · [BACKEND] Módulo de Entrega e Logística         |
 |                                             |                                 | B26 · [VENDAS] Sprint 1: Base de Vendas               |
 |                                             |                                 | B3 · [BACKEND] Modelagem SQL e Normalização (14 tabs) |
@@ -40,6 +41,7 @@
 
 | ID   | Área    | Card                                 | Status / Evidência                                                                                                                                                                                                                           |
 | :--- | :------ | :----------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| B31  | VENDAS  | Sprint 2: Trocas e Devoluções        | **Concluído (2026-04-12):** S2-A (solicitarTroca → status EM TROCA), S2-B (autorizarTroca → TROCA AUTORIZADA → confirmarRecebimento → CONCLUÍDA + cupom), S2-C (rejeitarTroca → TROCA REJEITADA), S2-D (prazo 7 dias a partir de `ven_data_hora_entrega`, migration 028). Eliminados hacks `(repo as any).db`; novo método `obterUsuarioIdInternoPorUuid` em `IRepositorioPagamentos`. 4 testes integração passando; zero regressões em 149 testes. **Testes E2E Cypress adicionados (2026-04-12):** `web/cypress/e2e/user/cliente/checkout/troca-cliente.cy.ts` (S2-A + S2-D, 6 cenários) e `web/cypress/e2e/user/admin/trocas/troca-admin.cy.ts` (S2-B + S2-C, 7 cenários). Fixtures em `web/cypress/fixtures/trocas/`. |
 | B26  | VENDAS  | Sprint 1: Base de Vendas             | **Concluído:** Criada infraestrutura de vendas (Repositório, Serviço, Controlador, Rotas e Migração 010). Backend permite criar e consultar vendas. |
 | B28  | BACKEND | Módulo de Entrega e Logística        | **Concluído:** Implementação do módulo (DTO, Repository, Service, Controller, Routes). Migration 013 para renomear tabelas; integração automática com alteração de status de venda para 'EM TRÂNSITO'. |
 | B21  | BACKEND | Gestão de Administradores            | **Implementado:** CRUD completo de administradores (listagem, criação, inativação/ativação) com trava de segurança de auto-inativação. |

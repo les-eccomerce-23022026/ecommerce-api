@@ -151,7 +151,23 @@ npm run test:coverage
 
 ---
 
-## 10. Operações de Banco de Dados (Schema `les` e Índices)
+## 10. Segurança no ambiente de testes
+
+- `x-use-test-db` só deve ser usado em ambiente controlado (CI/local) com `ENABLE_TEST_DB_SWITCH=true`.
+- Endpoint `POST /api/admin/bootstrap` só funciona em `NODE_ENV=test` e exige header `x-test-bootstrap-key` igual a `TEST_BOOTSTRAP_KEY`.
+- Não versionar segredos reais em `.env`, `cypress.env.json` ou scripts.
+- Para Cypress, defina credenciais via variáveis de ambiente:
+  - `CYPRESS_ADMIN_EMAIL`, `CYPRESS_ADMIN_SENHA`
+  - `CYPRESS_CLIENTE_EMAIL`, `CYPRESS_CLIENTE_SENHA`
+- Pipeline de segurança recomendada (workflow `security-ci`):
+  - secret scan (`gitleaks`)
+  - SAST (`semgrep` + lint)
+  - config lint (`yamllint`, `shellcheck`, `hadolint`)
+  - testes backend/frontend
+
+---
+
+## 11. Operações de Banco de Dados (Schema `les` e Índices)
 
 ### Schema de aplicação (`les`)
 

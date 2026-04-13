@@ -22,4 +22,11 @@ export interface IRepositorioEntrega {
    * @param vendaUuid UUID público da venda.
    */
   listarPorVendaUuid(vendaUuid: string): Promise<IEntregaOutputDto[]>;
+
+  /**
+   * Atualiza o endereço de uma entrega existente.
+   * @param uuid UUID da entrega.
+   * @param novoEndereco Novo objeto de endereço.
+   */
+  atualizarEndereco(uuid: string, novoEndereco: object): Promise<void>;
 }

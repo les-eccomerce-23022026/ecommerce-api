@@ -96,18 +96,17 @@ export class ControladorPagamentos {
       try {
         if (this.gestaoCliente && req.usuario?.uuid) {
           const perfil = await this.gestaoCliente.obterPerfil(req.usuario.uuid);
-          
-          // Buscar ID interno do usuário para os cupons
-          const usuIdRes = await (this.repoPagamentos as any).db.executar('SELECT usu_id FROM usuarios WHERE usu_uuid = $1', [req.usuario.uuid]);
-          if (usuIdRes.length > 0) {
-            const realCupons = await this.repoPagamentos.listarCuponsTrocaPorUsuario(usuIdRes[0].usu_id);
+
+          const usuId = await this.repoPagamentos.obterUsuarioIdInternoPorUuid(req.usuario.uuid);
+          if (usuId !== null) {
+            const realCupons = await this.repoPagamentos.listarCuponsTrocaPorUsuario(usuId);
             cuponsTroca = realCupons
-              .filter(c => c.ativo && c.valorAtual > 0)
-              .map(c => ({
+              .filter((c) => c.ativo && c.valorAtual > 0)
+              .map((c) => ({
                 codigo: c.codigo,
                 valor: c.valorAtual,
                 tipo: 'troca' as const,
-                descricao: `Saldo de troca: R$ ${c.valorAtual.toFixed(2)}`
+                descricao: `Saldo de troca: R$ ${c.valorAtual.toFixed(2)}`,
               }));
           }
 

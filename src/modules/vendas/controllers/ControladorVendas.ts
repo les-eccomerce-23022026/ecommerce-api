@@ -140,26 +140,22 @@ export class ControladorVendas {
       const { uuid } = req.params;
       const { retornarEstoque } = req.body;
 
-      const resultado = await this.servicoVendas.confirmarRecebimentoTroca(uuid, retornarEstoque, this.repoPagamentos);
-      
-      const vendaCompleta = await this.servicoVendas.visualizarDetalhesVenda(uuid, { ehAdmin: true });
-      
-      const usuIdRes = await (this.repoPagamentos as any).db.executar('SELECT usu_id FROM usuarios WHERE usu_uuid = $1', [vendaCompleta.usuarioUuid]);
-      const usuId = usuIdRes[0].usu_id;
+      const { venda, cupom: codigoCupom } = await this.servicoVendas.confirmarRecebimentoTroca(
+        uuid,
+        Boolean(retornarEstoque),
+      );
 
-      const valorCupom = vendaCompleta.itens
-        .filter(i => i.emTroca)
-        .reduce((acc, cur) => acc + (cur.precoUnitario * cur.quantidade), 0);
-      
-      const valorFinal = valorCupom > 0 ? valorCupom : vendaCompleta.totalVenda;
+      const valorCupom = venda.itens
+        .filter((i) => i.emTroca)
+        .reduce((acc, cur) => acc + cur.precoUnitario * cur.quantidade, 0);
+      const valorFinal = valorCupom > 0 ? valorCupom : venda.totalVenda;
 
-      await this.repoPagamentos.criarCupomTroca({
-        usuarioId: usuId,
-        codigo: resultado.cupom,
-        valor: valorFinal
-      });
+      const usuId = await this.repoPagamentos.obterUsuarioIdInternoPorUuid(venda.usuarioUuid);
+      if (!usuId) throw new Error('Usuário não encontrado ao criar cupom de troca');
 
-      res.json({ pedido: resultado.venda, cupomGerado: { codigo: resultado.cupom, valor: valorFinal } });
+      await this.repoPagamentos.criarCupomTroca({ usuarioId: usuId, codigo: codigoCupom, valor: valorFinal });
+
+      res.json({ pedido: venda, cupomGerado: { codigo: codigoCupom, valor: valorFinal } });
     } catch (err: unknown) {
       res.status(400).json({ erro: (err as Error).message });
     }

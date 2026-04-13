@@ -116,4 +116,13 @@ export class RepositorioEntregaPostgres implements IRepositorioEntrega {
       criadoEm: new Date(r.ent_criado_em),
     }));
   }
+
+  public async atualizarEndereco(uuid: string, novoEndereco: object): Promise<void> {
+    const query = `
+      UPDATE entregas 
+      SET ent_endereco_json = $1
+      WHERE ent_uuid = $2
+    `;
+    await this.db.executar(query, [JSON.stringify(novoEndereco), uuid]);
+  }
 }
