@@ -120,6 +120,37 @@ npm run test:coverage
 - Cenários em linguagem de negócio: [`bdd/README.md`](bdd/README.md) (especificação; a automação está em `src/tests/**`, com pastas por domínio em `integracao/`).
 - Detalhes de SQL e modelagem: [`sql/README.md`](sql/README.md).
 
+### Guia rápido de testes por estratégia e domínio
+
+#### Estratégia
+
+| Comando | Escopo |
+|---------|--------|
+| `npm test` | Suite completa (unitários + integração + auditoria) |
+| `npm run test:unit` | Apenas testes unitários (`src/tests/unitarios`) |
+| `npm run test:int` | Apenas testes de integração (`src/tests/integracao`) |
+| `npm run test:coverage` | Suite completa com cobertura |
+
+#### Domínio de negócio
+
+| Domínio | Unitário | Integração | Completo do domínio |
+|--------|----------|------------|---------------------|
+| Admin | `npm run test:unit:admin` | `npm run test:int:admin` | `npm run test:dominio:admin` |
+| Clientes | `npm run test:unit:clientes` | `npm run test:int:clientes` | `npm run test:dominio:clientes` |
+| Vendas | `npm run test:unit:vendas` | `npm run test:int:vendas` | `npm run test:dominio:vendas` |
+| Pagamentos | `npm run test:unit:pagamentos` | `npm run test:int:pagamentos` | `npm run test:dominio:pagamentos` |
+| Entrega | `npm run test:unit:entrega` | `npm run test:int:entrega` | `npm run test:dominio:entrega` |
+| Frete | `npm run test:unit:frete` | `npm run test:int:frete` | `npm run test:dominio:frete` |
+
+#### Complementares
+
+| Comando | Escopo |
+|---------|--------|
+| `npm run test:unit:usuarios` | Repositório de usuários |
+| `npm run test:unit:utils` | Utilitários (`utils` + formatação) |
+| `npm run test:unit:infra` | Infra/middlewares |
+| `npm run test:auditoria` | Auditoria de condicionais |
+
 ---
 
 ## 7. Scripts úteis
