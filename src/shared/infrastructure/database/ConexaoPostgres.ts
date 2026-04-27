@@ -32,8 +32,13 @@ export class ConexaoPostgres implements IConexaoBanco {
 
   private static criarPoolProducao(): Pool {
     const urlConfigurada = process.env.POSTGRES_URL;
+    const schema = process.env.POSTGRES_SCHEMA || 'les';
+
     if (urlConfigurada) {
-      return new Pool({ connectionString: urlConfigurada });
+      return new Pool({
+        connectionString: urlConfigurada,
+        options: `-c search_path=${schema},public`,
+      });
     }
 
     const host = process.env.POSTGRES_HOST ?? 'localhost';
@@ -42,21 +47,34 @@ export class ConexaoPostgres implements IConexaoBanco {
     const senha = process.env.POSTGRES_PASSWORD ?? 'ecm_senha';
     const banco = process.env.POSTGRES_DB ?? 'ecm_livraria';
 
-    const connectionString = `postgresql://${usuario}:${senha}@${host}:${porta}/${banco}`;
-    return new Pool({ connectionString });
+    return new Pool({
+      user: usuario,
+      password: senha,
+      host,
+      port: Number(porta),
+      database: banco,
+      options: `-c search_path=${schema},public`,
+    });
   }
 
   private obterPoolTeste(): Pool {
     if (!this.poolTeste) {
+      const schema = process.env.POSTGRES_SCHEMA || 'les';
       // Configurações via variáveis de ambiente para a instância de teste
-      const host = process.env.POSTGRES_HOST_TEST ?? '172.17.0.1';
+      const host = process.env.POSTGRES_HOST_TEST ?? 'localhost';
       const porta = process.env.POSTGRES_PORT_TEST ?? '5433';
       const usuario = process.env.POSTGRES_USER_TEST ?? 'ecm_user_test';
       const senha = process.env.POSTGRES_PASSWORD_TEST ?? 'ecm_senha_test';
       const banco = process.env.POSTGRES_DB_TEST ?? 'ecm_livraria_test';
 
-      const connectionString = `postgresql://${usuario}:${senha}@${host}:${porta}/${banco}`;
-      this.poolTeste = new Pool({ connectionString });
+      this.poolTeste = new Pool({
+        user: usuario,
+        password: senha,
+        host,
+        port: Number(porta),
+        database: banco,
+        options: `-c search_path=${schema},public`,
+      });
     }
     return this.poolTeste;
   }

@@ -13,13 +13,14 @@ export function registrarRotasLivros(router: Router): void {
   const controller = new ControladorLivros(servico);
 
   router.get('/categorias/catalogo', controller.categoriasCatalogo.bind(controller));
-  router.get('/livros', controller.listarCatalogo.bind(controller));
-  router.get('/livros/:uuid', controller.detalhes.bind(controller));
-
+  
   router.get(
     '/admin/livros',
     autenticacaoMiddleware,
     adminOnlyMiddleware,
     controller.listarAdmin.bind(controller),
   );
+
+  router.get('/livros', controller.listarCatalogo.bind(controller));
+  router.get('/livros/:uuid([0-9a-fA-F-]{36})', controller.detalhes.bind(controller));
 }

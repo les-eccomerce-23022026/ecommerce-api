@@ -1,200 +1,93 @@
 import { Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
-import { ServicoPagamentos } from './ServicoPagamentos';
-import { IPagamentoInputDto, IPagamentoOutputDto } from './IPagamento.dto';
+import type { GestaoIdentidadeCliente } from '@/modules/clientes/clientes.service';
 import type { ServicoFrete } from '@/modules/frete/ServicoFrete';
 import { cepOrigemPadrao, sanitizarCep8Digitos } from '@/modules/frete/freteCepUtil';
-import type { GestaoIdentidadeCliente } from '@/modules/clientes/clientes.service';
 import { Logger } from '@/shared/utils/Logger.util';
-import { PARCELAS_CARTAO_MAX } from './IPagamento.dto';
+import { IPagamentoInputDto, IPagamentoOutputDto, PARCELAS_CARTAO_MAX } from './IPagamento.dto';
+import { ServicoPagamentos } from './ServicoPagamentos';
+import { PagamentosHelper } from './pagamentos.helper';
 
-/** Política de parcelamento no cartão exposta ao checkout (linguagem ubíqua do domínio de pagamentos). */
 const POLITICA_PARCELAMENTO_CARTAO_PADRAO = {
   parcelasMaximas: PARCELAS_CARTAO_MAX,
   parcelasSemJuros: 6,
 } as const;
 
-/**
- * Controlador para operações de pagamentos.
- */
 export class ControladorPagamentos {
-  private readonly servicoPagamentos: ServicoPagamentos;
-
-  private readonly servicoFrete: ServicoFrete;
-
-  private readonly gestaoCliente?: GestaoIdentidadeCliente;
-
   constructor(
-    servicoPagamentos: ServicoPagamentos,
-    servicoFrete: ServicoFrete,
-    gestaoCliente?: GestaoIdentidadeCliente,
-  ) {
-    this.servicoPagamentos = servicoPagamentos;
-    this.servicoFrete = servicoFrete;
-    this.gestaoCliente = gestaoCliente;
-  }
+    private readonly servicoPagamentos: ServicoPagamentos,
+    private readonly servicoFrete: ServicoFrete,
+    private readonly gestaoCliente?: GestaoIdentidadeCliente,
+  ) {}
 
-  /**
-   * Fornece informações necessárias ao frontend para seleção de pagamento
-   * (endereços do cliente, cartões salvos, cupons e opções de frete).
-   * Aqui retornamos uma resposta simplificada e segura para consumo do cliente.
-   */
-  // eslint-disable-next-line class-methods-use-this
   public obterPagamentoInfo = async (req: Request, res: Response): Promise<void> => {
     try {
-      const cepQ = typeof req.query.cepDestino === 'string' ? req.query.cepDestino : '';
-      const pesoQ = req.query.pesoKg ?? req.query.peso;
-      const valorItensQ = req.query.valorTotalItens;
-      const pesoNum =
-        pesoQ !== undefined && String(pesoQ).length > 0 ? Number(pesoQ) : 1;
-      const valorItensNum =
-        valorItensQ !== undefined && String(valorItensQ).length > 0
-          ? Number(valorItensQ)
-          : undefined;
-
-      const cepDestino = cepQ.trim() || '01000000';
-      if (!Number.isFinite(pesoNum) || pesoNum <= 0) {
+      const { cepDestino, pesoKg, valorTotalItens } = PagamentosHelper.extrairParametros(req);
+      if (!Number.isFinite(pesoKg) || pesoKg <= 0) {
         res.status(400).json({ erro: 'pesoKg inválido' });
         return;
       }
-      const opcoes = await this.servicoFrete.cotarEPersistir({
-        cepDestino,
-        pesoKg: pesoNum,
-        valorTotalItens:
-          valorItensNum !== undefined && Number.isFinite(valorItensNum) ? valorItensNum : undefined,
-      });
-      const freteOpcoes = opcoes.map((o) => ({
-        uuid: o.cotacaoUuid,
-        tipo: o.tipo,
-        valor: o.valor,
-        prazo: o.prazo,
-        selecionado: false,
-      }));
-
-      let enderecosCliente: Array<{
-        uuid: string;
-        logradouro: string;
-        numero: string;
-        complemento: string;
-        bairro: string;
-        cep: string;
-        cidade: string;
-        estado: string;
-        tipo: 'cobranca' | 'entrega' | 'ambos';
-      }> = [];
-
-      let cartoesCliente: Array<{
-        uuid: string;
-        ultimosDigitosCartao: string;
-        nomeCliente: string;
-        nomeImpresso: string;
-        bandeira: string;
-        validade: string;
-        principal: boolean;
-      }> = [];
-
-      try {
-        if (this.gestaoCliente && req.usuario?.uuid) {
-          const perfil = await this.gestaoCliente.obterPerfil(req.usuario.uuid);
-          enderecosCliente = (perfil.enderecos ?? []).map((e) => ({
-            uuid: e.uuid ?? '',
-            logradouro: e.logradouro,
-            numero: e.numero,
-            complemento: e.complemento ?? '',
-            bairro: e.bairro,
-            cep: e.cep,
-            cidade: e.cidade,
-            estado: e.estado,
-            tipo: 'ambos' as const,
-          }));
-          cartoesCliente = (perfil.cartoes ?? []).map((c) => ({
-            uuid: c.uuid,
-            ultimosDigitosCartao: c.ultimosDigitosCartao,
-            nomeCliente: c.nomeImpresso,
-            nomeImpresso: c.nomeImpresso,
-            bandeira: c.bandeira,
-            validade: c.validade,
-            principal: c.principal,
-          }));
-        }
-      } catch (erro) {
-        Logger.error(
-          '[pagamentos.obterPagamentoInfo] Falha ao obter perfil do cliente; endereços e cartões ficam vazios.',
-          erro instanceof Error ? erro.message : String(erro),
-        );
-      }
-
-      const resposta = {
-        enderecosCliente,
-        cartoesCliente,
+      const [opcoes, dadosCliente] = await Promise.all([
+        this.servicoFrete.cotarEPersistir({ cepDestino, pesoKg, valorTotalItens }),
+        this.obterDadosCliente(req.usuario?.uuid),
+      ]);
+      res.status(200).json({
+        enderecosCliente: dadosCliente.enderecos,
+        cartoesCliente: dadosCliente.cartoes,
         politicaParcelamentoCartao: { ...POLITICA_PARCELAMENTO_CARTAO_PADRAO },
-        cuponsDisponiveis: [
-          { uuid: uuidv4(), codigo: 'DESCONTO10', tipo: 'promocional', valor: 10, descricao: '10% de desconto (simulado)' },
-          { uuid: uuidv4(), codigo: 'TROCA50', tipo: 'troca', valor: 50, descricao: 'Cupom de troca R$50 (simulado)' },
-        ],
+        cuponsDisponiveis: PagamentosHelper.obterCuponsSimulados(),
         bandeirasPermitidas: ['Visa', 'Mastercard', 'Elo', 'American Express', 'Hipercard'],
-        freteOpcoes,
+        freteOpcoes: PagamentosHelper.mapearFreteOpcoes(opcoes),
         freteMeta: {
           provedor: this.servicoFrete.getCodigoProvedorAtivo(),
           cepOrigem: cepOrigemPadrao(),
-          cepDestino: cepQ.trim() ? sanitizarCep8Digitos(cepQ) : '01000000',
-          pesoKg: pesoNum,
+          cepDestino: sanitizarCep8Digitos(cepDestino),
+          pesoKg,
         },
-      };
-
-      res.status(200).json(resposta);
+      });
     } catch (erro) {
+      Logger.error('[pagamentos.obterPagamentoInfo] Erro fatal:', (erro as Error).message || String(erro));
       res.status(500).json({ erro: (erro as Error).message });
     }
   };
 
-  /**
-   * Seleciona forma de pagamento para uma venda.
-   */
+  private async obterDadosCliente(usuarioUuid?: string) {
+    let enderecos: ReturnType<typeof PagamentosHelper.mapearEnderecos> = [];
+    let cartoes: ReturnType<typeof PagamentosHelper.mapearCartoes> = [];
+    if (this.gestaoCliente && usuarioUuid) {
+      try {
+        const perfil = await this.gestaoCliente.obterPerfil(usuarioUuid);
+        enderecos = PagamentosHelper.mapearEnderecos(perfil);
+        cartoes = PagamentosHelper.mapearCartoes(perfil);
+      } catch (erro) {
+        Logger.error('[pagamentos.obterDadosCliente] Falha ao obter perfil do cliente:', (erro as Error).message || String(erro));
+      }
+    }
+    return { enderecos, cartoes };
+  }
+
   public definirMetodoLiquidacao = async (req: Request, res: Response): Promise<void> => {
     try {
       const dados: IPagamentoInputDto = req.body;
       const resultado = await this.servicoPagamentos.definirMetodoLiquidacao(dados);
       const { pagamento, pixCobranca } = resultado;
-
       const resposta: IPagamentoOutputDto = {
-        id: pagamento.id,
-        vendaUuid: pagamento.vendaUuid,
-        valor: pagamento.valor,
-        formaPagamento: {
-          tipo: pagamento.formaPagamento.getTipo(),
-          detalhes: pagamento.formaPagamento.getDetalhes()
-        },
-        cartao: pagamento.cartao ? {
-          numeroTokenizado: pagamento.cartao.getNumeroTokenizado(),
-          nomeTitular: pagamento.cartao.getNomeTitular(),
-          validade: pagamento.cartao.getValidade(),
-          bandeira: pagamento.cartao.getBandeira()
-        } : undefined,
-        status: pagamento.status,
-        criadoEm: pagamento.criadoEm,
-        processadoEm: pagamento.processadoEm,
-        ...(pixCobranca
-          ? {
-              pixCobranca: {
-                copiaCola: pixCobranca.copiaCola,
-                qrCodeBase64: pixCobranca.qrCodeBase64,
-                expiraEm: pixCobranca.expiraEm.toISOString(),
-                segredoConfirmacao: pixCobranca.segredoConfirmacao
-              }
-            }
-          : {})
+        ...PagamentosHelper.mapearPagamentoParaDto(pagamento),
+        ...(pixCobranca ? {
+          pixCobranca: {
+            copiaCola: pixCobranca.copiaCola,
+            qrCodeBase64: pixCobranca.qrCodeBase64,
+            expiraEm: pixCobranca.expiraEm.toISOString(),
+            segredoConfirmacao: pixCobranca.segredoConfirmacao
+          }
+        } : {})
       };
-
       res.status(201).json(resposta);
     } catch (erro) {
       res.status(400).json({ erro: (erro as Error).message });
     }
   };
 
-  /**
-   * Polling: status da venda e pagamentos (PIX pendente).
-   */
   public obterResumoPagamentosVenda = async (req: Request, res: Response): Promise<void> => {
     try {
       const { vendaUuid } = req.params;
@@ -210,16 +103,11 @@ export class ControladorPagamentos {
     }
   };
 
-  /**
-   * Webhook simulado do PSP — confirma liquidação PIX (sem JWT; valida segredo).
-   */
   public webhookPagamentoPixSimulado = async (req: Request, res: Response): Promise<void> => {
     try {
-      const body = req.body as { pagamentoUuid?: unknown; segredoConfirmacao?: unknown };
-      const pagamentoUuid =
-        typeof body.pagamentoUuid === 'string' ? body.pagamentoUuid.trim() : '';
-      const segredo =
-        typeof body.segredoConfirmacao === 'string' ? body.segredoConfirmacao.trim() : '';
+      const body = req.body as { pagamentoUuid?: string; segredoConfirmacao?: string };
+      const pagamentoUuid = typeof body.pagamentoUuid === 'string' ? body.pagamentoUuid.trim() : '';
+      const segredo = typeof body.segredoConfirmacao === 'string' ? body.segredoConfirmacao.trim() : '';
       if (!pagamentoUuid || !segredo) {
         res.status(400).json({ erro: 'pagamentoUuid e segredoConfirmacao são obrigatórios' });
         return;
@@ -228,17 +116,10 @@ export class ControladorPagamentos {
       res.status(200).json({ sucesso: true, mensagem: 'PIX confirmado' });
     } catch (erro) {
       const msg = (erro as Error).message;
-      if (msg.includes('expirada')) {
-        res.status(410).json({ erro: msg });
-        return;
-      }
-      res.status(400).json({ erro: msg });
+      res.status(msg.includes('expirada') ? 410 : 400).json({ erro: msg });
     }
   };
 
-  /**
-   * Registra intenção de pagamento no provedor (valor travado para confirmação no checkout).
-   */
   public registrarIntencaoPagamento = async (req: Request, res: Response): Promise<void> => {
     try {
       const valorTotal = Number((req.body as { valorTotal?: unknown }).valorTotal);
@@ -253,15 +134,11 @@ export class ControladorPagamentos {
     }
   };
 
-  /**
-   * Vincula intenção de pagamento (CRIADA) à venda informada.
-   */
   public vincularIntencaoVenda = async (req: Request, res: Response): Promise<void> => {
     try {
       const { inpUuid } = req.params;
       const vendaUuid = typeof (req.body as { vendaUuid?: unknown }).vendaUuid === 'string'
-        ? (req.body as { vendaUuid: string }).vendaUuid.trim()
-        : '';
+        ? (req.body as { vendaUuid: string }).vendaUuid.trim() : '';
       if (!vendaUuid) {
         res.status(400).json({ erro: 'vendaUuid é obrigatório' });
         return;
@@ -273,50 +150,22 @@ export class ControladorPagamentos {
     }
   };
 
-  /**
-   * Processa o pagamento.
-   */
   public solicitarAutorizacaoFinanceira = async (req: Request, res: Response): Promise<void> => {
     try {
       const { pagamentoUuid } = req.params;
       const pagamento = await this.servicoPagamentos.solicitarAutorizacaoFinanceira(pagamentoUuid);
-
-      const resposta: IPagamentoOutputDto = {
-        id: pagamento.id,
-        vendaUuid: pagamento.vendaUuid,
-        valor: pagamento.valor,
-        formaPagamento: {
-          tipo: pagamento.formaPagamento.getTipo(),
-          detalhes: pagamento.formaPagamento.getDetalhes()
-        },
-        cartao: pagamento.cartao ? {
-          numeroTokenizado: pagamento.cartao.getNumeroTokenizado(),
-          nomeTitular: pagamento.cartao.getNomeTitular(),
-          validade: pagamento.cartao.getValidade(),
-          bandeira: pagamento.cartao.getBandeira()
-        } : undefined,
-        status: pagamento.status,
-        criadoEm: pagamento.criadoEm,
-        processadoEm: pagamento.processadoEm
-      };
-
-      res.status(200).json(resposta);
+      res.status(200).json(PagamentosHelper.mapearPagamentoParaDto(pagamento));
     } catch (erro) {
       res.status(400).json({ erro: (erro as Error).message });
     }
   };
 
-  /**
-   * Endpoint compatível com frontend: confirma pagamento no provedor (intenção prévia obrigatória).
-   */
   public solicitarAutorizacaoFinanceiraCheckout = async (req: Request, res: Response): Promise<void> => {
     try {
       const corpo = req.body as Record<string, unknown>;
       const resultado = await this.servicoPagamentos.confirmarAutorizacaoFinanceiraCheckout(corpo);
-      const vendaUuid =
-        typeof corpo.vendaUuid === 'string' && corpo.vendaUuid.trim().length > 0
-          ? corpo.vendaUuid.trim()
-          : uuidv4();
+      const vendaUuid = typeof corpo.vendaUuid === 'string' && corpo.vendaUuid.trim().length > 0
+        ? corpo.vendaUuid.trim() : uuidv4();
       res.status(200).json({
         sucesso: resultado.sucesso,
         pedidoUuid: vendaUuid,
@@ -325,47 +174,19 @@ export class ControladorPagamentos {
       });
     } catch (erro) {
       const mensagem = (erro as Error).message;
-      if (mensagem.includes('Stripe ainda não implementado')) {
-        res.status(501).json({ erro: mensagem });
-        return;
-      }
-      res.status(400).json({ erro: mensagem });
+      res.status(mensagem.includes('Stripe ainda não implementado') ? 501 : 400).json({ erro: mensagem });
     }
   };
 
-  /**
-   * Consulta pagamento por UUID.
-   */
   public consultarPagamento = async (req: Request, res: Response): Promise<void> => {
     try {
       const { pagamentoUuid } = req.params;
       const pagamento = await this.servicoPagamentos.consultarPagamento(pagamentoUuid);
-
       if (!pagamento) {
         res.status(404).json({ erro: 'Pagamento não encontrado' });
         return;
       }
-
-      const resposta: IPagamentoOutputDto = {
-        id: pagamento.id,
-        vendaUuid: pagamento.vendaUuid,
-        valor: pagamento.valor,
-        formaPagamento: {
-          tipo: pagamento.formaPagamento.getTipo(),
-          detalhes: pagamento.formaPagamento.getDetalhes()
-        },
-        cartao: pagamento.cartao ? {
-          numeroTokenizado: pagamento.cartao.getNumeroTokenizado(),
-          nomeTitular: pagamento.cartao.getNomeTitular(),
-          validade: pagamento.cartao.getValidade(),
-          bandeira: pagamento.cartao.getBandeira()
-        } : undefined,
-        status: pagamento.status,
-        criadoEm: pagamento.criadoEm,
-        processadoEm: pagamento.processadoEm
-      };
-
-      res.status(200).json(resposta);
+      res.status(200).json(PagamentosHelper.mapearPagamentoParaDto(pagamento));
     } catch (erro) {
       res.status(400).json({ erro: (erro as Error).message });
     }

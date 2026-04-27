@@ -9,6 +9,7 @@ import { ProvedorFreteSimulado } from './ProvedorFreteSimulado';
 export class ProvedorFreteStubExterno implements IProvedorFrete {
   private readonly delegado = new ProvedorFreteSimulado();
 
+  // eslint-disable-next-line class-methods-use-this
   public getCodigo(): string {
     return 'externo_stub';
   }

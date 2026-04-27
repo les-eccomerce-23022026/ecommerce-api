@@ -1,5 +1,5 @@
 import type { ICotacaoFreteEntrada, IOpcaoFreteCalculada } from '@/modules/frete/IFrete.dto';
-import { cepOrigemPadrao, sanitizarCep8Digitos } from '@/modules/frete/freteCepUtil';
+import { sanitizarCep8Digitos } from '@/modules/frete/freteCepUtil';
 import type { IProvedorFrete } from './IProvedorFrete';
 
 export function arredondarParaDecimal(valor: number, casas: number): number {
@@ -32,13 +32,14 @@ function pesoEfetivo(pesoKg: number): number {
  * Transportadora simulada própria: CEP + peso + modalidade, sem API externa.
  */
 export class ProvedorFreteSimulado implements IProvedorFrete {
+  // eslint-disable-next-line class-methods-use-this
   public getCodigo(): string {
     return 'simulado';
   }
 
+  // eslint-disable-next-line class-methods-use-this
   public async calcularOpcoes(entrada: ICotacaoFreteEntrada): Promise<IOpcaoFreteCalculada[]> {
     const cepDest = sanitizarCep8Digitos(entrada.cepDestino);
-    const cepOrig = entrada.cepOrigem ? sanitizarCep8Digitos(entrada.cepOrigem) : cepOrigemPadrao();
     const peso = pesoEfetivo(entrada.pesoKg);
     const fatorRegiao = fatorRegionalPorCep(cepDest);
 

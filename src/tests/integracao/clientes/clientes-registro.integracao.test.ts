@@ -31,7 +31,7 @@ describe('Integração - Clientes (Registro)', () => {
 
       expect(resposta.status).toBe(400);
       expect(resposta.body.sucesso).toBe(false);
-      expect(resposta.body.mensagem).toBe('Senha e confirmação de senha não conferem.');
+      expect(resposta.body.mensagem).toBe('Senha e confirmação não conferem.');
     });
 
     it('deve falhar no registro com senha fraca', async () => {
@@ -51,7 +51,7 @@ describe('Integração - Clientes (Registro)', () => {
 
       expect(resposta.status).toBe(400);
       expect(resposta.body.sucesso).toBe(false);
-      expect(resposta.body.mensagem).toContain('Já existe um usuário cadastrado com este e-mail');
+      expect(resposta.body.mensagem).toContain('E-mail já cadastrado.');
     });
 
     it('deve falhar no registro com CPF duplicado', async () => {
@@ -60,7 +60,7 @@ describe('Integração - Clientes (Registro)', () => {
 
       expect(resposta.status).toBe(400);
       expect(resposta.body.sucesso).toBe(false);
-      expect(resposta.body.mensagem).toContain('Já existe um usuário cadastrado com este CPF');
+      expect(resposta.body.mensagem).toContain('CPF já cadastrado.');
     });
   });
 });

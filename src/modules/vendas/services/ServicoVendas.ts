@@ -1,7 +1,7 @@
-import { IRepositorioVendas, IVenda } from '../repositories/IRepositorioVendas';
-import { IVendaInputDto } from '../dtos/IVenda.dto';
 import type { IRepositorioCotacaoFrete } from '@/modules/frete/cotacaoFrete/IRepositorioCotacaoFrete';
 import { EstadosCotacaoFrete } from '@/modules/frete/cotacaoFrete/EstadosCotacaoFrete';
+import { IRepositorioVendas, IVenda } from '../repositories/IRepositorioVendas';
+import { IVendaInputDto } from '../dtos/IVenda.dto';
 
 const TOLERANCIA_MOEDA = 0.02;
 

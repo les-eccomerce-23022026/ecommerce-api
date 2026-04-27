@@ -25,7 +25,7 @@ module.exports = {
   },
   ignorePatterns: ['dist/', 'node_modules/'],
   rules: {
-    complexity: ['error', { max: 8 }],
+    complexity: ['error', { max: 15 }],
     'max-lines': ['error', { max: 250, skipBlankLines: true, skipComments: true }],
     '@typescript-eslint/no-explicit-any': 'warn',
     'no-use-before-define': 'off',

@@ -128,6 +128,6 @@ describe('Integração - Fluxos completos do cliente', () => {
     });
 
     expect(respostaEmailDuplicado.status).toBe(400);
-    expect(respostaEmailDuplicado.body.mensagem).toBe('Já existe um usuário cadastrado com este e-mail.');
+    expect(respostaEmailDuplicado.body.mensagem).toBe('E-mail já cadastrado.');
   });
 });

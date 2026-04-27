@@ -39,7 +39,7 @@ export class ControladorVendas {
   public visualizarDetalhesVenda = async (req: Request, res: Response) => {
     try {
       const { uuid } = req.params;
-      const usuario = req.usuario;
+      const { usuario } = req;
       if (!usuario?.uuid) {
         res.status(401).json({ erro: 'Usuário não identificado.' });
         return;
