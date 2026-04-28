@@ -7,15 +7,15 @@ import { LIVRO_UUID_TESTE, payloadPedidoValido } from '@/tests/helpers/pedido-ve
 const EMAIL_CLIENTE_B = 'cliente.b.pedido@email.com';
 const CPF_CLIENTE_B = '111.222.333-44';
 
-async function logApi(reqPromise: Promise<any>) {
+async function logApi(reqPromise: Promise<import('supertest').Response>) {
   const res = await reqPromise;
-  const req = (res as any).request;
-  console.log(`\n🚀 [API CALL] ${req.method} ${req.url}`);
-  if (req._data) {
-    console.log(`📦 PAYLOAD: ${JSON.stringify(req._data).substring(0, 200)}`);
-  }
-  const count = Array.isArray(res.body) ? res.body.length : (res.body ? 1 : 0);
-  console.log(`✅ RESPONSE COUNT: ${count}`);
+  // Comentado para evitar lint errors
+  // console.log(`\n🚀 [API CALL] ${req.method} ${req.url}`);
+  // if (req._data) {
+  //   console.log(`📦 PAYLOAD: ${JSON.stringify(req._data).substring(0, 200)}`);
+  // }
+  // const count = Array.isArray(res.body) ? res.body.length : (res.body ? 1 : 0);
+  // console.log(`✅ RESPONSE COUNT: ${count}`);
   return res;
 }
 
@@ -117,7 +117,7 @@ describe('Integração — Vendas / pedido do cliente', () => {
         const res = await logApi(request(app)
           .post('/api/vendas')
           .set('Authorization', `Bearer ${tokenCliente}`)
-          .send(payloadPedidoValido({ precoUnitario: 50, quantidade: 1, valorFrete: 10, parcelas: 2 } as any)));
+          .send(payloadPedidoValido({ precoUnitario: 50, quantidade: 1, valorFrete: 10, parcelas: 2 })));
 
         expect(res.status).toBe(400);
         expect(res.body.erro).toMatch(/RN0069/i);
