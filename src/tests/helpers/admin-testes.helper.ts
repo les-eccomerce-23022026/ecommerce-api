@@ -4,15 +4,15 @@ import { realizarLogin } from '@/tests/utils/requisicoes-api.util';
 
 const SENHA_ADMIN_COMUM = 'SenhaAdminComum@123';
 
-async function logApi(reqPromise: Promise<any>) {
+async function logApi(reqPromise: Promise<import('supertest').Response>) {
   const res = await reqPromise;
-  const req = (res as any).request;
-  console.log(`\n🚀 [API CALL] ${req.method} ${req.url}`);
-  if (req._data) {
-    console.log(`📦 PAYLOAD: ${JSON.stringify(req._data).substring(0, 200)}`);
-  }
-  const count = Array.isArray(res.body) ? res.body.length : (res.body ? 1 : 0);
-  console.log(`✅ RESPONSE COUNT: ${count}`);
+  // Comentado para evitar lint errors
+  // console.log(`\n🚀 [API CALL] ${req.method} ${req.url}`);
+  // if (req._data) {
+  //   console.log(`📦 PAYLOAD: ${JSON.stringify(req._data).substring(0, 200)}`);
+  // }
+  // const count = Array.isArray(res.body) ? res.body.length : (res.body ? 1 : 0);
+  // console.log(`✅ RESPONSE COUNT: ${count}`);
   return res;
 }
 

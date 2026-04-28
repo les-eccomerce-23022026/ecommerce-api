@@ -8,7 +8,7 @@ export function payloadPedidoValido(opcoes?: {
   precoUnitario?: number;
   quantidade?: number;
   valorFrete?: number;
-  [key: string]: any;
+  [key: string]: unknown;
 }): Record<string, unknown> {
   const { precoUnitario, quantidade, valorFrete, ...extras } = opcoes || {};
   const preco = precoUnitario ?? 50;
