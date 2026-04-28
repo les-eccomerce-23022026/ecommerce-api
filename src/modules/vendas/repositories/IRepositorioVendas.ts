@@ -12,6 +12,7 @@ export interface IVenda {
   usuarioUuid: string;
   itens: IItemVenda[];
   criadoEm: Date;
+  dataHoraEntrega?: Date; // Data de entrega para validação de trocas (RN0043)
 }
 
 /**
@@ -34,4 +35,5 @@ export interface IRepositorioVendas {
   /** Listagem administrativa (todas as vendas), mais recentes primeiro. */
   listarTodas(limite?: number): Promise<IVenda[]>;
   atualizarStatus(vendaUuid: string, novoStatus: string): Promise<void>;
+  registrarTroca(vendaUuid: string, justificativa: string): Promise<{ id: string }>;
 }

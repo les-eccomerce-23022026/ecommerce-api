@@ -140,12 +140,27 @@ export class RepositorioVendasPostgres implements IRepositorioVendas {
   public async atualizarStatus(vendaUuid: string, novoStatus: string): Promise<void> {
     const queryEncontrarStatus = 'SELECT stv_id FROM status_vendas WHERE stv_descricao = $1';
     const resStatus = await this.db.executar<{ stv_id: number }>(queryEncontrarStatus, [novoStatus]);
-    
+
     if (resStatus.length === 0) throw new Error(`Status '${novoStatus}' não encontrado.`);
 
     const stvId = resStatus[0].stv_id;
 
     const queryUpdate = 'UPDATE vendas SET stv_id = $1, ven_atualizado_em = NOW() WHERE ven_uuid = $2';
     await this.db.executar(queryUpdate, [stvId, vendaUuid]);
+  }
+
+  public async registrarTroca(vendaUuid: string, justificativa: string): Promise<{ id: string }> {
+    // Verificar se a venda existe
+    const venda = await this.obterPorUuid(vendaUuid);
+    if (!venda) throw new Error('Venda não encontrada');
+
+    // Inserir registro de troca
+    const query = `
+      INSERT INTO trocas (ven_id, tro_justificativa, tro_data_solicitacao)
+      VALUES ((SELECT ven_id FROM vendas WHERE ven_uuid = $1), $2, NOW())
+      RETURNING tro_uuid
+    `;
+    const rows = await this.db.executar<{ tro_uuid: string }>(query, [vendaUuid, justificativa]);
+    return { id: rows[0].tro_uuid };
   }
 }
