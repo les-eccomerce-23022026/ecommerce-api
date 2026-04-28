@@ -26,49 +26,11 @@ export class ServicoVendas {
    * RF0033, RF0037
    */
   public async registrarPedidoVenda(dados: IVendaInputDto): Promise<IVenda> {
-    if (!dados.usuarioUuid) throw new Error('Usuário é obrigatório');
-    if (dados.itens.length === 0) throw new Error('Venda deve possuir ao menos um item');
-    if (dados.valorTotal <= 0) throw new Error('Valor total inválido');
+    ServicoVendas.validarDadosBasicosVenda(dados);
+    ServicoVendas.validarParcelamento(dados);
+    ServicoVendas.validarPagamentosSplit(dados);
 
-    // RN0069: Parcelamento mínimo R$ 80,00
-    const parcelas = (dados as any).parcelas || 1;
-    if (parcelas > 1 && dados.valorTotal < 80) {
-      throw new Error('RN0069: Compras abaixo de R$ 80,00 não permitem parcelamento');
-    }
-
-    // RN0034: Mínimo R$ 10,00 por meio de pagamento no split (exceto cupom)
-    const pagamentos = (dados as any).pagamentos || [];
-    if (pagamentos.length > 0) {
-      pagamentos.forEach((pg: any) => {
-        if (pg.tipo === 'cartao' && pg.valor < 10) {
-          throw new Error('RN0034: Valor mínimo por cartão deve ser R$ 10,00');
-        }
-      });
-    }
-
-    let valorFreteFinal = Number(dados.valorFrete);
-    let cfrId: number | undefined;
-
-    const cotacaoUuid = typeof dados.cotacaoUuid === 'string' ? dados.cotacaoUuid.trim() : '';
-
-    if (cotacaoUuid) {
-      if (!this.repositorioCotacaoFrete) {
-        throw new Error('Cotação de frete não suportada nesta configuração');
-      }
-      const cot = await this.repositorioCotacaoFrete.obterPorUuid(cotacaoUuid);
-      if (!cot) throw new Error('Cotação de frete não encontrada');
-      if (cot.estado !== EstadosCotacaoFrete.CRIADA) {
-        throw new Error('Cotação de frete inválida ou já utilizada');
-      }
-      if (cot.expiraEm.getTime() < Date.now()) {
-        throw new Error('Cotação de frete expirada');
-      }
-      if (cot.venId != null) {
-        throw new Error('Cotação de frete já vinculada a uma venda');
-      }
-      valorFreteFinal = cot.valor;
-      cfrId = cot.cfrId;
-    }
+    const { valorFreteFinal, cfrId } = await ServicoVendas.processarCotacaoFrete(dados, this.repositorioCotacaoFrete);
 
     const esperadoTotal = Number(dados.valorTotalItens) + valorFreteFinal;
     if (Math.abs(esperadoTotal - dados.valorTotal) > TOLERANCIA_MOEDA) {
@@ -83,11 +45,68 @@ export class ServicoVendas {
 
     const { venda, venId } = await this.repositorioVendas.cadastrar(dadosInsert);
 
-    if (cotacaoUuid && this.repositorioCotacaoFrete) {
-      await this.repositorioCotacaoFrete.marcarConsumida(cotacaoUuid, venId);
+    if (dados.cotacaoUuid && this.repositorioCotacaoFrete) {
+      await this.repositorioCotacaoFrete.marcarConsumida(dados.cotacaoUuid, venId);
     }
 
     return venda;
+  }
+
+  private static validarDadosBasicosVenda(dados: IVendaInputDto): void {
+    if (!dados.usuarioUuid) throw new Error('Usuário é obrigatório');
+    if (dados.itens.length === 0) throw new Error('Venda deve possuir ao menos um item');
+    if (dados.valorTotal <= 0) throw new Error('Valor total inválido');
+  }
+
+  private static validarParcelamento(dados: IVendaInputDto): void {
+    // RN0069: Parcelamento mínimo R$ 80,00
+    const parcelas = dados.parcelas || 1;
+    if (parcelas > 1 && dados.valorTotal < 80) {
+      throw new Error('RN0069: Compras abaixo de R$ 80,00 não permitem parcelamento');
+    }
+  }
+
+  private static validarPagamentosSplit(dados: IVendaInputDto): void {
+    // RN0034: Mínimo R$ 10,00 por meio de pagamento no split (exceto cupom)
+    const pagamentos = dados.pagamentos || [];
+    if (pagamentos.length > 0) {
+      pagamentos.forEach((pg) => {
+        if (pg.tipo === 'cartao' && pg.valor < 10) {
+          throw new Error('RN0034: Valor mínimo por cartão deve ser R$ 10,00');
+        }
+      });
+    }
+  }
+
+  private static async processarCotacaoFrete(
+    dados: IVendaInputDto,
+    repositorioCotacaoFrete: IRepositorioCotacaoFrete | null
+  ): Promise<{ valorFreteFinal: number; cfrId: number | undefined }> {
+    let valorFreteFinal = Number(dados.valorFrete);
+    let cfrId: number | undefined;
+
+    const cotacaoUuid = typeof dados.cotacaoUuid === 'string' ? dados.cotacaoUuid.trim() : '';
+
+    if (cotacaoUuid) {
+      if (!repositorioCotacaoFrete) {
+        throw new Error('Cotação de frete não suportada nesta configuração');
+      }
+      const cot = await repositorioCotacaoFrete.obterPorUuid(cotacaoUuid);
+      if (!cot) throw new Error('Cotação de frete não encontrada');
+      if (cot.estado !== EstadosCotacaoFrete.CRIADA) {
+        throw new Error('Cotação de frete inválida ou já utilizada');
+      }
+      if (cot.expiraEm.getTime() < Date.now()) {
+        throw new Error('Cotação de frete expirada');
+      }
+      if (cot.venId != null) {
+        throw new Error('Cotação de frete já vinculada a uma venda');
+      }
+      valorFreteFinal = cot.valor;
+      cfrId = cot.cfrId;
+    }
+
+    return { valorFreteFinal, cfrId };
   }
 
   /**
@@ -145,6 +164,6 @@ export class ServicoVendas {
       throw new Error('Prazo de 7 dias para troca expirado');
     }
 
-    return this.repositorioVendas.registrarTroca!(vendaUuid, justificativa);
+    return this.repositorioVendas.registrarTroca(vendaUuid, justificativa);
   }
 }

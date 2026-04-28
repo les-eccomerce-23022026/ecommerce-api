@@ -8,6 +8,14 @@ export interface IItemVendaDto {
 }
 
 /**
+ * DTO para pagamento split em múltiplos meios.
+ */
+export interface IPagamentoSplitDto {
+  tipo: string;
+  valor: number;
+}
+
+/**
  * DTO para inserção de uma nova venda.
  */
 export interface IVendaInputDto {
@@ -20,4 +28,8 @@ export interface IVendaInputDto {
   cotacaoUuid?: string;
   /** Preenchido pelo serviço após resolver a cotação; usado na persistência. */
   cfrId?: number;
+  /** Número de parcelas (1 = à vista). Usado apenas para validação RN0069. */
+  parcelas?: number;
+  /** Lista de pagamentos split. Usado apenas para validação RN0034. */
+  pagamentos?: IPagamentoSplitDto[];
 }
