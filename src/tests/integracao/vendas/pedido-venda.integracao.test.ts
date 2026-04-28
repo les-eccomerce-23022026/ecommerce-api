@@ -7,6 +7,18 @@ import { LIVRO_UUID_TESTE, payloadPedidoValido } from '@/tests/helpers/pedido-ve
 const EMAIL_CLIENTE_B = 'cliente.b.pedido@email.com';
 const CPF_CLIENTE_B = '111.222.333-44';
 
+async function logApi(reqPromise: Promise<any>) {
+  const res = await reqPromise;
+  const req = (res as any).request;
+  console.log(`\n🚀 [API CALL] ${req.method} ${req.url}`);
+  if (req._data) {
+    console.log(`📦 PAYLOAD: ${JSON.stringify(req._data).substring(0, 200)}`);
+  }
+  const count = Array.isArray(res.body) ? res.body.length : (res.body ? 1 : 0);
+  console.log(`✅ RESPONSE COUNT: ${count}`);
+  return res;
+}
+
 /**
  * Pedido de venda (cliente autenticado): POST /vendas, GET /vendas/:uuid, GET /minhas-vendas.
  * Organizado em cenários felizes e de falha (alinhado aos bdd/vendas).
@@ -29,13 +41,13 @@ describe('Integração — Vendas / pedido do cliente', () => {
 
   describe('POST /api/vendas', () => {
     describe('cenários felizes', () => {
-      it('cria pedido com status EM PROCESSAMENTO e totais coerentes', async () => {
+      it('[RF0033][RF0037][RN0038] cria pedido com status EM PROCESSAMENTO e totais coerentes', async () => {
         const body = payloadPedidoValido({ precoUnitario: 50, quantidade: 1, valorFrete: 10 });
 
-        const res = await request(app)
+        const res = await logApi(request(app)
           .post('/api/vendas')
           .set('Authorization', `Bearer ${tokenCliente}`)
-          .send(body);
+          .send(body));
 
         expect(res.status).toBe(201);
         expect(res.body.status).toBe('EM PROCESSAMENTO');
@@ -44,18 +56,18 @@ describe('Integração — Vendas / pedido do cliente', () => {
         expect(res.body.itens).toHaveLength(1);
       });
 
-      it('permite consultar o mesmo pedido em GET /vendas/:uuid', async () => {
+      it('[RF0025] permite consultar o mesmo pedido em GET /vendas/:uuid', async () => {
         const body = payloadPedidoValido({ precoUnitario: 30, quantidade: 2, valorFrete: 5 });
-        const criado = await request(app)
+        const criado = await logApi(request(app)
           .post('/api/vendas')
           .set('Authorization', `Bearer ${tokenCliente}`)
-          .send(body);
+          .send(body));
 
         const vendaUuid = criado.body.id as string;
 
-        const det = await request(app)
+        const det = await logApi(request(app)
           .get(`/api/vendas/${vendaUuid}`)
-          .set('Authorization', `Bearer ${tokenCliente}`);
+          .set('Authorization', `Bearer ${tokenCliente}`));
 
         expect(det.status).toBe(200);
         expect(det.body.id).toBe(vendaUuid);
@@ -64,15 +76,15 @@ describe('Integração — Vendas / pedido do cliente', () => {
     });
 
     describe('cenários de falha', () => {
-      it('retorna 401 sem token', async () => {
-        const res = await request(app).post('/api/vendas').send(payloadPedidoValido());
+      it('[RNF0037] retorna 401 sem token', async () => {
+        const res = await logApi(request(app).post('/api/vendas').send(payloadPedidoValido()));
 
         expect(res.status).toBe(401);
         expect(res.body.sucesso).toBe(false);
       });
 
-      it('retorna 400 quando não há itens no pedido', async () => {
-        const res = await request(app)
+      it('[RF0033] retorna 400 quando não há itens no pedido', async () => {
+        const res = await logApi(request(app)
           .post('/api/vendas')
           .set('Authorization', `Bearer ${tokenCliente}`)
           .send({
@@ -80,14 +92,14 @@ describe('Integração — Vendas / pedido do cliente', () => {
             valorTotalItens: 0,
             valorFrete: 0,
             valorTotal: 0,
-          });
+          }));
 
         expect(res.status).toBe(400);
         expect(res.body.erro).toMatch(/item/i);
       });
 
-      it('retorna 400 quando valor total é inválido (<= 0)', async () => {
-        const res = await request(app)
+      it('[RN0037] retorna 400 quando valor total é inválido (<= 0)', async () => {
+        const res = await logApi(request(app)
           .post('/api/vendas')
           .set('Authorization', `Bearer ${tokenCliente}`)
           .send({
@@ -95,28 +107,54 @@ describe('Integração — Vendas / pedido do cliente', () => {
             valorTotalItens: 10,
             valorFrete: 0,
             valorTotal: 0,
-          });
+          }));
 
         expect(res.status).toBe(400);
         expect(res.body.erro).toMatch(/Valor total/i);
+      });
+
+      it('[RN0069] retorna 400 ao tentar parcelar compra < R$ 80', async () => {
+        const res = await logApi(request(app)
+          .post('/api/vendas')
+          .set('Authorization', `Bearer ${tokenCliente}`)
+          .send(payloadPedidoValido({ precoUnitario: 50, quantidade: 1, valorFrete: 10, parcelas: 2 } as any)));
+
+        expect(res.status).toBe(400);
+        expect(res.body.erro).toMatch(/RN0069/i);
+      });
+
+      it('[RN0034] retorna 400 se um dos cartões no split for < R$ 10', async () => {
+        const res = await logApi(request(app)
+          .post('/api/vendas')
+          .set('Authorization', `Bearer ${tokenCliente}`)
+          .send({
+            ...payloadPedidoValido({ precoUnitario: 50, quantidade: 1, valorFrete: 10 }),
+            pagamentos: [
+              { tipo: 'cartao', valor: 55 },
+              { tipo: 'cartao', valor: 5 }, // Invalida RN0034 (mínimo 10)
+            ],
+          }));
+
+        expect(res.status).toBe(400);
+        expect(res.body.erro).toMatch(/RN0034/i);
       });
 
     });
   });
 
   describe('GET /api/vendas/:uuid — isolamento entre clientes', () => {
-    it('cliente B recebe 404 ao tentar acessar pedido do cliente A', async () => {
-      const criado = await request(app)
+    it('[RNF0037] cliente B recebe 404 ao tentar acessar pedido do cliente A', async () => {
+      const criado = await logApi(request(app)
         .post('/api/vendas')
         .set('Authorization', `Bearer ${tokenCliente}`)
-        .send(payloadPedidoValido({ precoUnitario: 20, quantidade: 1, valorFrete: 5 }));
+        .send(payloadPedidoValido({ precoUnitario: 20, quantidade: 1, valorFrete: 5 })));
 
       expect(criado.status).toBe(201);
       const vendaUuid = criado.body.id as string;
 
-      const res = await request(app)
+      const res = await logApi(request(app)
         .get(`/api/vendas/${vendaUuid}`)
-        .set('Authorization', `Bearer ${tokenClienteB}`);
+        .set('Authorization', `Bearer ${tokenClienteB}`));
 
       expect(res.status).toBe(404);
       expect(res.body.erro).toMatch(/não encontrada/i);
@@ -125,17 +163,17 @@ describe('Integração — Vendas / pedido do cliente', () => {
 
   describe('GET /api/vendas/:uuid', () => {
     describe('cenários de falha', () => {
-      it('retorna 404 para UUID inexistente', async () => {
-        const res = await request(app)
+      it('[RF0025] retorna 404 para UUID inexistente', async () => {
+        const res = await logApi(request(app)
           .get('/api/vendas/00000000-0000-0000-0000-00000000beef')
-          .set('Authorization', `Bearer ${tokenCliente}`);
+          .set('Authorization', `Bearer ${tokenCliente}`));
 
         expect(res.status).toBe(404);
         expect(res.body.erro).toMatch(/não encontrada/i);
       });
 
-      it('retorna 401 sem token', async () => {
-        const res = await request(app).get('/api/vendas/00000000-0000-0000-0000-00000000beef');
+      it('[RNF0037] retorna 401 sem token', async () => {
+        const res = await logApi(request(app).get('/api/vendas/00000000-0000-0000-0000-00000000beef'));
 
         expect(res.status).toBe(401);
       });
@@ -143,15 +181,15 @@ describe('Integração — Vendas / pedido do cliente', () => {
   });
 
   describe('GET /api/minhas-vendas', () => {
-    it('cenário feliz: retorna lista com pedidos do cliente', async () => {
-      await request(app)
+    it('[RF0025] cenário feliz: retorna lista com pedidos do cliente', async () => {
+      await logApi(request(app)
         .post('/api/vendas')
         .set('Authorization', `Bearer ${tokenCliente}`)
-        .send(payloadPedidoValido({ precoUnitario: 40, quantidade: 1, valorFrete: 5 }));
+        .send(payloadPedidoValido({ precoUnitario: 40, quantidade: 1, valorFrete: 5 })));
 
-      const res = await request(app)
+      const res = await logApi(request(app)
         .get('/api/minhas-vendas')
-        .set('Authorization', `Bearer ${tokenCliente}`);
+        .set('Authorization', `Bearer ${tokenCliente}`));
 
       expect(res.status).toBe(200);
       expect(Array.isArray(res.body)).toBe(true);
@@ -162,10 +200,16 @@ describe('Integração — Vendas / pedido do cliente', () => {
       });
     });
 
-    it('cenário de falha: retorna 401 sem token', async () => {
-      const res = await request(app).get('/api/minhas-vendas');
+    it('[RNF0037] cenário de falha: retorna 401 sem token', async () => {
+      const res = await logApi(request(app).get('/api/minhas-vendas'));
 
       expect(res.status).toBe(401);
     });
   });
 });
+
+/**
+ * COMO RODAR ESTE TESTE:
+ * cd backend
+ * npm test src/tests/integracao/vendas/pedido-venda.integracao.test.ts
+ */

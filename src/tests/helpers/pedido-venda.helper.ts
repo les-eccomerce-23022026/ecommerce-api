@@ -8,10 +8,12 @@ export function payloadPedidoValido(opcoes?: {
   precoUnitario?: number;
   quantidade?: number;
   valorFrete?: number;
+  [key: string]: any;
 }): Record<string, unknown> {
-  const preco = opcoes?.precoUnitario ?? 50;
-  const qtd = opcoes?.quantidade ?? 1;
-  const frete = opcoes?.valorFrete ?? 10;
+  const { precoUnitario, quantidade, valorFrete, ...extras } = opcoes || {};
+  const preco = precoUnitario ?? 50;
+  const qtd = quantidade ?? 1;
+  const frete = valorFrete ?? 10;
   const totalItens = preco * qtd;
   const total = totalItens + frete;
 
@@ -20,5 +22,6 @@ export function payloadPedidoValido(opcoes?: {
     valorTotalItens: totalItens,
     valorFrete: frete,
     valorTotal: total,
+    ...extras,
   };
 }

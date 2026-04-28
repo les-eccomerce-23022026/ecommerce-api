@@ -30,6 +30,22 @@ export class ServicoVendas {
     if (dados.itens.length === 0) throw new Error('Venda deve possuir ao menos um item');
     if (dados.valorTotal <= 0) throw new Error('Valor total inválido');
 
+    // RN0069: Parcelamento mínimo R$ 80,00
+    const parcelas = (dados as any).parcelas || 1;
+    if (parcelas > 1 && dados.valorTotal < 80) {
+      throw new Error('RN0069: Compras abaixo de R$ 80,00 não permitem parcelamento');
+    }
+
+    // RN0034: Mínimo R$ 10,00 por meio de pagamento no split (exceto cupom)
+    const pagamentos = (dados as any).pagamentos || [];
+    if (pagamentos.length > 0) {
+      pagamentos.forEach((pg: any) => {
+        if (pg.tipo === 'cartao' && pg.valor < 10) {
+          throw new Error('RN0034: Valor mínimo por cartão deve ser R$ 10,00');
+        }
+      });
+    }
+
     let valorFreteFinal = Number(dados.valorFrete);
     let cfrId: number | undefined;
 
@@ -99,5 +115,36 @@ export class ServicoVendas {
    */
   public async listarVendasCliente(usuarioUuid: string): Promise<IVenda[]> {
     return this.repositorioVendas.listarPorUsuario(usuarioUuid);
+  }
+
+  /**
+   * Solicita a troca de uma venda ou itens (RN0043).
+   * Apenas para pedidos ENTREGUE dentro de 7 dias corridos da data de entrega.
+   */
+  public async solicitarTroca(
+    vendaUuid: string,
+    usuarioUuid: string,
+    justificativa: string,
+  ): Promise<{ id: string }> {
+    const venda = await this.repositorioVendas.obterPorUuid(vendaUuid);
+    if (!venda) throw new Error('Venda não encontrada');
+    if (venda.usuarioUuid !== usuarioUuid) throw new Error('Venda não encontrada');
+
+    if (venda.status !== 'ENTREGUE') {
+      throw new Error('Apenas pedidos com status ENTREGUE podem solicitar troca');
+    }
+
+    if (!venda.dataHoraEntrega) {
+      throw new Error('Data de entrega não registrada para validação de prazo');
+    }
+
+    const seteDiasEmMs = 7 * 24 * 60 * 60 * 1000;
+    const expiracao = new Date(venda.dataHoraEntrega.getTime() + seteDiasEmMs);
+
+    if (new Date() > expiracao) {
+      throw new Error('Prazo de 7 dias para troca expirado');
+    }
+
+    return this.repositorioVendas.registrarTroca!(vendaUuid, justificativa);
   }
 }

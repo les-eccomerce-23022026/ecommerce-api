@@ -19,6 +19,18 @@ type DadosCadastroCliente = {
   enderecoEntregaIgualCobranca?: boolean;
 };
 
+async function logApi(reqPromise: Promise<any>) {
+  const res = await reqPromise;
+  const req = (res as any).request;
+  console.log(`\n🚀 [API CALL] ${req.method} ${req.url}`);
+  if (req._data) {
+    console.log(`📦 PAYLOAD: ${JSON.stringify(req._data).substring(0, 200)}`);
+  }
+  const count = Array.isArray(res.body) ? res.body.length : (res.body ? 1 : 0);
+  console.log(`✅ RESPONSE COUNT: ${count}`);
+  return res;
+}
+
 export async function registrarCliente(
   app: Application,
   dados: DadosCadastroCliente & { limparDados?: boolean } = {},
@@ -39,10 +51,10 @@ export async function registrarCliente(
     await di.repoUsuarios.deletarPorEmail(finalEmail);
   }
 
-  const res = await request(app).post('/api/clientes/registro').send({
+  const res = await logApi(request(app).post('/api/clientes/registro').send({
     ...payloadPadrao,
     ...dados,
-  });
+  }));
 
   // Apenas log de debug para cenários de erro esperados nos testes
   if (res.status !== 201 && process.env.NODE_ENV !== 'test') {
@@ -73,13 +85,13 @@ export async function registrarAdmin(
     await di.repoUsuarios.deletarPorEmail(finalEmail);
   }
 
-  return request(app)
+  return logApi(request(app)
     .post('/api/admin/registro')
     .set('Authorization', `Bearer ${tokenAdmin}`)
     .send({
       ...payloadPadrao,
       ...dados,
-    });
+    }));
 }
 
 export async function realizarLogin(
@@ -87,7 +99,7 @@ export async function realizarLogin(
   email: string,
   senha: string,
 ): Promise<Response> {
-  return request(app).post('/api/auth/login').send({ email, senha });
+  return logApi(request(app).post('/api/auth/login').send({ email, senha }));
 }
 
 export async function obterTokenCliente(

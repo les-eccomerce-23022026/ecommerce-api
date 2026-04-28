@@ -69,28 +69,28 @@ describe('ServicoVendas — registrarPedidoVenda', () => {
   });
 
   describe('validações de entrada', () => {
-    it('lança erro quando usuarioUuid está ausente', async () => {
+    it('[RN0026] lança erro quando usuarioUuid está ausente', async () => {
       const servico = new ServicoVendas(mockRepoVendas);
       await expect(
         servico.registrarPedidoVenda(dadosBase({ usuarioUuid: '' })),
       ).rejects.toThrow('Usuário é obrigatório');
     });
 
-    it('lança erro quando não há itens no pedido', async () => {
+    it('[RF0033] lança erro quando não há itens no pedido', async () => {
       const servico = new ServicoVendas(mockRepoVendas);
       await expect(
         servico.registrarPedidoVenda(dadosBase({ itens: [] })),
       ).rejects.toThrow('Venda deve possuir ao menos um item');
     });
 
-    it('lança erro quando valorTotal é menor ou igual a zero', async () => {
+    it('[RN0037] lança erro quando valorTotal é menor ou igual a zero', async () => {
       const servico = new ServicoVendas(mockRepoVendas);
       await expect(
         servico.registrarPedidoVenda(dadosBase({ valorTotal: 0 })),
       ).rejects.toThrow('Valor total inválido');
     });
 
-    it('lança erro quando valorTotal diverge de itens+frete em mais de R$ 0.02', async () => {
+    it('[RN0081] lança erro quando valorTotal diverge de itens+frete em mais de R$ 0.02', async () => {
       const servico = new ServicoVendas(mockRepoVendas);
       // itens=50 + frete=10 = 60; informado 60.021 → acima da tolerância
       await expect(
@@ -98,7 +98,7 @@ describe('ServicoVendas — registrarPedidoVenda', () => {
       ).rejects.toThrow('Valor total não confere com itens + frete');
     });
 
-    it('aceita valorTotal com diferença de até R$ 0.019 (dentro da tolerância)', async () => {
+    it('[RN0081] aceita valorTotal com diferença de até R$ 0.019 (dentro da tolerância)', async () => {
       const servico = new ServicoVendas(mockRepoVendas);
       // itens=50 + frete=10 = 60; informado 60.019 → dentro da tolerância
       const resultado = await servico.registrarPedidoVenda(dadosBase({ valorTotal: 60.019 }));
@@ -108,7 +108,7 @@ describe('ServicoVendas — registrarPedidoVenda', () => {
   });
 
   describe('fluxo feliz sem cotação', () => {
-    it('registra pedido e retorna a venda criada', async () => {
+    it('[RN0038][RF0037] registra pedido e retorna a venda criada com status EM PROCESSAMENTO', async () => {
       const servico = new ServicoVendas(mockRepoVendas);
       const resultado = await servico.registrarPedidoVenda(dadosBase());
 
@@ -121,14 +121,14 @@ describe('ServicoVendas — registrarPedidoVenda', () => {
   });
 
   describe('fluxo com cotação de frete (cotacaoUuid)', () => {
-    it('lança erro quando cotacaoUuid é informado mas repositório de cotação não está configurado', async () => {
+    it('[RF0082] lança erro quando cotacaoUuid é informado mas repositório de cotação não está configurado', async () => {
       const servico = new ServicoVendas(mockRepoVendas); // sem repoCotacao
       await expect(
         servico.registrarPedidoVenda(dadosBase({ cotacaoUuid: COTACAO_UUID })),
       ).rejects.toThrow('Cotação de frete não suportada nesta configuração');
     });
 
-    it('lança erro quando a cotação não é encontrada', async () => {
+    it('[RF0082] lança erro quando a cotação não é encontrada', async () => {
       mockRepoCotacao.obterPorUuid.mockResolvedValue(null);
       const servico = new ServicoVendas(mockRepoVendas, mockRepoCotacao);
       await expect(
@@ -136,7 +136,7 @@ describe('ServicoVendas — registrarPedidoVenda', () => {
       ).rejects.toThrow('Cotação de frete não encontrada');
     });
 
-    it('lança erro quando a cotação está no estado CONSUMIDA (≠ CRIADA)', async () => {
+    it('[RF0082] lança erro quando a cotação está no estado CONSUMIDA (≠ CRIADA)', async () => {
       mockRepoCotacao.obterPorUuid.mockResolvedValue(cotacaoPadrao({ estado: 'CONSUMIDA' }));
       const servico = new ServicoVendas(mockRepoVendas, mockRepoCotacao);
       await expect(
@@ -144,7 +144,7 @@ describe('ServicoVendas — registrarPedidoVenda', () => {
       ).rejects.toThrow('Cotação de frete inválida ou já utilizada');
     });
 
-    it('lança erro quando a cotação está expirada (expiraEm no passado)', async () => {
+    it('[RF0082] lança erro quando a cotação está expirada (expiraEm no passado)', async () => {
       mockRepoCotacao.obterPorUuid.mockResolvedValue(
         cotacaoPadrao({ expiraEm: new Date(Date.now() - 1000) }),
       );
@@ -154,7 +154,7 @@ describe('ServicoVendas — registrarPedidoVenda', () => {
       ).rejects.toThrow('Cotação de frete expirada');
     });
 
-    it('lança erro quando a cotação já está vinculada a outra venda (venId != null)', async () => {
+    it('[RF0082] lança erro quando a cotação já está vinculada a outra venda (venId != null)', async () => {
       mockRepoCotacao.obterPorUuid.mockResolvedValue(cotacaoPadrao({ venId: 42 }));
       const servico = new ServicoVendas(mockRepoVendas, mockRepoCotacao);
       await expect(
@@ -162,7 +162,7 @@ describe('ServicoVendas — registrarPedidoVenda', () => {
       ).rejects.toThrow('Cotação de frete já vinculada a uma venda');
     });
 
-    it('fluxo feliz com cotação: usa valor do frete da cotação e chama marcarConsumida', async () => {
+    it('[RF0082][RN0081] fluxo feliz com cotação: usa valor do frete da cotação e chama marcarConsumida', async () => {
       const cotacao = cotacaoPadrao({ valor: 15 }); // frete da cotação = 15, diferente do input
       mockRepoCotacao.obterPorUuid.mockResolvedValue(cotacao);
       mockRepoCotacao.marcarConsumida.mockResolvedValue();
@@ -194,7 +194,7 @@ describe('ServicoVendas — visualizarDetalhesVenda', () => {
     } as jest.Mocked<IRepositorioVendas>;
   });
 
-  it('retorna a venda quando o dono a consulta', async () => {
+  it('[RF0025] retorna a venda quando o dono a consulta', async () => {
     const venda = vendaResultado(); // usuarioUuid = USUARIO_UUID
     mockRepoVendas.obterPorUuid.mockResolvedValue(venda);
     const servico = new ServicoVendas(mockRepoVendas);
@@ -205,7 +205,7 @@ describe('ServicoVendas — visualizarDetalhesVenda', () => {
     expect(resultado).toBe(venda);
   });
 
-  it('admin pode consultar venda de outro cliente', async () => {
+  it('[RF0025] admin pode consultar venda de outro cliente', async () => {
     const venda = vendaResultado(); // usuarioUuid = USUARIO_UUID
     mockRepoVendas.obterPorUuid.mockResolvedValue(venda);
     const servico = new ServicoVendas(mockRepoVendas);
@@ -216,7 +216,7 @@ describe('ServicoVendas — visualizarDetalhesVenda', () => {
     expect(resultado).toBe(venda);
   });
 
-  it('lança erro quando a venda não é encontrada', async () => {
+  it('[RF0025] lança erro quando a venda não é encontrada', async () => {
     mockRepoVendas.obterPorUuid.mockResolvedValue(null);
     const servico = new ServicoVendas(mockRepoVendas);
     await expect(
@@ -224,7 +224,7 @@ describe('ServicoVendas — visualizarDetalhesVenda', () => {
     ).rejects.toThrow('Venda não encontrada');
   });
 
-  it('lança erro quando cliente tenta consultar venda de outro cliente (mesmo erro que não existe)', async () => {
+  it('[RF0025][RNF0037] lança erro quando cliente tenta consultar venda de outro cliente (mesmo erro que não existe)', async () => {
     const venda = vendaResultado(); // dono = USUARIO_UUID
     mockRepoVendas.obterPorUuid.mockResolvedValue(venda);
     const servico = new ServicoVendas(mockRepoVendas);
@@ -235,7 +235,7 @@ describe('ServicoVendas — visualizarDetalhesVenda', () => {
 });
 
 describe('ServicoVendas — listarVendasCliente', () => {
-  it('delega a listagem ao repositório e retorna o resultado', async () => {
+  it('[RF0025] delega a listagem ao repositório e retorna o resultado', async () => {
     const mockRepoVendas = {
       cadastrar: jest.fn(),
       obterPorUuid: jest.fn(),
@@ -251,3 +251,59 @@ describe('ServicoVendas — listarVendasCliente', () => {
     expect(mockRepoVendas.listarPorUsuario).toHaveBeenCalledWith(USUARIO_UUID);
   });
 });
+
+describe('ServicoVendas — solicitarTroca (RN0043)', () => {
+  let mockRepoVendas: jest.Mocked<IRepositorioVendas>;
+
+  beforeEach(() => {
+    mockRepoVendas = {
+      cadastrar: jest.fn(),
+      obterPorUuid: jest.fn(),
+      listarPorUsuario: jest.fn(),
+      listarTodas: jest.fn(),
+      atualizarStatus: jest.fn(),
+      registrarTroca: jest.fn().mockResolvedValue({ id: 'troca-uuid-1' }),
+    } as unknown as jest.Mocked<IRepositorioVendas>;
+  });
+
+  it('[RN0043] permite solicitar troca se status for ENTREGUE e estiver dentro do prazo de 7 dias', async () => {
+    const dataEntrega = new Date(); // Hoje
+    const venda = { ...vendaResultado(), status: 'ENTREGUE', dataHoraEntrega: dataEntrega };
+    mockRepoVendas.obterPorUuid.mockResolvedValue(venda as any);
+
+    const servico = new ServicoVendas(mockRepoVendas);
+    const resultado = await servico.solicitarTroca('venda-uuid-1', USUARIO_UUID, 'Defeito no livro');
+
+    expect(resultado).toBeDefined();
+    expect(mockRepoVendas.registrarTroca).toHaveBeenCalled();
+  });
+
+  it('[RN0043] lança erro se o status não for ENTREGUE', async () => {
+    const venda = { ...vendaResultado(), status: 'EM PROCESSAMENTO' };
+    mockRepoVendas.obterPorUuid.mockResolvedValue(venda as any);
+
+    const servico = new ServicoVendas(mockRepoVendas);
+    await expect(
+      servico.solicitarTroca('venda-uuid-1', USUARIO_UUID, 'Justificativa'),
+    ).rejects.toThrow('Apenas pedidos com status ENTREGUE podem solicitar troca');
+  });
+
+  it('[RN0043] lança erro se o prazo de 7 dias expirou', async () => {
+    const dataEntrega = new Date();
+    dataEntrega.setDate(dataEntrega.getDate() - 8); // 8 dias atrás
+
+    const venda = { ...vendaResultado(), status: 'ENTREGUE', dataHoraEntrega: dataEntrega };
+    mockRepoVendas.obterPorUuid.mockResolvedValue(venda as any);
+
+    const servico = new ServicoVendas(mockRepoVendas);
+    await expect(
+      servico.solicitarTroca('venda-uuid-1', USUARIO_UUID, 'Justificativa'),
+    ).rejects.toThrow('Prazo de 7 dias para troca expirado');
+  });
+});
+
+/**
+ * COMO RODAR ESTE TESTE:
+ * cd backend
+ * npm test src/tests/unitarios/vendas/ServicoVendas.test.ts
+ */

@@ -22,6 +22,18 @@ export type CotacaoPac = {
   valorFrete: number;
 };
 
+async function logApi(reqPromise: Promise<any>) {
+  const res = await reqPromise;
+  const req = (res as any).request;
+  console.log(`\n🚀 [API CALL] ${req.method} ${req.url}`);
+  if (req._data) {
+    console.log(`📦 PAYLOAD: ${JSON.stringify(req._data).substring(0, 200)}`);
+  }
+  const count = Array.isArray(res.body) ? res.body.length : (res.body ? 1 : 0);
+  console.log(`✅ RESPONSE COUNT: ${count}`);
+  return res;
+}
+
 /**
  * Cota frete simulado e retorna a opção PAC (uuid + valor) para uso em `POST /vendas` com `cotacaoUuid`.
  */
@@ -30,14 +42,14 @@ export async function cotarFretePac(
   token: string,
   valorTotalItens: number,
 ): Promise<CotacaoPac> {
-  const res = await request(app)
+  const res = await logApi(request(app)
     .post('/api/frete/cotar')
     .set('Authorization', `Bearer ${token}`)
     .send({
       cepDestino: '01310100',
       pesoKg: 1,
       valorTotalItens,
-    });
+    }));
 
   if (res.status !== 200) {
     throw new Error(`frete/cotar: ${res.status} ${JSON.stringify(res.body)}`);

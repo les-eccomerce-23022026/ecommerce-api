@@ -4,6 +4,18 @@ import { realizarLogin } from '@/tests/utils/requisicoes-api.util';
 
 const SENHA_ADMIN_COMUM = 'SenhaAdminComum@123';
 
+async function logApi(reqPromise: Promise<any>) {
+  const res = await reqPromise;
+  const req = (res as any).request;
+  console.log(`\n🚀 [API CALL] ${req.method} ${req.url}`);
+  if (req._data) {
+    console.log(`📦 PAYLOAD: ${JSON.stringify(req._data).substring(0, 200)}`);
+  }
+  const count = Array.isArray(res.body) ? res.body.length : (res.body ? 1 : 0);
+  console.log(`✅ RESPONSE COUNT: ${count}`);
+  return res;
+}
+
 /**
  * Cria um administrador não-mestre via API (token do mestre) e retorna token + e-mail.
  * CPF é variado para evitar colisão quando vários admins são criados na mesma suíte.
@@ -17,7 +29,7 @@ export async function criarAdminComumObterToken(
   const parte = String(Math.floor(100 + Math.random() * 899)).padStart(3, '0');
   const cpf = `111.222.${parte}-44`;
 
-  const res = await request(app)
+  const res = await logApi(request(app)
     .post('/api/admin/registro')
     .set('Authorization', `Bearer ${tokenMestre}`)
     .send({
@@ -26,7 +38,7 @@ export async function criarAdminComumObterToken(
       cpf,
       senha: SENHA_ADMIN_COMUM,
       confirmacaoSenha: SENHA_ADMIN_COMUM,
-    });
+    }));
 
   if (res.status !== 201) {
     throw new Error(`Falha ao criar admin comum: ${res.status} ${JSON.stringify(res.body)}`);
