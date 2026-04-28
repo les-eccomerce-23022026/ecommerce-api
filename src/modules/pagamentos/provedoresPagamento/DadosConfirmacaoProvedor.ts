@@ -14,6 +14,8 @@ export interface DadosConfirmacaoProvedor {
    * Não exige idIntencao no cliente.
    */
   confirmacaoServicoInterna?: boolean;
+  /** Metadados para simulação de comportamento (Sandbox). */
+  cartaoParaSimulacao?: { ultimosDigitos: string };
 }
 
 export interface ResultadoIntencaoPagamento {

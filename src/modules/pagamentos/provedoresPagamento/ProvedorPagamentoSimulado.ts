@@ -63,6 +63,13 @@ export class ProvedorPagamentoSimulado implements IProvedorPagamento {
     const teto = obterTetoSimulacao();
     const valorTotal = Number(dados.valorTotal);
 
+    if (dados.cartaoParaSimulacao?.ultimosDigitos === '0002') {
+      return { sucesso: false, status: 'RECUSADO' };
+    }
+    if (dados.cartaoParaSimulacao?.ultimosDigitos === '0005') {
+      return { sucesso: false, status: 'FRAUDE' };
+    }
+
     if (dados.confirmacaoServicoInterna) {
       return ProvedorPagamentoSimulado.resultadoPorTeto(valorTotal, teto);
     }

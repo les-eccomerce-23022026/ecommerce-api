@@ -40,6 +40,9 @@ export class ProvedorFreteSimulado implements IProvedorFrete {
   // eslint-disable-next-line class-methods-use-this
   public async calcularOpcoes(entrada: ICotacaoFreteEntrada): Promise<IOpcaoFreteCalculada[]> {
     const cepDest = sanitizarCep8Digitos(entrada.cepDestino);
+    if (cepDest === '00000000') {
+      throw new Error('CEP não encontrado');
+    }
     const peso = pesoEfetivo(entrada.pesoKg);
     const fatorRegiao = fatorRegionalPorCep(cepDest);
 

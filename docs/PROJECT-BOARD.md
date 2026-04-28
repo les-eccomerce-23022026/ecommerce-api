@@ -7,9 +7,9 @@
 
 ## Board Kanban
 
-| 📛 Todo (0)                                 | 🔄 In Progress (1)              | ✅ Done (36)                                                          |
+| 📛 Todo (0)                                 | 🔄 In Progress (0)              | ✅ Done (37)                                                          |
 | ------------------------------------------- | ------------------------------- | --------------------------------------------------------------------- |
-|                                             | B14 · [BACKEND] Gateway Real (Stripe) | B1 · [BACKEND] Setup Inicial e Arquitetura                            |
+|                                             |                                 | B14 · [BACKEND] Gateway Real (Stripe) |
 |                                             |                                 | B2 · [BACKEND] Dockerização e Ambiente Dev                            |
 |                                             |                                 | B3 · [BACKEND] Modelagem SQL e Normalização                           |
 |                                             |                                 | B4 · [BACKEND] Infraestrutura de Repositórios PG                      |
@@ -45,6 +45,7 @@
 |                                             |                                 | B34 · [BACKEND] Fortalecimento da Segurança                           |
 |                                             |                                 | B35 · [BACKEND] Infraestrutura de Testes Avançada                     |
 |                                             |                                 | B36 · [BACKEND] Schema `les` e Padrões Arquiteturais                  |
+|                                             |                                 | B37 · [BACKEND] Sandbox de Falhas Determinística                      |
 
 ---
 
@@ -88,6 +89,7 @@
 | B34  | BACKEND | Fortalecimento da Segurança                         | **Negócio:** Protege o ativo mais valioso da empresa (dados dos clientes) contra ataques e vazamentos, minimizando riscos jurídicos e de imagem. **Arquivos:** `FiltroSeguranca.ts`, `HmacUtil.ts`. |
 | B35  | BACKEND | Infraestrutura de Testes Avançada                   | **Negócio:** Garante a continuidade do negócio e a estabilidade da plataforma em cada atualização, prevenindo bugs críticos em produção. **Arquivos:** `teste.setup.ts`, `BancoTesteIsolado.ts`. |
 | B36  | BACKEND | Schema `les` e Padrões Arquiteturais                | **Negócio:** Organização patrimonial dos dados e padronização técnica que facilita o escalonamento da equipe e do sistema. **Arquivos:** `ConexaoPostgres.ts`, `001_schema_les.sql`. |
+| B37  | BACKEND | Sandbox de Falhas Determinística                    | **Negócio:** Habilitação de testes E2E resilientes através de gatilhos determinísticos de falha (CEP '00000000', Cartão final '0002'). **Arquivos:** `ProvedorFreteSimulado.ts`, `ProvedorPagamentoSimulado.ts`. |
 
 ---
 

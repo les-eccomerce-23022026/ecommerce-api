@@ -6,6 +6,7 @@ import * as crypto from 'crypto';
  */
 export class CartaoCredito {
   private readonly numeroTokenizado: string;
+  private readonly ultimosDigitos: string;
 
   private readonly nomeTitular: string;
 
@@ -26,6 +27,7 @@ export class CartaoCredito {
 
     // Tokenização simples (em produção, usar serviço como PCI DSS compliant)
     this.numeroTokenizado = CartaoCredito.tokenizarNumero(numero);
+    this.ultimosDigitos = numero.replace(/\s+/g, '').slice(-4);
     this.nomeTitular = nomeTitular.trim().toUpperCase();
     this.validade = validade;
     this.bandeira = bandeira;
@@ -93,6 +95,10 @@ export class CartaoCredito {
     return this.numeroTokenizado;
   }
 
+  public getUltimosDigitos(): string {
+    return this.ultimosDigitos;
+  }
+
   public getNomeTitular(): string {
     return this.nomeTitular;
   }
@@ -122,10 +128,12 @@ export class CartaoCredito {
     numeroTokenizado: string,
     nomeTitular: string,
     validade: string,
-    bandeira: string
+    bandeira: string,
+    ultimosDigitos: string = '0000'
   ): CartaoCredito {
     const cartao = Object.create(CartaoCredito.prototype);
     cartao.numeroTokenizado = numeroTokenizado;
+    cartao.ultimosDigitos = ultimosDigitos;
     cartao.nomeTitular = nomeTitular;
     cartao.validade = validade;
     cartao.bandeira = bandeira;

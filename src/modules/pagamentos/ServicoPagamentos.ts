@@ -95,7 +95,12 @@ export class ServicoPagamentos {
     if (!pagamento) throw new Error('Pagamento não encontrado');
     if (pagamento.status !== StatusPagamento.PENDENTE) throw new Error('Pagamento já processado');
     if (pagamento.formaPagamento.getTipo() === TipoPagamento.PIX) throw new Error('PIX aguarda confirmação do provedor');
-    const resultado = await this.provedorPagamento.confirmarPagamento({ valorTotal: pagamento.valor, confirmacaoServicoInterna: true });
+    const ultimosDigitos = pagamento.cartao?.getUltimosDigitos();
+    const resultado = await this.provedorPagamento.confirmarPagamento({
+      valorTotal: pagamento.valor,
+      confirmacaoServicoInterna: true,
+      ...(ultimosDigitos ? { cartaoParaSimulacao: { ultimosDigitos } } : {})
+    });
     const atualizado = await this.repositorioPagamentos.atualizar(pagamentoUuid, { ...pagamento, status: resultado.sucesso ? StatusPagamento.APROVADO : StatusPagamento.RECUSADO, processadoEm: new Date() });
     await this.sincronizarStatusVendaAposPagamentos(pagamento.vendaUuid);
     return atualizado;
