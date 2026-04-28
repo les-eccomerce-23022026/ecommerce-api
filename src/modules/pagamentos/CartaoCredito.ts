@@ -6,6 +6,7 @@ import * as crypto from 'crypto';
  */
 export class CartaoCredito {
   private readonly numeroTokenizado: string;
+
   private readonly ultimosDigitos: string;
 
   private readonly nomeTitular: string;
