@@ -1,0 +1,42 @@
+# Regras do Cursor/Windsurf - Backend
+
+## Backend em Docker Compose
+
+Este backend usa Docker Compose para gerenciar o ambiente de desenvolvimento. **NÃO rode o backend diretamente no host com `npm run dev`**.
+
+### Comandos obrigatórios
+
+**Para iniciar o backend:**
+```bash
+cd backend
+docker compose up -d
+```
+
+**Para reiniciar o backend após alterações:**
+```bash
+cd backend
+docker compose restart app
+```
+
+**Para reconstruir após alterações no Dockerfile:**
+```bash
+cd backend
+docker compose up -d --build app
+```
+
+**Para parar o backend:**
+```bash
+cd backend
+docker compose down
+```
+
+### Importante
+
+- Sempre use `docker compose` para gerenciar o backend
+- O container `ecm_app` roda na porta 3000
+- O container usa volumes para montar o código do host, então alterações são refletidas automaticamente
+- Se as alterações não forem refletidas, reinicie o container: `docker compose restart app`
+
+### Referência
+
+Para mais detalhes, consulte [DOCKER.md](DOCKER.md).

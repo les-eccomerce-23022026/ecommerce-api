@@ -44,6 +44,34 @@ Execute [`sql/migrations/024_cobranca_pix_simulada.sql`](sql/migrations/024_cobr
 
 ## 2. Iniciar a aplicação
 
+**⚠️ IMPORTANTE: Este projeto usa Docker Compose para gerenciar o backend em ambiente de desenvolvimento.**
+
+Para instruções detalhadas sobre como usar Docker Compose para gerenciar o backend, consulte [DOCKER.md](DOCKER.md).
+
+### Comandos principais do Docker Compose
+
+```bash
+# Iniciar todos os serviços (app + postgres + redis)
+docker compose up -d
+
+# Parar todos os serviços
+docker compose down
+
+# Reiniciar o backend após alterações
+docker compose restart app
+
+# Reconstruir e iniciar (quando há alterações no Dockerfile)
+docker compose up -d --build app
+```
+
+**NÃO rode o backend diretamente no host com `npm run dev` quando estiver usando Docker.** Isso causa conflitos de porta (3000) e inconsistência entre o código no host e o container.
+
+---
+
+### Iniciar localmente (sem Docker - não recomendado)
+
+Se preferir rodar localmente (apenas para desenvolvimento rápido):
+
 ```bash
 npm install
 npm run dev
