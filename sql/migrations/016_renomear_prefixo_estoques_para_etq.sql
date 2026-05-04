@@ -2,36 +2,57 @@
 -- Descrição: Renomeia colunas da tabela estoques de est_ para etq_, eliminando
 --            colisão de prefixo com a tabela estados (também est_).
 -- Data: 2026-04-01
---
--- Contexto: estados usa est_id, est_sigla, est_nome; estoques passa a usar etq_*.
---
--- IMPORTANTE: Aplicar somente em bancos já migrados com o schema antigo (014 com est_*).
--- Instalações novas a partir do 014 atualizado já criam estoques com etq_* — não rodar 016.
 
-BEGIN;
+DO $$
+BEGIN
+    -- 1. Renomear colunas se elas ainda usarem o prefixo est_
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'estoques' AND column_name = 'est_id') THEN
+        ALTER TABLE estoques RENAME COLUMN est_id TO etq_id;
+    END IF;
 
--- -----------------------------------------------------------------------------
--- 1. Renomear colunas (ordem independente)
--- -----------------------------------------------------------------------------
-ALTER TABLE IF EXISTS estoques RENAME COLUMN est_id TO etq_id;
-ALTER TABLE IF EXISTS estoques RENAME COLUMN est_uuid TO etq_uuid;
-ALTER TABLE IF EXISTS estoques RENAME COLUMN est_quantidade_disponivel TO etq_quantidade_disponivel;
-ALTER TABLE IF EXISTS estoques RENAME COLUMN est_quantidade_reservada TO etq_quantidade_reservada;
-ALTER TABLE IF EXISTS estoques RENAME COLUMN est_preco_venda TO etq_preco_venda;
-ALTER TABLE IF EXISTS estoques RENAME COLUMN est_valor_custo_atual TO etq_valor_custo_atual;
-ALTER TABLE IF EXISTS estoques RENAME COLUMN est_ultimo_custo_calculado TO etq_ultimo_custo_calculado;
-ALTER TABLE IF EXISTS estoques RENAME COLUMN est_ativo TO etq_ativo;
-ALTER TABLE IF EXISTS estoques RENAME COLUMN est_criado_em TO etq_criado_em;
-ALTER TABLE IF EXISTS estoques RENAME COLUMN est_atualizado_em TO etq_atualizado_em;
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'estoques' AND column_name = 'est_uuid') THEN
+        ALTER TABLE estoques RENAME COLUMN est_uuid TO etq_uuid;
+    END IF;
 
--- -----------------------------------------------------------------------------
--- 2. Sequência do BIGSERIAL (nome legado estoques_est_id_seq)
--- -----------------------------------------------------------------------------
-ALTER SEQUENCE IF EXISTS estoques_est_id_seq RENAME TO estoques_etq_id_seq;
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'estoques' AND column_name = 'est_quantidade_disponivel') THEN
+        ALTER TABLE estoques RENAME COLUMN est_quantidade_disponivel TO etq_quantidade_disponivel;
+    END IF;
 
--- -----------------------------------------------------------------------------
--- 3. Trigger de timestamp: atualizar referência à coluna renomeada
--- -----------------------------------------------------------------------------
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'estoques' AND column_name = 'est_quantidade_reservada') THEN
+        ALTER TABLE estoques RENAME COLUMN est_quantidade_reservada TO etq_quantidade_reservada;
+    END IF;
+
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'estoques' AND column_name = 'est_preco_venda') THEN
+        ALTER TABLE estoques RENAME COLUMN est_preco_venda TO etq_preco_venda;
+    END IF;
+
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'estoques' AND column_name = 'est_valor_custo_atual') THEN
+        ALTER TABLE estoques RENAME COLUMN est_valor_custo_atual TO etq_valor_custo_atual;
+    END IF;
+
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'estoques' AND column_name = 'est_ultimo_custo_calculado') THEN
+        ALTER TABLE estoques RENAME COLUMN est_ultimo_custo_calculado TO etq_ultimo_custo_calculado;
+    END IF;
+
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'estoques' AND column_name = 'est_ativo') THEN
+        ALTER TABLE estoques RENAME COLUMN est_ativo TO etq_ativo;
+    END IF;
+
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'estoques' AND column_name = 'est_criado_em') THEN
+        ALTER TABLE estoques RENAME COLUMN est_criado_em TO etq_criado_em;
+    END IF;
+
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'estoques' AND column_name = 'est_atualizado_em') THEN
+        ALTER TABLE estoques RENAME COLUMN est_atualizado_em TO etq_atualizado_em;
+    END IF;
+
+    -- 2. Sequência do BIGSERIAL
+    IF EXISTS (SELECT 1 FROM pg_class WHERE relname = 'estoques_est_id_seq') THEN
+        ALTER SEQUENCE estoques_est_id_seq RENAME TO estoques_etq_id_seq;
+    END IF;
+END $$;
+
+-- 3. Trigger de timestamp: atualizar referência à coluna renomeada (sempre executado para garantir versão final)
 CREATE OR REPLACE FUNCTION fn_atualizar_timestamp_livros_estoque()
 RETURNS TRIGGER LANGUAGE plpgsql AS $$
 BEGIN
@@ -44,5 +65,3 @@ BEGIN
     RETURN NEW;
 END;
 $$;
-
-COMMIT;
