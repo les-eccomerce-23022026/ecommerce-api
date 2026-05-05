@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { di } from '@/shared/infrastructure/di.container';
 import { RespostaPadrao } from '@/shared/errors/Iresposta-padrao';
+import { obterErroValidacaoCadastroPublico } from '@/modules/clientes/clientes-cadastro-publico-validacao.util';
 
 const { gestaoIdentidadeCliente } = di;
 
@@ -41,51 +42,9 @@ export class ControladorClientes {
   public static async realizarCadastroPublico(requisicao: Request, resposta: Response): Promise<Response> {
     try {
       const dados = requisicao.body ?? {};
-
-      const camposObrigatorios = ['nome', 'cpf', 'email', 'senha', 'confirmacaoSenha'];
-      const faltando = camposObrigatorios.filter((campo) => !dados[campo]);
-
-      if (faltando.length > 0) {
-        return RespostaPadrao.enviarErro(
-          resposta,
-          400,
-          `Campos obrigatórios ausentes: ${faltando.join(', ')}`,
-        );
-      }
-
-      // Validar campos obrigatórios do endereço de cobrança (apenas se fornecido)
-      if (dados.enderecoCobranca) {
-        const camposEnderecoObrigatorios = ['logradouro', 'numero', 'bairro', 'cep', 'cidade', 'estado'];
-        const enderecoFaltando = camposEnderecoObrigatorios.filter((campo) => !dados.enderecoCobranca[campo]);
-
-        if (enderecoFaltando.length > 0) {
-          return RespostaPadrao.enviarErro(
-            resposta,
-            400,
-            `Campos obrigatórios do endereço de cobrança ausentes: ${enderecoFaltando.join(', ')}`,
-          );
-        }
-
-        // Se enderecoEntregaIgualCobranca for false, validar enderecoEntrega
-        if (dados.enderecoEntregaIgualCobranca === false) {
-          if (!dados.enderecoEntrega) {
-            return RespostaPadrao.enviarErro(
-              resposta,
-              400,
-              'enderecoEntrega é obrigatório quando enderecoEntregaIgualCobranca é false',
-            );
-          }
-          const camposEnderecoObrigatorios2 = ['logradouro', 'numero', 'bairro', 'cep', 'cidade', 'estado'];
-          const enderecoEntregaFaltando = camposEnderecoObrigatorios2.filter((campo) => !dados.enderecoEntrega[campo]);
-
-          if (enderecoEntregaFaltando.length > 0) {
-            return RespostaPadrao.enviarErro(
-              resposta,
-              400,
-              `Campos obrigatórios do endereço de entrega ausentes: ${enderecoEntregaFaltando.join(', ')}`,
-            );
-          }
-        }
+      const erroValidacao = obterErroValidacaoCadastroPublico(dados);
+      if (erroValidacao) {
+        return RespostaPadrao.enviarErro(resposta, 400, erroValidacao);
       }
 
       const clienteCriado = await gestaoIdentidadeCliente.realizarCadastroPublico(dados);

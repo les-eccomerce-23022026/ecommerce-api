@@ -1,9 +1,13 @@
 import request from 'supertest';
 import { configurarTesteIntegracao } from '@/tests/utils/setup-integracao.util';
 import { obterTokenCliente } from '@/tests/utils/requisicoes-api.util';
-import { LIVRO_UUID_TESTE } from '@/tests/helpers/pedido-venda.helper';
+import {
+  prepararTabelasPagamentoIntegracao,
+  criarVendaPagamentos,
+  registrarIntencaoPagamentos,
+} from './pagamentos.integracao.comum';
 
-describe('Integração - Pagamentos', () => {
+describe('Integração - Pagamentos (info, intenção e processar)', () => {
   const contexto = configurarTesteIntegracao();
   let token: string;
 
@@ -12,54 +16,11 @@ describe('Integração - Pagamentos', () => {
   });
 
   beforeEach(async () => {
-    if (contexto.db) {
-      await contexto.db.executar(
-        `INSERT INTO tipo_pagamento (tpg_descricao) VALUES ('pix') ON CONFLICT (tpg_descricao) DO NOTHING`
-      );
-      await contexto.db.executar(
-        `INSERT INTO status_vendas (stv_descricao) VALUES ('AGUARDANDO PAGAMENTO') ON CONFLICT (stv_descricao) DO NOTHING`
-      );
-      await contexto.db.executar(`
-        CREATE TABLE IF NOT EXISTS pagamento_pix_simulado (
-          ppx_id BIGSERIAL PRIMARY KEY,
-          pag_id BIGINT NOT NULL UNIQUE REFERENCES pagamento(pag_id) ON DELETE CASCADE,
-          ppx_copia_cola TEXT NOT NULL,
-          ppx_qr_base64 TEXT,
-          ppx_expira_em TIMESTAMPTZ NOT NULL,
-          ppx_segredo_confirmacao VARCHAR(128) NOT NULL
-        );
-      `);
-    }
+    await prepararTabelasPagamentoIntegracao(contexto.db);
   });
 
-  async function criarVenda(total = 60) {
-    const valorFrete = 10;
-    const valorTotalItens = total - valorFrete;
-    if (valorTotalItens <= 0) {
-      throw new Error('criarVenda: total deve ser maior que o frete fixo de teste (10)');
-    }
-    const res = await request(contexto.app)
-      .post('/api/vendas')
-      .set('Authorization', `Bearer ${token}`)
-      .send({
-        itens: [{ livroUuid: LIVRO_UUID_TESTE, quantidade: 1, precoUnitario: valorTotalItens }],
-        valorTotalItens,
-        valorFrete,
-        valorTotal: total,
-      });
-    expect(res.status).toBe(201);
-    return res.body.id as string;
-  }
-
-  async function registrarIntencao(valorTotal: number) {
-    const res = await request(contexto.app)
-      .post('/api/pagamentos/intencao-pagamento')
-      .set('Authorization', `Bearer ${token}`)
-      .send({ valorTotal });
-    expect(res.status).toBe(201);
-    return res.body as { idIntencao: string; segredoConfirmacao: string };
-  }
-
+  const criarVenda = (total = 60) => criarVendaPagamentos(contexto, token, total);
+  const registrarIntencao = (valorTotal: number) => registrarIntencaoPagamentos(contexto, token, valorTotal);
   it('GET /pagamento/info retorna estrutura de checkout simulada', async () => {
     const res = await request(contexto.app)
       .get('/api/pagamento/info')
@@ -211,7 +172,7 @@ describe('Integração - Pagamentos', () => {
       });
 
     expect(res.status).toBe(400);
-    expect(res.body.erro).toBe('Vínculo de venda inválido');
+    expect(res.body.erro).toContain('vendaUuid');
   });
 
   it('POST /pagamento/processar persiste pagamento com inp_id quando vendaUuid e aprovação', async () => {
@@ -239,5 +200,27 @@ describe('Integração - Pagamentos', () => {
     );
     expect(rows[0]?.inp_id).toBeDefined();
     expect(rows[0]?.inp_id).not.toBeNull();
+  });
+
+  it('POST /pagamento/processar reprova quando intenção expirada (TTL)', async () => {
+    const intencao = await registrarIntencao(90);
+    await contexto.db!.executar(
+      `UPDATE intencao_pagamento SET inp_expira_em = NOW() - INTERVAL '1 minute' WHERE inp_uuid = $1`,
+      [intencao.idIntencao]
+    );
+
+    const res = await request(contexto.app)
+      .post('/api/pagamento/processar')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        valorTotal: 90,
+        idIntencao: intencao.idIntencao,
+        segredoConfirmacao: intencao.segredoConfirmacao,
+        pagamentosCartao: [{ valor: 90 }],
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.body.sucesso).toBe(false);
+    expect(res.body.status).toBe('REPROVADA');
   });
 });

@@ -4,6 +4,14 @@ API Node.js/TypeScript (Express, PostgreSQL, Redis, JWT).
 
 ---
 
+## Contexto no monorepo
+
+- Visão geral do projeto: [`../README.md`](../README.md)
+- Frontend consumidor da API: [`../web/README.md`](../web/README.md)
+- Requisitos e ADRs (SSoT): [`../documentacao-exigida/README.md`](../documentacao-exigida/README.md)
+
+---
+
 ## 1. Banco de dados e Redis (desenvolvimento)
 
 Na pasta `backend`:
@@ -88,6 +96,13 @@ A API sobe em `http://localhost:${PORTA_HTTP:-3000}` (prefixo `/api`). Variávei
 
 **Só com Docker (app + banco):** `docker compose up -d` (o serviço `app` usa o `.env`).
 
+### Contrato com frontend
+
+- Base de API consumida pelo frontend: `/api`.
+- Sessão principal via cookie HttpOnly (`les_token` por padrão).
+- Para desenvolvimento local, o frontend usa proxy Vite (`localhost:5173 -> localhost:3000`).
+- Para detalhes do cliente web e variáveis `VITE_*`: consulte [`../web/README.md`](../web/README.md).
+
 ---
 
 ## 3. Credenciais de administrador
@@ -148,6 +163,37 @@ npm run test:coverage
 - Cenários em linguagem de negócio: [`bdd/README.md`](bdd/README.md) (especificação; a automação está em `src/tests/**`, com pastas por domínio em `integracao/`).
 - Detalhes de SQL e modelagem: [`sql/README.md`](sql/README.md).
 
+### Guia rápido de testes por estratégia e domínio
+
+#### Estratégia
+
+| Comando | Escopo |
+|---------|--------|
+| `npm test` | Suite completa (unitários + integração + auditoria) |
+| `npm run test:unit` | Apenas testes unitários (`src/tests/unitarios`) |
+| `npm run test:int` | Apenas testes de integração (`src/tests/integracao`) |
+| `npm run test:coverage` | Suite completa com cobertura |
+
+#### Domínio de negócio
+
+| Domínio | Unitário | Integração | Completo do domínio |
+|--------|----------|------------|---------------------|
+| Admin | `npm run test:unit:admin` | `npm run test:int:admin` | `npm run test:dominio:admin` |
+| Clientes | `npm run test:unit:clientes` | `npm run test:int:clientes` | `npm run test:dominio:clientes` |
+| Vendas | `npm run test:unit:vendas` | `npm run test:int:vendas` | `npm run test:dominio:vendas` |
+| Pagamentos | `npm run test:unit:pagamentos` | `npm run test:int:pagamentos` | `npm run test:dominio:pagamentos` |
+| Entrega | `npm run test:unit:entrega` | `npm run test:int:entrega` | `npm run test:dominio:entrega` |
+| Frete | `npm run test:unit:frete` | `npm run test:int:frete` | `npm run test:dominio:frete` |
+
+#### Complementares
+
+| Comando | Escopo |
+|---------|--------|
+| `npm run test:unit:usuarios` | Repositório de usuários |
+| `npm run test:unit:utils` | Utilitários (`utils` + formatação) |
+| `npm run test:unit:infra` | Infra/middlewares |
+| `npm run test:auditoria` | Auditoria de condicionais |
+
 ---
 
 ## 7. Scripts úteis
@@ -176,3 +222,76 @@ npm run test:coverage
 - Rotas HTTP de exemplo: pasta `http/`.
 - BDD (cenários): pasta `bdd/`.
 - Scripts curl (fluxos): `scripts/curl-*-bdd.sh`.
+
+---
+
+## 10. Segurança no ambiente de testes
+
+- `x-use-test-db` só deve ser usado em ambiente controlado (CI/local) com `ENABLE_TEST_DB_SWITCH=true`.
+- Endpoint `POST /api/admin/bootstrap` só funciona em `NODE_ENV=test` e exige header `x-test-bootstrap-key` igual a `TEST_BOOTSTRAP_KEY`.
+- Não versionar segredos reais em `.env`, `cypress.env.json` ou scripts.
+- Para Cypress, defina credenciais via variáveis de ambiente:
+  - `CYPRESS_ADMIN_EMAIL`, `CYPRESS_ADMIN_SENHA`
+  - `CYPRESS_CLIENTE_EMAIL`, `CYPRESS_CLIENTE_SENHA`
+- Pipeline de segurança recomendada (workflow `security-ci`):
+  - secret scan (`gitleaks`)
+  - SAST (`semgrep` + lint)
+  - config lint (`yamllint`, `shellcheck`, `hadolint`)
+  - testes backend/frontend
+- Política de gate incremental:
+  - checks rodam por escopo alterado (`backend/**`, `web/**`, `.github/**`);
+  - lint e SAST focam arquivos alterados no PR para não bloquear por dívida histórica fora do diff;
+  - E2E Cypress não entra no gate padrão neste estágio (somente unit/integration + segurança).
+- Validação operacional no GitHub:
+  - rode o workflow `security-ci` por `workflow_dispatch` com `full_gate=true` para execução completa (sem filtro incremental);
+  - mantenha `check_secrets=true` para validar os secrets obrigatórios antes de promover mudanças para `main/master`;
+  - use o modo incremental no dia a dia e o `full_gate` como checklist de release/hardening.
+- Secrets obrigatórios no repositório remoto (Settings → Secrets and variables → Actions):
+  - `TEST_BOOTSTRAP_KEY`
+  - `CYPRESS_ADMIN_EMAIL`, `CYPRESS_ADMIN_SENHA`
+  - `CYPRESS_CLIENTE_EMAIL`, `CYPRESS_CLIENTE_SENHA`
+
+---
+
+## 11. Operações de Banco de Dados (Schema `les` e Índices)
+
+### Schema de aplicação (`les`)
+
+A partir da versão 1.0.1, o banco de dados utiliza o schema **`les`** para objetos de negócio (tabelas, triggers, funções). Extensões como `pg_trgm` e `unaccent` permanecem no schema `public`.
+
+A aplicação configura automaticamente o `search_path=les,public` via pool de conexão (variável `POSTGRES_SCHEMA`).
+
+### Scripts de Banco
+
+| Script | Quando usar |
+|--------|-------------|
+| `./scripts/setup-db.sh` | **Estrutura + Seeds**: Reconstrói o banco a partir dos arquivos SQL (DDL, DML e Migrations). Ideal para novos ambientes ou reset total. |
+| `./scripts/setup-test-db.sh` | **Ambiente de Teste**: Equivalente ao `setup-db.sh` mas direcionado ao banco de testes (`:5433`). |
+| `./scripts/sync-db-test.sh` | **Espelhamento**: Realiza um clone lógico dos dados do banco de desenvolvimento para o banco de testes. Útil para debugar falhas com massa de dados real. |
+
+### Backup e Restauração
+
+Para gerar um backup compactado do schema `les`:
+
+```bash
+docker exec ecm_postgres pg_dump -U ecm_user -d ecm_livraria -n les -Fc > backup_les_$(date +%Y%m%d).dump
+```
+
+Para restaurar:
+
+```bash
+docker exec -i ecm_postgres pg_restore -U ecm_user -d ecm_livraria --clean --if-exists < backup_les_...dump
+```
+
+### Análise de Índices e Performance
+
+Query para listar o tamanho dos índices e identificar candidatos a otimização:
+
+```sql
+SELECT indexrelid::regclass AS indice,
+       pg_size_pretty(pg_relation_size(indexrelid)) AS tamanho
+FROM pg_stat_user_indexes
+ORDER BY pg_relation_size(indexrelid) DESC
+LIMIT 30;
+```
+

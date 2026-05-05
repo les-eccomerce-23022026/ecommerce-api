@@ -9,14 +9,18 @@ import {
   IAlterarSenhaDto,
   IEnderecoDto,
   IPerfilClienteDto,
+  ICartaoDto,
 } from '@/modules/clientes/Iclientes.dto';
 import { IRepositorioCartaoUsuario } from '@/modules/cartoes/IRepositorioCartaoUsuario';
 import { verificarForcaSenha } from '@/shared/utils/senha.util';
 import { IConexaoBanco } from '@/shared/infrastructure/database/IConexaoBanco';
-import { ClientesEnderecoService } from './clientes-endereco.service';
-import { ClientesCadastroService } from './clientes-cadastro.service';
-import { ClientesAtualizacaoService } from './clientes-atualizacao.service';
-import { ClientesConsultaService } from './clientes-consulta.service';
+import { GestaoEnderecoCliente } from '@/modules/clientes/gestao-identidade-cliente-endereco.service';
+import { GestaoIdentidadeClienteOperacoes } from '@/modules/clientes/gestao-identidade-cliente-operacoes.service';
+import {
+  mascararCpf,
+  mascararEmail,
+  converterTelefoneParaDto,
+} from '@/modules/clientes/gestao-identidade-cliente-texto.util';
 
 /**
  * Serviço responsável pelo fluxo de cadastro público de clientes.
@@ -32,19 +36,11 @@ export class GestaoIdentidadeCliente {
 
   private readonly repositorioCartoes: IRepositorioCartaoUsuario;
 
-  private readonly db: IConexaoBanco; // Acesso direto ao banco para queries customizadas
+  private readonly db: IConexaoBanco;
 
-  private readonly servicoEndereco: ClientesEnderecoService;
+  private readonly endereco: GestaoEnderecoCliente;
 
-  private readonly servicoCadastro: ClientesCadastroService;
-
-  private readonly servicoAtualizacao: ClientesAtualizacaoService;
-
-  private readonly servicoConsulta: ClientesConsultaService;
-
-  /**
-   * Construtor injetado com os repositórios — sem saber a implementação (Inversão de Dependência)
-   */
+  private readonly operacoes: GestaoIdentidadeClienteOperacoes;
   constructor(
     repositorioUsuarios: IRepositorioUsuarios,
     repositorioPerfil: IRepositorioPerfilCliente,
@@ -59,141 +55,122 @@ export class GestaoIdentidadeCliente {
     this.repositorioEndereco = repositorioEndereco;
     this.repositorioCartoes = repositorioCartoes;
     this.db = db;
-    this.servicoEndereco = new ClientesEnderecoService(repositorioEndereco, db);
-    this.servicoCadastro = new ClientesCadastroService(
-      repositorioUsuarios,
-      repositorioPerfil,
-      repositorioTelefone,
-      this.servicoEndereco,
-    );
-    this.servicoAtualizacao = new ClientesAtualizacaoService(
+    this.endereco = new GestaoEnderecoCliente(db, repositorioEndereco);
+    this.operacoes = new GestaoIdentidadeClienteOperacoes({
       repositorioUsuarios,
       repositorioPerfil,
       repositorioTelefone,
       repositorioEndereco,
-      this.servicoEndereco,
-    );
-    this.servicoConsulta = new ClientesConsultaService(
-      repositorioUsuarios,
-      repositorioPerfil,
-      repositorioTelefone,
-      repositorioEndereco,
-      repositorioCartoes,
-      db,
-      this.servicoEndereco,
-    );
+      endereco: this.endereco,
+      obterPerfil: (uuid) => this.obterPerfil(uuid),
+    });
   }
-
-  /**
-   * Altera a senha de um cliente existente. (RF0028)
-   *
-   * @param uuid Identificador único do cliente.
-   * @param dados Dados contendo senha atual e nova senha.
-   */
   public async alterarSenha(uuid: string, dados: IAlterarSenhaDto): Promise<void> {
     const usuario = await this.repositorioUsuarios.buscarPorUuid(uuid);
     if (!usuario) {
       throw new Error('Usuário não encontrado.');
     }
-
     const senhaValida = await bcrypt.compare(dados.senhaAtual, usuario.senhaHash);
     if (!senhaValida) {
       throw new Error('Senha atual incorreta.');
     }
-
     if (dados.novaSenha !== dados.confirmacaoNovaSenha) {
       throw new Error('Nova senha e confirmação não conferem.');
     }
-
     if (!verificarForcaSenha(dados.novaSenha)) {
       throw new Error('Nova senha muito fraca.');
     }
-
     if (dados.novaSenha === dados.senhaAtual) {
       throw new Error('Nova senha deve ser diferente da senha atual.');
     }
-
-    const novaSenhaHash = await bcrypt.hash(dados.novaSenha, 10); // Reduzido de 12 para 10 em testes
+    const novaSenhaHash = await bcrypt.hash(dados.novaSenha, 10);
     await this.repositorioUsuarios.atualizarUsuario(uuid, { senhaHash: novaSenhaHash });
   }
 
-  /**
-   * Atualiza os dados de um cliente existente.
-   * Suporta atualização parcial e exige senha para dados críticos (E-mail, CPF, Telefone).
-   *
-   * @param uuid Identificador único do cliente.
-   * @param dados Dados a serem atualizados (parcial).
-   */
   public async atualizarCliente(uuid: string, dados: IAtualizarClienteDto) {
-    await this.servicoAtualizacao.atualizarCliente(uuid, dados);
-    return this.obterPerfil(uuid);
+    return this.operacoes.atualizarCliente(uuid, dados);
   }
 
-  /**
-   * Adiciona um novo endereço de entrega ou cobrança ao cliente. (RF0026)
-   */
   public async adicionarEndereco(
     uuid: string,
     dados: IEnderecoDto & { tipoEndereco?: 'cobranca' | 'entrega' },
   ): Promise<IEnderecoDto> {
     const usuario = await this.repositorioUsuarios.buscarPorUuid(uuid);
     if (!usuario) throw new Error('Usuário não encontrado.');
-
-    return this.servicoEndereco.criarEndereco(usuario.id, dados, dados.tipoEndereco || 'entrega', false);
+    return this.endereco.criarEndereco(usuario.id, dados, dados.tipoEndereco || 'entrega', false);
   }
 
-  /**
-   * Remove um endereço pelo UUID do endereço, validando o dono.
-   */
   public async removerEndereco(uuidUsuario: string, uuidEndereco: string): Promise<void> {
     const usuario = await this.repositorioUsuarios.buscarPorUuid(uuidUsuario);
     if (!usuario) throw new Error('Usuário não encontrado.');
-
     const todosEnderecos = await this.repositorioEndereco.buscarPorIdUsuario(usuario.id);
     const enderecoExistente = todosEnderecos.find((e) => e.uuid === uuidEndereco);
-
     if (!enderecoExistente) {
       throw new Error('Endereço não encontrado.');
     }
-
     await this.repositorioEndereco.deletar(usuario.id, uuidEndereco);
   }
 
-  /**
-   * Inativa um cliente (soft delete) (RF0023).
-   *
-   * @param uuid Identificador único do cliente.
-   */
   public async suspenderAcessoCliente(uuid: string): Promise<void> {
     const usuario = await this.repositorioUsuarios.buscarPorUuid(uuid);
     if (!usuario) {
       throw new Error('Usuário não encontrado.');
     }
-
     if (!usuario.ativo) {
       throw new Error('Conta já está inativa.');
     }
-
     await this.repositorioUsuarios.atualizarUsuario(uuid, { ativo: false });
   }
 
-  /**
-   * Obtém o perfil completo do cliente.
-   *
-   * @param uuid UUID do cliente.
-   * @returns Dados do perfil do cliente.
-   */
   public async obterPerfil(uuid: string): Promise<IPerfilClienteDto> {
-    return this.servicoConsulta.obterPerfil(uuid);
+    const usuario = await this.repositorioUsuarios.buscarPorUuid(uuid);
+    if (!usuario) {
+      throw new Error('Usuário não encontrado.');
+    }
+    const perfil = await this.repositorioPerfil.buscarPorIdUsuario(usuario.id);
+    const telefones = await this.repositorioTelefone.buscarPorIdUsuario(usuario.id);
+    let telefonePrincipal = telefones.find((telefone) => telefone.principal) ?? telefones[0];
+    if (!telefonePrincipal && usuario.telefoneRapido) {
+      telefonePrincipal = {
+        id: 0,
+        uuid: '',
+        idUsuario: usuario.id,
+        idTipoTelefone: 1,
+        ddd: '',
+        numero: usuario.telefoneRapido,
+        principal: true,
+      };
+    }
+    const enderecosUsuario = await this.repositorioEndereco.buscarPorIdUsuario(usuario.id);
+    const enderecosDto = await this.endereco.converterEnderecosParaDto(enderecosUsuario);
+    const cartoesUsuario = await this.repositorioCartoes.buscarPorUsuario(usuario.id);
+    const cartoesDto: ICartaoDto[] = cartoesUsuario.map((c) => ({
+      uuid: c.uuid,
+      ultimosDigitosCartao: c.ultimosDigitosCartao,
+      nomeImpresso: c.nomeImpresso,
+      bandeira: c.bandeira || 'Outra',
+      validade: c.validade.toISOString().substring(0, 7),
+      principal: c.principal,
+    }));
+    return {
+      uuid: usuario.uuid,
+      nome: usuario.nome,
+      email: usuario.email,
+      emailMascarado: mascararEmail(usuario.email),
+      cpf: usuario.cpf,
+      cpfMascarado: mascararCpf(usuario.cpf),
+      genero: perfil?.genero,
+      dataNascimento: perfil?.dataNascimento ? perfil.dataNascimento.toISOString().split('T')[0] : undefined,
+      telefone: telefonePrincipal ? converterTelefoneParaDto(telefonePrincipal) : undefined,
+      enderecos: enderecosDto,
+      cartoes: cartoesDto,
+    };
   }
 
   public async realizarCadastroPublico(dados: ICriarClienteDto) {
-    return this.servicoCadastro.realizarCadastroPublico(dados);
+    return this.operacoes.realizarCadastroPublico(dados);
   }
 
-  /**
-   * Edita um endereço de um cliente (PATCH). (RF0026)
-   */
   public async editarEndereco(
     uuidUsuario: string,
     uuidEndereco: string,
@@ -201,7 +178,6 @@ export class GestaoIdentidadeCliente {
   ): Promise<IEnderecoDto> {
     const usuario = await this.repositorioUsuarios.buscarPorUuid(uuidUsuario);
     if (!usuario) throw new Error('Usuário não encontrado.');
-
-    return this.servicoEndereco.editarEndereco(usuario.id, uuidEndereco, dados);
+    return this.endereco.editarEndereco(usuario, uuidEndereco, dados);
   }
 }

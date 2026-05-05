@@ -119,10 +119,23 @@ export class ControladorAdmin {
    * Sem este método, o Cypress não teria como criar o primeiro admin de teste sem usar SQL manual.
    */
   public static async bootstrapAdmin(requisicao: Request, resposta: Response): Promise<Response> {
-    const isTestDb = requisicao.headers['x-use-test-db'] === 'true' || process.env.NODE_ENV === 'test';
-    
-    if (!isTestDb) {
-      return RespostaPadrao.enviarErro(resposta, 403, 'Acesso bloqueado. Este endpoint é exclusivo para configuração de testes.');
+    const ambienteTeste = process.env.NODE_ENV === 'test';
+    if (!ambienteTeste) {
+      return RespostaPadrao.enviarErro(
+        resposta,
+        403,
+        'Acesso bloqueado. Endpoint de bootstrap permitido apenas em NODE_ENV=test.',
+      );
+    }
+
+    const chaveEsperada = process.env.TEST_BOOTSTRAP_KEY;
+    const chaveRecebida = String(requisicao.headers['x-test-bootstrap-key'] ?? '');
+    if (!chaveEsperada || chaveRecebida !== chaveEsperada) {
+      return RespostaPadrao.enviarErro(
+        resposta,
+        403,
+        'Acesso bloqueado. Chave de bootstrap inválida.',
+      );
     }
 
     try {

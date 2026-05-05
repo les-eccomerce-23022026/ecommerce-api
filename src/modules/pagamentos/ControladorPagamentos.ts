@@ -1,70 +1,28 @@
 import { Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
-import type { GestaoIdentidadeCliente } from '@/modules/clientes/clientes.service';
 import type { ServicoFrete } from '@/modules/frete/ServicoFrete';
-import { cepOrigemPadrao, sanitizarCep8Digitos } from '@/modules/frete/freteCepUtil';
-import { Logger } from '@/shared/utils/Logger.util';
-import { IPagamentoInputDto, IPagamentoOutputDto, PARCELAS_CARTAO_MAX } from './IPagamento.dto';
+import type { GestaoIdentidadeCliente } from '@/modules/clientes/clientes.service';
+import { executarObterPagamentoInfo } from '@/modules/pagamentos/controlador-pagamentos-obter-info.handler';
+import { IPagamentoInputDto, IPagamentoOutputDto } from './IPagamento.dto';
 import { ServicoPagamentos } from './ServicoPagamentos';
+import type { IRepositorioPagamentos } from './IRepositorioPagamentos';
 import { PagamentosHelper } from './pagamentos.helper';
-
-const POLITICA_PARCELAMENTO_CARTAO_PADRAO = {
-  parcelasMaximas: PARCELAS_CARTAO_MAX,
-  parcelasSemJuros: 6,
-} as const;
 
 export class ControladorPagamentos {
   constructor(
     private readonly servicoPagamentos: ServicoPagamentos,
     private readonly servicoFrete: ServicoFrete,
+    private readonly repoPagamentos: IRepositorioPagamentos,
     private readonly gestaoCliente?: GestaoIdentidadeCliente,
   ) {}
 
   public obterPagamentoInfo = async (req: Request, res: Response): Promise<void> => {
-    try {
-      const { cepDestino, pesoKg, valorTotalItens } = PagamentosHelper.extrairParametros(req);
-      if (!Number.isFinite(pesoKg) || pesoKg <= 0) {
-        res.status(400).json({ erro: 'pesoKg inválido' });
-        return;
-      }
-      const [opcoes, dadosCliente] = await Promise.all([
-        this.servicoFrete.cotarEPersistir({ cepDestino, pesoKg, valorTotalItens }),
-        this.obterDadosCliente(req.usuario?.uuid),
-      ]);
-      res.status(200).json({
-        enderecosCliente: dadosCliente.enderecos,
-        cartoesCliente: dadosCliente.cartoes,
-        politicaParcelamentoCartao: { ...POLITICA_PARCELAMENTO_CARTAO_PADRAO },
-        cuponsDisponiveis: PagamentosHelper.obterCuponsSimulados(),
-        bandeirasPermitidas: ['Visa', 'Mastercard', 'Elo', 'American Express', 'Hipercard'],
-        freteOpcoes: PagamentosHelper.mapearFreteOpcoes(opcoes),
-        freteMeta: {
-          provedor: this.servicoFrete.getCodigoProvedorAtivo(),
-          cepOrigem: cepOrigemPadrao(),
-          cepDestino: sanitizarCep8Digitos(cepDestino),
-          pesoKg,
-        },
-      });
-    } catch (erro) {
-      Logger.error('[pagamentos.obterPagamentoInfo] Erro fatal:', (erro as Error).message || String(erro));
-      res.status(500).json({ erro: (erro as Error).message });
-    }
+    await executarObterPagamentoInfo(req, res, {
+      servicoFrete: this.servicoFrete,
+      repoPagamentos: this.repoPagamentos,
+      gestaoCliente: this.gestaoCliente,
+    });
   };
-
-  private async obterDadosCliente(usuarioUuid?: string) {
-    let enderecos: ReturnType<typeof PagamentosHelper.mapearEnderecos> = [];
-    let cartoes: ReturnType<typeof PagamentosHelper.mapearCartoes> = [];
-    if (this.gestaoCliente && usuarioUuid) {
-      try {
-        const perfil = await this.gestaoCliente.obterPerfil(usuarioUuid);
-        enderecos = PagamentosHelper.mapearEnderecos(perfil);
-        cartoes = PagamentosHelper.mapearCartoes(perfil);
-      } catch (erro) {
-        Logger.error('[pagamentos.obterDadosCliente] Falha ao obter perfil do cliente:', (erro as Error).message || String(erro));
-      }
-    }
-    return { enderecos, cartoes };
-  }
 
   public definirMetodoLiquidacao = async (req: Request, res: Response): Promise<void> => {
     try {

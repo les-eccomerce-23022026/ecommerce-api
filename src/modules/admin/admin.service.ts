@@ -14,6 +14,17 @@ export class ServicoAdmin {
     this.repositorioUsuarios = repositorioUsuarios;
   }
 
+  private static validarSenhaCadastroAdministrador(dados: ICriarAdminDto): void {
+    if (dados.senha !== dados.confirmacaoSenha) {
+      throw new Error('Senha e confirmação de senha não conferem.');
+    }
+    if (!verificarForcaSenha(dados.senha)) {
+      throw new Error(
+        'Senha fraca. É necessário pelo menos 8 caracteres, incluindo maiúsculas, minúsculas e caractere especial.',
+      );
+    }
+  }
+
   /**
    * Lista todos os administradores cadastrados.
    */
@@ -73,15 +84,7 @@ export class ServicoAdmin {
    * @param dados Dados para criação do administrador.
    */
   public async registrarNovoAdministrador(dados: ICriarAdminDto): Promise<IRespostaAdminCriadoDto> {
-    if (dados.senha !== dados.confirmacaoSenha) {
-      throw new Error('Senha e confirmação de senha não conferem.');
-    }
-
-    if (!verificarForcaSenha(dados.senha)) {
-      throw new Error(
-        'Senha fraca. É necessário pelo menos 8 caracteres, incluindo maiúsculas, minúsculas e caractere especial.',
-      );
-    }
+    ServicoAdmin.validarSenhaCadastroAdministrador(dados);
 
     const existenteAdminPorEmail = await this.repositorioUsuarios.buscarPorEmailPapel(
       dados.email,
@@ -105,31 +108,34 @@ export class ServicoAdmin {
       PAPEL_CLIENTE.id,
     );
 
-    let senhaHash: string;
-
+    let senhaHash = await bcrypt.hash(dados.senha, 10);
     if (existenteClientePorEmail && dados.usarMesmaSenha) {
       senhaHash = existenteClientePorEmail.senhaHash;
-    } else {
-      senhaHash = await bcrypt.hash(dados.senha, 10);
     }
 
-    let usuario;
     if (existenteClientePorEmail) {
       await this.repositorioUsuarios.atualizarUsuario(existenteClientePorEmail.uuid, {
         idPapel: PAPEL_ADMIN.id,
         senhaHash,
       });
-      usuario = await this.repositorioUsuarios.buscarPorUuid(existenteClientePorEmail.uuid);
+      const usuario = await this.repositorioUsuarios.buscarPorUuid(existenteClientePorEmail.uuid);
       if (!usuario) throw new Error('Erro ao carregar usuário promovido.');
-    } else {
-      usuario = await this.repositorioUsuarios.criarUsuario({
-        nome: dados.nome,
-        email: dados.email,
-        cpf: dados.cpf,
-        senhaHash,
-        role: PAPEL_ADMIN,
-      });
+      return {
+        uuid: usuario.uuid,
+        nome: usuario.nome,
+        email: usuario.email,
+        cpf: usuario.cpf,
+        role: usuario.role.descricao,
+      };
     }
+
+    const usuario = await this.repositorioUsuarios.criarUsuario({
+      nome: dados.nome,
+      email: dados.email,
+      cpf: dados.cpf,
+      senhaHash,
+      role: PAPEL_ADMIN,
+    });
 
     return {
       uuid: usuario.uuid,

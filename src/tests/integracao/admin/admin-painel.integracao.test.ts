@@ -2,7 +2,7 @@ import request from 'supertest';
 import { Application } from 'express';
 import { configurarTesteIntegracao } from '@/tests/utils/setup-integracao.util';
 import { obterTokenAdmin, obterTokenCliente } from '@/tests/utils/requisicoes-api.util';
-import { criarVendaPedido } from '@/tests/helpers/vendas-admin-fluxo.helper';
+import { aprovarPagamentoDaVenda, criarVendaPedido } from '@/tests/helpers/vendas-admin-fluxo.helper';
 
 describe('Integração — Painel administrativo (dashboard e pedidos)', () => {
   const contexto = configurarTesteIntegracao();
@@ -55,11 +55,13 @@ describe('Integração — Painel administrativo (dashboard e pedidos)', () => {
 
   describe('Fluxo despacho e entrega via rotas admin', () => {
     it('despacha pedido EM PROCESSAMENTO e confirma entrega', async () => {
-      const { vendaUuid } = await criarVendaPedido(app, tokenCliente, {
+      const { vendaUuid, valorTotal } = await criarVendaPedido(app, tokenCliente, {
         precoUnitario: 30,
         quantidade: 1,
         valorFrete: 10,
       });
+
+      await aprovarPagamentoDaVenda(app, tokenCliente, vendaUuid, valorTotal);
 
       const resDesp = await request(app)
         .put(`/api/admin/pedidos/${vendaUuid}/despachar`)
@@ -90,11 +92,13 @@ describe('Integração — Painel administrativo (dashboard e pedidos)', () => {
     });
 
     it('rejeita despacho duplicado (já em trânsito)', async () => {
-      const { vendaUuid } = await criarVendaPedido(app, tokenCliente, {
+      const { vendaUuid, valorTotal } = await criarVendaPedido(app, tokenCliente, {
         precoUnitario: 20,
         quantidade: 1,
         valorFrete: 8,
       });
+
+      await aprovarPagamentoDaVenda(app, tokenCliente, vendaUuid, valorTotal);
 
       await request(app)
         .put(`/api/admin/pedidos/${vendaUuid}/despachar`)

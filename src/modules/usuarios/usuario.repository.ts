@@ -1,5 +1,6 @@
 import { IUsuario } from '@/modules/usuarios/Iusuario.entity';
-import { PAPEL_CLIENTE } from '@/shared/types/papeis';
+import { montarClausulasAtualizacaoUsuario } from '@/modules/usuarios/usuario-repository-atualizacao.util';
+import { PAPEL_CLIENTE, PAPEL_ADMIN } from '@/shared/types/papeis';
 import { IConexaoBanco, DbParametro } from '@/shared/infrastructure/database/IConexaoBanco';
 import { obterTipoBancoAtual } from '@/shared/infrastructure/database/ContextoBanco';
 import { IRepositorioUsuarios, IDadosCriarUsuario, IFiltrosConsultaClientes } from './IRepositorioUsuarios';
@@ -74,40 +75,16 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
   }
 
   public async atualizarUsuario(uuid: string, dados: Partial<IUsuario>): Promise<IUsuario | undefined> {
-    const campos: string[] = [];
-    const valores: DbParametro[] = [];
-    let contador = 1;
-
-    const mapeamento: Record<string, string> = {
-      nome: 'usu_nome',
-      email: 'usu_email',
-      cpf: 'usu_cpf',
-      telefoneRapido: 'usu_telefone_rapido',
-      senhaHash: 'usu_senha_hash',
-      idPapel: 'pap_id',
-      ativo: 'usu_ativo',
-      isAdminMestre: 'usu_is_admin_mestre',
-      genero: 'usu_genero',
-      dataNascimento: 'usu_data_nascimento',
-    };
-
-    Object.entries(mapeamento).forEach(([key, field]) => {
-      const val = (dados as Record<string, unknown>)[key];
-      if (val !== undefined) {
-        campos.push(`${field} = $${contador}`);
-        contador += 1;
-        valores.push(val as DbParametro);
-      } else if (key === 'idPapel' && dados.role?.id !== undefined) {
-        campos.push(`${field} = $${contador}`);
-        contador += 1;
-        valores.push(dados.role.id as DbParametro);
-      }
-    });
-
+    const { campos, valores } = montarClausulasAtualizacaoUsuario(dados);
     if (campos.length === 0) return this.buscarPorUuid(uuid);
 
     valores.push(uuid);
-    const query = `UPDATE usuarios SET ${campos.join(', ')} WHERE usu_uuid = $${contador}`;
+    const idxUuid = valores.length;
+    const query = `
+      UPDATE usuarios 
+      SET ${campos.join(', ')} 
+      WHERE usu_uuid = $${idxUuid}
+    `;
 
     await this.db.executar(query, valores);
     return this.buscarPorUuid(uuid);

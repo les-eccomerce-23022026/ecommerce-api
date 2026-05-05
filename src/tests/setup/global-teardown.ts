@@ -11,8 +11,10 @@ export default async function globalTeardown(): Promise<void> {
     await fecharClienteRedis();
 
     // Fecha o pool do Postgres de forma mais agressiva
-    const conexao = ConexaoPostgres.obterInstancia();
-    await conexao.finalizar();
+    if (ConexaoPostgres.possuiInstancia()) {
+      const conexao = ConexaoPostgres.obterInstancia();
+      await conexao.finalizar();
+    }
 
     // Força reset da instância singleton para próximos testes
     ConexaoPostgres.resetInstancia();

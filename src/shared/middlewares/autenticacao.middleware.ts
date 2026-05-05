@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { di } from '@/shared/infrastructure/di.container';
 import { Logger } from '@/shared/utils/Logger.util';
-import { obterNomeCookieAuth } from '@/shared/constants/auth-cookie';
+import { extrairTokenJwtDaRequisicao } from '@/shared/middlewares/autenticacao-token.util';
 
 /**
  * Middleware para autenticação via JWT no header Authorization Bearer.
@@ -13,22 +13,7 @@ export async function autenticacaoMiddleware(
   res: Response,
   next: NextFunction,
 ): Promise<void> {
-  const { authorization } = req.headers;
-  const nomeCookie = obterNomeCookieAuth();
-
-  let token: string | undefined;
-  const tokenDoCookie = req.cookies?.[nomeCookie];
-  if (typeof tokenDoCookie === 'string' && tokenDoCookie.length > 0) {
-    token = tokenDoCookie;
-  }
-
-  if (!token && authorization) {
-    const [schema, tokenFromHeader] = authorization.split(' ');
-
-    if (tokenFromHeader && schema === 'Bearer') {
-      token = tokenFromHeader;
-    }
-  }
+  const token = extrairTokenJwtDaRequisicao(req);
 
   if (!token) {
     res.status(401).json({

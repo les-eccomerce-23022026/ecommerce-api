@@ -33,6 +33,52 @@ export class ControladorEntrega {
   }
 
   /**
+   * Registra falha na entrega: PATCH /entregas/:entregaUuid/falha
+   */
+  public async registrarFalha(req: Request, res: Response): Promise<void> {
+    try {
+      const { entregaUuid } = req.params;
+      await this.servicoEntrega.registrarFalhaEntrega(entregaUuid);
+      res.status(204).send();
+    } catch (err: unknown) {
+      const mensagem = err instanceof Error ? err.message : 'Erro ao registrar falha';
+      res.status(400).json({ erro: mensagem });
+    }
+  }
+
+  /**
+   * Confirma recebimento: PATCH /entregas/:entregaUuid/confirmar
+   */
+  public async confirmarRecebimento(req: Request, res: Response): Promise<void> {
+    try {
+      const { entregaUuid } = req.params;
+      await this.servicoEntrega.confirmarRecebimento(entregaUuid);
+      res.status(204).send();
+    } catch (err: unknown) {
+      const mensagem = err instanceof Error ? err.message : 'Erro ao confirmar recebimento';
+      res.status(400).json({ erro: mensagem });
+    }
+  }
+
+  /**
+   * Reagenda entrega (re-endereçamento): PATCH /entregas/:entregaUuid/reagendar
+   */
+  public async reagendarEntrega(req: Request, res: Response): Promise<void> {
+    try {
+      const { entregaUuid } = req.params;
+      const { endereco } = req.body;
+      if (!endereco) {
+        throw new Error('Novo endereço é obrigatório para reagendamento.');
+      }
+      await this.servicoEntrega.reagendarEntrega(entregaUuid, endereco);
+      res.status(204).send();
+    } catch (err: unknown) {
+      const mensagem = err instanceof Error ? err.message : 'Erro ao reagendar entrega';
+      res.status(400).json({ erro: mensagem });
+    }
+  }
+
+  /**
    * Endpoint para consultar uma única entrega: GET /entregas/:entregaUuid
    */
   public async consultarEntrega(req: Request, res: Response): Promise<void> {

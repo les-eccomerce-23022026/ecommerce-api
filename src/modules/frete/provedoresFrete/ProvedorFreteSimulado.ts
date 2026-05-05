@@ -18,6 +18,18 @@ function fatorRegionalPorCep(cep8: string): number {
   return 1.22;
 }
 
+function lerFloatEnvNaoNegativo(valorBruto: string | undefined, fallback: number): number {
+  const n = parseFloat(valorBruto ?? '');
+  return Number.isFinite(n) && n >= 0 ? n : fallback;
+}
+
+function obterParametrosPrecificacaoSimulada(): { b: number; pk: number; ms: number } {
+  const b = lerFloatEnvNaoNegativo(process.env.FRETE_SIM_BASE_REAIS, 8);
+  const pk = lerFloatEnvNaoNegativo(process.env.FRETE_SIM_POR_KG, 3.5);
+  const ms = lerFloatEnvNaoNegativo(process.env.FRETE_SIM_MULT_SEDEX, 1.9);
+  return { b, pk, ms };
+}
+
 function pesoEfetivo(pesoKg: number): number {
   const p = Number(pesoKg);
   if (!Number.isFinite(p) || p <= 0) {
@@ -32,9 +44,14 @@ function pesoEfetivo(pesoKg: number): number {
  * Transportadora simulada própria: CEP + peso + modalidade, sem API externa.
  */
 export class ProvedorFreteSimulado implements IProvedorFrete {
-  // eslint-disable-next-line class-methods-use-this
+  private readonly codigoProvedor = 'simulado';
   public getCodigo(): string {
-    return 'simulado';
+    return this.codigoProvedor;
+  }
+
+  private metaSimuladaParaOpcoes(peso: number, fatorRegiao: number): IOpcaoFreteCalculada['metaSimulada'] {
+    const ajusteInstancia = this.codigoProvedor === 'simulado' ? 0 : 0;
+    return { fatorRegiao, pesoArredondado: arredondarParaDecimal(peso + ajusteInstancia, 3) };
   }
 
   // eslint-disable-next-line class-methods-use-this
@@ -45,19 +62,9 @@ export class ProvedorFreteSimulado implements IProvedorFrete {
     }
     const peso = pesoEfetivo(entrada.pesoKg);
     const fatorRegiao = fatorRegionalPorCep(cepDest);
-
-    const base = parseFloat(process.env.FRETE_SIM_BASE_REAIS ?? '8');
-    const porKg = parseFloat(process.env.FRETE_SIM_POR_KG ?? '3.5');
-    const b = Number.isFinite(base) && base >= 0 ? base : 8;
-    const pk = Number.isFinite(porKg) && porKg >= 0 ? porKg : 3.5;
-
+    const { b, pk, ms } = obterParametrosPrecificacaoSimulada();
     const nucleo = (b + pk * peso) * fatorRegiao;
-
-    const multPac = 1.0;
-    const multSedex = parseFloat(process.env.FRETE_SIM_MULT_SEDEX ?? '1.9');
-    const ms = Number.isFinite(multSedex) && multSedex > 0 ? multSedex : 1.9;
-
-    const valorPac = arredondarParaDecimal(nucleo * multPac, 2);
+    const valorPac = arredondarParaDecimal(nucleo, 2);
     const valorSedex = arredondarParaDecimal(nucleo * ms, 2);
     const valorRetira = 0;
 
@@ -65,7 +72,7 @@ export class ProvedorFreteSimulado implements IProvedorFrete {
     const prazoSedex = '1 a 3 dias úteis';
     const prazoRetira = 'Retirar em até 24h';
 
-    const meta = { fatorRegiao, pesoArredondado: arredondarParaDecimal(peso, 3) };
+    const meta = this.metaSimuladaParaOpcoes(peso, fatorRegiao);
 
     return [
       { tipoServico: 'PAC', valor: valorPac, prazoTexto: prazoPac, metaSimulada: meta },

@@ -7,6 +7,7 @@ import { ConexaoPostgres } from '@/shared/infrastructure/database/ConexaoPostgre
 import { RepositorioVendasPostgres } from '@/modules/vendas/repositories/RepositorioVendasPostgres';
 import { RepositorioEntregaPostgres } from '@/modules/entrega/RepositorioEntregaPostgres';
 import { ServicoEntrega } from '@/modules/entrega/ServicoEntrega';
+import { ServicoNotificacaoEmail } from '@/modules/entrega/adapters/ServicoNotificacaoEmail';
 import { autenticacaoMiddleware } from '@/shared/middlewares/autenticacao.middleware';
 import { 
   adminOnlyMiddleware, 
@@ -21,7 +22,8 @@ export function registrarRotasAdmin(app: IRouter): void {
   const db = ConexaoPostgres.obterInstancia();
   const repoVendas = new RepositorioVendasPostgres(db);
   const repoEntrega = new RepositorioEntregaPostgres(db);
-  const servicoEntrega = new ServicoEntrega(repoEntrega, repoVendas);
+  const servicoNotificacao = new ServicoNotificacaoEmail();
+  const servicoEntrega = new ServicoEntrega(repoEntrega, repoVendas, servicoNotificacao);
   const servicoPedidosAdmin = new ServicoPedidosAdmin(repoVendas, servicoEntrega);
   const servicoDashboardAdmin = new ServicoDashboardAdmin(db);
   const controladorPainel = new ControladorAdminPainel(servicoDashboardAdmin, servicoPedidosAdmin);

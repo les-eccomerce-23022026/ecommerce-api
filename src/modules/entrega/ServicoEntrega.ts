@@ -1,6 +1,7 @@
 import { IRepositorioVendas } from '@/modules/vendas/repositories/IRepositorioVendas';
 import { IRepositorioEntrega } from '@/modules/entrega/IRepositorioEntrega';
 import { IEntregaInputDto, IEntregaOutputDto } from './IEntrega.dto';
+import { IServicoNotificacao } from './ports/IServicoNotificacao';
 
 /**
  * Serviço responsável por gerenciar a lógica de negócio das entregas.
@@ -10,13 +11,20 @@ export class ServicoEntrega {
 
   private readonly repositorioVendas: IRepositorioVendas;
 
-  constructor(repositorioEntrega: IRepositorioEntrega, repositorioVendas: IRepositorioVendas) {
+  private readonly servicoNotificacao: IServicoNotificacao;
+
+  constructor(
+    repositorioEntrega: IRepositorioEntrega,
+    repositorioVendas: IRepositorioVendas,
+    servicoNotificacao: IServicoNotificacao
+  ) {
     this.repositorioEntrega = repositorioEntrega;
     this.repositorioVendas = repositorioVendas;
+    this.servicoNotificacao = servicoNotificacao;
   }
 
   /**
-   * Agenda remessa e atualiza o status da venda para 'EM TRÂNSITO'.
+   * Agenda remessa, atualiza status para 'EM TRÂNSITO' e envia notificação.
    * @param dados Dados da entrega.
    */
   public async agendarRemessa(dados: IEntregaInputDto): Promise<IEntregaOutputDto> {
@@ -37,7 +45,43 @@ export class ServicoEntrega {
     // 3. Atualizar o status da venda para 'EM TRÂNSITO' conforme regra de negócio
     await this.repositorioVendas.atualizarStatus(dados.vendaUuid, 'EM TRÂNSITO');
 
+    // 4. Enviar notificação de rastreio
+    const email = await this.repositorioVendas.obterEmailUsuarioPorVenda(dados.vendaUuid);
+    if (email) {
+      await this.servicoNotificacao.enviarNotificacaoRastreio(email, entrega.uuid, dados.vendaUuid);
+    }
+
     return entrega;
+  }
+
+  /**
+   * Registra falha na entrega, mudando status da venda para 'FALHA NA ENTREGA'.
+   * @param entregaUuid UUID da entrega.
+   */
+  public async registrarFalhaEntrega(entregaUuid: string): Promise<void> {
+    const entrega = await this.repositorioEntrega.obterPorUuid(entregaUuid);
+    if (!entrega) {
+      throw new Error('Entrega não encontrada.');
+    }
+    await this.repositorioVendas.atualizarStatus(entrega.vendaUuid, 'FALHA NA ENTREGA');
+  }
+
+  /**
+   * Reagenda entrega após correção de endereço, voltando para 'EM PROCESSAMENTO'.
+   * @param entregaUuid UUID da entrega.
+   * @param novoEndereco Novo endereço corrigido pelo cliente.
+   */
+  public async reagendarEntrega(entregaUuid: string, novoEndereco: object): Promise<void> {
+    const entrega = await this.repositorioEntrega.obterPorUuid(entregaUuid);
+    if (!entrega) {
+      throw new Error('Entrega não encontrada.');
+    }
+
+    // 1. Atualizar endereço da remessa
+    await this.repositorioEntrega.atualizarEndereco(entregaUuid, novoEndereco);
+
+    // 2. Voltar status para EM PROCESSAMENTO para permitir novo despacho
+    await this.repositorioVendas.atualizarStatus(entrega.vendaUuid, 'EM PROCESSAMENTO');
   }
 
   /**

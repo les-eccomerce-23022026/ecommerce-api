@@ -22,14 +22,18 @@ export class EnderecoEntrega {
   }
 
   private validarCamposObrigatorios(): void {
-    if (!this.logradouro) throw new Error('Campo rua inválido');
-    if (!this.bairro) throw new Error('Campo bairro inválido');
-    if (!this.cidade) throw new Error('Campo cidade inválido');
-    if (!this.estado) throw new Error('Campo estado inválido');
-    if (!this.numero) throw new Error('Campo numero inválido');
-    if (!this.tipoResidencia) throw new Error('Campo tipo residencia inválido');
-    if (!this.tipoLogradouro) throw new Error('Campo tipo logradouro inválido');
-    if (!this.pais) throw new Error('Campo pais inválido');
+    const regras: Array<[boolean, string]> = [
+      [!this.logradouro, 'Campo rua inválido'],
+      [!this.bairro, 'Campo bairro inválido'],
+      [!this.cidade, 'Campo cidade inválido'],
+      [!this.estado, 'Campo estado inválido'],
+      [!this.numero, 'Campo numero inválido'],
+      [!this.tipoResidencia, 'Campo tipo residencia inválido'],
+      [!this.tipoLogradouro, 'Campo tipo logradouro inválido'],
+      [!this.pais, 'Campo pais inválido'],
+    ];
+    const invalido = regras.find(([cond]) => cond);
+    if (invalido) throw new Error(invalido[1]);
   }
 
   private static formatarCep(cep: string): string {

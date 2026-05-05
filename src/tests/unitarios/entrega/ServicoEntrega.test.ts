@@ -2,11 +2,13 @@ import { ServicoEntrega } from '@/modules/entrega/ServicoEntrega';
 import { IRepositorioEntrega } from '@/modules/entrega/IRepositorioEntrega';
 import { IRepositorioVendas, IVenda } from '@/modules/vendas/repositories/IRepositorioVendas';
 import { IEntregaOutputDto } from '@/modules/entrega/IEntrega.dto';
+import { IServicoNotificacao } from '@/modules/entrega/ports/IServicoNotificacao';
 
 describe('ServicoEntrega', () => {
   let servico: ServicoEntrega;
   let mockRepoEntrega: jest.Mocked<IRepositorioEntrega>;
   let mockRepoVendas: jest.Mocked<IRepositorioVendas>;
+  let mockServicoNotificacao: { enviarNotificacaoRastreio: jest.Mock };
 
   beforeEach(() => {
     mockRepoEntrega = {
@@ -18,9 +20,14 @@ describe('ServicoEntrega', () => {
     mockRepoVendas = {
       obterPorUuid: jest.fn(),
       atualizarStatus: jest.fn(),
+      obterEmailUsuarioPorVenda: jest.fn(),
     } as unknown as jest.Mocked<IRepositorioVendas>;
 
-    servico = new ServicoEntrega(mockRepoEntrega, mockRepoVendas);
+    mockServicoNotificacao = {
+      enviarNotificacaoRastreio: jest.fn(),
+    };
+
+    servico = new ServicoEntrega(mockRepoEntrega, mockRepoVendas, mockServicoNotificacao as unknown as IServicoNotificacao);
   });
 
   describe('agendarRemessa', () => {
@@ -39,12 +46,11 @@ describe('ServicoEntrega', () => {
         criadoEm: new Date(),
       };
 
-      // Mock: Venda existe (frete deve bater com custo informado)
       mockRepoVendas.obterPorUuid.mockResolvedValue({
         id: 'venda-123',
         frete: 20,
       } as unknown as IVenda);
-      // Mock: Cadastro bem sucedido
+      mockRepoVendas.obterEmailUsuarioPorVenda.mockResolvedValue('cliente@teste.com');
       mockRepoEntrega.cadastrar.mockResolvedValue(entregaOutput as IEntregaOutputDto);
 
       const resultado = await servico.agendarRemessa(dadosInput);
@@ -53,6 +59,11 @@ describe('ServicoEntrega', () => {
       expect(mockRepoVendas.obterPorUuid).toHaveBeenCalledWith('venda-123');
       expect(mockRepoEntrega.cadastrar).toHaveBeenCalledWith(dadosInput);
       expect(mockRepoVendas.atualizarStatus).toHaveBeenCalledWith('venda-123', 'EM TRÂNSITO');
+      expect(mockServicoNotificacao.enviarNotificacaoRastreio).toHaveBeenCalledWith(
+        'cliente@teste.com',
+        'entrega-uuid',
+        'venda-123',
+      );
     });
 
     it('deve lançar erro se a venda não existir', async () => {
@@ -64,7 +75,7 @@ describe('ServicoEntrega', () => {
           tipoFrete: 'PAC',
           endereco: {},
           custo: 5.0,
-        })
+        }),
       ).rejects.toThrow('Venda com UUID invalida não encontrada.');
     });
   });

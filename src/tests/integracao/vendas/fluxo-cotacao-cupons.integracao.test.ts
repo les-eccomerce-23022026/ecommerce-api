@@ -53,6 +53,14 @@ describe('Integração — Checkout: cotação de frete + cupons + cartões', ()
       expect(resVenda.body.status).toBe('EM PROCESSAMENTO');
       expect(resVenda.body.frete).toBe(cot.valorFrete);
 
+      // Garantir cupom de troca no banco (Sprint 1)
+      const usuRes = await contexto.db!.executar<{ usu_id: number }>('SELECT usu_id FROM usuarios LIMIT 1');
+      await contexto.db!.executar(`
+        INSERT INTO cupons_troca (usu_id, ctr_codigo, ctr_valor_original, ctr_valor_atual)
+        VALUES ($1, 'TROCA50', 50, 50)
+        ON CONFLICT (ctr_codigo) DO UPDATE SET ctr_valor_atual = 50, ctr_ativo = true
+      `, [usuRes[0].usu_id]);
+
       const partes = montarPartesPagamentoCuponsEDoisCartoes(valorTotal);
 
       const resPromo = await logApi(request(app)

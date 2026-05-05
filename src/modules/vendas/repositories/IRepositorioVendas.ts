@@ -12,7 +12,9 @@ export interface IVenda {
   usuarioUuid: string;
   itens: IItemVenda[];
   criadoEm: Date;
-  dataHoraEntrega?: Date; // Data de entrega para validação de trocas (RN0043)
+  motivoTroca?: string;
+  /** Data e hora em que a entrega foi confirmada. Usada para calcular o prazo de 7 dias para troca (RN0043). */
+  dataHoraEntrega?: Date;
 }
 
 /**
@@ -23,6 +25,7 @@ export interface IItemVenda {
   livroUuid: string;
   quantidade: number;
   precoUnitario: number;
+  emTroca?: boolean;
 }
 
 /**
@@ -35,5 +38,15 @@ export interface IRepositorioVendas {
   /** Listagem administrativa (todas as vendas), mais recentes primeiro. */
   listarTodas(limite?: number): Promise<IVenda[]>;
   atualizarStatus(vendaUuid: string, novoStatus: string): Promise<void>;
-  registrarTroca(vendaUuid: string, justificativa: string): Promise<{ id: string }>;
+
+  /** 
+   * Registra solicitação de troca na venda e marca itens.
+   * Altera status da venda para 'EM TROCA'.
+   */
+  registrarSolicitacaoTroca(vendaUuid: string, motivo: string, itensUuids: string[]): Promise<void>;
+
+  /**
+   * Obtém o e-mail do usuário vinculado a uma venda.
+   */
+  obterEmailUsuarioPorVenda(vendaUuid: string): Promise<string | null>;
 }

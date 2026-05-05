@@ -1,4 +1,5 @@
 import { Pool } from 'pg';
+import { existsSync } from 'node:fs';
 import { IConexaoBanco, DbParametro } from './IConexaoBanco';
 import { obterTipoBancoAtual, obterTransacaoAtual, contextoBanco, obterContextoAtual, definirTransacaoGlobalParaTestes } from './ContextoBanco';
 
@@ -7,7 +8,7 @@ import { obterTipoBancoAtual, obterTransacaoAtual, contextoBanco, obterContextoA
  * Gerencia pools independentes para produção e teste.
  */
 export class ConexaoPostgres implements IConexaoBanco {
-  private static instancia: ConexaoPostgres;
+  private static instancia: ConexaoPostgres | null = null;
 
   private poolProducao: Pool;
 
@@ -24,57 +25,52 @@ export class ConexaoPostgres implements IConexaoBanco {
     return ConexaoPostgres.instancia;
   }
 
+  public static possuiInstancia(): boolean {
+    return ConexaoPostgres.instancia !== null;
+  }
+
   public static resetInstancia(): void {
-    if (ConexaoPostgres.instancia) {
-      ConexaoPostgres.instancia = null!;
-    }
+    ConexaoPostgres.instancia = null;
   }
 
   private static criarPoolProducao(): Pool {
+    const schema = process.env.POSTGRES_SCHEMA ?? 'les';
+    const options = `-c search_path=${schema},public`;
+
     const urlConfigurada = process.env.POSTGRES_URL;
-    const schema = process.env.POSTGRES_SCHEMA || 'les';
 
     if (urlConfigurada) {
-      return new Pool({
-        connectionString: urlConfigurada,
-        options: `-c search_path=${schema},public`,
-      });
+      return new Pool({ connectionString: urlConfigurada, options });
     }
 
-    const host = process.env.POSTGRES_HOST ?? 'localhost';
-    const porta = process.env.POSTGRES_PORT ?? '5432';
-    const usuario = process.env.POSTGRES_USER ?? 'ecm_user';
-    const senha = process.env.POSTGRES_PASSWORD ?? 'ecm_senha';
-    const banco = process.env.POSTGRES_DB ?? 'ecm_livraria';
+    const host = ConexaoPostgres.requireEnvComFallbackTeste('POSTGRES_HOST', 'POSTGRES_HOST_TEST');
+    const porta = ConexaoPostgres.requireEnvComFallbackTeste('POSTGRES_PORT', 'POSTGRES_PORT_TEST');
+    const usuario = ConexaoPostgres.requireEnvComFallbackTeste('POSTGRES_USER', 'POSTGRES_USER_TEST');
+    const senha = ConexaoPostgres.requireEnvComFallbackTeste('POSTGRES_PASSWORD', 'POSTGRES_PASSWORD_TEST');
+    const banco = ConexaoPostgres.requireEnvComFallbackTeste('POSTGRES_DB', 'POSTGRES_DB_TEST');
 
-    return new Pool({
-      user: usuario,
-      password: senha,
-      host,
-      port: Number(porta),
-      database: banco,
-      options: `-c search_path=${schema},public`,
-    });
+    const connectionString = `postgresql://${usuario}:${senha}@${host}:${porta}/${banco}`;
+    return new Pool({ connectionString, options });
   }
 
   private obterPoolTeste(): Pool {
     if (!this.poolTeste) {
-      const schema = process.env.POSTGRES_SCHEMA || 'les';
+      const schema = process.env.POSTGRES_SCHEMA ?? 'les';
+      const options = `-c search_path=${schema},public`;
+
       // Configurações via variáveis de ambiente para a instância de teste
-      const host = process.env.POSTGRES_HOST_TEST ?? 'localhost';
+      const hostConfigurado = process.env.POSTGRES_HOST_TEST ?? 'localhost';
+      const executandoEmDocker = existsSync('/.dockerenv');
+      const host = executandoEmDocker && ['localhost', '127.0.0.1'].includes(hostConfigurado)
+        ? '172.17.0.1'
+        : hostConfigurado;
       const porta = process.env.POSTGRES_PORT_TEST ?? '5433';
       const usuario = process.env.POSTGRES_USER_TEST ?? 'ecm_user_test';
       const senha = process.env.POSTGRES_PASSWORD_TEST ?? 'ecm_senha_test';
       const banco = process.env.POSTGRES_DB_TEST ?? 'ecm_livraria_test';
 
-      this.poolTeste = new Pool({
-        user: usuario,
-        password: senha,
-        host,
-        port: Number(porta),
-        database: banco,
-        options: `-c search_path=${schema},public`,
-      });
+      const connectionString = `postgresql://${usuario}:${senha}@${host}:${porta}/${banco}`;
+      this.poolTeste = new Pool({ connectionString, options });
     }
     return this.poolTeste;
   }
@@ -87,10 +83,40 @@ export class ConexaoPostgres implements IConexaoBanco {
     return tipo === 'teste' ? this.obterPoolTeste() : this.poolProducao;
   }
 
-  public async executar<T = unknown>(sql: string, parametros?: DbParametro[]): Promise<T[]> {
-    const transacao = obterTransacaoAtual();
-    const executor = transacao || this.obterPoolAtivo();
+  private static obterSchemaPadrao(): string {
+    return process.env.POSTGRES_SCHEMA ?? 'les';
+  }
 
+  public async executar<T = unknown>(sql: string, parametros?: DbParametro[], opcoes?: { searchPath?: string }): Promise<T[]> {
+    const transacao = obterTransacaoAtual();
+    const pool = this.obterPoolAtivo();
+
+    if (opcoes?.searchPath) {
+      // Validação básica contra SQL injection no nome do schema
+      if (!/^[a-z0-9_, ]+$/i.test(opcoes.searchPath)) {
+        throw new Error(`searchPath inválido: ${opcoes.searchPath}`);
+      }
+
+      const schemaPadrao = ConexaoPostgres.obterSchemaPadrao();
+      const pathFull = `${opcoes.searchPath}, ${schemaPadrao}, public`;
+
+      if (transacao) {
+        await transacao.query(`SET LOCAL search_path = ${pathFull}`);
+        const { rows } = await transacao.query(sql, parametros);
+        return rows as T[];
+      }
+
+      const cliente = await pool.connect();
+      try {
+        await cliente.query(`SET LOCAL search_path = ${pathFull}`);
+        const { rows } = await cliente.query(sql, parametros);
+        return rows as T[];
+      } finally {
+        cliente.release();
+      }
+    }
+
+    const executor = transacao || pool;
     const { rows } = await executor.query(sql, parametros);
     return rows as T[];
   }
@@ -161,5 +187,29 @@ export class ConexaoPostgres implements IConexaoBanco {
       encerramentos.push(this.poolTeste.end());
     }
     await Promise.all(encerramentos);
+  }
+
+  private static requireEnv(nome: string): string {
+    const valor = process.env[nome];
+    if (!valor || valor.trim().length === 0) {
+      throw new Error(`Variável de ambiente obrigatória ausente: ${nome}`);
+    }
+    return valor;
+  }
+
+  private static requireEnvComFallbackTeste(nomePrincipal: string, nomeTeste: string): string {
+    const principal = process.env[nomePrincipal];
+    if (principal && principal.trim().length > 0) {
+      return principal;
+    }
+
+    if (process.env.NODE_ENV === 'test') {
+      const teste = process.env[nomeTeste];
+      if (teste && teste.trim().length > 0) {
+        return teste;
+      }
+    }
+
+    throw new Error(`Variável de ambiente obrigatória ausente: ${nomePrincipal}`);
   }
 }

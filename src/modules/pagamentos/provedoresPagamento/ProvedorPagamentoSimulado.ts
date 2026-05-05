@@ -127,6 +127,14 @@ export class ProvedorPagamentoSimulado implements IProvedorPagamento {
       return falhaSoma;
     }
 
+    const falhaMagic = ProvedorPagamentoSimulado.falhaSeMagicRecusar(dados);
+    if (falhaMagic) {
+      await this.repositorioIntencao.atualizarEstado(idIntencao!, EstadosIntencaoPagamento.RECUSADA, {
+        recusadoEm: new Date()
+      });
+      return falhaMagic;
+    }
+
     return this.finalizarPorTeto(idIntencao!, valorTotal, teto);
   }
 
@@ -148,19 +156,19 @@ export class ProvedorPagamentoSimulado implements IProvedorPagamento {
   ): Promise<ResultadoConfirmacaoPagamento> {
     const aprovado = valorTotal <= teto;
     const agoraDate = new Date();
+
     if (aprovado) {
       await this.repositorioIntencao.atualizarEstado(idIntencao, EstadosIntencaoPagamento.CONFIRMADA, {
         confirmadoEm: agoraDate
       });
-    } else {
-      await this.repositorioIntencao.atualizarEstado(idIntencao, EstadosIntencaoPagamento.RECUSADA, {
-        recusadoEm: agoraDate
-      });
+      return { sucesso: true, status: 'APROVADO' };
     }
-    return {
-      sucesso: aprovado,
-      status: aprovado ? 'APROVADO' : 'RECUSADO'
-    };
+
+    await this.repositorioIntencao.atualizarEstado(idIntencao, EstadosIntencaoPagamento.RECUSADA, {
+      recusadoEm: agoraDate
+    });
+
+    return { sucesso: false, status: 'RECUSADO' };
   }
 
   private static faltaIdentificadores(
@@ -193,6 +201,15 @@ export class ProvedorPagamentoSimulado implements IProvedorPagamento {
     }
     const soma = dados.pagamentosCartao.reduce((acc, p) => acc + p.valor, 0);
     if (Math.abs(soma - valorTotal) > 0.01) {
+      return { sucesso: false, status: 'RECUSADO' };
+    }
+    return null;
+  }
+
+  private static falhaSeMagicRecusar(
+    dados: DadosConfirmacaoProvedor
+  ): ResultadoConfirmacaoPagamento | null {
+    if (dados.pagamentosCartao?.some((p) => p.magicRecusar)) {
       return { sucesso: false, status: 'RECUSADO' };
     }
     return null;

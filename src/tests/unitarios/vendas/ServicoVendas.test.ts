@@ -1,5 +1,7 @@
 import { ServicoVendas } from '@/modules/vendas/services/ServicoVendas';
 import { IRepositorioVendas, IVenda } from '@/modules/vendas/repositories/IRepositorioVendas';
+import type { ICotacaoFretePersistida } from '@/modules/frete/IFrete.dto';
+import type { IRepositorioCotacaoFrete } from '@/modules/frete/cotacaoFrete/IRepositorioCotacaoFrete';
 
 const LIVRO_UUID = '550e8400-e29b-41d4-a716-446655440000';
 const USUARIO_UUID = 'usuario-uuid-1';
@@ -16,7 +18,169 @@ function vendaResultado(): IVenda {
     criadoEm: new Date(),
   };
 }
+const COTACAO_UUID = 'c9ad0f4d-91c7-4474-a7da-715f90cbd986';
 
+function dadosBase(override: Record<string, unknown> = {}) {
+  return {
+    usuarioUuid: USUARIO_UUID,
+    itens: [{ livroUuid: LIVRO_UUID, quantidade: 1, precoUnitario: 50 }],
+    valorTotalItens: 50,
+    valorFrete: 10,
+    valorTotal: 60,
+    ...override,
+  };
+}
+
+function cotacaoPadrao(override: Partial<ICotacaoFretePersistida> = {}): ICotacaoFretePersistida {
+  return {
+    cfrId: 1,
+    cfrUuid: COTACAO_UUID,
+    provedor: 'simulado',
+    estado: 'CRIADA',
+    tipoServico: 'PAC',
+    valor: 10,
+    prazoTexto: '5 dias úteis',
+    expiraEm: new Date(Date.now() + 60 * 60 * 1000), // 1h no futuro
+    venId: null,
+    ...override,
+  };
+}
+
+describe('ServicoVendas — registrarPedidoVenda', () => {
+  let mockRepoVendas: jest.Mocked<IRepositorioVendas>;
+  let mockRepoCotacao: jest.Mocked<IRepositorioCotacaoFrete>;
+
+  beforeEach(() => {
+    mockRepoVendas = {
+      cadastrar: jest.fn().mockResolvedValue({ venda: vendaResultado(), venId: 1 }),
+      obterPorUuid: jest.fn(),
+      listarPorUsuario: jest.fn(),
+      listarTodas: jest.fn(),
+      atualizarStatus: jest.fn(),
+      registrarSolicitacaoTroca: jest.fn(),
+      obterEmailUsuarioPorVenda: jest.fn(),
+    } as jest.Mocked<IRepositorioVendas>;
+
+    mockRepoCotacao = {
+      inserirLinhas: jest.fn(),
+      obterPorUuid: jest.fn(),
+      marcarConsumida: jest.fn(),
+      marcarExpiradasCriadasVencidas: jest.fn(),
+    } as jest.Mocked<IRepositorioCotacaoFrete>;
+  });
+
+  describe('validações de entrada', () => {
+    it('lança erro quando usuarioUuid está ausente', async () => {
+      const servico = new ServicoVendas(mockRepoVendas);
+      await expect(
+        servico.registrarPedidoVenda(dadosBase({ usuarioUuid: '' })),
+      ).rejects.toThrow('Usuário é obrigatório');
+    });
+
+    it('lança erro quando não há itens no pedido', async () => {
+      const servico = new ServicoVendas(mockRepoVendas);
+      await expect(
+        servico.registrarPedidoVenda(dadosBase({ itens: [] })),
+      ).rejects.toThrow('Venda deve possuir ao menos um item');
+    });
+
+    it('lança erro quando valorTotal é menor ou igual a zero', async () => {
+      const servico = new ServicoVendas(mockRepoVendas);
+      await expect(
+        servico.registrarPedidoVenda(dadosBase({ valorTotal: 0 })),
+      ).rejects.toThrow('Valor total inválido');
+    });
+
+    it('lança erro quando valorTotal diverge de itens+frete em mais de R$ 0.02', async () => {
+      const servico = new ServicoVendas(mockRepoVendas);
+      // itens=50 + frete=10 = 60; informado 60.021 → acima da tolerância
+      await expect(
+        servico.registrarPedidoVenda(dadosBase({ valorTotal: 60.021 })),
+      ).rejects.toThrow('Valor total não confere com itens + frete');
+    });
+
+    it('aceita valorTotal com diferença de até R$ 0.019 (dentro da tolerância)', async () => {
+      const servico = new ServicoVendas(mockRepoVendas);
+      // itens=50 + frete=10 = 60; informado 60.019 → dentro da tolerância
+      const resultado = await servico.registrarPedidoVenda(dadosBase({ valorTotal: 60.019 }));
+      expect(resultado).toBeDefined();
+      expect(mockRepoVendas.cadastrar).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('fluxo feliz sem cotação', () => {
+    it('registra pedido e retorna a venda criada', async () => {
+      const servico = new ServicoVendas(mockRepoVendas);
+      const resultado = await servico.registrarPedidoVenda(dadosBase());
+
+      expect(resultado.id).toBe('venda-uuid-1');
+      expect(resultado.status).toBe('EM PROCESSAMENTO');
+      expect(mockRepoVendas.cadastrar).toHaveBeenCalledWith(
+        expect.objectContaining({ usuarioUuid: USUARIO_UUID, valorFrete: 10 }),
+      );
+    });
+  });
+
+  describe('fluxo com cotação de frete (cotacaoUuid)', () => {
+    it('lança erro quando cotacaoUuid é informado mas repositório de cotação não está configurado', async () => {
+      const servico = new ServicoVendas(mockRepoVendas); // sem repoCotacao
+      await expect(
+        servico.registrarPedidoVenda(dadosBase({ cotacaoUuid: COTACAO_UUID })),
+      ).rejects.toThrow('Cotação de frete não suportada nesta configuração');
+    });
+
+    it('lança erro quando a cotação não é encontrada', async () => {
+      mockRepoCotacao.obterPorUuid.mockResolvedValue(null);
+      const servico = new ServicoVendas(mockRepoVendas, mockRepoCotacao);
+      await expect(
+        servico.registrarPedidoVenda(dadosBase({ cotacaoUuid: COTACAO_UUID })),
+      ).rejects.toThrow('Cotação de frete não encontrada');
+    });
+
+    it('lança erro quando a cotação está no estado CONSUMIDA (≠ CRIADA)', async () => {
+      mockRepoCotacao.obterPorUuid.mockResolvedValue(cotacaoPadrao({ estado: 'CONSUMIDA' }));
+      const servico = new ServicoVendas(mockRepoVendas, mockRepoCotacao);
+      await expect(
+        servico.registrarPedidoVenda(dadosBase({ cotacaoUuid: COTACAO_UUID })),
+      ).rejects.toThrow('Cotação de frete inválida ou já utilizada');
+    });
+
+    it('lança erro quando a cotação está expirada (expiraEm no passado)', async () => {
+      mockRepoCotacao.obterPorUuid.mockResolvedValue(
+        cotacaoPadrao({ expiraEm: new Date(Date.now() - 1000) }),
+      );
+      const servico = new ServicoVendas(mockRepoVendas, mockRepoCotacao);
+      await expect(
+        servico.registrarPedidoVenda(dadosBase({ cotacaoUuid: COTACAO_UUID })),
+      ).rejects.toThrow('Cotação de frete expirada');
+    });
+
+    it('lança erro quando a cotação já está vinculada a outra venda (venId != null)', async () => {
+      mockRepoCotacao.obterPorUuid.mockResolvedValue(cotacaoPadrao({ venId: 42 }));
+      const servico = new ServicoVendas(mockRepoVendas, mockRepoCotacao);
+      await expect(
+        servico.registrarPedidoVenda(dadosBase({ cotacaoUuid: COTACAO_UUID })),
+      ).rejects.toThrow('Cotação de frete já vinculada a uma venda');
+    });
+
+    it('fluxo feliz com cotação: usa valor do frete da cotação e chama marcarConsumida', async () => {
+      const cotacao = cotacaoPadrao({ valor: 15 }); // frete da cotação = 15, diferente do input
+      mockRepoCotacao.obterPorUuid.mockResolvedValue(cotacao);
+      mockRepoCotacao.marcarConsumida.mockResolvedValue();
+
+      // Ajusta o valorTotal para bater com itens(50) + frete_cotacao(15) = 65
+      const servico = new ServicoVendas(mockRepoVendas, mockRepoCotacao);
+      await servico.registrarPedidoVenda(
+        dadosBase({ cotacaoUuid: COTACAO_UUID, valorFrete: 99, valorTotal: 65 }),
+      );
+
+      expect(mockRepoVendas.cadastrar).toHaveBeenCalledWith(
+        expect.objectContaining({ valorFrete: 15, cfrId: cotacao.cfrId }),
+      );
+      expect(mockRepoCotacao.marcarConsumida).toHaveBeenCalledWith(COTACAO_UUID, 1);
+    });
+  });
+});
 describe('ServicoVendas — visualizarDetalhesVenda', () => {
   let mockRepoVendas: jest.Mocked<IRepositorioVendas>;
 
@@ -27,7 +191,8 @@ describe('ServicoVendas — visualizarDetalhesVenda', () => {
       listarPorUsuario: jest.fn(),
       listarTodas: jest.fn(),
       atualizarStatus: jest.fn(),
-      registrarTroca: jest.fn().mockResolvedValue({ id: 'troca-uuid-1' }),
+      registrarSolicitacaoTroca: jest.fn(),
+      obterEmailUsuarioPorVenda: jest.fn(),
     } as jest.Mocked<IRepositorioVendas>;
   });
 
@@ -79,7 +244,8 @@ describe('ServicoVendas — listarVendasCliente', () => {
       listarPorUsuario: jest.fn().mockResolvedValue([vendaResultado()]),
       listarTodas: jest.fn(),
       atualizarStatus: jest.fn(),
-      registrarTroca: jest.fn().mockResolvedValue({ id: 'troca-uuid-1' }),
+      registrarSolicitacaoTroca: jest.fn(),
+      obterEmailUsuarioPorVenda: jest.fn(),
     } as jest.Mocked<IRepositorioVendas>;
 
     const servico = new ServicoVendas(mockRepoVendas);
@@ -100,7 +266,8 @@ describe('ServicoVendas — solicitarTroca (RN0043)', () => {
       listarPorUsuario: jest.fn(),
       listarTodas: jest.fn(),
       atualizarStatus: jest.fn(),
-      registrarTroca: jest.fn().mockResolvedValue({ id: 'troca-uuid-1' }),
+      registrarSolicitacaoTroca: jest.fn(),
+      obterEmailUsuarioPorVenda: jest.fn(),
     } as unknown as jest.Mocked<IRepositorioVendas>;
   });
 
@@ -108,12 +275,13 @@ describe('ServicoVendas — solicitarTroca (RN0043)', () => {
     const dataEntrega = new Date(); // Hoje
     const venda = { ...vendaResultado(), status: 'ENTREGUE', dataHoraEntrega: dataEntrega };
     mockRepoVendas.obterPorUuid.mockResolvedValue(venda as IVenda);
+    mockRepoVendas.registrarSolicitacaoTroca.mockResolvedValue();
 
     const servico = new ServicoVendas(mockRepoVendas);
-    const resultado = await servico.solicitarTroca('venda-uuid-1', USUARIO_UUID, 'Defeito no livro');
+    const resultado = await servico.solicitarTroca('venda-uuid-1', USUARIO_UUID, 'Defeito no livro', []);
 
     expect(resultado).toBeDefined();
-    expect(mockRepoVendas.registrarTroca).toHaveBeenCalled();
+    expect(mockRepoVendas.registrarSolicitacaoTroca).toHaveBeenCalled();
   });
 
   it('[RN0043] lança erro se o status não for ENTREGUE', async () => {
@@ -122,8 +290,8 @@ describe('ServicoVendas — solicitarTroca (RN0043)', () => {
 
     const servico = new ServicoVendas(mockRepoVendas);
     await expect(
-      servico.solicitarTroca('venda-uuid-1', USUARIO_UUID, 'Justificativa'),
-    ).rejects.toThrow('Apenas pedidos com status ENTREGUE podem solicitar troca');
+      servico.solicitarTroca('venda-uuid-1', USUARIO_UUID, 'Justificativa', []),
+    ).rejects.toThrow('Apenas pedidos entregues podem ser trocados');
   });
 
   it('[RN0043] lança erro se o prazo de 7 dias expirou', async () => {
@@ -135,7 +303,7 @@ describe('ServicoVendas — solicitarTroca (RN0043)', () => {
 
     const servico = new ServicoVendas(mockRepoVendas);
     await expect(
-      servico.solicitarTroca('venda-uuid-1', USUARIO_UUID, 'Justificativa'),
+      servico.solicitarTroca('venda-uuid-1', USUARIO_UUID, 'Justificativa', []),
     ).rejects.toThrow('Prazo de 7 dias para troca expirado');
   });
 });
