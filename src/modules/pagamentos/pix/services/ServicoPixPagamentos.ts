@@ -1,6 +1,6 @@
-import { IPagamento, IRepositorioPagamentos } from '../repositories/IRepositorioPagamentos';
-import { IResultadoDefinirMetodoLiquidacao } from '../entities/IPagamento.dto';
-import { gerarDadosCobrancaPixSimulada } from '../pix/gerarCobrancaPixSimulada';
+import { IPagamento, IRepositorioPagamentos } from '../../repositories/IRepositorioPagamentos';
+import { IResultadoDefinirMetodoLiquidacao } from '../../entities/IPagamento.dto';
+import { gerarDadosCobrancaPixSimulada } from '../gerarCobrancaPixSimulada';
 
 export class ServicoPixPagamentos {
   constructor(

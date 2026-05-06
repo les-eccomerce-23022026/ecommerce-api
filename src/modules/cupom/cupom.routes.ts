@@ -48,6 +48,13 @@ export function registrarRotasCupom(router: Router): void {
   // Endpoint para aplicar cupom
   router.post('/cupom/aplicar', autenticacaoMiddleware, (req, res) => {
     const { codigo } = req.body;
+
+    if (!codigo) {
+      return res.status(400).json({
+        ok: false,
+        erro: 'Código do cupom é obrigatório',
+      });
+    }
     
     // TODO: Implementar lógica real de aplicação de cupom
     // Por enquanto, valida cupons de teste fixos
@@ -67,7 +74,7 @@ export function registrarRotasCupom(router: Router): void {
       });
     }
 
-    res.json({
+    return res.json({
       ok: true,
       dados: {
         ...cupom,

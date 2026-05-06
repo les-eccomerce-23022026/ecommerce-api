@@ -41,6 +41,7 @@ export class GestaoIdentidadeCliente {
   private readonly endereco: GestaoEnderecoCliente;
 
   private readonly operacoes: GestaoIdentidadeClienteOperacoes;
+
   constructor(
     repositorioUsuarios: IRepositorioUsuarios,
     repositorioPerfil: IRepositorioPerfilCliente,
@@ -65,6 +66,7 @@ export class GestaoIdentidadeCliente {
       obterPerfil: (uuid) => this.obterPerfil(uuid),
     });
   }
+
   public async alterarSenha(uuid: string, dados: IAlterarSenhaDto): Promise<void> {
     const usuario = await this.repositorioUsuarios.buscarPorUuid(uuid);
     if (!usuario) {

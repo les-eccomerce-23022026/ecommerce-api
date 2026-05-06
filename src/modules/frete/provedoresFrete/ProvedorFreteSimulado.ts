@@ -45,6 +45,7 @@ function pesoEfetivo(pesoKg: number): number {
  */
 export class ProvedorFreteSimulado implements IProvedorFrete {
   private readonly codigoProvedor = 'simulado';
+
   public getCodigo(): string {
     return this.codigoProvedor;
   }

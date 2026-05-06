@@ -1,6 +1,4 @@
 import { ServicoPagamentos } from '@/modules/pagamentos/services/ServicoPagamentos';
-import { TipoPagamento } from '@/modules/pagamentos/entities/FormaPagamento';
-import { StatusPagamento } from '@/modules/pagamentos/entities/IPagamento';
 import { IRepositorioPagamentos } from '@/modules/pagamentos/repositories/IRepositorioPagamentos';
 import { IProvedorPagamento } from '@/modules/pagamentos/provedoresPagamento/IProvedorPagamento';
 import { IRepositorioIntencaoPagamento } from '@/modules/pagamentos/intencaoPagamento/IRepositorioIntencaoPagamento';
@@ -88,7 +86,7 @@ describe('ServicoPagamentos (TDD)', () => {
 
     it('deve retornar pagamento encontrado', async () => {
       const pagamentoMock = { id: '123', valor: 100 };
-      (repositorioPagamentosMock.obterPorUuid as jest.Mock).mockResolvedValue(pagamentoMock as any);
+      (repositorioPagamentosMock.obterPorUuid as jest.Mock).mockResolvedValue(pagamentoMock as unknown);
 
       const resultado = await servico.consultarPagamento('uuid');
       expect(resultado).toEqual(pagamentoMock);

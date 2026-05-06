@@ -58,7 +58,8 @@ describe('ServicoVendas — registrarPedidoVenda', () => {
       listarPorUsuario: jest.fn(),
       listarTodas: jest.fn(),
       atualizarStatus: jest.fn(),
-      registrarTroca: jest.fn().mockResolvedValue({ id: 'troca-uuid-1' }),
+      registrarSolicitacaoTroca: jest.fn().mockResolvedValue(undefined),
+      obterEmailUsuarioPorVenda: jest.fn().mockResolvedValue('test@example.com'),
     } as jest.Mocked<IRepositorioVendas>;
 
     mockRepoCotacao = {

@@ -155,6 +155,7 @@ export class GestaoEnderecoCliente {
 
   private static aplicarApelidoSeInformado(ref: RefEnderecoUsuario, dados: Partial<IEnderecoDto>): void {
     if (dados.apelido !== undefined) {
+      // eslint-disable-next-line no-param-reassign
       ref.current.apelido = dados.apelido;
     }
   }
@@ -169,6 +170,7 @@ export class GestaoEnderecoCliente {
     }
     const cidade = dados.cidade ?? dtoAtual.cidade;
     const estado = dados.estado ?? dtoAtual.estado;
+    // eslint-disable-next-line no-param-reassign
     ref.current.idCidade = await this.garantirLocalidade(cidade, estado);
   }
 
@@ -176,6 +178,7 @@ export class GestaoEnderecoCliente {
     if (dados.bairro === undefined) {
       return;
     }
+    // eslint-disable-next-line no-param-reassign
     ref.current.idBairro = await this.obterOuCriarBairro(dados.bairro, ref.current.idCidade);
   }
 
@@ -183,6 +186,7 @@ export class GestaoEnderecoCliente {
     if (dados.cep === undefined) {
       return;
     }
+    // eslint-disable-next-line no-param-reassign
     ref.current.idCep = await this.obterOuCriarCep(dados.cep, ref.current.idCidade, ref.current.idBairro);
   }
 
@@ -197,18 +201,22 @@ export class GestaoEnderecoCliente {
     const logradouro = dados.logradouro ?? dtoAtual.logradouro;
     const numero = dados.numero ?? dtoAtual.numero;
     const tipoLogradouro = dados.tipoLogradouro ?? dtoAtual.tipoLogradouro ?? 'Rua';
+    // eslint-disable-next-line no-param-reassign
     ref.current.idLogradouro = await this.obterOuCriarLogradouro(tipoLogradouro, logradouro);
+    // eslint-disable-next-line no-param-reassign
     ref.current.numero = numero;
   }
 
   private static aplicarComplementoSeInformado(ref: RefEnderecoUsuario, dados: Partial<IEnderecoDto>): void {
     if (dados.complemento !== undefined) {
+      // eslint-disable-next-line no-param-reassign
       ref.current.complemento = dados.complemento;
     }
   }
 
   private static aplicarPaisSeInformado(ref: RefEnderecoUsuario, dados: Partial<IEnderecoDto>): void {
     if (dados.pais !== undefined) {
+      // eslint-disable-next-line no-param-reassign
       ref.current.idPais = GestaoEnderecoCliente.obterOuCriarPais(dados.pais);
     }
   }
@@ -220,6 +228,7 @@ export class GestaoEnderecoCliente {
     if (dados.tipoResidencia === undefined) {
       return;
     }
+    // eslint-disable-next-line no-param-reassign
     ref.current.idTipoResidencia = await GestaoEnderecoCliente.obterIdTipoResidencia(this.db, dados.tipoResidencia);
   }
 

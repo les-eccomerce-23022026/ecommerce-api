@@ -87,6 +87,7 @@ export class ServicoPagamentos {
     };
     return confirmarAutorizacaoFinanceiraCheckoutServico(deps, corpo);
   }
+
   public async consultarPagamento(pagamentoUuid: string): Promise<IPagamento> {
     const p = await this.repositorioPagamentos.obterPorUuid(pagamentoUuid);
     if (!p) throw new Error('Pagamento não encontrado');

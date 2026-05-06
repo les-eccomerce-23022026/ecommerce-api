@@ -1,3 +1,4 @@
+/* eslint-disable max-lines */
 import { ServicoVendas } from '@/modules/vendas/services/ServicoVendas';
 import { IRepositorioVendas, IVenda } from '@/modules/vendas/repositories/IRepositorioVendas';
 import type { ICotacaoFretePersistida } from '@/modules/frete/IFrete.dto';

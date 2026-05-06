@@ -1,6 +1,6 @@
 import { IUsuario } from '@/modules/usuarios/Iusuario.entity';
 import { montarClausulasAtualizacaoUsuario } from '@/modules/usuarios/usuario-repository-atualizacao.util';
-import { PAPEL_CLIENTE, PAPEL_ADMIN } from '@/shared/types/papeis';
+import { PAPEL_CLIENTE } from '@/shared/types/papeis';
 import { IConexaoBanco, DbParametro } from '@/shared/infrastructure/database/IConexaoBanco';
 import { obterTipoBancoAtual } from '@/shared/infrastructure/database/ContextoBanco';
 import { IRepositorioUsuarios, IDadosCriarUsuario, IFiltrosConsultaClientes } from './IRepositorioUsuarios';
