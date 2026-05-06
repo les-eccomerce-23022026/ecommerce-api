@@ -2,7 +2,7 @@ import { IRepositorioEnderecoUsuario } from '@/shared/types/IRepositorioEndereco
 import { IEnderecoDto } from '@/modules/clientes/Iclientes.dto';
 import { IConexaoBanco } from '@/shared/infrastructure/database/IConexaoBanco';
 import { IEnderecoUsuario } from '@/shared/types/IEnderecoUsuario';
-import { ClientesUtils } from './clientes-utils.service';
+import { ClientesUtils } from './clientesUtils.service';
 
 export class ClientesEnderecoService {
   constructor(

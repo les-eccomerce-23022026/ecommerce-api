@@ -4,8 +4,8 @@ import { IConexaoBanco } from '@/shared/infrastructure/database/IConexaoBanco';
 import { IEnderecoUsuario } from '@/shared/types/IEnderecoUsuario';
 import { IUsuario } from '@/modules/usuarios/Iusuario.entity';
 import { IRowIdSimples } from '@/shared/types/db-rows.types';
-import { GestaoEnderecoLeituras } from '@/modules/clientes/gestao-identidade-cliente-endereco-leituras';
-import { mapearEnderecoUsuarioParaDto } from '@/modules/clientes/gestao-identidade-cliente-endereco-dto.mapper';
+import { GestaoEnderecoLeituras } from '@/modules/clientes/gestaoIdentidadeClienteEndereco.leituras';
+import { mapearEnderecoUsuarioParaDto } from '@/modules/clientes/gestaoIdentidadeClienteEndereco.dto.mapper';
 
 type RefEnderecoUsuario = { current: IEnderecoUsuario };
 

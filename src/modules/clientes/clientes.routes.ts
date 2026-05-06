@@ -1,6 +1,6 @@
 import { IRouter } from 'express';
 import { ControladorClientes } from '@/modules/clientes/clientes.controller';
-import { ControladorConsultaClientes } from '@/modules/clientes/consulta-clientes.controller';
+import { ControladorConsultaClientes } from '@/modules/clientes/consultaClientes.controller';
 import { autenticacaoMiddleware } from '@/shared/middlewares/autenticacao.middleware';
 import { adminOnlyMiddleware, clienteOnlyMiddleware } from '@/shared/middlewares/autorizacao.middleware';
 

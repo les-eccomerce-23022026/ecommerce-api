@@ -1,8 +1,8 @@
 import { IConexaoBanco, DbParametro } from '@/shared/infrastructure/database/IConexaoBanco';
 import { IRepositorioPagamentos, IPagamento } from './IRepositorioPagamentos';
-import { FormaPagamento, TipoPagamento } from './FormaPagamento';
-import { CartaoCredito } from './CartaoCredito';
-import { StatusPagamento } from './IPagamento';
+import { FormaPagamento, TipoPagamento } from '../entities/FormaPagamento';
+import { CartaoCredito } from '../entities/CartaoCredito';
+import { StatusPagamento } from '../entities/IPagamento';
 
 /**
  * Implementação do repositório de pagamentos para PostgreSQL.

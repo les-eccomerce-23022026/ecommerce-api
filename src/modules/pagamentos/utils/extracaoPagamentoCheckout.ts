@@ -2,7 +2,7 @@
  * Extração e validação de payload do checkout (POST /pagamento/processar).
  */
 
-import { PARCELAS_CARTAO_MAX } from './IPagamento.dto';
+import { PARCELAS_CARTAO_MAX } from '../entities/IPagamento.dto';
 
 export interface CheckoutPagamentoExtraido {
   idIntencao: string;

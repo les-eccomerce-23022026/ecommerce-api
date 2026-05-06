@@ -1,12 +1,12 @@
 import { v4 as uuidv4 } from 'uuid';
-import type { IRepositorioPagamentos, IPagamento } from '@/modules/pagamentos/IRepositorioPagamentos';
+import type { IRepositorioPagamentos, IPagamento } from '@/modules/pagamentos/repositories/IRepositorioPagamentos';
 import type { IRepositorioVendas } from '@/modules/vendas/repositories/IRepositorioVendas';
-import { IPagamentoInputDto, IResultadoDefinirMetodoLiquidacao, PARCELAS_CARTAO_MAX } from '@/modules/pagamentos/IPagamento.dto';
-import { FormaPagamento, TipoPagamento } from '@/modules/pagamentos/FormaPagamento';
-import { CartaoCredito } from '@/modules/pagamentos/CartaoCredito';
-import { StatusPagamento } from '@/modules/pagamentos/IPagamento';
+import { IPagamentoInputDto, IResultadoDefinirMetodoLiquidacao, PARCELAS_CARTAO_MAX } from '@/modules/pagamentos/entities/IPagamento.dto';
+import { FormaPagamento, TipoPagamento } from '@/modules/pagamentos/entities/FormaPagamento';
+import { CartaoCredito } from '@/modules/pagamentos/entities/CartaoCredito';
+import { StatusPagamento } from '@/modules/pagamentos/entities/IPagamento';
 import { gerarDadosCobrancaPixSimulada } from '@/modules/pagamentos/pix/gerarCobrancaPixSimulada';
-import { sincronizarStatusVendaAposPagamentos } from '@/modules/pagamentos/servico-pagamentos-venda.util';
+import { sincronizarStatusVendaAposPagamentos } from '@/modules/pagamentos/services/servicoPagamentosVenda.util';
 
 function obterDetalhesPorTipo(dados: IPagamentoInputDto): string | undefined {
   const mapaDetalhes: Partial<Record<TipoPagamento, () => string | undefined>> = {
@@ -38,9 +38,9 @@ function validarParcelasCartaoSeInformado(dados: IPagamentoInputDto): void {
   if (dados.parcelasCartao == null) {
     return;
   }
-  if (dados.tipoPagamento !== TipoPagamento.CARTAO_CREDITO) throw new Error('Parcelas só para cartão');
+  if (dados.tipoPagamento !== TipoPagamento.CARTAO_CREDITO) throw new Error('parcelasCartao só permitido para cartão de crédito');
   const n = Number(dados.parcelasCartao);
-  if (!Number.isInteger(n) || n < 1 || n > PARCELAS_CARTAO_MAX) throw new Error('Parcelas inválidas');
+  if (!Number.isInteger(n) || n < 1 || n > PARCELAS_CARTAO_MAX) throw new Error('parcelasCartao inválido');
 }
 
 export function validarDadosPagamento(dados: IPagamentoInputDto): void {

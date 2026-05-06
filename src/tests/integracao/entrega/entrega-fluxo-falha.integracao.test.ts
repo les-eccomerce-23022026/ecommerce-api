@@ -1,20 +1,22 @@
 import request from 'supertest';
 import { configurarTesteIntegracao } from '@/tests/utils/setup-integracao.util';
-import { obterTokenCliente } from '@/tests/utils/requisicoes-api.util';
+import { obterTokenCliente, obterTokenAdmin } from '@/tests/utils/requisicoes-api.util';
 import { LIVRO_UUID_TESTE } from '@/tests/helpers/pedido-venda.helper';
 
 describe('Integração - Fluxo de Falha e Reagendamento de Entrega (Sprint 3)', () => {
   const contexto = configurarTesteIntegracao();
   let token: string;
+  let tokenAdmin: string;
 
   beforeAll(async () => {
     token = await obterTokenCliente(contexto.app);
+    tokenAdmin = await obterTokenAdmin(contexto.app);
   });
 
   it('deve agendar entrega e simular notificação de rastreio (S3-A)', async () => {
-    // Espionamos o console.log do adapter (já que não temos um mock injetável no teste via supertest)
+    // Espionamos o console.info do adapter (já que não temos um mock injetável no teste via supertest)
     // Em um cenário real de TDD rigoroso, usaríamos um container de DI para trocar o adapter no teste.
-    const spyNotificacao = jest.spyOn(console, 'log').mockImplementation();
+    const spyNotificacao = jest.spyOn(console, 'info').mockImplementation();
 
     // 1. Criar venda
     const resVenda = await request(contexto.app)
@@ -74,7 +76,7 @@ describe('Integração - Fluxo de Falha e Reagendamento de Entrega (Sprint 3)', 
     // 2. Registrar Falha (Admin)
     const resFalha = await request(contexto.app)
       .patch(`/api/entregas/${entregaUuid}/falha`)
-      .set('Authorization', `Bearer ${token}`);
+      .set('Authorization', `Bearer ${tokenAdmin}`);
     
     expect(resFalha.status).toBe(204);
 

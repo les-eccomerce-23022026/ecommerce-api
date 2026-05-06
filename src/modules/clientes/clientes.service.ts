@@ -14,13 +14,13 @@ import {
 import { IRepositorioCartaoUsuario } from '@/modules/cartoes/IRepositorioCartaoUsuario';
 import { verificarForcaSenha } from '@/shared/utils/senha.util';
 import { IConexaoBanco } from '@/shared/infrastructure/database/IConexaoBanco';
-import { GestaoEnderecoCliente } from '@/modules/clientes/gestao-identidade-cliente-endereco.service';
-import { GestaoIdentidadeClienteOperacoes } from '@/modules/clientes/gestao-identidade-cliente-operacoes.service';
+import { GestaoEnderecoCliente } from '@/modules/clientes/gestaoIdentidadeClienteEndereco.service';
+import { GestaoIdentidadeClienteOperacoes } from '@/modules/clientes/gestaoIdentidadeClienteOperacoes.service';
 import {
   mascararCpf,
   mascararEmail,
   converterTelefoneParaDto,
-} from '@/modules/clientes/gestao-identidade-cliente-texto.util';
+} from '@/modules/clientes/gestaoIdentidadeClienteTexto.util';
 
 /**
  * Serviço responsável pelo fluxo de cadastro público de clientes.

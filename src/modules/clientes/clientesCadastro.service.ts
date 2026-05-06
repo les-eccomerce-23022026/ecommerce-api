@@ -8,8 +8,8 @@ import {
 import { verificarForcaSenha } from '@/shared/utils/senha.util';
 import { validarCpf } from '@/shared/utils/validacao-cpf.util';
 import { PAPEL_CLIENTE } from '@/shared/types/papeis';
-import { ClientesUtils } from './clientes-utils.service';
-import { ClientesEnderecoService } from './clientes-endereco.service';
+import { ClientesUtils } from './clientesUtils.service';
+import { ClientesEnderecoService } from './clientesEndereco.service';
 
 export class ClientesCadastroService {
   constructor(

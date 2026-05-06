@@ -1,6 +1,6 @@
 import type { IEnderecoDto } from '@/modules/clientes/Iclientes.dto';
 import type { IEnderecoUsuario } from '@/shared/types/IEnderecoUsuario';
-import type { GestaoEnderecoLeituras } from '@/modules/clientes/gestao-identidade-cliente-endereco-leituras';
+import type { GestaoEnderecoLeituras } from '@/modules/clientes/gestaoIdentidadeClienteEndereco.leituras';
 import type {
   IRowBairro,
   IRowCep,

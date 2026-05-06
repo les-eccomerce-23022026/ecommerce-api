@@ -2,18 +2,18 @@ import type { IRepositorioVendas } from '@/modules/vendas/repositories/IReposito
 import {
   confirmarAutorizacaoFinanceiraCheckoutServico,
   type DepsCheckoutPagamentos,
-} from '@/modules/pagamentos/servico-pagamentos-checkout-flow.util';
-import { definirMetodoLiquidacaoServico } from '@/modules/pagamentos/servico-pagamentos-definir-metodo.util';
+} from '@/modules/pagamentos/services/servicoPagamentosCheckoutFlow.util';
+import { definirMetodoLiquidacaoServico } from '@/modules/pagamentos/services/servicoPagamentosDefinirMetodo.util';
 import {
   confirmarPagamentoPixWebhookServico,
   obterResumoPagamentosVenda,
   solicitarAutorizacaoFinanceiraServico,
-} from '@/modules/pagamentos/servico-pagamentos-venda.util';
-import { IRepositorioPagamentos, IPagamento } from './IRepositorioPagamentos';
-import { IPagamentoInputDto, IResultadoDefinirMetodoLiquidacao } from './IPagamento.dto';
-import type { IProvedorPagamento } from './provedoresPagamento/IProvedorPagamento';
-import type { ResultadoIntencaoPagamento } from './provedoresPagamento/DadosConfirmacaoProvedor';
-import type { IRepositorioIntencaoPagamento } from './intencaoPagamento/IRepositorioIntencaoPagamento';
+} from '@/modules/pagamentos/services/servicoPagamentosVenda.util';
+import { IRepositorioPagamentos, IPagamento } from '../repositories/IRepositorioPagamentos';
+import { IPagamentoInputDto, IResultadoDefinirMetodoLiquidacao } from '../entities/IPagamento.dto';
+import type { IProvedorPagamento } from '../provedoresPagamento/IProvedorPagamento';
+import type { ResultadoIntencaoPagamento } from '../provedoresPagamento/DadosConfirmacaoProvedor';
+import type { IRepositorioIntencaoPagamento } from '../intencaoPagamento/IRepositorioIntencaoPagamento';
 
 /**
  * Serviço responsável pela lógica de negócios dos pagamentos (Livraria e-commerce).

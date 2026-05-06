@@ -1,8 +1,8 @@
 import { IRouter } from 'express';
 import { ControladorAdmin } from '@/modules/admin/admin.controller';
-import { ControladorAdminPainel } from '@/modules/admin/controlador-admin-painel';
-import { ServicoDashboardAdmin } from '@/modules/admin/servico-dashboard-admin';
-import { ServicoPedidosAdmin } from '@/modules/admin/servico-pedidos-admin';
+import { ControladorAdminPainel } from '@/modules/admin/controladorAdminPainel';
+import { ServicoDashboardAdmin } from '@/modules/admin/servicoDashboardAdmin';
+import { ServicoPedidosAdmin } from '@/modules/admin/servicoPedidosAdmin';
 import { ConexaoPostgres } from '@/shared/infrastructure/database/ConexaoPostgres';
 import { RepositorioVendasPostgres } from '@/modules/vendas/repositories/RepositorioVendasPostgres';
 import { RepositorioEntregaPostgres } from '@/modules/entrega/RepositorioEntregaPostgres';

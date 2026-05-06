@@ -1,5 +1,5 @@
-import { extrairCheckoutPagamento } from '@/modules/pagamentos/extracaoPagamentoCheckout';
-import type { IRepositorioPagamentos } from '@/modules/pagamentos/IRepositorioPagamentos';
+import { extrairCheckoutPagamento } from '@/modules/pagamentos/utils/extracaoPagamentoCheckout';
+import type { IRepositorioPagamentos } from '@/modules/pagamentos/repositories/IRepositorioPagamentos';
 import type { IProvedorPagamento } from '@/modules/pagamentos/provedoresPagamento/IProvedorPagamento';
 import type {
   IRepositorioIntencaoPagamento,
@@ -11,8 +11,8 @@ import {
   processarSaldosCuponsTroca,
   type CupomCheckoutLinha,
   type PagamentoCartaoCheckoutLinha,
-} from '@/modules/pagamentos/servico-pagamentos-checkout.util';
-import { sincronizarStatusVendaAposPagamentos } from '@/modules/pagamentos/servico-pagamentos-venda.util';
+} from '@/modules/pagamentos/services/servicoPagamentosCheckout.util';
+import { sincronizarStatusVendaAposPagamentos } from '@/modules/pagamentos/services/servicoPagamentosVenda.util';
 
 export type DepsCheckoutPagamentos = {
   repositorioPagamentos: IRepositorioPagamentos;

@@ -7,8 +7,8 @@ import type { ICriarClienteDto } from '@/modules/clientes/Iclientes.dto';
 import { verificarForcaSenha } from '@/shared/utils/senha.util';
 import { validarCpf } from '@/shared/utils/validacao-cpf.util';
 import { PAPEL_CLIENTE } from '@/shared/types/papeis';
-import type { GestaoEnderecoCliente } from '@/modules/clientes/gestao-identidade-cliente-endereco.service';
-import { mapearTipoTelefone } from '@/modules/clientes/gestao-identidade-cliente-texto.util';
+import type { GestaoEnderecoCliente } from '@/modules/clientes/gestaoIdentidadeClienteEndereco.service';
+import { mapearTipoTelefone } from '@/modules/clientes/gestaoIdentidadeClienteTexto.util';
 
 export type DepsCadastroPublicoCliente = {
   repositorioUsuarios: IRepositorioUsuarios;
@@ -20,7 +20,7 @@ export type DepsCadastroPublicoCliente = {
 
 function validarSenhaECpfCadastroPublico(dados: ICriarClienteDto): void {
   if (dados.senha !== dados.confirmacaoSenha) {
-    throw new Error('Senha e confirmação de senha não conferem.');
+    throw new Error('Senha e confirmação não conferem.');
   }
   if (!verificarForcaSenha(dados.senha)) {
     throw new Error(
@@ -38,11 +38,11 @@ async function garantirEmailECpfLivresCadastro(
 ): Promise<void> {
   const existentePorEmail = await deps.repositorioUsuarios.buscarPorEmail(dados.email);
   if (existentePorEmail) {
-    throw new Error('Já existe um usuário cadastrado com este e-mail.');
+    throw new Error('E-mail já cadastrado.');
   }
   const existentePorCpf = await deps.repositorioUsuarios.buscarPorCpf(dados.cpf);
   if (existentePorCpf) {
-    throw new Error('Já existe um usuário cadastrado com este CPF.');
+    throw new Error('CPF já cadastrado.');
   }
 }
 

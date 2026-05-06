@@ -1,7 +1,7 @@
 import { Request } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { IPerfilClienteDto } from '@/modules/clientes/Iclientes.dto';
-import type { IPagamento } from './IPagamento';
+import type { IPagamento } from '../entities/IPagamento';
 
 export class PagamentosHelper {
   public static extrairParametros(req: Request) {

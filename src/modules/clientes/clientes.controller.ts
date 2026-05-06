@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { di } from '@/shared/infrastructure/di.container';
 import { RespostaPadrao } from '@/shared/errors/Iresposta-padrao';
-import { obterErroValidacaoCadastroPublico } from '@/modules/clientes/clientes-cadastro-publico-validacao.util';
+import { obterErroValidacaoCadastroPublico } from '@/modules/clientes/clientesCadastroPublicoValidacao.util';
 
 const { gestaoIdentidadeCliente } = di;
 

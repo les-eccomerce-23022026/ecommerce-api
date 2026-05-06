@@ -1,7 +1,7 @@
 import { FabricaConexaoBanco } from '@/shared/infrastructure/database/FabricaConexaoBanco';
 import { RepositorioUsuarios } from '@/modules/usuarios/usuario.repository';
 import { GestaoIdentidadeCliente } from '@/modules/clientes/clientes.service';
-import { ServicoConsultaClientes } from '@/modules/clientes/consulta-clientes.service';
+import { ServicoConsultaClientes } from '@/modules/clientes/consultaClientes.service';
 import { ServicoCartoes } from '@/modules/cartoes/cartoes.service';
 import { RepositorioCartaoUsuario } from '@/modules/cartoes/IRepositorioCartaoUsuario';
 import { ServicoAdmin } from '@/modules/admin/admin.service';

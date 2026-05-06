@@ -10,8 +10,8 @@ import {
 } from '@/modules/clientes/Iclientes.dto';
 import { IPerfilCliente } from '@/shared/types/IPerfilCliente';
 import { ITelefoneUsuario } from '@/shared/types/ITelefoneUsuario';
-import { ClientesUtils } from './clientes-utils.service';
-import { ClientesEnderecoService } from './clientes-endereco.service';
+import { ClientesUtils } from './clientesUtils.service';
+import { ClientesEnderecoService } from './clientesEndereco.service';
 
 export class ClientesAtualizacaoService {
   constructor(

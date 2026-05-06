@@ -4,8 +4,8 @@ import type { ServicoFrete } from '@/modules/frete/ServicoFrete';
 import { cepOrigemPadrao, sanitizarCep8Digitos } from '@/modules/frete/freteCepUtil';
 import type { GestaoIdentidadeCliente } from '@/modules/clientes/clientes.service';
 import { Logger } from '@/shared/utils/Logger.util';
-import { PARCELAS_CARTAO_MAX } from '@/modules/pagamentos/IPagamento.dto';
-import type { IRepositorioPagamentos } from '@/modules/pagamentos/IRepositorioPagamentos';
+import { PARCELAS_CARTAO_MAX } from '@/modules/pagamentos/entities/IPagamento.dto';
+import type { IRepositorioPagamentos } from '@/modules/pagamentos/repositories/IRepositorioPagamentos';
 
 const POLITICA_PARCELAMENTO_CARTAO_PADRAO = {
   parcelasMaximas: PARCELAS_CARTAO_MAX,

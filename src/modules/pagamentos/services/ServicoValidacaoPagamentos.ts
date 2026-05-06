@@ -1,5 +1,5 @@
-import { IPagamentoInputDto, PARCELAS_CARTAO_MAX } from './IPagamento.dto';
-import { TipoPagamento, FormaPagamento } from './FormaPagamento';
+import { IPagamentoInputDto, PARCELAS_CARTAO_MAX } from '../entities/IPagamento.dto';
+import { TipoPagamento, FormaPagamento } from '../entities/FormaPagamento';
 
 export class ServicoValidacaoPagamentos {
   public static validarDadosPagamento(dados: IPagamentoInputDto): void {

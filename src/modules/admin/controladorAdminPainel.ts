@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { RespostaPadrao } from '@/shared/errors/Iresposta-padrao';
-import { ServicoDashboardAdmin } from '@/modules/admin/servico-dashboard-admin';
-import { ServicoPedidosAdmin } from '@/modules/admin/servico-pedidos-admin';
+import { ServicoDashboardAdmin } from '@/modules/admin/servicoDashboardAdmin';
+import { ServicoPedidosAdmin } from '@/modules/admin/servicoPedidosAdmin';
 
 /**
  * Rotas do painel administrativo: dashboard e pedidos (contrato do frontend).

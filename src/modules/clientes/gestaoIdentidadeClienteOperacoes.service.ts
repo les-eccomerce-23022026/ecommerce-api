@@ -10,9 +10,9 @@ import {
   IPerfilClienteDto,
 } from '@/modules/clientes/Iclientes.dto';
 import { IPerfilCliente } from '@/shared/types/IPerfilCliente';
-import { GestaoEnderecoCliente } from '@/modules/clientes/gestao-identidade-cliente-endereco.service';
-import { mapearTipoTelefone, normalizarDigitos } from '@/modules/clientes/gestao-identidade-cliente-texto.util';
-import { realizarCadastroPublicoCliente } from '@/modules/clientes/gestao-identidade-cliente-cadastro-publico.util';
+import { GestaoEnderecoCliente } from '@/modules/clientes/gestaoIdentidadeClienteEndereco.service';
+import { mapearTipoTelefone, normalizarDigitos } from '@/modules/clientes/gestaoIdentidadeClienteTexto.util';
+import { realizarCadastroPublicoCliente } from '@/modules/clientes/gestaoIdentidadeClienteCadastroPublico.util';
 
 type DepsOperacoes = {
   repositorioUsuarios: IRepositorioUsuarios;

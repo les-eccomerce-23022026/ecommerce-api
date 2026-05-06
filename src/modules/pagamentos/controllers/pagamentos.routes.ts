@@ -1,9 +1,9 @@
 import { Router } from 'express';
 import { ConexaoPostgres } from '@/shared/infrastructure/database/ConexaoPostgres';
 import { autenticacaoMiddleware } from '@/shared/middlewares/autenticacao.middleware';
-import { ControladorPagamentos } from '@/modules/pagamentos/ControladorPagamentos';
-import { ServicoPagamentos } from '@/modules/pagamentos/ServicoPagamentos';
-import { RepositorioPagamentosPostgres } from '@/modules/pagamentos/RepositorioPagamentosPostgres';
+import { ControladorPagamentos } from '@/modules/pagamentos/controllers/ControladorPagamentos';
+import { ServicoPagamentos } from '@/modules/pagamentos/services/ServicoPagamentos';
+import { RepositorioPagamentosPostgres } from '@/modules/pagamentos/repositories/RepositorioPagamentosPostgres';
 import { FabricaProvedorPagamento } from '@/modules/pagamentos/provedoresPagamento/FabricaProvedorPagamento';
 import { RepositorioIntencaoPagamentoPostgres } from '@/modules/pagamentos/intencaoPagamento/RepositorioIntencaoPagamentoPostgres';
 import { RepositorioVendasPostgres } from '@/modules/vendas/repositories/RepositorioVendasPostgres';

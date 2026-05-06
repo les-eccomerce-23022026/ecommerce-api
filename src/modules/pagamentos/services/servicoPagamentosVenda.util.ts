@@ -1,7 +1,7 @@
 import type { IRepositorioVendas } from '@/modules/vendas/repositories/IRepositorioVendas';
-import type { IRepositorioPagamentos, IPagamento } from '@/modules/pagamentos/IRepositorioPagamentos';
-import { TipoPagamento } from '@/modules/pagamentos/FormaPagamento';
-import { StatusPagamento } from '@/modules/pagamentos/IPagamento';
+import type { IRepositorioPagamentos, IPagamento } from '@/modules/pagamentos/repositories/IRepositorioPagamentos';
+import { TipoPagamento } from '@/modules/pagamentos/entities/FormaPagamento';
+import { StatusPagamento } from '@/modules/pagamentos/entities/IPagamento';
 import type { IProvedorPagamento } from '@/modules/pagamentos/provedoresPagamento/IProvedorPagamento';
 
 const MAPA_SATISFACAO_PAGAMENTO: Record<TipoPagamento, (p: IPagamento) => boolean> = {

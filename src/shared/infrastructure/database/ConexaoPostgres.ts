@@ -2,6 +2,7 @@ import { Pool } from 'pg';
 import { existsSync } from 'node:fs';
 import { IConexaoBanco, DbParametro } from './IConexaoBanco';
 import { obterTipoBancoAtual, obterTransacaoAtual, contextoBanco, obterContextoAtual, definirTransacaoGlobalParaTestes } from './ContextoBanco';
+import { Logger } from '../../utils/Logger.util';
 
 /**
  * Implementação da interface IConexaoBanco para Postgres utilizando 'pg' Pool.
@@ -164,8 +165,7 @@ export class ConexaoPostgres implements IConexaoBanco {
     const cliente = obterTransacaoAtual();
     const transacaoExistente = obterContextoAtual();
     if (!cliente) {
-      // eslint-disable-next-line no-console
-      console.log('REVERTER FALHOU. ContextoAtual:', JSON.stringify(transacaoExistente));
+      Logger.error('REVERTER FALHOU. ContextoAtual:', JSON.stringify(transacaoExistente));
       throw new Error('Nenhuma transação ativa para reverter.');
     }
     try {

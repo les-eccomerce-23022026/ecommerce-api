@@ -8,8 +8,8 @@ import {
   ICartaoDto,
 } from '@/modules/clientes/Iclientes.dto';
 import { IConexaoBanco } from '@/shared/infrastructure/database/IConexaoBanco';
-import { ClientesUtils } from './clientes-utils.service';
-import { ClientesEnderecoService } from './clientes-endereco.service';
+import { ClientesUtils } from './clientesUtils.service';
+import { ClientesEnderecoService } from './clientesEndereco.service';
 
 export class ClientesConsultaService {
   constructor(

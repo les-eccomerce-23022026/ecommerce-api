@@ -16,7 +16,7 @@ export class ServicoAdmin {
 
   private static validarSenhaCadastroAdministrador(dados: ICriarAdminDto): void {
     if (dados.senha !== dados.confirmacaoSenha) {
-      throw new Error('Senha e confirmação de senha não conferem.');
+      throw new Error('Senha e confirmação não conferem.');
     }
     if (!verificarForcaSenha(dados.senha)) {
       throw new Error(

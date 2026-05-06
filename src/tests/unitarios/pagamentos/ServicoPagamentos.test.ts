@@ -1,7 +1,7 @@
-import { ServicoPagamentos } from '@/modules/pagamentos/ServicoPagamentos';
-import { TipoPagamento } from '@/modules/pagamentos/FormaPagamento';
-import { StatusPagamento } from '@/modules/pagamentos/IPagamento';
-import { IRepositorioPagamentos } from '@/modules/pagamentos/IRepositorioPagamentos';
+import { ServicoPagamentos } from '@/modules/pagamentos/services/ServicoPagamentos';
+import { TipoPagamento } from '@/modules/pagamentos/entities/FormaPagamento';
+import { StatusPagamento } from '@/modules/pagamentos/entities/IPagamento';
+import { IRepositorioPagamentos } from '@/modules/pagamentos/repositories/IRepositorioPagamentos';
 import { IProvedorPagamento } from '@/modules/pagamentos/provedoresPagamento/IProvedorPagamento';
 import { IRepositorioIntencaoPagamento } from '@/modules/pagamentos/intencaoPagamento/IRepositorioIntencaoPagamento';
 import { IRepositorioVendas } from '@/modules/vendas/repositories/IRepositorioVendas';
@@ -20,6 +20,7 @@ describe('ServicoPagamentos (TDD)', () => {
       obterVenIdPorVendaUuid: jest.fn(),
       obterPagIdInternoPorUuid: jest.fn(),
       inserirPixSimulado: jest.fn(),
+      obterPorUuid: jest.fn(),
     };
     provedorPagamentoMock = { registrarIntencaoPagamento: jest.fn(), confirmarPagamento: jest.fn() };
     repositorioIntencaoMock = { vincularVenda: jest.fn(), obterPorUuid: jest.fn() };
@@ -33,47 +34,64 @@ describe('ServicoPagamentos (TDD)', () => {
     );
   });
 
-  describe('pagamentoSatisfeitoParaVenda (Privado)', () => {
-    it('deve considerar CUPOM_PROMOCIONAL satisfeito se PENDENTE ou APROVADO', () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const satisfeito = (servico as any).pagamentoSatisfeitoParaVenda({
-        formaPagamento: { getTipo: () => TipoPagamento.CUPOM_PROMOCIONAL },
-        status: StatusPagamento.PENDENTE,
-      });
-      expect(satisfeito).toBe(true);
+  describe('registrarIntencaoPagamento', () => {
+    it('deve lançar erro para valor inválido', async () => {
+      await expect(servico.registrarIntencaoPagamento(-1)).rejects.toThrow(
+        'Valor total da intenção de pagamento deve ser positivo',
+      );
+      await expect(servico.registrarIntencaoPagamento(0)).rejects.toThrow(
+        'Valor total da intenção de pagamento deve ser positivo',
+      );
     });
 
-    it('deve considerar PIX satisfeito apenas se APROVADO', () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const satisfeito = (servico as any).pagamentoSatisfeitoParaVenda({
-        formaPagamento: { getTipo: () => TipoPagamento.PIX },
-        status: StatusPagamento.APROVADO,
-      });
-      expect(satisfeito).toBe(true);
+    it('deve registrar intenção com sucesso', async () => {
+      const resultadoMock = { idIntencao: '123', segredoConfirmacao: 'secret' };
+      (provedorPagamentoMock.registrarIntencaoPagamento as jest.Mock).mockResolvedValue(resultadoMock);
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const pendente = (servico as any).pagamentoSatisfeitoParaVenda({
-        formaPagamento: { getTipo: () => TipoPagamento.PIX },
-        status: StatusPagamento.PENDENTE,
-      });
-      expect(pendente).toBe(false);
+      const resultado = await servico.registrarIntencaoPagamento(100);
+      expect(resultado).toEqual(resultadoMock);
+      expect(provedorPagamentoMock.registrarIntencaoPagamento).toHaveBeenCalledWith(100);
     });
   });
 
-  describe('validarRegrasNegocio (Privado)', () => {
-    it('deve exigir valor mínimo de R$ 10,00 para PIX', async () => {
-      const formaPix = {
-        isPix: () => true,
-        isCupomPromocional: () => false,
-        isCupomTroca: () => false,
-        getDetalhes: () => '',
-      };
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await expect((servico as any).validarRegrasNegocio(formaPix, 10)).resolves.not.toThrow();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      await expect((servico as any).validarRegrasNegocio(formaPix, 9.99)).rejects.toThrow(
-        'Valor mínimo por linha PIX é R$ 10,00',
+  describe('vincularIntencaoVenda', () => {
+    it('deve lançar erro para identificadores vazios', async () => {
+      await expect(servico.vincularIntencaoVenda('', 'uuid')).rejects.toThrow(
+        'Identificadores da intenção e da venda são obrigatórios',
       );
+      await expect(servico.vincularIntencaoVenda('inp', '')).rejects.toThrow(
+        'Identificadores da intenção e da venda são obrigatórios',
+      );
+    });
+
+    it('deve lançar erro quando venda não encontrada', async () => {
+      (repositorioPagamentosMock.obterVenIdPorVendaUuid as jest.Mock).mockResolvedValue(null);
+
+      await expect(servico.vincularIntencaoVenda('inp', 'uuid')).rejects.toThrow('Venda não encontrada');
+    });
+
+    it('deve vincular com sucesso', async () => {
+      (repositorioPagamentosMock.obterVenIdPorVendaUuid as jest.Mock).mockResolvedValue(1);
+      (repositorioIntencaoMock.vincularVenda as jest.Mock).mockResolvedValue(true);
+
+      await expect(servico.vincularIntencaoVenda('inp', 'uuid')).resolves.not.toThrow();
+      expect(repositorioIntencaoMock.vincularVenda).toHaveBeenCalledWith('inp', 1);
+    });
+  });
+
+  describe('consultarPagamento', () => {
+    it('deve lançar erro quando pagamento não encontrado', async () => {
+      (repositorioPagamentosMock.obterPorUuid as jest.Mock).mockResolvedValue(null);
+
+      await expect(servico.consultarPagamento('uuid')).rejects.toThrow('Pagamento não encontrado');
+    });
+
+    it('deve retornar pagamento encontrado', async () => {
+      const pagamentoMock = { id: '123', valor: 100 };
+      (repositorioPagamentosMock.obterPorUuid as jest.Mock).mockResolvedValue(pagamentoMock as any);
+
+      const resultado = await servico.consultarPagamento('uuid');
+      expect(resultado).toEqual(pagamentoMock);
     });
   });
 });

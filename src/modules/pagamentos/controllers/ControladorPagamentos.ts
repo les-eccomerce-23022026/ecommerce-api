@@ -2,11 +2,11 @@ import { Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import type { ServicoFrete } from '@/modules/frete/ServicoFrete';
 import type { GestaoIdentidadeCliente } from '@/modules/clientes/clientes.service';
-import { executarObterPagamentoInfo } from '@/modules/pagamentos/controlador-pagamentos-obter-info.handler';
-import { IPagamentoInputDto, IPagamentoOutputDto } from './IPagamento.dto';
-import { ServicoPagamentos } from './ServicoPagamentos';
-import type { IRepositorioPagamentos } from './IRepositorioPagamentos';
-import { PagamentosHelper } from './pagamentos.helper';
+import { executarObterPagamentoInfo } from '@/modules/pagamentos/handlers/controladorPagamentosObterInfo.handler';
+import { IPagamentoInputDto, IPagamentoOutputDto } from '../entities/IPagamento.dto';
+import { ServicoPagamentos } from '../services/ServicoPagamentos';
+import type { IRepositorioPagamentos } from '../repositories/IRepositorioPagamentos';
+import { PagamentosHelper } from '../utils/pagamentos.helper';
 
 export class ControladorPagamentos {
   constructor(

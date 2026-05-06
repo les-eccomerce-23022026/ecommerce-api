@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { ServicoVendas } from '@/modules/vendas/services/ServicoVendas';
 import { PAPEL_ADMIN } from '@/shared/types/papeis';
-import type { IRepositorioPagamentos } from '@/modules/pagamentos/IRepositorioPagamentos';
+import type { IRepositorioPagamentos } from '@/modules/pagamentos/repositories/IRepositorioPagamentos';
 
 /**
  * Controlador para requisições de vendas.

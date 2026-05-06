@@ -6,7 +6,7 @@ import { ControladorVendas } from '@/modules/vendas/controllers/ControladorVenda
 import { ServicoVendas } from '@/modules/vendas/services/ServicoVendas';
 import { RepositorioVendasPostgres } from '@/modules/vendas/repositories/RepositorioVendasPostgres';
 import { RepositorioCotacaoFretePostgres } from '@/modules/frete/cotacaoFrete/RepositorioCotacaoFretePostgres';
-import { RepositorioPagamentosPostgres } from '@/modules/pagamentos/RepositorioPagamentosPostgres';
+import { RepositorioPagamentosPostgres } from '@/modules/pagamentos/repositories/RepositorioPagamentosPostgres';
 
 /**
  * Registra rotas de vendas no roteador.

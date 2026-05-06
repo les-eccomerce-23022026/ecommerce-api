@@ -5,7 +5,7 @@ import { registrarRotasAutenticacao } from '@/modules/auth/auth.routes';
 import { registrarRotasClientes } from '@/modules/clientes/clientes.routes';
 import { registrarRotasCartoes } from '@/modules/cartoes/cartoes.routes';
 import { registrarRotasEntrega } from '@/modules/entrega/entrega.routes';
-import { registrarRotasPagamentos } from '@/modules/pagamentos/pagamentos.routes';
+import { registrarRotasPagamentos } from '@/modules/pagamentos/controllers/pagamentos.routes';
 import { registrarRotasAdmin } from '@/modules/admin/admin.routes';
 import { registrarRotasVendas } from '@/modules/vendas/vendas.routes';
 import { registrarRotasLivros } from '@/modules/livros/livros.routes';

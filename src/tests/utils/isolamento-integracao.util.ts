@@ -21,6 +21,12 @@ export async function iniciarEscopoIsolamentoIntegracao(
   const db = FabricaConexaoBanco.obterConexao();
   await db.iniciarTransacao();
 
+  // Garante que o status 'FALHA NA ENTREGA' exista para testes de Sprint 3
+  await db.executar(`
+    INSERT INTO status_vendas (stv_descricao) VALUES ('FALHA NA ENTREGA')
+    ON CONFLICT (stv_descricao) DO NOTHING
+  `);
+
   return {
     db,
     finalizar: async () => {

@@ -4,8 +4,8 @@ import {
   percentualCrescimento,
   indicesUltimosMeses,
   inicioFimMes,
-} from '@/modules/admin/servico-dashboard-admin-helpers';
-import { DashboardAdminConsultas } from '@/modules/admin/servico-dashboard-admin-consultas';
+} from '@/modules/admin/servicoDashboardAdminHelpers';
+import { DashboardAdminConsultas } from '@/modules/admin/servicoDashboardAdminConsultas';
 
 export type IDashboardAdminJson = Record<string, unknown>;
 
