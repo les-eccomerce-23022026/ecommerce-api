@@ -1,6 +1,8 @@
 import { IConexaoBanco, DbParametro } from '@/shared/infrastructure/database/IConexaoBanco';
 import { IRepositorioVendas, IVenda, IItemVenda } from '@/modules/vendas/repositories/IRepositorioVendas';
+/* eslint-disable max-lines */
 import { IVendaInputDto } from '@/modules/vendas/dtos/IVenda.dto';
+import { STATUS_VENDAS } from '@/modules/vendas/constants/statusVendas.constant';
 
 /**
  * Implementação do repositório de vendas para PostgreSQL.
@@ -23,8 +25,12 @@ export class RepositorioVendasPostgres implements IRepositorioVendas {
     const usuId = usuRes[0].usu_id;
 
     // 2. Obter ID do status 'EM PROCESSAMENTO'
-    const statusQuery = "SELECT stv_id FROM status_vendas WHERE stv_descricao = 'EM PROCESSAMENTO'";
-    const statusRes = await this.db.executar<{ stv_id: number }>(statusQuery);
+    const statusQuery = 'SELECT stv_id FROM status_vendas WHERE stv_descricao = $1';
+    const statusRes = await this.db.executar<{ stv_id: number }>(statusQuery, [STATUS_VENDAS.EM_PROCESSAMENTO]);
+    
+    if (statusRes.length === 0) {
+      throw new Error('Status EM PROCESSAMENTO não encontrado');
+    }
     const statusId = statusRes[0].stv_id;
 
     // 3. Inserir a Venda
@@ -67,7 +73,7 @@ export class RepositorioVendasPostgres implements IRepositorioVendas {
       venda: {
         id: vendaRow.ven_uuid as string,
         usuarioUuid: dados.usuarioUuid,
-        status: 'EM PROCESSAMENTO',
+        status: STATUS_VENDAS.EM_PROCESSAMENTO,
         totalItens: Number(dados.valorTotalItens),
         frete: Number(dados.valorFrete),
         totalVenda: Number(dados.valorTotal),
@@ -80,35 +86,40 @@ export class RepositorioVendasPostgres implements IRepositorioVendas {
 
   public async obterPorUuid(uuid: string): Promise<IVenda | null> {
     const query = `
-      SELECT v.ven_uuid, v.ven_total_itens, v.ven_frete, v.ven_total_venda,
-             v.ven_criado_em, v.ven_data_hora_entrega, s.stv_descricao as status,
-             u.usu_uuid as "usuarioUuid", v.ven_motivo_troca as "motivoTroca"
+      SELECT 
+        v.ven_uuid, v.ven_total_itens, v.ven_frete, v.ven_total_venda,
+        v.ven_criado_em, v.ven_data_hora_entrega, s.stv_descricao as status,
+        u.usu_uuid as "usuarioUuid", v.ven_motivo_troca as "motivoTroca",
+        i.itv_uuid as id, i.liv_uuid as "livroUuid", i.itv_quantidade as quantidade,
+        i.itv_preco_unitario as "precoUnitario", i.itv_em_troca as "emTroca"
       FROM vendas v
       JOIN status_vendas s ON v.stv_id = s.stv_id
       JOIN usuarios u ON v.usu_id = u.usu_id
+      LEFT JOIN itens_venda i ON v.ven_id = i.ven_id
       WHERE v.ven_uuid = $1
     `;
     const rows = await this.db.executar<{
       ven_uuid: string; ven_total_itens: number; ven_frete: number;
       ven_total_venda: number; ven_criado_em: string; ven_data_hora_entrega: string | null;
       status: string; usuarioUuid: string; motivoTroca: string | null;
+      id: string | null; livroUuid: string | null; quantidade: number | null;
+      precoUnitario: number | null; emTroca: boolean | null;
     }>(query, [uuid]);
 
     if (rows.length === 0) return null;
 
     const v = rows[0];
 
-    // Buscar itens
-    const itensQuery = `
-      SELECT itv_uuid as id, liv_uuid as "livroUuid", itv_quantidade as quantidade,
-             itv_preco_unitario as "precoUnitario", itv_em_troca as "emTroca"
-      FROM itens_venda
-      WHERE ven_id = (SELECT ven_id FROM vendas WHERE ven_uuid = $1)
-    `;
-    const itensRows = await this.db.executar<{
-      id: string; livroUuid: string; quantidade: number;
-      precoUnitario: number; emTroca: boolean;
-    }>(itensQuery, [uuid]);
+    // Agrupar itens (se houver múltiplas linhas devido ao LEFT JOIN)
+    const itens = rows
+      .filter((row) => row.id !== null)
+      .map((i) => ({
+        id: i.id!,
+        livroUuid: i.livroUuid!,
+        quantidade: Number(i.quantidade),
+        precoUnitario: Number(i.precoUnitario),
+        emTroca: i.emTroca!,
+      }));
 
     return {
       id: v.ven_uuid,
@@ -120,13 +131,7 @@ export class RepositorioVendasPostgres implements IRepositorioVendas {
       criadoEm: new Date(v.ven_criado_em),
       dataHoraEntrega: v.ven_data_hora_entrega ? new Date(v.ven_data_hora_entrega) : undefined,
       motivoTroca: v.motivoTroca || undefined,
-      itens: itensRows.map((i) => ({
-        id: i.id,
-        livroUuid: i.livroUuid,
-        quantidade: Number(i.quantidade),
-        precoUnitario: Number(i.precoUnitario),
-        emTroca: i.emTroca,
-      })),
+      itens,
     };
   }
 
@@ -134,11 +139,11 @@ export class RepositorioVendasPostgres implements IRepositorioVendas {
     const queryUpdateVenda = `
       UPDATE vendas 
       SET ven_motivo_troca = $1, 
-          stv_id = (SELECT stv_id FROM status_vendas WHERE stv_descricao = 'EM TROCA'),
+          stv_id = (SELECT stv_id FROM status_vendas WHERE stv_descricao = $2),
           ven_atualizado_em = NOW()
-      WHERE ven_uuid = $2
+      WHERE ven_uuid = $3
     `;
-    await this.db.executar(queryUpdateVenda, [motivo, vendaUuid]);
+    await this.db.executar(queryUpdateVenda, [motivo, STATUS_VENDAS.EM_TROCA, vendaUuid]);
 
     if (itensUuids.length > 0) {
       const queryUpdateItens = `
@@ -151,23 +156,121 @@ export class RepositorioVendasPostgres implements IRepositorioVendas {
   }
 
   public async listarPorUsuario(usuarioUuid: string): Promise<IVenda[]> {
-    const queryIds = 'SELECT ven_uuid FROM vendas v JOIN usuarios u ON v.usu_id = u.usu_id WHERE u.usu_uuid = $1 ORDER BY v.ven_criado_em DESC';
-    const rows = await this.db.executar<{ ven_uuid: string }>(queryIds, [usuarioUuid]);
+    const query = `
+      SELECT 
+        v.ven_uuid, v.ven_total_itens, v.ven_frete, v.ven_total_venda,
+        v.ven_criado_em, v.ven_data_hora_entrega, s.stv_descricao as status,
+        u.usu_uuid as "usuarioUuid", v.ven_motivo_troca as "motivoTroca",
+        i.itv_uuid as "itv_id", i.liv_uuid as "itv_livroUuid", 
+        i.itv_quantidade as "itv_quantidade", i.itv_preco_unitario as "itv_precoUnitario",
+        i.itv_em_troca as "itv_emTroca"
+      FROM vendas v
+      JOIN status_vendas s ON v.stv_id = s.stv_id
+      JOIN usuarios u ON v.usu_id = u.usu_id
+      LEFT JOIN itens_venda i ON v.ven_id = i.ven_id
+      WHERE u.usu_uuid = $1
+      ORDER BY v.ven_criado_em DESC
+    `;
+    const rows = await this.db.executar<{
+      ven_uuid: string; ven_total_itens: number; ven_frete: number;
+      ven_total_venda: number; ven_criado_em: string; ven_data_hora_entrega: string | null;
+      status: string; usuarioUuid: string; motivoTroca: string | null;
+      itv_id: string | null; itv_livroUuid: string | null;
+      itv_quantidade: number | null; itv_precoUnitario: number | null; itv_emTroca: boolean | null;
+    }>(query, [usuarioUuid]);
 
-    const vendas = await Promise.all(rows.map((r) => this.obterPorUuid(r.ven_uuid)));
-    return vendas.filter((v) => v !== null) as IVenda[];
+    // Agrupar itens por venda
+    const mapaVendas = new Map<string, IVenda>();
+    
+    rows.forEach((row) => {
+      if (!mapaVendas.has(row.ven_uuid)) {
+        mapaVendas.set(row.ven_uuid, {
+          id: row.ven_uuid,
+          usuarioUuid: row.usuarioUuid,
+          status: row.status,
+          totalItens: Number(row.ven_total_itens),
+          frete: Number(row.ven_frete),
+          totalVenda: Number(row.ven_total_venda),
+          criadoEm: new Date(row.ven_criado_em),
+          dataHoraEntrega: row.ven_data_hora_entrega ? new Date(row.ven_data_hora_entrega) : undefined,
+          motivoTroca: row.motivoTroca || undefined,
+          itens: [],
+        });
+      }
+
+      // Adicionar item se existir
+      if (row.itv_id) {
+        const venda = mapaVendas.get(row.ven_uuid)!;
+        venda.itens.push({
+          id: row.itv_id,
+          livroUuid: row.itv_livroUuid!,
+          quantidade: Number(row.itv_quantidade),
+          precoUnitario: Number(row.itv_precoUnitario),
+          emTroca: row.itv_emTroca!,
+        });
+      }
+    });
+
+    return Array.from(mapaVendas.values());
   }
 
   public async listarTodas(limite = 500): Promise<IVenda[]> {
-    const queryIds = `
-      SELECT ven_uuid
-      FROM vendas
-      ORDER BY ven_criado_em DESC
+    const query = `
+      SELECT 
+        v.ven_uuid, v.ven_total_itens, v.ven_frete, v.ven_total_venda,
+        v.ven_criado_em, v.ven_data_hora_entrega, s.stv_descricao as status,
+        u.usu_uuid as "usuarioUuid", v.ven_motivo_troca as "motivoTroca",
+        i.itv_uuid as "itv_id", i.liv_uuid as "itv_livroUuid", 
+        i.itv_quantidade as "itv_quantidade", i.itv_preco_unitario as "itv_precoUnitario",
+        i.itv_em_troca as "itv_emTroca"
+      FROM vendas v
+      JOIN status_vendas s ON v.stv_id = s.stv_id
+      JOIN usuarios u ON v.usu_id = u.usu_id
+      LEFT JOIN itens_venda i ON v.ven_id = i.ven_id
+      ORDER BY v.ven_criado_em DESC
       LIMIT $1
     `;
-    const rows = await this.db.executar<{ ven_uuid: string }>(queryIds, [limite]);
-    const vendas = await Promise.all(rows.map((r) => this.obterPorUuid(r.ven_uuid)));
-    return vendas.filter((v) => v !== null) as IVenda[];
+    const rows = await this.db.executar<{
+      ven_uuid: string; ven_total_itens: number; ven_frete: number;
+      ven_total_venda: number; ven_criado_em: string; ven_data_hora_entrega: string | null;
+      status: string; usuarioUuid: string; motivoTroca: string | null;
+      itv_id: string | null; itv_livroUuid: string | null;
+      itv_quantidade: number | null; itv_precoUnitario: number | null; itv_emTroca: boolean | null;
+    }>(query, [limite]);
+
+    // Agrupar itens por venda
+    const mapaVendas = new Map<string, IVenda>();
+    
+    rows.forEach((row) => {
+      if (!mapaVendas.has(row.ven_uuid)) {
+        mapaVendas.set(row.ven_uuid, {
+          id: row.ven_uuid,
+          usuarioUuid: row.usuarioUuid,
+          status: row.status,
+          totalItens: Number(row.ven_total_itens),
+          frete: Number(row.ven_frete),
+          totalVenda: Number(row.ven_total_venda),
+          criadoEm: new Date(row.ven_criado_em),
+          dataHoraEntrega: row.ven_data_hora_entrega ? new Date(row.ven_data_hora_entrega) : undefined,
+          motivoTroca: row.motivoTroca || undefined,
+          itens: [],
+        });
+      }
+
+      // Adicionar item se existir
+      if (row.itv_id) {
+        const venda = mapaVendas.get(row.ven_uuid)!;
+        venda.itens.push({
+          id: row.itv_id,
+          livroUuid: row.itv_livroUuid!,
+          quantidade: Number(row.itv_quantidade),
+          precoUnitario: Number(row.itv_precoUnitario),
+          emTroca: row.itv_emTroca!,
+        });
+      }
+    });
+
+    return Array.from(mapaVendas.values());
   }
 
   public async atualizarStatus(vendaUuid: string, novoStatus: string): Promise<void> {
@@ -180,7 +283,7 @@ export class RepositorioVendasPostgres implements IRepositorioVendas {
 
     // Registra data/hora de entrega ao confirmar recebimento (RN0043: prazo de 7 dias para troca).
     const queryUpdate =
-      novoStatus === 'ENTREGUE'
+      novoStatus === STATUS_VENDAS.ENTREGUE
         ? 'UPDATE vendas SET stv_id = $1, ven_atualizado_em = NOW(), ven_data_hora_entrega = NOW() WHERE ven_uuid = $2'
         : 'UPDATE vendas SET stv_id = $1, ven_atualizado_em = NOW() WHERE ven_uuid = $2';
 

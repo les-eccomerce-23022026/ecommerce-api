@@ -20,17 +20,25 @@ export interface IConexaoBanco {
   executar<T = unknown>(sql: string, parametros?: DbParametro[], opcoes?: { searchPath?: string }): Promise<T[]>;
 
   /**
-   * Inicia uma transação.
+   * Executa um bloco de código dentro de uma transação.
+   * Se a função lançar erro, a transação é revertida automaticamente.
+   * @param callback Função que recebe o cliente da transação e executa as operações
+   * @returns Resultado do callback
+   */
+  transacao<T>(callback: (cliente: IConexaoBanco) => Promise<T>): Promise<T>;
+
+  /**
+   * Inicia uma transação manualmente.
    */
   iniciarTransacao(): Promise<void>;
 
   /**
-   * Confirma uma transação.
+   * Confirma uma transação manual.
    */
   confirmarTransacao(): Promise<void>;
 
   /**
-   * Reverte uma transação.
+   * Reverte uma transação manual.
    */
   reverterTransacao(): Promise<void>;
 

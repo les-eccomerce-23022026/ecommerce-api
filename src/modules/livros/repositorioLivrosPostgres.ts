@@ -1,4 +1,3 @@
-import { IConexaoBanco, DbParametro } from '@/shared/infrastructure/database/IConexaoBanco';
 import type { ILivroCatalogoDto } from '@/modules/livros/ILivroCatalogo.dto';
 import type {
   ICategoriaMenuDto,
@@ -6,6 +5,7 @@ import type {
   OrdenacaoCatalogo,
 } from '@/modules/livros/ICatalogoLivros.dto';
 import { montarPartesSqlCatalogo } from '@/modules/livros/repositorioLivrosCatalogoSql';
+import type { IConexaoBanco, DbParametro } from '../../shared/infrastructure/database/IConexaoBanco';
 
 type RowLivro = {
   liv_uuid: string;
@@ -14,8 +14,8 @@ type RowLivro = {
   liv_sinopse: string | null;
   liv_imagem_url: string | null;
   aut_nome: string;
-  etq_preco_venda: string;
-  etq_quantidade_disponivel: string;
+  etq_preco_venda: number;
+  etq_quantidade_disponivel: number;
   liv_ativo: boolean;
 };
 
@@ -24,10 +24,10 @@ function mapRow(r: RowLivro): ILivroCatalogoDto {
     uuid: r.liv_uuid,
     titulo: r.liv_titulo,
     autor: r.aut_nome,
-    preco: Number(r.etq_preco_venda),
+    preco: r.etq_preco_venda,
     imagem: r.liv_imagem_url ?? undefined,
     isbn: r.liv_isbn,
-    estoque: Number(r.etq_quantidade_disponivel),
+    estoque: r.etq_quantidade_disponivel,
     sinopse: r.liv_sinopse ?? undefined,
     status: r.liv_ativo ? 'Ativo' : 'Inativo',
     estrelas: 5,
@@ -86,8 +86,8 @@ export class RepositorioLivrosPostgres {
         l.liv_sinopse,
         l.liv_imagem_url,
         a.aut_nome,
-        e.etq_preco_venda::text,
-        e.etq_quantidade_disponivel::text,
+        e.etq_preco_venda,
+        e.etq_quantidade_disponivel,
         l.liv_ativo
       FROM livros l
       INNER JOIN autores a ON l.aut_id = a.aut_id
@@ -118,8 +118,8 @@ export class RepositorioLivrosPostgres {
         l.liv_sinopse,
         l.liv_imagem_url,
         a.aut_nome,
-        e.etq_preco_venda::text,
-        e.etq_quantidade_disponivel::text,
+        e.etq_preco_venda,
+        e.etq_quantidade_disponivel,
         l.liv_ativo
       FROM livros l
       INNER JOIN autores a ON l.aut_id = a.aut_id
@@ -140,8 +140,8 @@ export class RepositorioLivrosPostgres {
         l.liv_sinopse,
         l.liv_imagem_url,
         a.aut_nome,
-        e.etq_preco_venda::text,
-        e.etq_quantidade_disponivel::text,
+        e.etq_preco_venda,
+        e.etq_quantidade_disponivel,
         l.liv_ativo
       FROM livros l
       INNER JOIN autores a ON l.aut_id = a.aut_id
@@ -155,11 +155,11 @@ export class RepositorioLivrosPostgres {
   }
 
   async obterEstoqueDisponivelPorLivId(livId: number): Promise<number | null> {
-    const rows = await this.db.executar<{ q: string }>(
-      `SELECT etq_quantidade_disponivel::text AS q FROM estoques WHERE liv_id = $1 AND etq_ativo = TRUE LIMIT 1`,
+    const rows = await this.db.executar<{ etq_quantidade_disponivel: number }>(
+      `SELECT etq_quantidade_disponivel FROM estoques WHERE liv_id = $1 AND etq_ativo = TRUE ORDER BY etq_id LIMIT 1`,
       [livId] as DbParametro[],
     );
-    return rows.length ? Number(rows[0].q) : null;
+    return rows.length ? rows[0].etq_quantidade_disponivel : null;
   }
 
   async obterLivIdPorUuid(livUuid: string): Promise<number | null> {

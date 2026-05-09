@@ -1,6 +1,7 @@
 import { IConexaoBanco, DbParametro } from '@/shared/infrastructure/database/IConexaoBanco';
 import { IRepositorioPagamentos, IPagamento } from './IRepositorioPagamentos';
 import { FormaPagamento, TipoPagamento } from '../entities/FormaPagamento';
+/* eslint-disable max-lines */
 import { CartaoCredito } from '../entities/CartaoCredito';
 import { StatusPagamento } from '../entities/IPagamento';
 
@@ -144,11 +145,51 @@ export class RepositorioPagamentosPostgres implements IRepositorioPagamentos {
   }
 
   public async listarPorVenda(vendaUuid: string): Promise<IPagamento[]> {
-    const query = 'SELECT p.pag_uuid FROM pagamento p JOIN vendas v ON p.ven_id = v.ven_id WHERE v.ven_uuid = $1 ORDER BY p.pag_criado_em ASC';
-    const rows = await this.db.executar<{ pag_uuid: string }>(query, [vendaUuid]);
+    const query = `
+      SELECT 
+        p.pag_uuid, p.pag_valor, p.pag_detalhes_cupom, p.pag_criado_em, p.pag_processado_em,
+        tp.tpg_descricao, sp.stp_descricao, v.ven_uuid,
+        c.cpp_numero_tokenizado, c.cpp_nome_titular, c.cpp_validade, c.cpp_bandeira
+      FROM pagamento p
+      JOIN tipo_pagamento tp ON p.tpg_id = tp.tpg_id
+      JOIN status_pagamento sp ON p.stp_id = sp.stp_id
+      JOIN vendas v ON p.ven_id = v.ven_id
+      LEFT JOIN cartao_pagamento c ON p.pag_id = c.pag_id
+      WHERE v.ven_uuid = $1
+      ORDER BY p.pag_criado_em ASC
+    `;
+    const rows = await this.db.executar<{
+      pag_uuid: string; pag_valor: number; pag_detalhes_cupom: string | null;
+      pag_criado_em: string; pag_processado_em: string | null;
+      tpg_descricao: string; stp_descricao: string; ven_uuid: string;
+      cpp_numero_tokenizado: string | null; cpp_nome_titular: string | null;
+      cpp_validade: string | null; cpp_bandeira: string | null;
+    }>(query, [vendaUuid]);
 
-    const pagamentos = await Promise.all(rows.map(r => this.obterPorUuid(r.pag_uuid)));
-    return pagamentos.filter((p: IPagamento | null): p is IPagamento => p !== null);
+    return rows.map((r) => {
+      const formaPagamento = new FormaPagamento(r.tpg_descricao as TipoPagamento, r.pag_detalhes_cupom || undefined);
+
+      let cartao: CartaoCredito | undefined;
+      if (r.cpp_numero_tokenizado) {
+        cartao = CartaoCredito.reconstituir(
+          r.cpp_numero_tokenizado,
+          r.cpp_nome_titular ?? '',
+          r.cpp_validade ?? '',
+          r.cpp_bandeira ?? ''
+        );
+      }
+
+      return {
+        id: r.pag_uuid,
+        vendaUuid: r.ven_uuid,
+        valor: Number(r.pag_valor),
+        formaPagamento,
+        cartao,
+        status: r.stp_descricao as StatusPagamento,
+        criadoEm: new Date(r.pag_criado_em),
+        processadoEm: r.pag_processado_em ? new Date(r.pag_processado_em) : undefined
+      };
+    });
   }
 
   public async inserirPixSimulado(

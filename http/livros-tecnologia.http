@@ -1,0 +1,333 @@
+# Livros Mais Vendidos de Tecnologia 2024-2025
+# Fonte: Forbes - 10 Must-Read Tech Books Of 2024
+# https://www.forbes.com/sites/peterhigh/2025/01/02/top-10-tech-books-of-2024/
+
+# Pré-requisitos:
+# 1. Os autores, editoras e categorias já devem existir no banco de dados
+# 2. É necessário estar autenticado como admin
+# 3. Obter token de autenticação do cookie ou header
+
+@baseUrl = http://localhost:3000/api
+@token = {{cookie}}
+
+### 1. Co-Intelligence: Living and Working with AI
+### por Ethan Mollick
+POST {{baseUrl}}/admin/livros
+Cookie: {{token}}
+Content-Type: application/json
+
+{
+  "uuid": "tech-001-co-intelligence",
+  "titulo": "Co-Intelligence: Living and Working with AI",
+  "isbn": "978-0593716423",
+  "sinopse": "Wharton professor Ethan Mollick provides guidance to help individuals thrive in the age of AI. He examines how to effectively partner with AI as a co-worker, co-teacher and coach while offering practical insights for preserving human identity and creating positive outcomes in this new era of human-AI collaboration.",
+  "imagemUrl": "https://m.media-amazon.com/images/I/81QkZJvFQ4L._SY466_.jpg",
+  "autorNome": "Ethan Mollick",
+  "editoraNome": "Portfolio",
+  "grupoPrecificacaoNome": "Técnico",
+  "categoriaNome": "Tecnologia",
+  "ano": 2024,
+  "edicao": "1ª edição",
+  "numeroPaginas": 320,
+  "altura": 23.00,
+  "largura": 15.50,
+  "peso": 0.520,
+  "profundidade": 3.00,
+  "codigoBarras": "9780593716423",
+  "quantidadeEstoque": 15,
+  "precoVenda": 89.90,
+  "valorCusto": 53.94
+}
+
+### 2. Supremacy: AI, ChatGPT, and the Race that Will Change the World
+### por Parmy Olson
+POST {{baseUrl}}/admin/livros
+Cookie: {{token}}
+Content-Type: application/json
+
+{
+  "uuid": "tech-002-supremacy",
+  "titulo": "Supremacy: AI, ChatGPT, and the Race that Will Change the World",
+  "isbn": "978-0316546315",
+  "sinopse": "Financial Times and Schroders Business Book of the Year Award winner. Bloomberg technology writer Parmy Olson provides an insider's look at the high-stakes competition between OpenAI and DeepMind, revealing the complex dynamics shaping AI's future through exclusive access to industry sources.",
+  "imagemUrl": "https://m.media-amazon.com/images/I/71hQvKz6QjL._SY466_.jpg",
+  "autorNome": "Parmy Olson",
+  "editoraNome": "St. Martin's Press",
+  "grupoPrecificacaoNome": "Técnico",
+  "categoriaNome": "Tecnologia",
+  "ano": 2024,
+  "edicao": "1ª edição",
+  "numeroPaginas": 384,
+  "altura": 23.50,
+  "largura": 16.00,
+  "peso": 0.680,
+  "profundidade": 3.50,
+  "codigoBarras": "9780316546315",
+  "quantidadeEstoque": 12,
+  "precoVenda": 94.90,
+  "valorCusto": 56.94
+}
+
+### 3. Nexus: A Brief History of Information Networks from the Stone Age to AI
+### por Yuval Noah Harari
+POST {{baseUrl}}/admin/livros
+Cookie: {{token}}
+Content-Type: application/json
+
+{
+  "uuid": "tech-003-nexus",
+  "titulo": "Nexus: A Brief History of Information Networks from the Stone Age to AI",
+  "isbn": "978-0593714214",
+  "sinopse": "Nexus examines humanity's fraught relationship with information, tracing its influence from the Stone Age to the modern era of AI. Through historical milestones like religious canonization, witch-hunts and totalitarian regimes, Harari unpacks how societies have wielded information as both a tool for progress and a weapon of control.",
+  "imagemUrl": "https://m.media-amazon.com/images/I/81JjYkLJ3ML._SY466_.jpg",
+  "autorNome": "Yuval Noah Harari",
+  "editoraNome": "Random House",
+  "grupoPrecificacaoNome": "Varejo",
+  "categoriaNome": "Tecnologia",
+  "ano": 2024,
+  "edicao": "1ª edição",
+  "numeroPaginas": 544,
+  "altura": 24.00,
+  "largura": 16.50,
+  "peso": 0.920,
+  "profundidade": 4.50,
+  "codigoBarras": "9780593714214",
+  "quantidadeEstoque": 20,
+  "precoVenda": 99.90,
+  "valorCusto": 59.94
+}
+
+### 4. The Corporate Life Cycle: Business, Investment, and Management Implications
+### por Aswath Damodaran
+POST {{baseUrl}}/admin/livros
+Cookie: {{token}}
+Content-Type: application/json
+
+{
+  "uuid": "tech-004-corporate-lifecycle",
+  "titulo": "The Corporate Life Cycle: Business, Investment, and Management Implications",
+  "isbn": "978-1119980467",
+  "sinopse": "NYU professor and valuation expert Aswath Damodaran presents a universal framework for understanding how companies evolve through different stages of the corporate lifecycle. His work helps readers recognize crucial transition points in corporate finance and adjust their strategies accordingly.",
+  "imagemUrl": "https://m.media-amazon.com/images/I/71yN8Q9gD3L._SY466_.jpg",
+  "autorNome": "Aswath Damodaran",
+  "editoraNome": "Wiley",
+  "grupoPrecificacaoNome": "Negócios",
+  "categoriaNome": "Negócios",
+  "ano": 2024,
+  "edicao": "1ª edição",
+  "numeroPaginas": 432,
+  "altura": 23.50,
+  "largura": 16.00,
+  "peso": 0.760,
+  "profundidade": 3.80,
+  "codigoBarras": "9781119980467",
+  "quantidadeEstoque": 10,
+  "precoVenda": 109.90,
+  "valorCusto": 65.94
+}
+
+### 5. Burn Book: A Tech Love Story
+### por Kara Swisher
+POST {{baseUrl}}/admin/livros
+Cookie: {{token}}
+Content-Type: application/json
+
+{
+  "uuid": "tech-005-burn-book",
+  "titulo": "Burn Book: A Tech Love Story",
+  "isbn": "978-1250278576",
+  "sinopse": "Veteran tech journalist Kara Swisher delivers an insider's chronicle of Silicon Valley's most influential figures. Drawing from three decades of interviews with leaders like Steve Jobs, Jeff Bezos and Mark Zuckerberg, she provides a candid look at how tech visionaries have both contributed to and hindered progress in the digital age.",
+  "imagemUrl": "https://m.media-amazon.com/images/I/81RkW2rVjWL._SY466_.jpg",
+  "autorNome": "Kara Swisher",
+  "editoraNome": "Flatiron Books",
+  "grupoPrecificacaoNome": "Varejo",
+  "categoriaNome": "Tecnologia",
+  "ano": 2024,
+  "edicao": "1ª edição",
+  "numeroPaginas": 368,
+  "altura": 23.50,
+  "largura": 16.00,
+  "peso": 0.620,
+  "profundidade": 3.20,
+  "codigoBarras": "9781250278576",
+  "quantidadeEstoque": 18,
+  "precoVenda": 79.90,
+  "valorCusto": 47.94
+}
+
+### 6. All Hands on Tech: The AI-Powered Citizen Revolution
+### por Tom Davenport e Ian Barkin
+POST {{baseUrl}}/admin/livros
+Cookie: {{token}}
+Content-Type: application/json
+
+{
+  "uuid": "tech-006-all-hands-on-tech",
+  "titulo": "All Hands on Tech: The AI-Powered Citizen Revolution",
+  "isbn": "978-1119984182",
+  "sinopse": "This book explores the transformative power of citizen developers—business domain experts leveraging democratized technology to drive innovation. Through compelling case studies, the authors reveal how empowering employees to create applications, automations and analytics enhances organizational agility and minimizes IT bottlenecks.",
+  "imagemUrl": "https://m.media-amazon.com/images/I/71T8vYrZpXL._SY466_.jpg",
+  "autorNome": "Tom Davenport",
+  "editoraNome": "Wiley",
+  "grupoPrecificacaoNome": "Técnico",
+  "categoriaNome": "Tecnologia",
+  "ano": 2024,
+  "edicao": "1ª edição",
+  "numeroPaginas": 288,
+  "altura": 23.50,
+  "largura": 16.00,
+  "peso": 0.520,
+  "profundidade": 2.80,
+  "codigoBarras": "9781119984182",
+  "quantidadeEstoque": 14,
+  "precoVenda": 84.90,
+  "valorCusto": 50.94
+}
+
+### 7. AI Snake Oil: What Artificial Intelligence Can Do, What It Can't, and How to Tell the Difference
+### por Arvind Narayanan e Sayash Kapoor
+POST {{baseUrl}}/admin/livros
+Cookie: {{token}}
+Content-Type: application/json
+
+{
+  "uuid": "tech-007-ai-snake-oil",
+  "titulo": "AI Snake Oil: What Artificial Intelligence Can Do, What It Can't, and How to Tell the Difference",
+  "isbn": "978-0691236811",
+  "sinopse": "Computer scientists Narayanan and Kapoor cut through AI hype and misinformation to provide a clear understanding of AI's true capabilities and limitations. They examine AI's impact across areas like education, medicine, hiring and criminal justice, helping readers understand potential risks and make informed decisions about AI adoption.",
+  "imagemUrl": "https://m.media-amazon.com/images/I/71pJZvZ5oNL._SY466_.jpg",
+  "autorNome": "Arvind Narayanan",
+  "editoraNome": "Princeton University Press",
+  "grupoPrecificacaoNome": "Técnico",
+  "categoriaNome": "Tecnologia",
+  "ano": 2024,
+  "edicao": "1ª edição",
+  "numeroPaginas": 352,
+  "altura": 23.50,
+  "largura": 15.50,
+  "peso": 0.580,
+  "profundidade": 3.00,
+  "codigoBarras": "9780691236811",
+  "quantidadeEstoque": 16,
+  "precoVenda": 89.90,
+  "valorCusto": 53.94
+}
+
+### 8. The Singularity Is Nearer: When We Merge with AI
+### por Ray Kurzweil
+POST {{baseUrl}}/admin/livros
+Cookie: {{token}}
+Content-Type: application/json
+
+{
+  "uuid": "tech-008-singularity-nearer",
+  "titulo": "The Singularity Is Nearer: When We Merge with AI",
+  "isbn": "978-0593714160",
+  "sinopse": "A renowned futurist, Kurzweil returns with a fresh perspective on technological advancement, examining his earlier predictions and exploring how exponential growth in AI and biotechnology will transform human life. He tackles controversial topics from job automation to life extension, offering both optimistic visions and consideration of potential perils.",
+  "imagemUrl": "https://m.media-amazon.com/images/I/81x7Y0KQD5L._SY466_.jpg",
+  "autorNome": "Ray Kurzweil",
+  "editoraNome": "Viking",
+  "grupoPrecificacaoNome": "Varejo",
+  "categoriaNome": "Tecnologia",
+  "ano": 2024,
+  "edicao": "1ª edição",
+  "numeroPaginas": 416,
+  "altura": 24.00,
+  "largura": 16.50,
+  "peso": 0.720,
+  "profundidade": 3.80,
+  "codigoBarras": "9780593714160",
+  "quantidadeEstoque": 13,
+  "precoVenda": 94.90,
+  "valorCusto": 56.94
+}
+
+### 9. The Nvidia Way: Jensen Huang and the Making of a Tech Giant
+### por Tae Kim
+POST {{baseUrl}}/admin/livros
+Cookie: {{token}}
+Content-Type: application/json
+
+{
+  "uuid": "tech-009-nvidia-way",
+  "titulo": "The Nvidia Way: Jensen Huang and the Making of a Tech Giant",
+  "isbn": "978-0593714252",
+  "sinopse": "This business history book reveals how Nvidia transformed from a gaming-focused startup to a powerhouse driving the AI revolution. Drawing from more than 100 interviews, including conversations with CEO Jensen Huang and his cofounders, Kim uncovers the company's unique culture and strategic decisions that enabled Nvidia to outmaneuver tech giants.",
+  "imagemUrl": "https://m.media-amazon.com/images/I/71W8rQ6pR7L._SY466_.jpg",
+  "autorNome": "Tae Kim",
+  "editoraNome": "Portfolio",
+  "grupoPrecificacaoNome": "Negócios",
+  "categoriaNome": "Tecnologia",
+  "ano": 2024,
+  "edicao": "1ª edição",
+  "numeroPaginas": 368,
+  "altura": 23.50,
+  "largura": 16.00,
+  "peso": 0.640,
+  "profundidade": 3.20,
+  "codigoBarras": "9780593714252",
+  "quantidadeEstoque": 11,
+  "precoVenda": 89.90,
+  "valorCusto": 53.94
+}
+
+### 10. The AI-Savvy Leader: Nine Ways to Take Back Control and Make AI Work
+### por David De Cremer
+POST {{baseUrl}}/admin/livros
+Cookie: {{token}}
+Content-Type: application/json
+
+{
+  "uuid": "tech-010-ai-savvy-leader",
+  "titulo": "The AI-Savvy Leader: Nine Ways to Take Back Control and Make AI Work",
+  "isbn": "978-1647825867",
+  "sinopse": "A compelling guide for leaders to take charge of AI transformation in their organizations. It highlights how many leaders have abdicated their roles, risking organizational failure in navigating the complexities of human-machine collaboration. Focusing on nine actionable steps rooted in core leadership skills, the book equips leaders to integrate AI responsibly and effectively.",
+  "imagemUrl": "https://m.media-amazon.com/images/I/71m3J0h8qWL._SY466_.jpg",
+  "autorNome": "David De Cremer",
+  "editoraNome": "Harvard Business Review Press",
+  "grupoPrecificacaoNome": "Negócios",
+  "categoriaNome": "Negócios",
+  "ano": 2024,
+  "edicao": "1ª edição",
+  "numeroPaginas": 272,
+  "altura": 21.00,
+  "largura": 14.00,
+  "peso": 0.440,
+  "profundidade": 2.50,
+  "codigoBarras": "9781647825867",
+  "quantidadeEstoque": 17,
+  "precoVenda": 79.90,
+  "valorCusto": 47.94
+}
+
+### SQL para inserir autores, editoras e categorias necessários
+### Execute este SQL no banco de dados antes de usar os comandos curl acima
+
+-- Inserir autores
+INSERT INTO autores (aut_nome, aut_descricao) VALUES
+('Ethan Mollick', 'Professor da Wharton e autor do newsletter One Useful Thing, especialista em IA e inovação.'),
+('Parmy Olson', 'Jornalista de tecnologia do Bloomberg, vencedora do Financial Times and Schroders Business Book of the Year Award.'),
+('Yuval Noah Harari', 'Historiador e autor best-seller, conhecido por obras como Sapiens e Homo Deus.'),
+('Aswath Damodaran', 'Professor da NYU e especialista em valuation, considerado o pai da avaliação moderna.'),
+('Kara Swisher', 'Veterana jornalista de tecnologia, cofundadora da Recode e All Things D.'),
+('Tom Davenport', 'Professor e autor especializado em analytics e inteligência artificial.'),
+('Arvind Narayanan', 'Cientista da computação e professor de Princeton, especialista em IA e privacidade.'),
+('Ray Kurzweil', 'Futurista e inventor, diretor de engenharia do Google, conhecido por suas previsões sobre IA.'),
+('Tae Kim', 'Jornalista de tecnologia e autor especializado em negócios de tecnologia.'),
+('David De Cremer', 'Professor e pesquisador especializado em liderança e transformação digital.')
+ON CONFLICT DO NOTHING;
+
+-- Inserir editoras
+INSERT INTO editoras (edi_nome, edi_cnpj) VALUES
+('Portfolio', '00.000.000/0001-06'),
+('St. Martin''s Press', '00.000.000/0001-07'),
+('Random House', '00.000.000/0001-08'),
+('Wiley', '00.000.000/0001-09'),
+('Flatiron Books', '00.000.000/0001-10'),
+('Princeton University Press', '00.000.000/0001-11'),
+('Viking', '00.000.000/0001-12'),
+('Harvard Business Review Press', '00.000.000/0001-13')
+ON CONFLICT DO NOTHING;
+
+-- Categoria Tecnologia já deve existir no seed
+-- Categoria Negócios já deve existir no seed

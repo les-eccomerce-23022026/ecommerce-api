@@ -123,6 +123,18 @@ export class ConexaoPostgres implements IConexaoBanco {
     return rows as T[];
   }
 
+  public async transacao<T>(callback: (cliente: IConexaoBanco) => Promise<T>): Promise<T> {
+    await this.iniciarTransacao();
+    try {
+      const resultado = await callback(this);
+      await this.confirmarTransacao();
+      return resultado;
+    } catch (erro) {
+      await this.reverterTransacao();
+      throw erro;
+    }
+  }
+
   public async iniciarTransacao(): Promise<void> {
     const transacaoExistente = obterTransacaoAtual();
     if (transacaoExistente) {

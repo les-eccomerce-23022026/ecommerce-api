@@ -42,14 +42,14 @@ export function registrarRotasAdmin(app: IRouter): void {
     controladorPainel.listarPedidosAdmin,
   );
 
-  app.put(
+  app.patch(
     '/admin/pedidos/:uuid/despachar',
     autenticacaoMiddleware,
     adminOnlyMiddleware,
     controladorPainel.despacharPedido,
   );
 
-  app.put(
+  app.patch(
     '/admin/pedidos/:uuid/entrega',
     autenticacaoMiddleware,
     adminOnlyMiddleware,

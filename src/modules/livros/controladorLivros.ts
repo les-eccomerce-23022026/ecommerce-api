@@ -77,4 +77,52 @@ export class ControladorLivros {
       res.status(500).json({ erro: msg });
     }
   };
+
+  criarLivro = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const dados = req.body;
+      const livro = await this.servico.criarLivro(dados);
+      res.status(201).json(livro);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Erro ao criar livro';
+      Logger.error(`[ControladorLivros.criarLivro] Erro: ${msg}`, err instanceof Error ? err.stack : String(err));
+      res.status(500).json({ erro: msg });
+    }
+  };
+
+  criarLivrosEmLote = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const dadosLivros = req.body;
+      const livros = await this.servico.criarLivrosEmLote(dadosLivros);
+      res.status(201).json({ livros, quantidade: livros.length });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Erro ao criar livros em lote';
+      Logger.error(`[ControladorLivros.criarLivrosEmLote] Erro: ${msg}`, err instanceof Error ? err.stack : String(err));
+      res.status(500).json({ erro: msg });
+    }
+  };
+
+  criarAutoresEmLote = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const autores = req.body;
+      const ids = await this.servico.criarAutoresEmLote(autores);
+      res.status(201).json({ ids, quantidade: ids.length });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Erro ao criar autores em lote';
+      Logger.error(`[ControladorLivros.criarAutoresEmLote] Erro: ${msg}`, err instanceof Error ? err.stack : String(err));
+      res.status(500).json({ erro: msg });
+    }
+  };
+
+  criarEditorasEmLote = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const editoras = req.body;
+      const ids = await this.servico.criarEditorasEmLote(editoras);
+      res.status(201).json({ ids, quantidade: ids.length });
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Erro ao criar editoras em lote';
+      Logger.error(`[ControladorLivros.criarEditorasEmLote] Erro: ${msg}`, err instanceof Error ? err.stack : String(err));
+      res.status(500).json({ erro: msg });
+    }
+  };
 }
