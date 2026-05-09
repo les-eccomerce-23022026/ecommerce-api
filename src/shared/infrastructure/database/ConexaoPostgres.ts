@@ -51,6 +51,7 @@ export class ConexaoPostgres implements IConexaoBanco {
     const banco = ConexaoPostgres.requireEnvComFallbackTeste('POSTGRES_DB', 'POSTGRES_DB_TEST');
 
     const connectionString = `postgresql://${usuario}:${senha}@${host}:${porta}/${banco}`;
+    Logger.info(`[ConexaoPostgres] Criando pool de produção: ${host}:${porta}/${banco}`);
     return new Pool({ connectionString, options });
   }
 

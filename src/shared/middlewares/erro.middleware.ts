@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { RespostaPadrao } from '@/shared/errors/Iresposta-padrao';
+import { Logger } from '@/shared/utils/Logger.util';
 
 const MENSAGEM_ERRO_INESPERADO = 'Erro interno do servidor.';
 
@@ -20,5 +21,13 @@ export function middlewareErro(
 ): void {
   const mensagem = RespostaPadrao.obterMensagemErro(erro, MENSAGEM_ERRO_INESPERADO);
   const statusCode = 500;
+  
+  // Logar o erro completo para debug
+  if (erro instanceof Error) {
+    Logger.error(`[middlewareErro] ${erro.message}`, erro.stack);
+  } else {
+    Logger.error(`[middlewareErro] Erro desconhecido: ${String(erro)}`);
+  }
+  
   RespostaPadrao.enviarErro(resposta, statusCode, mensagem);
 }

@@ -37,7 +37,10 @@
     "lint": "eslint \"src/**/*.{ts,tsx}\"",
     "lint:fix": "eslint \"src/**/*.{ts,tsx}\" --fix",
     "format": "prettier \"src/**/*.{ts,tsx,js,jsx,json,md}\" --write",
-    "db:compare": "./scripts/comparar-schemas.sh"
+    "db:compare": "./scripts/comparar-schemas.sh",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down",
+    "docker:logs": "docker compose logs -f"
   },
   "author": "",
   "license": "ISC",
@@ -48,6 +51,7 @@
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.21.0",
+    "iconv-lite": "^0.7.2",
     "ioredis": "^5.4.1",
     "jsonwebtoken": "^9.0.2",
     "pg": "^8.13.0",

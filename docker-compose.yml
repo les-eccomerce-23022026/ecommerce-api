@@ -4,9 +4,9 @@ services:
     container_name: ecm_postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ecm_livraria
-      POSTGRES_USER: ecm_user
-      POSTGRES_PASSWORD: ecm_senha
+      POSTGRES_DB: ${POSTGRES_DB:-ecm_livraria}
+      POSTGRES_USER: ${POSTGRES_USER:-ecm_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ecm_senha}
     ports:
       - "5432:5432"
     volumes:
@@ -29,7 +29,7 @@ services:
     container_name: ecm_app
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "3002:3002"
     volumes:
       - .:/app
       - /app/node_modules

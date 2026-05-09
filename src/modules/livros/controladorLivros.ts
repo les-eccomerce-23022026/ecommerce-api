@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import type { OrdenacaoCatalogo } from '@/modules/livros/ICatalogoLivros.dto';
 import { ServicoLivros } from '@/modules/livros/servicoLivros';
+import { Logger } from '@/shared/utils/Logger.util';
 
 function parseIntPositivo(val: unknown, padrao: number): number {
   const n = parseInt(String(val ?? ''), 10);
@@ -37,6 +38,7 @@ export class ControladorLivros {
       });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Erro ao listar livros';
+      Logger.error(`[ControladorLivros.listarCatalogo] Erro: ${msg}`, err instanceof Error ? err.stack : String(err));
       res.status(500).json({ erro: msg });
     }
   };
