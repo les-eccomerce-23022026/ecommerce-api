@@ -8,6 +8,10 @@ import { RepositorioVendasPostgres } from '@/modules/vendas/repositories/Reposit
 import { RepositorioEntregaPostgres } from '@/modules/entrega/RepositorioEntregaPostgres';
 import { ServicoEntrega } from '@/modules/entrega/ServicoEntrega';
 import { ServicoNotificacaoEmail } from '@/modules/entrega/adapters/ServicoNotificacaoEmail';
+import { ServicoMockCorreios } from '@/modules/logistica-mocks/servicoMockCorreios';
+import { ServicoMockLoggi } from '@/modules/logistica-mocks/servicoMockLoggi';
+import { RepositorioRastreamentoPostgres } from '@/modules/logistica-mocks/repositorios/RepositorioRastreamentoPostgres';
+import { RepositorioEventoRastreamentoPostgres } from '@/modules/logistica-mocks/repositorios/RepositorioEventoRastreamentoPostgres';
 import { autenticacaoMiddleware } from '@/shared/middlewares/autenticacao.middleware';
 import { 
   adminOnlyMiddleware, 
@@ -21,10 +25,14 @@ import {
 export function registrarRotasAdmin(app: IRouter): void {
   const db = ConexaoPostgres.obterInstancia();
   const repoVendas = new RepositorioVendasPostgres(db);
-  const repoEntrega = new RepositorioEntregaPostgres(db);
+  const repoRastreamento = new RepositorioRastreamentoPostgres(db);
+  const repoEventoRastreamento = new RepositorioEventoRastreamentoPostgres(db);
+  const repoEntrega = new RepositorioEntregaPostgres(db, repoRastreamento);
   const servicoNotificacao = new ServicoNotificacaoEmail();
   const servicoEntrega = new ServicoEntrega(repoEntrega, repoVendas, servicoNotificacao);
-  const servicoPedidosAdmin = new ServicoPedidosAdmin(repoVendas, servicoEntrega);
+  const servicoMockCorreios = new ServicoMockCorreios(repoRastreamento, repoEventoRastreamento);
+  const servicoMockLoggi = new ServicoMockLoggi(repoRastreamento, repoEventoRastreamento);
+  const servicoPedidosAdmin = new ServicoPedidosAdmin(repoVendas, servicoEntrega, servicoMockCorreios, servicoMockLoggi);
   const servicoDashboardAdmin = new ServicoDashboardAdmin(db);
   const controladorPainel = new ControladorAdminPainel(servicoDashboardAdmin, servicoPedidosAdmin);
 

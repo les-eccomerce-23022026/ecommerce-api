@@ -1,6 +1,10 @@
 import dotenv from 'dotenv';
 import { criarAplicacao } from '@/shared/infrastructure/http/app';
 import { Logger } from '@/shared/utils/Logger.util';
+import { SimuladorAtualizacaoRastreamento } from '@/modules/logistica-mocks/SimuladorAtualizacaoRastreamento';
+import { RepositorioRastreamentoPostgres } from '@/modules/logistica-mocks/repositorios/RepositorioRastreamentoPostgres';
+import { RepositorioEventoRastreamentoPostgres } from '@/modules/logistica-mocks/repositorios/RepositorioEventoRastreamentoPostgres';
+import { ConexaoPostgres } from '@/shared/infrastructure/database/ConexaoPostgres';
 
 dotenv.config();
 
@@ -32,7 +36,43 @@ const porta = process.env.PORTA_HTTP!;
 
 const app = criarAplicacao();
 
+// Instanciar simulador de atualização de rastreamento (apenas em desenvolvimento)
+let simulador: SimuladorAtualizacaoRastreamento | null = null;
+if (process.env.NODE_ENV === 'development') {
+  try {
+    const db = ConexaoPostgres.obterInstancia();
+    const repoRastreamento = new RepositorioRastreamentoPostgres(db);
+    const repoEventoRastreamento = new RepositorioEventoRastreamentoPostgres(db);
+    simulador = new SimuladorAtualizacaoRastreamento(
+      repoRastreamento,
+      repoEventoRastreamento,
+      60, // 60 minutos em desenvolvimento para não impactar o desempenho
+    );
+    simulador.iniciar();
+    Logger.info('[Server] Simulador de atualização de rastreamento iniciado (intervalo: 60 minutos)');
+  } catch (erro) {
+    const mensagemErro = erro instanceof Error ? erro.message : String(erro);
+    Logger.warn(`[Server] Simulador de atualização de rastreamento fora do ar. Causa: ${mensagemErro}`);
+    Logger.debug('[Server] Detalhes do erro ao iniciar simulador:', erro as any);
+  }
+}
+
 app.listen(Number(porta), () => {
   Logger.info(`Servidor iniciado na porta ${porta}`);
+});
+
+// Parar simulador ao encerrar o servidor
+process.on('SIGTERM', () => {
+  if (simulador) {
+    simulador.parar();
+    Logger.info('[Server] Simulador de atualização de rastreamento parado');
+  }
+});
+
+process.on('SIGINT', () => {
+  if (simulador) {
+    simulador.parar();
+    Logger.info('[Server] Simulador de atualização de rastreamento parado');
+  }
 });
 

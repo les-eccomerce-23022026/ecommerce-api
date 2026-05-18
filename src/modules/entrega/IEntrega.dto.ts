@@ -7,6 +7,7 @@ export interface IEntregaInputDto {
   endereco: object; // Objeto de endereço (será salvo como JSONB)
   custo: number;
   entregador?: string;
+  codigoRastreamento?: string; // Código de rastreamento da transportadora
 }
 
 /**
@@ -20,6 +21,7 @@ export interface IEntregaOutputDto {
   custo: number;
   entregador: string | null;
   criadoEm: Date;
+  codigoRastreamento?: string; // Código de rastreamento da transportadora
 }
 
 /**

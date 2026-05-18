@@ -16,6 +16,9 @@ pnpm-debug.log*
 .env.*
 *.local
 
+# Configurações sensíveis
+scripts/config/credentials.sh
+
 # Sistema / editor
 .DS_Store
 Thumbs.db

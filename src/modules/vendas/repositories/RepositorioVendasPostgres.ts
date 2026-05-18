@@ -156,6 +156,7 @@ export class RepositorioVendasPostgres implements IRepositorioVendas {
   }
 
   public async listarPorUsuario(usuarioUuid: string): Promise<IVenda[]> {
+    console.log('[RepositorioVendasPostgres.listarPorUsuario] Buscando vendas do usuarioUuid:', usuarioUuid);
     const query = `
       SELECT 
         v.ven_uuid, v.ven_total_itens, v.ven_frete, v.ven_total_venda,
@@ -178,6 +179,7 @@ export class RepositorioVendasPostgres implements IRepositorioVendas {
       itv_id: string | null; itv_livroUuid: string | null;
       itv_quantidade: number | null; itv_precoUnitario: number | null; itv_emTroca: boolean | null;
     }>(query, [usuarioUuid]);
+    console.log('[RepositorioVendasPostgres.listarPorUsuario] Linhas retornadas do BD:', rows.length);
 
     // Agrupar itens por venda
     const mapaVendas = new Map<string, IVenda>();

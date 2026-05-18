@@ -11,21 +11,27 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-
-  redis:
-    image: redis:7-alpine
-    container_name: ecm_redis
-    restart: unless-stopped
-    command: ["redis-server", "--appendonly", "yes"]
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ecm_user -d ecm_livraria"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    networks:
+      - ecm_network
 
   app:
     build:
       context: .
       target: development
+      dockerfile: Dockerfile
     container_name: ecm_app
     restart: unless-stopped
     ports:
@@ -36,11 +42,26 @@ services:
     env_file:
       - .env
     depends_on:
-      - postgres
-      - redis
-    command: sh -c "echo 'Iniciando instalacao de dependencias...' && npm install && echo 'Dependencias instaladas. Iniciando servidor...' && npm run dev"
+      postgres:
+        condition: service_healthy
+    environment:
+      - NODE_ENV=development
+      - POSTGRES_HOST=postgres
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+    networks:
+      - ecm_network
+
+networks:
+  ecm_network:
+    driver: bridge
 
 volumes:
   postgres_data:
-  redis_data:
 

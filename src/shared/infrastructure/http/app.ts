@@ -12,6 +12,12 @@ import { registrarRotasLivros } from '@/modules/livros/livros.routes';
 import { registrarRotasCarrinho } from '@/modules/carrinho/carrinho.routes';
 import { registrarRotasFrete } from '@/modules/frete/frete.routes';
 import { registrarRotasCupom } from '@/modules/cupom/cupom.routes';
+import { criarRotasLogisticaMocks } from '@/modules/logistica-mocks/logisticaMocks.routes';
+import { ServicoMockCorreios } from '@/modules/logistica-mocks/servicoMockCorreios';
+import { ServicoMockLoggi } from '@/modules/logistica-mocks/servicoMockLoggi';
+import { RepositorioRastreamentoPostgres } from '@/modules/logistica-mocks/repositorios/RepositorioRastreamentoPostgres';
+import { RepositorioEventoRastreamentoPostgres } from '@/modules/logistica-mocks/repositorios/RepositorioEventoRastreamentoPostgres';
+import { ConexaoPostgres } from '@/shared/infrastructure/database/ConexaoPostgres';
 import { middlewareErro } from '@/shared/middlewares/erro.middleware';
 import { middlewareTrocaBanco } from '@/shared/middlewares/troca-banco.middleware';
 
@@ -27,6 +33,7 @@ const origensCorsPermitidas = (): string[] =>
 export function criarAplicacao(): Application {
   const app = express();
   const apiRouter = Router();
+  const db = ConexaoPostgres.obterInstancia();
 
   app.use(cookieParser());
   app.use(
@@ -49,6 +56,12 @@ export function criarAplicacao(): Application {
   app.use(express.json());
   app.use(middlewareTrocaBanco);
 
+  // Instanciar serviços mock de logística
+  const repoRastreamento = new RepositorioRastreamentoPostgres(db);
+  const repoEventoRastreamento = new RepositorioEventoRastreamentoPostgres(db);
+  const servicoMockCorreios = new ServicoMockCorreios(repoRastreamento, repoEventoRastreamento);
+  const servicoMockLoggi = new ServicoMockLoggi(repoRastreamento, repoEventoRastreamento);
+
   // Registro das rotas da API.
   registrarRotasPagamentos(apiRouter);
   registrarRotasFrete(apiRouter);
@@ -61,6 +74,9 @@ export function criarAplicacao(): Application {
   registrarRotasLivros(apiRouter);
   registrarRotasCarrinho(apiRouter);
   registrarRotasCupom(apiRouter);
+  
+  // Rotas mockadas para APIs de logística (Correios e Loggi)
+  apiRouter.use('/mock/logistica', criarRotasLogisticaMocks(servicoMockCorreios, servicoMockLoggi));
 
   // Aplica o prefixo configurável (default: /api)
   const prefixo = process.env.API_PREFIX ?? '/api';

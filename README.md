@@ -1,6 +1,6 @@
 # Backend — API LES (Livraria)
 
-API Node.js/TypeScript (Express, PostgreSQL, Redis, JWT).
+API Node.js/TypeScript (Express, PostgreSQL, JWT).
 
 ---
 
@@ -12,7 +12,7 @@ API Node.js/TypeScript (Express, PostgreSQL, Redis, JWT).
 
 ---
 
-## 1. Banco de dados e Redis (desenvolvimento)
+## 1. Banco de dados (desenvolvimento)
 
 Na pasta `backend`:
 
@@ -22,9 +22,8 @@ docker compose up -d
 ```
 
 - Postgres: `localhost:5432` — banco `ecm_livraria` (usuário/senha padrão do `docker-compose.yml`: `ecm_user` / `ecm_senha`).
-- Redis: `localhost:6379`.
 
-**Ambiente de testes isolado** (Postgres `5433`, Redis `6380`):
+**Ambiente de testes isolado** (Postgres `5433`):
 
 ```bash
 docker compose -f docker-compose.test.yml up -d
@@ -59,7 +58,7 @@ Para instruções detalhadas sobre como usar Docker Compose para gerenciar o bac
 ### Comandos principais do Docker Compose
 
 ```bash
-# Iniciar todos os serviços (app + postgres + redis)
+# Iniciar todos os serviços (app + postgres)
 docker compose up -d
 
 # Parar todos os serviços
@@ -253,13 +252,13 @@ npm run test:coverage
 
 ---
 
-## 11. Operações de Banco de Dados (Schema `les` e Índices)
+## 11. Operações de Banco de Dados (Schema `livraria` e Índices)
 
-### Schema de aplicação (`les`)
+### Schema de aplicação (`livraria`)
 
-A partir da versão 1.0.1, o banco de dados utiliza o schema **`les`** para objetos de negócio (tabelas, triggers, funções). Extensões como `pg_trgm` e `unaccent` permanecem no schema `public`.
+A partir da versão 1.0.1, o banco de dados utiliza o schema **`livraria`** para objetos de negócio (tabelas, triggers, funções). A partir de 2026-05-17, o schema foi reestruturado com subdivisões por contexto limitado DDD (ver ADR 0006). Extensões como `pg_trgm` e `unaccent` permanecem no schema `public`.
 
-A aplicação configura automaticamente o `search_path=les,public` via pool de conexão (variável `POSTGRES_SCHEMA`).
+A aplicação configura automaticamente o `search_path=livraria_comercial, livraria_logistica, livraria_financeiro, livraria_catalogo, livraria_gestao, livraria_ref, livraria_audit, livraria, public` via pool de conexão (variável `POSTGRES_SCHEMA`).
 
 ### Scripts de Banco
 

@@ -4,9 +4,8 @@ Este projeto usa Docker Compose para gerenciar o backend em ambiente de desenvol
 
 ## Serviços
 
-- **ecm_app**: Container do backend Node/Express (porta 3000)
+- **ecm_app**: Container do backend Node/Express (porta 3002)
 - **ecm_postgres**: Container do PostgreSQL (porta 5432)
-- **ecm_redis**: Container do Redis (porta 6379)
 
 ## Comandos Principais
 

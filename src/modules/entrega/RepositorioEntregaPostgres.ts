@@ -1,15 +1,18 @@
 import { IEntregaInputDto, IEntregaOutputDto } from '@/modules/entrega/IEntrega.dto';
 import { IConexaoBanco, DbParametro } from '@/shared/infrastructure/database/IConexaoBanco';
 import { IRepositorioEntrega } from './IRepositorioEntrega';
+import { IRepositorioRastreamento, IRastreamentoInputDto } from '@/modules/logistica-mocks/repositorios/IRepositorioRastreamento';
 
 /**
  * Implementação do repositório de entregas para PostgreSQL.
  */
 export class RepositorioEntregaPostgres implements IRepositorioEntrega {
   private readonly db: IConexaoBanco;
+  private readonly repositorioRastreamento: IRepositorioRastreamento;
 
-  constructor(db: IConexaoBanco) {
+  constructor(db: IConexaoBanco, repositorioRastreamento: IRepositorioRastreamento) {
     this.db = db;
+    this.repositorioRastreamento = repositorioRastreamento;
   }
 
   public async cadastrar(dados: IEntregaInputDto): Promise<IEntregaOutputDto> {
@@ -42,6 +45,18 @@ export class RepositorioEntregaPostgres implements IRepositorioEntrega {
     const rows = await this.db.executar<{ ent_uuid: string; ent_criado_em: string }>(queryInsert, valores);
     const row = rows[0];
 
+    // 4. Salvar código de rastreamento se fornecido
+    let codigoRastreamento: string | undefined;
+    if (dados.codigoRastreamento) {
+      const transportadora = dados.tipoFrete.startsWith('LOGGI') ? 'Loggi' : 'Correios';
+      await this.repositorioRastreamento.cadastrar({
+        entUuid: row.ent_uuid,
+        codigo: dados.codigoRastreamento,
+        transportadora,
+      });
+      codigoRastreamento = dados.codigoRastreamento;
+    }
+
     return {
       uuid: row.ent_uuid,
       vendaUuid: dados.vendaUuid,
@@ -50,6 +65,7 @@ export class RepositorioEntregaPostgres implements IRepositorioEntrega {
       custo: Number(dados.custo),
       entregador: dados.entregador || null,
       criadoEm: new Date(row.ent_criado_em),
+      codigoRastreamento,
     };
   }
 
@@ -75,6 +91,10 @@ export class RepositorioEntregaPostgres implements IRepositorioEntrega {
     if (rows.length === 0) return null;
     const r = rows[0];
 
+    // Buscar código de rastreamento
+    const rastreamentos = await this.repositorioRastreamento.listarPorEntrega(r.ent_uuid);
+    const codigoRastreamento = rastreamentos.length > 0 ? rastreamentos[0].codigo : undefined;
+
     return {
       uuid: r.ent_uuid,
       vendaUuid: r.vendaUuid,
@@ -83,6 +103,7 @@ export class RepositorioEntregaPostgres implements IRepositorioEntrega {
       custo: Number(r.ent_custo),
       entregador: r.ent_entregador,
       criadoEm: new Date(r.ent_criado_em),
+      codigoRastreamento,
     };
   }
 
@@ -106,15 +127,26 @@ export class RepositorioEntregaPostgres implements IRepositorioEntrega {
       tipoFrete: string;
     }>(query, [vendaUuid]);
 
-    return rows.map((r) => ({
-      uuid: r.ent_uuid,
-      vendaUuid: r.vendaUuid,
-      tipoFrete: r.tipoFrete,
-      endereco: r.ent_endereco_json,
-      custo: Number(r.ent_custo),
-      entregador: r.ent_entregador,
-      criadoEm: new Date(r.ent_criado_em),
-    }));
+    // Buscar códigos de rastreamento para todas as entregas
+    const entregasComRastreamento = await Promise.all(
+      rows.map(async (r) => {
+        const rastreamentos = await this.repositorioRastreamento.listarPorEntrega(r.ent_uuid);
+        const codigoRastreamento = rastreamentos.length > 0 ? rastreamentos[0].codigo : undefined;
+
+        return {
+          uuid: r.ent_uuid,
+          vendaUuid: r.vendaUuid,
+          tipoFrete: r.tipoFrete,
+          endereco: r.ent_endereco_json,
+          custo: Number(r.ent_custo),
+          entregador: r.ent_entregador,
+          criadoEm: new Date(r.ent_criado_em),
+          codigoRastreamento,
+        };
+      })
+    );
+
+    return entregasComRastreamento;
   }
 
   public async atualizarEndereco(uuid: string, novoEndereco: object): Promise<void> {

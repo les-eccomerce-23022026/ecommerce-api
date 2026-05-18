@@ -70,9 +70,17 @@ export class ControladorVendas {
       if (!usuarioUuid) throw new Error('Usuário não identificado.');
 
       const vendas = await this.servicoVendas.listarVendasCliente(usuarioUuid);
-      res.json(vendas);
+      
+      // Mapear dataHoraEntrega para dataEntrega para compatibilidade com frontend
+      const vendasMapeadas = vendas.map((venda) => ({
+        ...venda,
+        dataEntrega: venda.dataHoraEntrega ? venda.dataHoraEntrega.toISOString() : undefined,
+      }));
+      
+      res.json(vendasMapeadas);
     } catch (err: unknown) {
       const mensagem = err instanceof Error ? err.message : 'Erro desconhecido';
+      console.error('[ControladorVendas.listarVendasCliente] Erro:', mensagem, err);
       res.status(401).json({ erro: mensagem });
     }
   };

@@ -83,18 +83,13 @@ ADD CONSTRAINT fk_pagamento_vendas
 FOREIGN KEY (ven_id) REFERENCES vendas(ven_id) ON DELETE CASCADE;
 
 
--- Atualizar FK em entrega ou entregas (ecm_venda -> vendas)
--- Nota: A migration 012 criou FK para ecm_venda(ven_id). A 013 pode já ter renomeado entrega -> entregas.
+-- Atualizar FK em entregas (ecm_venda -> vendas)
+-- Nota: Após migration 025 e 029, a tabela entregas está em livraria_logistica
+-- Verifica se a tabela existe (independente do schema via search_path)
 
 DO $$
 BEGIN
-  IF to_regclass('public.entrega') IS NOT NULL THEN
-    ALTER TABLE entrega DROP CONSTRAINT IF EXISTS entrega_ven_id_fkey;
-    ALTER TABLE entrega DROP CONSTRAINT IF EXISTS fk_entrega_vendas;
-    ALTER TABLE entrega
-      ADD CONSTRAINT fk_entrega_vendas
-      FOREIGN KEY (ven_id) REFERENCES vendas(ven_id) ON DELETE CASCADE;
-  ELSIF to_regclass('public.entregas') IS NOT NULL THEN
+  IF to_regclass('entregas') IS NOT NULL THEN
     ALTER TABLE entregas DROP CONSTRAINT IF EXISTS entrega_ven_id_fkey;
     ALTER TABLE entregas DROP CONSTRAINT IF EXISTS fk_entrega_vendas;
     ALTER TABLE entregas

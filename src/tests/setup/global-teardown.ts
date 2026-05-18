@@ -1,5 +1,4 @@
 import { ConexaoPostgres } from '../../shared/infrastructure/database/ConexaoPostgres';
-import { fecharClienteRedis } from '../../shared/infrastructure/cache/redis';
 
 /**
  * Global teardown para Jest: fecha conexões adequadamente
@@ -7,9 +6,6 @@ import { fecharClienteRedis } from '../../shared/infrastructure/cache/redis';
  */
 export default async function globalTeardown(): Promise<void> {
   try {
-    // Fecha Redis primeiro
-    await fecharClienteRedis();
-
     // Fecha o pool do Postgres de forma mais agressiva
     if (ConexaoPostgres.possuiInstancia()) {
       const conexao = ConexaoPostgres.obterInstancia();

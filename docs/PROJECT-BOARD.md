@@ -54,7 +54,7 @@
 | ID | Área | Card | Status / Evidência |
 | :--- | :------ | :-------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | B1 | BACKEND | Setup Inicial e Arquitetura | Definir estrutura de módulos, injeção de dependência manual e padrões SOLID/DDD. |
-| B2 | BACKEND | Dockerização e Ambiente Dev | Criar Dockerfile multi-stage; configurar docker-compose com Node.js + Postgres + Redis; hot reload com ts-node-dev. |
+| B2 | BACKEND | Dockerização e Ambiente Dev | Criar Dockerfile multi-stage; configurar docker-compose com Node.js + Postgres; hot reload com ts-node-dev. |
 | B3 | BACKEND | Modelagem SQL e Normalização | Criar 14 tabelas normalizadas (DDR/DML); triggers de atualização; diagramas ER PlantUML. |
 | B4 | BACKEND | Infraestrutura de Repositórios PG | Implementar Pool de conexões, Transações seguras e Repositórios para Usuários, Endereços, Perfis e Telefones. |
 | B5 | BACKEND | Auth com JWT (Bearer) | Implementado: autenticação completa com login seguro e proteção de rotas. |
