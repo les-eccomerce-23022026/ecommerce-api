@@ -6,7 +6,7 @@
 -- -----------------------------------------------------------------------------
 -- Insere as bandeiras de cartão suportadas (RN0025)
 -- -----------------------------------------------------------------------------
-INSERT INTO bandeiras_cartao (ban_descricao) VALUES
+INSERT INTO livraria_financeiro.bandeiras_cartao (ban_descricao) VALUES
 ('Visa'),
 ('Mastercard'),
 ('Elo'),

@@ -1,7 +1,7 @@
 -- Migration: 018_criar_tabelas_intencao_pagamento.sql
 -- Intenção de cobrança persistida (agnóstica ao provedor); segredo apenas como HMAC no backend.
 
-CREATE TABLE IF NOT EXISTS intencao_pagamento (
+CREATE TABLE IF NOT EXISTS livraria_financeiro.intencao_pagamento (
     inp_id                      BIGSERIAL       PRIMARY KEY,
     inp_uuid                    UUID            NOT NULL UNIQUE DEFAULT gen_random_uuid(),
     inp_valor                   DECIMAL(10,2)   NOT NULL CHECK (inp_valor > 0),
@@ -15,28 +15,28 @@ CREATE TABLE IF NOT EXISTS intencao_pagamento (
     inp_tentativas_confirmacao  INTEGER         NOT NULL DEFAULT 0 CHECK (inp_tentativas_confirmacao >= 0),
     inp_confirmado_em           TIMESTAMPTZ,
     inp_recusado_em             TIMESTAMPTZ,
-    ven_id                      BIGINT          REFERENCES vendas(ven_id) ON DELETE SET NULL
+    ven_id                      BIGINT          REFERENCES livraria_comercial.ecm_venda(ven_id) ON DELETE SET NULL
 );
 
-COMMENT ON TABLE intencao_pagamento IS 'Intenção de pagamento/cobrança antes da confirmação no provedor (valor travado, TTL, estado).';
-COMMENT ON COLUMN intencao_pagamento.inp_hash_segredo IS 'HMAC-SHA-256 (hex) do segredo de confirmação; nunca armazenar segredo em claro.';
-COMMENT ON COLUMN intencao_pagamento.inp_expira_em IS 'Após este instante a intenção não pode ser confirmada (validação obrigatória na API).';
+COMMENT ON TABLE livraria_financeiro.intencao_pagamento IS 'Intenção de pagamento/cobrança antes da confirmação no provedor (valor travado, TTL, estado).';
+COMMENT ON COLUMN livraria_financeiro.intencao_pagamento.inp_hash_segredo IS 'HMAC-SHA-256 (hex) do segredo de confirmação; nunca armazenar segredo em claro.';
+COMMENT ON COLUMN livraria_financeiro.intencao_pagamento.inp_expira_em IS 'Após este instante a intenção não pode ser confirmada (validação obrigatória na API).';
 
-CREATE INDEX IF NOT EXISTS idx_intencao_pagamento_uuid ON intencao_pagamento(inp_uuid);
-CREATE INDEX IF NOT EXISTS idx_intencao_pagamento_estado_expira ON intencao_pagamento(inp_estado, inp_expira_em);
+CREATE INDEX IF NOT EXISTS idx_intencao_pagamento_uuid ON livraria_financeiro.intencao_pagamento(inp_uuid);
+CREATE INDEX IF NOT EXISTS idx_intencao_pagamento_estado_expira ON livraria_financeiro.intencao_pagamento(inp_estado, inp_expira_em);
 
 -- Extensão mínima para o provedor simulado (reserva para flags futuras)
-CREATE TABLE IF NOT EXISTS intencao_pagamento_simulado (
-    inp_id      BIGINT  PRIMARY KEY REFERENCES intencao_pagamento(inp_id) ON DELETE CASCADE
+CREATE TABLE IF NOT EXISTS livraria_financeiro.intencao_pagamento_simulado (
+    inp_id      BIGINT  PRIMARY KEY REFERENCES livraria_financeiro.intencao_pagamento(inp_id) ON DELETE CASCADE
 );
 
-COMMENT ON TABLE intencao_pagamento_simulado IS 'Metadados específicos do provedor de pagamento simulado.';
+COMMENT ON TABLE livraria_financeiro.intencao_pagamento_simulado IS 'Metadados específicos do provedor de pagamento simulado.';
 
 -- Extensão para Stripe (IDs externos; sem client_secret em claro)
-CREATE TABLE IF NOT EXISTS intencao_pagamento_stripe (
-    inp_id                      BIGINT          PRIMARY KEY REFERENCES intencao_pagamento(inp_id) ON DELETE CASCADE,
+CREATE TABLE IF NOT EXISTS livraria_financeiro.intencao_pagamento_stripe (
+    inp_id                      BIGINT          PRIMARY KEY REFERENCES livraria_financeiro.intencao_pagamento(inp_id) ON DELETE CASCADE,
     stripe_payment_intent_id    VARCHAR(255),
     stripe_customer_id          VARCHAR(255)
 );
 
-COMMENT ON TABLE intencao_pagamento_stripe IS 'Referências Stripe; segredos efêmeros não persistidos em texto plano.';
+COMMENT ON TABLE livraria_financeiro.intencao_pagamento_stripe IS 'Referências Stripe; segredos efêmeros não persistidos em texto plano.';

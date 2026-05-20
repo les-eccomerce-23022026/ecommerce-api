@@ -1,14 +1,12 @@
 -- =============================================================================
--- DDL 009 — Tabela de bandeiras de cartão de crédito
+-- DDL 008 — Tabela de bandeiras de cartão
 -- Sistema: LES – E-Commerce de Livros
+-- Schema: livraria_financeiro
 -- =============================================================================
 
--- -----------------------------------------------------------------------------
--- ban_bandeiras
--- Tabela de domínio para bandeiras de cartão suportadas pelo sistema.
--- RN0025: Bandeiras válidas: Visa, Mastercard, Elo, American Express, Hipercard.
--- -----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS bandeiras_cartao (
+CREATE SCHEMA IF NOT EXISTS livraria_financeiro;
+
+CREATE TABLE IF NOT EXISTS livraria_financeiro.bandeiras_cartao (
     ban_id              SERIAL      PRIMARY KEY,
     ban_uuid            UUID            NOT NULL    DEFAULT gen_random_uuid(),
     ban_descricao       VARCHAR(30) UNIQUE NOT NULL,
@@ -17,7 +15,8 @@ CREATE TABLE IF NOT EXISTS bandeiras_cartao (
     CONSTRAINT uq_bandeiras_uuid UNIQUE (ban_uuid)
 );
 
-COMMENT ON TABLE  bandeiras_cartao               IS 'Bandeiras de cartão de crédito suportadas (RN0025).';
-COMMENT ON COLUMN bandeiras_cartao.ban_id        IS 'Identificador interno da bandeira.';
-COMMENT ON COLUMN bandeiras_cartao.ban_uuid      IS 'Identificador público (UUID v4) para uso em rotas HTTP.';
-COMMENT ON COLUMN bandeiras_cartao.ban_descricao IS 'Nome da bandeira (Visa, Mastercard, Elo, etc.).';
+COMMENT ON TABLE  livraria_financeiro.bandeiras_cartao               IS 'Bandeiras de cartão de crédito suportadas (RN0025).';
+COMMENT ON COLUMN livraria_financeiro.bandeiras_cartao.ban_id        IS 'Identificador interno da bandeira.';
+COMMENT ON COLUMN livraria_financeiro.bandeiras_cartao.ban_uuid      IS 'Identificador público (UUID v4).';
+COMMENT ON COLUMN livraria_financeiro.bandeiras_cartao.ban_descricao IS 'Nome da bandeira (ex.: Visa, Mastercard, American Express).';
+COMMENT ON COLUMN livraria_financeiro.bandeiras_cartao.ban_criado_em IS 'Timestamp de criação da bandeira.';

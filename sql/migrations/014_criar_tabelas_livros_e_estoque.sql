@@ -17,7 +17,7 @@
 -- =============================================================================
 -- Tabela: autores
 -- =============================================================================
-CREATE TABLE IF NOT EXISTS autores (
+CREATE TABLE IF NOT EXISTS livraria_comercial.autores (
     aut_id          SERIAL          PRIMARY KEY,
     aut_uuid        UUID            NOT NULL UNIQUE DEFAULT gen_random_uuid(),
     aut_nome        VARCHAR(200)    NOT NULL,
@@ -28,21 +28,21 @@ CREATE TABLE IF NOT EXISTS autores (
     aut_atualizado_em TIMESTAMPTZ   DEFAULT CURRENT_TIMESTAMP
 );
 
-COMMENT ON TABLE autores                    IS 'Catálogo de autores de livros.';
-COMMENT ON COLUMN autores.aut_id            IS 'Identificador interno do autor.';
-COMMENT ON COLUMN autores.aut_uuid          IS 'Identificador público UUID do autor.';
-COMMENT ON COLUMN autores.aut_nome          IS 'Nome completo do autor.';
-COMMENT ON COLUMN autores.aut_nome_norm     IS 'Nome normalizado para busca (sem acentos, maiúsculas).';
-COMMENT ON COLUMN autores.aut_descricao     IS 'Biografia/descrição do autor.';
-COMMENT ON COLUMN autores.aut_ativo         IS 'Flag indicando se autor está ativo no catálogo.';
+COMMENT ON TABLE livraria_comercial.autores                    IS 'Catálogo de autores de livros.';
+COMMENT ON COLUMN livraria_comercial.autores.aut_id            IS 'Identificador interno do autor.';
+COMMENT ON COLUMN livraria_comercial.autores.aut_uuid          IS 'Identificador público UUID do autor.';
+COMMENT ON COLUMN livraria_comercial.autores.aut_nome          IS 'Nome completo do autor.';
+COMMENT ON COLUMN livraria_comercial.autores.aut_nome_norm     IS 'Nome normalizado para busca (sem acentos, maiúsculas).';
+COMMENT ON COLUMN livraria_comercial.autores.aut_descricao     IS 'Biografia/descrição do autor.';
+COMMENT ON COLUMN livraria_comercial.autores.aut_ativo         IS 'Flag indicando se autor está ativo no catálogo.';
 
-CREATE INDEX IF NOT EXISTS idx_autores_nome_norm ON autores USING gin (aut_nome_norm gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_autores_nome_norm ON livraria_comercial.autores USING gin (aut_nome_norm gin_trgm_ops);
 
 
 -- =============================================================================
 -- Tabela: editoras
 -- =============================================================================
-CREATE TABLE IF NOT EXISTS editoras (
+CREATE TABLE IF NOT EXISTS livraria_comercial.editoras (
     edi_id          SERIAL          PRIMARY KEY,
     edi_uuid        UUID            NOT NULL UNIQUE DEFAULT gen_random_uuid(),
     edi_nome        VARCHAR(200)    NOT NULL,
@@ -53,21 +53,21 @@ CREATE TABLE IF NOT EXISTS editoras (
     edi_atualizado_em TIMESTAMPTZ   DEFAULT CURRENT_TIMESTAMP
 );
 
-COMMENT ON TABLE editoras                     IS 'Catálogo de editoras de livros.';
-COMMENT ON COLUMN editoras.edi_id             IS 'Identificador interno da editora.';
-COMMENT ON COLUMN editoras.edi_uuid           IS 'Identificador público UUID da editora.';
-COMMENT ON COLUMN editoras.edi_nome           IS 'Nome da editora.';
-COMMENT ON COLUMN editoras.edi_nome_norm      IS 'Nome normalizado para busca (sem acentos, maiúsculas).';
-COMMENT ON COLUMN editoras.edi_cnpj           IS 'CNPJ da editora.';
-COMMENT ON COLUMN editoras.edi_ativo          IS 'Flag indicando se editora está ativa no catálogo.';
+COMMENT ON TABLE livraria_comercial.editoras                     IS 'Catálogo de editoras de livros.';
+COMMENT ON COLUMN livraria_comercial.editoras.edi_id             IS 'Identificador interno da editora.';
+COMMENT ON COLUMN livraria_comercial.editoras.edi_uuid           IS 'Identificador público UUID da editora.';
+COMMENT ON COLUMN livraria_comercial.editoras.edi_nome           IS 'Nome da editora.';
+COMMENT ON COLUMN livraria_comercial.editoras.edi_nome_norm      IS 'Nome normalizado para busca (sem acentos, maiúsculas).';
+COMMENT ON COLUMN livraria_comercial.editoras.edi_cnpj           IS 'CNPJ da editora.';
+COMMENT ON COLUMN livraria_comercial.editoras.edi_ativo          IS 'Flag indicando se editora está ativa no catálogo.';
 
-CREATE INDEX IF NOT EXISTS idx_editoras_nome_norm ON editoras USING gin (edi_nome_norm gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_editoras_nome_norm ON livraria_comercial.editoras USING gin (edi_nome_norm gin_trgm_ops);
 
 
 -- =============================================================================
 -- Tabela: categorias
 -- =============================================================================
-CREATE TABLE IF NOT EXISTS categorias (
+CREATE TABLE IF NOT EXISTS livraria_comercial.categorias (
     cat_id          SERIAL          PRIMARY KEY,
     cat_uuid        UUID            NOT NULL UNIQUE DEFAULT gen_random_uuid(),
     cat_nome        VARCHAR(100)    NOT NULL UNIQUE,
@@ -77,21 +77,21 @@ CREATE TABLE IF NOT EXISTS categorias (
     cat_criado_em   TIMESTAMPTZ     DEFAULT CURRENT_TIMESTAMP
 );
 
-COMMENT ON TABLE categorias                   IS 'Catálogo de categorias de livros.';
-COMMENT ON COLUMN categorias.cat_id           IS 'Identificador interno da categoria.';
-COMMENT ON COLUMN categorias.cat_uuid         IS 'Identificador público UUID da categoria.';
-COMMENT ON COLUMN categorias.cat_nome         IS 'Nome da categoria.';
-COMMENT ON COLUMN categorias.cat_nome_norm    IS 'Nome normalizado para busca (sem acentos, maiúsculas).';
-COMMENT ON COLUMN categorias.cat_descricao    IS 'Descrição da categoria.';
-COMMENT ON COLUMN categorias.cat_ativo        IS 'Flag indicando se categoria está ativa.';
+COMMENT ON TABLE livraria_comercial.categorias                   IS 'Catálogo de categorias de livros.';
+COMMENT ON COLUMN livraria_comercial.categorias.cat_id           IS 'Identificador interno da categoria.';
+COMMENT ON COLUMN livraria_comercial.categorias.cat_uuid         IS 'Identificador público UUID da categoria.';
+COMMENT ON COLUMN livraria_comercial.categorias.cat_nome         IS 'Nome da categoria.';
+COMMENT ON COLUMN livraria_comercial.categorias.cat_nome_norm    IS 'Nome normalizado para busca (sem acentos, maiúsculas).';
+COMMENT ON COLUMN livraria_comercial.categorias.cat_descricao    IS 'Descrição da categoria.';
+COMMENT ON COLUMN livraria_comercial.categorias.cat_ativo        IS 'Flag indicando se categoria está ativa.';
 
-CREATE INDEX IF NOT EXISTS idx_categorias_nome_norm ON categorias USING gin (cat_nome_norm gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_categorias_nome_norm ON livraria_comercial.categorias USING gin (cat_nome_norm gin_trgm_ops);
 
 
 -- =============================================================================
 -- Tabela: grupos_precificacao
 -- =============================================================================
-CREATE TABLE IF NOT EXISTS grupos_precificacao (
+CREATE TABLE IF NOT EXISTS livraria_comercial.grupos_precificacao (
     gpr_id                  SERIAL          PRIMARY KEY,
     gpr_uuid                UUID            NOT NULL UNIQUE DEFAULT gen_random_uuid(),
     gpr_descricao           VARCHAR(100)    NOT NULL UNIQUE,
@@ -100,18 +100,18 @@ CREATE TABLE IF NOT EXISTS grupos_precificacao (
     gpr_criado_em           TIMESTAMPTZ     DEFAULT CURRENT_TIMESTAMP
 );
 
-COMMENT ON TABLE grupos_precificacao                  IS 'Grupos de precificação para cálculo de preços de venda.';
-COMMENT ON COLUMN grupos_precificacao.gpr_id          IS 'Identificador interno do grupo.';
-COMMENT ON COLUMN grupos_precificacao.gpr_uuid        IS 'Identificador público UUID do grupo.';
-COMMENT ON COLUMN grupos_precificacao.gpr_descricao   IS 'Descrição do grupo (ex.: Varejo, Atacado, Técnico).';
-COMMENT ON COLUMN grupos_precificacao.gpr_margem_lucro_percentual IS 'Margem de lucro percentual padrão do grupo.';
-COMMENT ON COLUMN grupos_precificacao.gpr_ativo       IS 'Flag indicando se grupo está ativo.';
+COMMENT ON TABLE livraria_comercial.grupos_precificacao                  IS 'Grupos de precificação para cálculo de preços de venda.';
+COMMENT ON COLUMN livraria_comercial.grupos_precificacao.gpr_id          IS 'Identificador interno do grupo.';
+COMMENT ON COLUMN livraria_comercial.grupos_precificacao.gpr_uuid        IS 'Identificador público UUID do grupo.';
+COMMENT ON COLUMN livraria_comercial.grupos_precificacao.gpr_descricao   IS 'Descrição do grupo (ex.: Varejo, Atacado, Técnico).';
+COMMENT ON COLUMN livraria_comercial.grupos_precificacao.gpr_margem_lucro_percentual IS 'Margem de lucro percentual padrão do grupo.';
+COMMENT ON COLUMN livraria_comercial.grupos_precificacao.gpr_ativo       IS 'Flag indicando se grupo está ativo.';
 
 
 -- =============================================================================
 -- Tabela: fornecedores
 -- =============================================================================
-CREATE TABLE IF NOT EXISTS fornecedores (
+CREATE TABLE IF NOT EXISTS livraria_comercial.fornecedores (
     for_id          SERIAL          PRIMARY KEY,
     for_uuid        UUID            NOT NULL UNIQUE DEFAULT gen_random_uuid(),
     for_nome        VARCHAR(200)    NOT NULL,
@@ -124,23 +124,23 @@ CREATE TABLE IF NOT EXISTS fornecedores (
     for_atualizado_em TIMESTAMPTZ   DEFAULT CURRENT_TIMESTAMP
 );
 
-COMMENT ON TABLE fornecedores                 IS 'Cadastro de fornecedores para entrada de estoque.';
-COMMENT ON COLUMN fornecedores.for_id         IS 'Identificador interno do fornecedor.';
-COMMENT ON COLUMN fornecedores.for_uuid       IS 'Identificador público UUID do fornecedor.';
-COMMENT ON COLUMN fornecedores.for_nome       IS 'Nome do fornecedor.';
-COMMENT ON COLUMN fornecedores.for_nome_norm  IS 'Nome normalizado para busca.';
-COMMENT ON COLUMN fornecedores.for_cnpj       IS 'CNPJ do fornecedor.';
-COMMENT ON COLUMN fornecedores.for_email      IS 'Email para contato.';
-COMMENT ON COLUMN fornecedores.for_telefone   IS 'Telefone para contato.';
-COMMENT ON COLUMN fornecedores.for_ativo      IS 'Flag indicando se fornecedor está ativo.';
+COMMENT ON TABLE livraria_comercial.fornecedores                 IS 'Cadastro de fornecedores para entrada de estoque.';
+COMMENT ON COLUMN livraria_comercial.fornecedores.for_id         IS 'Identificador interno do fornecedor.';
+COMMENT ON COLUMN livraria_comercial.fornecedores.for_uuid       IS 'Identificador público UUID do fornecedor.';
+COMMENT ON COLUMN livraria_comercial.fornecedores.for_nome       IS 'Nome do fornecedor.';
+COMMENT ON COLUMN livraria_comercial.fornecedores.for_nome_norm  IS 'Nome normalizado para busca.';
+COMMENT ON COLUMN livraria_comercial.fornecedores.for_cnpj       IS 'CNPJ do fornecedor.';
+COMMENT ON COLUMN livraria_comercial.fornecedores.for_email      IS 'Email para contato.';
+COMMENT ON COLUMN livraria_comercial.fornecedores.for_telefone   IS 'Telefone para contato.';
+COMMENT ON COLUMN livraria_comercial.fornecedores.for_ativo      IS 'Flag indicando se fornecedor está ativo.';
 
-CREATE INDEX IF NOT EXISTS idx_fornecedores_nome_norm ON fornecedores USING gin (for_nome_norm gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_fornecedores_nome_norm ON livraria_comercial.fornecedores USING gin (for_nome_norm gin_trgm_ops);
 
 
 -- =============================================================================
 -- Tabela: livros (Entidade central de catálogo - Read-Heavy)
 -- =============================================================================
-CREATE TABLE IF NOT EXISTS livros (
+CREATE TABLE IF NOT EXISTS livraria_comercial.livros (
     liv_id              BIGSERIAL       PRIMARY KEY,
     liv_uuid            UUID            NOT NULL UNIQUE DEFAULT gen_random_uuid(),
     liv_titulo          VARCHAR(300)    NOT NULL,
@@ -157,9 +157,9 @@ CREATE TABLE IF NOT EXISTS livros (
     liv_codigo_barras   VARCHAR(20)     UNIQUE,
     
     -- FKs para tabelas de apoio
-    aut_id              INTEGER         NOT NULL REFERENCES autores(aut_id),
-    edi_id              INTEGER         NOT NULL REFERENCES editoras(edi_id),
-    gpr_id              INTEGER         NOT NULL REFERENCES grupos_precificacao(gpr_id),
+    aut_id              INTEGER         NOT NULL REFERENCES livraria_comercial.autores(aut_id),
+    edi_id              INTEGER         NOT NULL REFERENCES livraria_comercial.editoras(edi_id),
+    gpr_id              INTEGER         NOT NULL REFERENCES livraria_comercial.grupos_precificacao(gpr_id),
     
     liv_ativo           BOOLEAN         NOT NULL DEFAULT TRUE,
     liv_imagem_url      VARCHAR(500),
@@ -167,62 +167,62 @@ CREATE TABLE IF NOT EXISTS livros (
     liv_atualizado_em   TIMESTAMPTZ     DEFAULT CURRENT_TIMESTAMP
 );
 
-COMMENT ON TABLE livros                       IS 'Catálogo central de livros (dados imutáveis do produto).';
-COMMENT ON COLUMN livros.liv_id               IS 'Identificador interno do livro.';
-COMMENT ON COLUMN livros.liv_uuid             IS 'Identificador público UUID do livro.';
-COMMENT ON COLUMN livros.liv_titulo           IS 'Título completo do livro.';
-COMMENT ON COLUMN livros.liv_titulo_norm      IS 'Título normalizado para busca (sem acentos, maiúsculas).';
-COMMENT ON COLUMN livros.liv_ano              IS 'Ano de publicação.';
-COMMENT ON COLUMN livros.liv_edicao           IS 'Número/ano da edição (ex.: "3ª edição").';
-COMMENT ON COLUMN livros.liv_isbn             IS 'ISBN do livro (único).';
-COMMENT ON COLUMN livros.liv_numero_paginas   IS 'Número total de páginas.';
-COMMENT ON COLUMN livros.liv_sinopse          IS 'Sinopse/descrição do livro.';
-COMMENT ON COLUMN livros.liv_altura           IS 'Altura do livro em cm.';
-COMMENT ON COLUMN livros.liv_largura          IS 'Largura do livro em cm.';
-COMMENT ON COLUMN livros.liv_peso             IS 'Peso do livro em kg.';
-COMMENT ON COLUMN livros.liv_profundidade     IS 'Profundidade do livro em cm.';
-COMMENT ON COLUMN livros.liv_codigo_barras    IS 'Código de barras EAN/UPC.';
-COMMENT ON COLUMN livros.aut_id               IS 'FK para autor principal.';
-COMMENT ON COLUMN livros.edi_id               IS 'FK para editora.';
-COMMENT ON COLUMN livros.gpr_id               IS 'FK para grupo de precificação.';
-COMMENT ON COLUMN livros.liv_ativo            IS 'Flag indicando se livro está ativo no catálogo.';
-COMMENT ON COLUMN livros.liv_imagem_url       IS 'URL da imagem de capa do livro.';
+COMMENT ON TABLE livraria_comercial.livros                       IS 'Catálogo central de livros (dados imutáveis do produto).';
+COMMENT ON COLUMN livraria_comercial.livros.liv_id               IS 'Identificador interno do livro.';
+COMMENT ON COLUMN livraria_comercial.livros.liv_uuid             IS 'Identificador público UUID do livro.';
+COMMENT ON COLUMN livraria_comercial.livros.liv_titulo           IS 'Título completo do livro.';
+COMMENT ON COLUMN livraria_comercial.livros.liv_titulo_norm      IS 'Título normalizado para busca (sem acentos, maiúsculas).';
+COMMENT ON COLUMN livraria_comercial.livros.liv_ano              IS 'Ano de publicação.';
+COMMENT ON COLUMN livraria_comercial.livros.liv_edicao           IS 'Número/ano da edição (ex.: "3ª edição").';
+COMMENT ON COLUMN livraria_comercial.livros.liv_isbn             IS 'ISBN do livro (único).';
+COMMENT ON COLUMN livraria_comercial.livros.liv_numero_paginas   IS 'Número total de páginas.';
+COMMENT ON COLUMN livraria_comercial.livros.liv_sinopse          IS 'Sinopse/descrição do livro.';
+COMMENT ON COLUMN livraria_comercial.livros.liv_altura           IS 'Altura do livro em cm.';
+COMMENT ON COLUMN livraria_comercial.livros.liv_largura          IS 'Largura do livro em cm.';
+COMMENT ON COLUMN livraria_comercial.livros.liv_peso             IS 'Peso do livro em kg.';
+COMMENT ON COLUMN livraria_comercial.livros.liv_profundidade     IS 'Profundidade do livro em cm.';
+COMMENT ON COLUMN livraria_comercial.livros.liv_codigo_barras    IS 'Código de barras EAN/UPC.';
+COMMENT ON COLUMN livraria_comercial.livros.aut_id               IS 'FK para autor principal.';
+COMMENT ON COLUMN livraria_comercial.livros.edi_id               IS 'FK para editora.';
+COMMENT ON COLUMN livraria_comercial.livros.gpr_id               IS 'FK para grupo de precificação.';
+COMMENT ON COLUMN livraria_comercial.livros.liv_ativo            IS 'Flag indicando se livro está ativo no catálogo.';
+COMMENT ON COLUMN livraria_comercial.livros.liv_imagem_url       IS 'URL da imagem de capa do livro.';
 
-CREATE INDEX IF NOT EXISTS idx_livros_titulo_norm ON livros USING gin (liv_titulo_norm gin_trgm_ops);
-CREATE INDEX IF NOT EXISTS idx_livros_isbn ON livros(liv_isbn);
-CREATE INDEX IF NOT EXISTS idx_livros_autor ON livros(aut_id);
-CREATE INDEX IF NOT EXISTS idx_livros_editora ON livros(edi_id);
-CREATE INDEX IF NOT EXISTS idx_livros_grupo_precificacao ON livros(gpr_id);
+CREATE INDEX IF NOT EXISTS idx_livros_titulo_norm ON livraria_comercial.livros USING gin (liv_titulo_norm gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_livros_isbn ON livraria_comercial.livros(liv_isbn);
+CREATE INDEX IF NOT EXISTS idx_livros_autor ON livraria_comercial.livros(aut_id);
+CREATE INDEX IF NOT EXISTS idx_livros_editora ON livraria_comercial.livros(edi_id);
+CREATE INDEX IF NOT EXISTS idx_livros_grupo_precificacao ON livraria_comercial.livros(gpr_id);
 
 
 -- =============================================================================
 -- Tabela: livro_categorias (Tabela associativa N:N)
 -- =============================================================================
-CREATE TABLE IF NOT EXISTS livro_categorias (
+CREATE TABLE IF NOT EXISTS livraria_comercial.livro_categorias (
     lct_id          SERIAL          PRIMARY KEY,
-    liv_id          BIGINT          NOT NULL REFERENCES livros(liv_id) ON DELETE CASCADE,
-    cat_id          INTEGER         NOT NULL REFERENCES categorias(cat_id) ON DELETE CASCADE,
+    liv_id          BIGINT          NOT NULL REFERENCES livraria_comercial.livros(liv_id) ON DELETE CASCADE,
+    cat_id          INTEGER         NOT NULL REFERENCES livraria_comercial.categorias(cat_id) ON DELETE CASCADE,
     lct_criado_em   TIMESTAMPTZ     DEFAULT CURRENT_TIMESTAMP,
     
     CONSTRAINT uq_livro_categoria UNIQUE (liv_id, cat_id)
 );
 
-COMMENT ON TABLE livro_categorias           IS 'Tabela associativa para relacionamento N:N entre livros e categorias.';
-COMMENT ON COLUMN livro_categorias.lct_id   IS 'Identificador interno do relacionamento.';
-COMMENT ON COLUMN livro_categorias.liv_id   IS 'FK para livro.';
-COMMENT ON COLUMN livro_categorias.cat_id   IS 'FK para categoria.';
+COMMENT ON TABLE livraria_comercial.livro_categorias           IS 'Tabela associativa para relacionamento N:N entre livros e categorias.';
+COMMENT ON COLUMN livraria_comercial.livro_categorias.lct_id   IS 'Identificador interno do relacionamento.';
+COMMENT ON COLUMN livraria_comercial.livro_categorias.liv_id   IS 'FK para livro.';
+COMMENT ON COLUMN livraria_comercial.livro_categorias.cat_id   IS 'FK para categoria.';
 
-CREATE INDEX IF NOT EXISTS idx_livro_categorias_livro ON livro_categorias(liv_id);
-CREATE INDEX IF NOT EXISTS idx_livro_categorias_categoria ON livro_categorias(cat_id);
+CREATE INDEX IF NOT EXISTS idx_livro_categorias_livro ON livraria_comercial.livro_categorias(liv_id);
+CREATE INDEX IF NOT EXISTS idx_livro_categorias_categoria ON livraria_comercial.livro_categorias(cat_id);
 
 
 -- =============================================================================
 -- Tabela: estoques (Operação - Write-Heavy)
 -- =============================================================================
-CREATE TABLE IF NOT EXISTS estoques (
+CREATE TABLE IF NOT EXISTS livraria_comercial.estoques (
     etq_id                      BIGSERIAL       PRIMARY KEY,
     etq_uuid                    UUID            NOT NULL UNIQUE DEFAULT gen_random_uuid(),
-    liv_id                      BIGINT          NOT NULL UNIQUE REFERENCES livros(liv_id) ON DELETE CASCADE,
+    liv_id                      BIGINT          NOT NULL UNIQUE REFERENCES livraria_comercial.livros(liv_id) ON DELETE CASCADE,
     etq_quantidade_disponivel   INTEGER         NOT NULL DEFAULT 0 CHECK (etq_quantidade_disponivel >= 0),
     etq_quantidade_reservada    INTEGER         NOT NULL DEFAULT 0 CHECK (etq_quantidade_reservada >= 0),
     etq_preco_venda             DECIMAL(10,2)   NOT NULL CHECK (etq_preco_venda >= 0),
@@ -233,28 +233,28 @@ CREATE TABLE IF NOT EXISTS estoques (
     etq_atualizado_em           TIMESTAMPTZ     DEFAULT CURRENT_TIMESTAMP
 );
 
-COMMENT ON TABLE estoques                         IS 'Controle de estoque e preços por livro (dados operacionais mutáveis).';
-COMMENT ON COLUMN estoques.etq_id                 IS 'Identificador interno do estoque.';
-COMMENT ON COLUMN estoques.etq_uuid               IS 'Identificador público UUID do estoque.';
-COMMENT ON COLUMN estoques.liv_id                 IS 'FK única para livro (relacionamento 1:1).';
-COMMENT ON COLUMN estoques.etq_quantidade_disponivel IS 'Quantidade disponível para venda.';
-COMMENT ON COLUMN estoques.etq_quantidade_reservada  IS 'Quantidade reservada para pedidos em andamento.';
-COMMENT ON COLUMN estoques.etq_preco_venda        IS 'Preço de venda atual (calculado via RN0013).';
-COMMENT ON COLUMN estoques.etq_valor_custo_atual  IS 'Custo unitário atual do livro.';
-COMMENT ON COLUMN estoques.etq_ultimo_custo_calculado IS 'Data do último cálculo de custo (média ponderada).';
-COMMENT ON COLUMN estoques.etq_ativo              IS 'Flag indicando se registro de estoque está ativo.';
+COMMENT ON TABLE livraria_comercial.estoques                         IS 'Controle de estoque e preços por livro (dados operacionais mutáveis).';
+COMMENT ON COLUMN livraria_comercial.estoques.etq_id                 IS 'Identificador interno do estoque.';
+COMMENT ON COLUMN livraria_comercial.estoques.etq_uuid               IS 'Identificador público UUID do estoque.';
+COMMENT ON COLUMN livraria_comercial.estoques.liv_id                 IS 'FK única para livro (relacionamento 1:1).';
+COMMENT ON COLUMN livraria_comercial.estoques.etq_quantidade_disponivel IS 'Quantidade disponível para venda.';
+COMMENT ON COLUMN livraria_comercial.estoques.etq_quantidade_reservada  IS 'Quantidade reservada para pedidos em andamento.';
+COMMENT ON COLUMN livraria_comercial.estoques.etq_preco_venda        IS 'Preço de venda atual (calculado via RN0013).';
+COMMENT ON COLUMN livraria_comercial.estoques.etq_valor_custo_atual  IS 'Custo unitário atual do livro.';
+COMMENT ON COLUMN livraria_comercial.estoques.etq_ultimo_custo_calculado IS 'Data do último cálculo de custo (média ponderada).';
+COMMENT ON COLUMN livraria_comercial.estoques.etq_ativo              IS 'Flag indicando se registro de estoque está ativo.';
 
-CREATE INDEX IF NOT EXISTS idx_estoques_livro ON estoques(liv_id);
+CREATE INDEX IF NOT EXISTS idx_estoques_livro ON livraria_comercial.estoques(liv_id);
 
 
 -- =============================================================================
 -- Tabela: historico_entradas_estoque (Suporte RN0051)
 -- =============================================================================
-CREATE TABLE IF NOT EXISTS historico_entradas_estoque (
+CREATE TABLE IF NOT EXISTS livraria_comercial.historico_entradas_estoque (
     hee_id              BIGSERIAL       PRIMARY KEY,
     hee_uuid            UUID            NOT NULL UNIQUE DEFAULT gen_random_uuid(),
-    liv_id              BIGINT          NOT NULL REFERENCES livros(liv_id),
-    for_id              INTEGER         NOT NULL REFERENCES fornecedores(for_id),
+    liv_id              BIGINT          NOT NULL REFERENCES livraria_comercial.livros(liv_id),
+    for_id              INTEGER         NOT NULL REFERENCES livraria_comercial.fornecedores(for_id),
     hee_quantidade      INTEGER         NOT NULL CHECK (hee_quantidade > 0),
     hee_valor_custo_unitario DECIMAL(10,2) NOT NULL CHECK (hee_valor_custo_unitario >= 0),
     hee_valor_total     DECIMAL(10,2)   NOT NULL CHECK (hee_valor_total >= 0),
@@ -264,31 +264,31 @@ CREATE TABLE IF NOT EXISTS historico_entradas_estoque (
     hee_criado_em       TIMESTAMPTZ     DEFAULT CURRENT_TIMESTAMP
 );
 
-COMMENT ON TABLE historico_entradas_estoque         IS 'Histórico de entradas de estoque para cálculo de custo médio (RN0051).';
-COMMENT ON COLUMN historico_entradas_estoque.hee_id         IS 'Identificador interno do registro.';
-COMMENT ON COLUMN historico_entradas_estoque.hee_uuid       IS 'Identificador público UUID do registro.';
-COMMENT ON COLUMN historico_entradas_estoque.liv_id         IS 'FK para livro.';
-COMMENT ON COLUMN historico_entradas_estoque.for_id         IS 'FK para fornecedor.';
-COMMENT ON COLUMN historico_entradas_estoque.hee_quantidade IS 'Quantidade recebida.';
-COMMENT ON COLUMN historico_entradas_estoque.hee_valor_custo_unitario IS 'Custo unitário na entrada.';
-COMMENT ON COLUMN historico_entradas_estoque.hee_valor_total IS 'Valor total da entrada (quantidade * custo).';
-COMMENT ON COLUMN historico_entradas_estoque.hee_data_entrada IS 'Data da entrada do estoque.';
-COMMENT ON COLUMN historico_entradas_estoque.hee_numero_nota_fiscal IS 'Número da nota fiscal.';
-COMMENT ON COLUMN historico_entradas_estoque.hee_observacoes IS 'Observações adicionais.';
+COMMENT ON TABLE livraria_comercial.historico_entradas_estoque         IS 'Histórico de entradas de estoque para cálculo de custo médio (RN0051).';
+COMMENT ON COLUMN livraria_comercial.historico_entradas_estoque.hee_id         IS 'Identificador interno do registro.';
+COMMENT ON COLUMN livraria_comercial.historico_entradas_estoque.hee_uuid       IS 'Identificador público UUID do registro.';
+COMMENT ON COLUMN livraria_comercial.historico_entradas_estoque.liv_id         IS 'FK para livro.';
+COMMENT ON COLUMN livraria_comercial.historico_entradas_estoque.for_id         IS 'FK para fornecedor.';
+COMMENT ON COLUMN livraria_comercial.historico_entradas_estoque.hee_quantidade IS 'Quantidade recebida.';
+COMMENT ON COLUMN livraria_comercial.historico_entradas_estoque.hee_valor_custo_unitario IS 'Custo unitário na entrada.';
+COMMENT ON COLUMN livraria_comercial.historico_entradas_estoque.hee_valor_total IS 'Valor total da entrada (quantidade * custo).';
+COMMENT ON COLUMN livraria_comercial.historico_entradas_estoque.hee_data_entrada IS 'Data da entrada do estoque.';
+COMMENT ON COLUMN livraria_comercial.historico_entradas_estoque.hee_numero_nota_fiscal IS 'Número da nota fiscal.';
+COMMENT ON COLUMN livraria_comercial.historico_entradas_estoque.hee_observacoes IS 'Observações adicionais.';
 
-CREATE INDEX IF NOT EXISTS idx_historico_entradas_livro ON historico_entradas_estoque(liv_id);
-CREATE INDEX IF NOT EXISTS idx_historico_entradas_fornecedor ON historico_entradas_estoque(for_id);
-CREATE INDEX IF NOT EXISTS idx_historico_entradas_data ON historico_entradas_estoque(hee_data_entrada);
+CREATE INDEX IF NOT EXISTS idx_historico_entradas_livro ON livraria_comercial.historico_entradas_estoque(liv_id);
+CREATE INDEX IF NOT EXISTS idx_historico_entradas_fornecedor ON livraria_comercial.historico_entradas_estoque(for_id);
+CREATE INDEX IF NOT EXISTS idx_historico_entradas_data ON livraria_comercial.historico_entradas_estoque(hee_data_entrada);
 
 
 -- =============================================================================
 -- Tabela: avaliacoes_livro (Para RN0068)
 -- =============================================================================
-CREATE TABLE IF NOT EXISTS avaliacoes_livro (
+CREATE TABLE IF NOT EXISTS livraria_comercial.avaliacoes_livro (
     avl_id              BIGSERIAL       PRIMARY KEY,
     avl_uuid            UUID            NOT NULL UNIQUE DEFAULT gen_random_uuid(),
-    liv_id              BIGINT          NOT NULL REFERENCES livros(liv_id) ON DELETE CASCADE,
-    usu_id              BIGINT          NOT NULL REFERENCES usuarios(usu_id),
+    liv_id              BIGINT          NOT NULL REFERENCES livraria_comercial.livros(liv_id) ON DELETE CASCADE,
+    usu_id              BIGINT          NOT NULL REFERENCES livraria_gestao.usuarios(usu_id),
     avl_nota            INTEGER         NOT NULL CHECK (avl_nota >= 1 AND avl_nota <= 5),
     avl_comentario      VARCHAR(1000),
     avl_aprovado        BOOLEAN         NOT NULL DEFAULT FALSE,
@@ -298,18 +298,18 @@ CREATE TABLE IF NOT EXISTS avaliacoes_livro (
     CONSTRAINT uq_usuario_livro_avaliacao UNIQUE (usu_id, liv_id)
 );
 
-COMMENT ON TABLE avaliacoes_livro               IS 'Avaliações de usuários para livros (RN0068).';
-COMMENT ON COLUMN avaliacoes_livro.avl_id       IS 'Identificador interno da avaliação.';
-COMMENT ON COLUMN avaliacoes_livro.avl_uuid     IS 'Identificador público UUID da avaliação.';
-COMMENT ON COLUMN avaliacoes_livro.liv_id       IS 'FK para livro avaliado.';
-COMMENT ON COLUMN avaliacoes_livro.usu_id       IS 'FK para usuário que avaliou.';
-COMMENT ON COLUMN avaliacoes_livro.avl_nota     IS 'Nota de 1 a 5 estrelas.';
-COMMENT ON COLUMN avaliacoes_livro.avl_comentario IS 'Comentário opcional do usuário.';
-COMMENT ON COLUMN avaliacoes_livro.avl_aprovado IS 'Flag indicando se avaliação foi aprovada para exibição.';
+COMMENT ON TABLE livraria_comercial.avaliacoes_livro               IS 'Avaliações de usuários para livros (RN0068).';
+COMMENT ON COLUMN livraria_comercial.avaliacoes_livro.avl_id       IS 'Identificador interno da avaliação.';
+COMMENT ON COLUMN livraria_comercial.avaliacoes_livro.avl_uuid     IS 'Identificador público UUID da avaliação.';
+COMMENT ON COLUMN livraria_comercial.avaliacoes_livro.liv_id       IS 'FK para livro avaliado.';
+COMMENT ON COLUMN livraria_comercial.avaliacoes_livro.usu_id       IS 'FK para usuário que avaliou.';
+COMMENT ON COLUMN livraria_comercial.avaliacoes_livro.avl_nota     IS 'Nota de 1 a 5 estrelas.';
+COMMENT ON COLUMN livraria_comercial.avaliacoes_livro.avl_comentario IS 'Comentário opcional do usuário.';
+COMMENT ON COLUMN livraria_comercial.avaliacoes_livro.avl_aprovado IS 'Flag indicando se avaliação foi aprovada para exibição.';
 
-CREATE INDEX IF NOT EXISTS idx_avaliacoes_livro ON avaliacoes_livro(liv_id);
-CREATE INDEX IF NOT EXISTS idx_avaliacoes_usuario ON avaliacoes_livro(usu_id);
-CREATE INDEX IF NOT EXISTS idx_avaliacoes_aprovado ON avaliacoes_livro(avl_aprovado);
+CREATE INDEX IF NOT EXISTS idx_avaliacoes_livro ON livraria_comercial.avaliacoes_livro(liv_id);
+CREATE INDEX IF NOT EXISTS idx_avaliacoes_usuario ON livraria_comercial.avaliacoes_livro(usu_id);
+CREATE INDEX IF NOT EXISTS idx_avaliacoes_aprovado ON livraria_comercial.avaliacoes_livro(avl_aprovado);
 
 
 -- =============================================================================
@@ -317,7 +317,7 @@ CREATE INDEX IF NOT EXISTS idx_avaliacoes_aprovado ON avaliacoes_livro(avl_aprov
 -- =============================================================================
 
 -- Função para normalizar texto (remove acentos, converte para maiúsculas)
-CREATE OR REPLACE FUNCTION fn_normalizar_texto(input_text TEXT)
+CREATE OR REPLACE FUNCTION livraria_comercial.fn_normalizar_texto(input_text TEXT)
 RETURNS TEXT LANGUAGE plpgsql IMMUTABLE AS $$
 BEGIN
     RETURN UPPER(UNACCENT(input_text));
@@ -325,94 +325,94 @@ END;
 $$;
 
 -- Trigger: normalizar nome de autor
-CREATE OR REPLACE FUNCTION fn_gerar_trigrama_autores()
+CREATE OR REPLACE FUNCTION livraria_comercial.fn_gerar_trigrama_autores()
 RETURNS TRIGGER LANGUAGE plpgsql AS $$
 BEGIN
-    NEW.aut_nome_norm := fn_normalizar_texto(NEW.aut_nome);
+    NEW.aut_nome_norm := livraria_comercial.fn_normalizar_texto(NEW.aut_nome);
     NEW.aut_uuid := COALESCE(NEW.aut_uuid, gen_random_uuid());
     RETURN NEW;
 END;
 $$;
 
-DROP TRIGGER IF EXISTS tg_autores_normalizar ON autores;
+DROP TRIGGER IF EXISTS tg_autores_normalizar ON livraria_comercial.autores;
 CREATE TRIGGER tg_autores_normalizar
-    BEFORE INSERT OR UPDATE ON autores
+    BEFORE INSERT OR UPDATE ON livraria_comercial.autores
     FOR EACH ROW
-    EXECUTE FUNCTION fn_gerar_trigrama_autores();
+    EXECUTE FUNCTION livraria_comercial.fn_gerar_trigrama_autores();
 
 
 -- Trigger: normalizar nome de editora
-CREATE OR REPLACE FUNCTION fn_gerar_trigrama_editoras()
+CREATE OR REPLACE FUNCTION livraria_comercial.fn_gerar_trigrama_editoras()
 RETURNS TRIGGER LANGUAGE plpgsql AS $$
 BEGIN
-    NEW.edi_nome_norm := fn_normalizar_texto(NEW.edi_nome);
+    NEW.edi_nome_norm := livraria_comercial.fn_normalizar_texto(NEW.edi_nome);
     NEW.edi_uuid := COALESCE(NEW.edi_uuid, gen_random_uuid());
     RETURN NEW;
 END;
 $$;
 
-DROP TRIGGER IF EXISTS tg_editoras_normalizar ON editoras;
+DROP TRIGGER IF EXISTS tg_editoras_normalizar ON livraria_comercial.editoras;
 CREATE TRIGGER tg_editoras_normalizar
-    BEFORE INSERT OR UPDATE ON editoras
+    BEFORE INSERT OR UPDATE ON livraria_comercial.editoras
     FOR EACH ROW
-    EXECUTE FUNCTION fn_gerar_trigrama_editoras();
+    EXECUTE FUNCTION livraria_comercial.fn_gerar_trigrama_editoras();
 
 
 -- Trigger: normalizar nome de categoria
-CREATE OR REPLACE FUNCTION fn_gerar_trigrama_categorias()
+CREATE OR REPLACE FUNCTION livraria_comercial.fn_gerar_trigrama_categorias()
 RETURNS TRIGGER LANGUAGE plpgsql AS $$
 BEGIN
-    NEW.cat_nome_norm := fn_normalizar_texto(NEW.cat_nome);
+    NEW.cat_nome_norm := livraria_comercial.fn_normalizar_texto(NEW.cat_nome);
     NEW.cat_uuid := COALESCE(NEW.cat_uuid, gen_random_uuid());
     RETURN NEW;
 END;
 $$;
 
-DROP TRIGGER IF EXISTS tg_categorias_normalizar ON categorias;
+DROP TRIGGER IF EXISTS tg_categorias_normalizar ON livraria_comercial.categorias;
 CREATE TRIGGER tg_categorias_normalizar
-    BEFORE INSERT OR UPDATE ON categorias
+    BEFORE INSERT OR UPDATE ON livraria_comercial.categorias
     FOR EACH ROW
-    EXECUTE FUNCTION fn_gerar_trigrama_categorias();
+    EXECUTE FUNCTION livraria_comercial.fn_gerar_trigrama_categorias();
 
 
 -- Trigger: normalizar título de livro
-CREATE OR REPLACE FUNCTION fn_gerar_trigrama_livros()
+CREATE OR REPLACE FUNCTION livraria_comercial.fn_gerar_trigrama_livros()
 RETURNS TRIGGER LANGUAGE plpgsql AS $$
 BEGIN
-    NEW.liv_titulo_norm := fn_normalizar_texto(NEW.liv_titulo);
+    NEW.liv_titulo_norm := livraria_comercial.fn_normalizar_texto(NEW.liv_titulo);
     NEW.liv_uuid := COALESCE(NEW.liv_uuid, gen_random_uuid());
     RETURN NEW;
 END;
 $$;
 
-DROP TRIGGER IF EXISTS tg_livros_normalizar ON livros;
+DROP TRIGGER IF EXISTS tg_livros_normalizar ON livraria_comercial.livros;
 CREATE TRIGGER tg_livros_normalizar
-    BEFORE INSERT OR UPDATE ON livros
+    BEFORE INSERT OR UPDATE ON livraria_comercial.livros
     FOR EACH ROW
-    EXECUTE FUNCTION fn_gerar_trigrama_livros();
+    EXECUTE FUNCTION livraria_comercial.fn_gerar_trigrama_livros();
 
 
 -- Trigger: normalizar nome de fornecedor
-CREATE OR REPLACE FUNCTION fn_gerar_trigrama_fornecedores()
+CREATE OR REPLACE FUNCTION livraria_comercial.fn_gerar_trigrama_fornecedores()
 RETURNS TRIGGER LANGUAGE plpgsql AS $$
 BEGIN
-    NEW.for_nome_norm := fn_normalizar_texto(NEW.for_nome);
+    NEW.for_nome_norm := livraria_comercial.fn_normalizar_texto(NEW.for_nome);
     NEW.for_uuid := COALESCE(NEW.for_uuid, gen_random_uuid());
     RETURN NEW;
 END;
 $$;
 
-DROP TRIGGER IF EXISTS tg_fornecedores_normalizar ON fornecedores;
+DROP TRIGGER IF EXISTS tg_fornecedores_normalizar ON livraria_comercial.fornecedores;
 CREATE TRIGGER tg_fornecedores_normalizar
-    BEFORE INSERT OR UPDATE ON fornecedores
+    BEFORE INSERT OR UPDATE ON livraria_comercial.fornecedores
     FOR EACH ROW
-    EXECUTE FUNCTION fn_gerar_trigrama_fornecedores();
+    EXECUTE FUNCTION livraria_comercial.fn_gerar_trigrama_fornecedores();
 
 
 -- =============================================================================
 -- Trigger: atualizar timestamp automaticamente
 -- =============================================================================
-CREATE OR REPLACE FUNCTION fn_atualizar_timestamp_livros_estoque()
+CREATE OR REPLACE FUNCTION livraria_comercial.fn_atualizar_timestamp_livros_estoque()
 RETURNS TRIGGER LANGUAGE plpgsql AS $$
 BEGIN
     IF TG_TABLE_NAME = 'autores' THEN NEW.aut_atualizado_em := NOW(); END IF;
@@ -425,38 +425,38 @@ BEGIN
 END;
 $$;
 
-DROP TRIGGER IF EXISTS tg_autores_atualizado_em ON autores;
+DROP TRIGGER IF EXISTS tg_autores_atualizado_em ON livraria_comercial.autores;
 CREATE TRIGGER tg_autores_atualizado_em
-    BEFORE UPDATE ON autores
+    BEFORE UPDATE ON livraria_comercial.autores
     FOR EACH ROW
-    EXECUTE FUNCTION fn_atualizar_timestamp_livros_estoque();
+    EXECUTE FUNCTION livraria_comercial.fn_atualizar_timestamp_livros_estoque();
 
-DROP TRIGGER IF EXISTS tg_editoras_atualizado_em ON editoras;
+DROP TRIGGER IF EXISTS tg_editoras_atualizado_em ON livraria_comercial.editoras;
 CREATE TRIGGER tg_editoras_atualizado_em
-    BEFORE UPDATE ON editoras
+    BEFORE UPDATE ON livraria_comercial.editoras
     FOR EACH ROW
-    EXECUTE FUNCTION fn_atualizar_timestamp_livros_estoque();
+    EXECUTE FUNCTION livraria_comercial.fn_atualizar_timestamp_livros_estoque();
 
-DROP TRIGGER IF EXISTS tg_livros_atualizado_em ON livros;
+DROP TRIGGER IF EXISTS tg_livros_atualizado_em ON livraria_comercial.livros;
 CREATE TRIGGER tg_livros_atualizado_em
-    BEFORE UPDATE ON livros
+    BEFORE UPDATE ON livraria_comercial.livros
     FOR EACH ROW
-    EXECUTE FUNCTION fn_atualizar_timestamp_livros_estoque();
+    EXECUTE FUNCTION livraria_comercial.fn_atualizar_timestamp_livros_estoque();
 
-DROP TRIGGER IF EXISTS tg_estoques_atualizado_em ON estoques;
+DROP TRIGGER IF EXISTS tg_estoques_atualizado_em ON livraria_comercial.estoques;
 CREATE TRIGGER tg_estoques_atualizado_em
-    BEFORE UPDATE ON estoques
+    BEFORE UPDATE ON livraria_comercial.estoques
     FOR EACH ROW
-    EXECUTE FUNCTION fn_atualizar_timestamp_livros_estoque();
+    EXECUTE FUNCTION livraria_comercial.fn_atualizar_timestamp_livros_estoque();
 
-DROP TRIGGER IF EXISTS tg_fornecedores_atualizado_em ON fornecedores;
+DROP TRIGGER IF EXISTS tg_fornecedores_atualizado_em ON livraria_comercial.fornecedores;
 CREATE TRIGGER tg_fornecedores_atualizado_em
-    BEFORE UPDATE ON fornecedores
+    BEFORE UPDATE ON livraria_comercial.fornecedores
     FOR EACH ROW
-    EXECUTE FUNCTION fn_atualizar_timestamp_livros_estoque();
+    EXECUTE FUNCTION livraria_comercial.fn_atualizar_timestamp_livros_estoque();
 
-DROP TRIGGER IF EXISTS tg_avaliacoes_livro_atualizado_em ON avaliacoes_livro;
+DROP TRIGGER IF EXISTS tg_avaliacoes_livro_atualizado_em ON livraria_comercial.avaliacoes_livro;
 CREATE TRIGGER tg_avaliacoes_livro_atualizado_em
-    BEFORE UPDATE ON avaliacoes_livro
+    BEFORE UPDATE ON livraria_comercial.avaliacoes_livro
     FOR EACH ROW
-    EXECUTE FUNCTION fn_atualizar_timestamp_livros_estoque();
+    EXECUTE FUNCTION livraria_comercial.fn_atualizar_timestamp_livros_estoque();

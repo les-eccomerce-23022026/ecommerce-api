@@ -24,7 +24,7 @@ BEGIN
     -- Obtém o id interno do papel 'admin' de forma segura
     SELECT pap_id
     INTO   v_id_papel_admin
-    FROM   papeis
+    FROM   livraria_comercial.papeis
     WHERE  pap_descricao = 'admin'
     LIMIT  1;
 
@@ -32,7 +32,7 @@ BEGIN
         RAISE EXCEPTION 'Papel "admin" não encontrado. Execute 001_seeds_tipos_referencia.sql antes deste script.';
     END IF;
 
-    INSERT INTO usuarios (
+    INSERT INTO livraria_gestao.usuarios (
         usu_uuid,
         usu_nome,
         usu_email,
@@ -40,6 +40,7 @@ BEGIN
         usu_senha_hash,
         pap_id,
         usu_ativo,
+        loj_id,
         usu_is_admin_mestre
     )
     VALUES (
@@ -50,6 +51,7 @@ BEGIN
         '$2a$10$C0kM1fJ942MS.BnEkxtZauPsu7PTQn8uR9FgeEdhhN9lXfiQ9F1hW',
         v_id_papel_admin,
         TRUE,
+        1,  -- loj_id = 1 (loja padrão)
         TRUE
     )
     ON CONFLICT (usu_email) DO NOTHING;

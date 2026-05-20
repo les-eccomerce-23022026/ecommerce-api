@@ -1,6 +1,7 @@
 -- =============================================================================
 -- DDL 004 — Tabela de telefones do usuário
 -- Sistema: LES – E-Commerce de Livros
+-- Schema: livraria_gestao
 -- =============================================================================
 
 -- -----------------------------------------------------------------------------
@@ -16,7 +17,7 @@
 --   • tel_ddd: exatamente 2 dígitos. tel_numero: 8 ou 9 dígitos (somente números).
 --     Formatação (ex.: (11) 91234-5678) é responsabilidade da camada de apresentação.
 -- -----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS telefones (
+CREATE TABLE IF NOT EXISTS livraria_gestao.telefones (
     tel_id              BIGSERIAL   PRIMARY KEY,
     tel_uuid            UUID        NOT NULL    DEFAULT gen_random_uuid(),
     usu_id              BIGINT      NOT NULL,
@@ -44,39 +45,39 @@ CREATE TABLE IF NOT EXISTS telefones (
     CONSTRAINT ck_telefones_numero_numerico
         CHECK (tel_numero ~ '^[0-9]{8,9}$'),
 
-    CONSTRAINT fk_telefones_usuarios
-        FOREIGN KEY (usu_id)
-        REFERENCES usuarios (usu_id)
-        ON UPDATE CASCADE
-        ON DELETE CASCADE,
-
-    CONSTRAINT fk_telefones_tipos
-        FOREIGN KEY (ttp_id)
-        REFERENCES tipos_telefones (ttp_id)
-        ON UPDATE CASCADE
-        ON DELETE RESTRICT
+    CONSTRAINT fk_telefones_usuario FOREIGN KEY (usu_id) REFERENCES livraria_gestao.usuarios(usu_id) ON DELETE CASCADE,
+    CONSTRAINT fk_telefones_tipo FOREIGN KEY (ttp_id) REFERENCES livraria_ref.tipos_telefones(ttp_id) ON DELETE RESTRICT
 );
 
-COMMENT ON TABLE  telefones                   IS 'Objetos de valor de telefone vinculados a um usuário. Um usuário pode ter N telefones, mas apenas um principal.';
-COMMENT ON COLUMN telefones.tel_id            IS 'Chave primária interna. Nunca exposta nas rotas HTTP.';
-COMMENT ON COLUMN telefones.tel_uuid          IS 'Identificador público (UUID v4). Retornado nas rotas HTTP.';
-COMMENT ON COLUMN telefones.usu_id            IS 'FK para usuarios — dono do telefone.';
-COMMENT ON COLUMN telefones.ttp_id            IS 'FK para tipos_telefones (celular, residencial, comercial…).';
-COMMENT ON COLUMN telefones.tel_ddd           IS 'Código DDD de 2 dígitos (somente números).';
-COMMENT ON COLUMN telefones.tel_numero        IS 'Número local com 8 ou 9 dígitos (somente números, sem formatação).';
-COMMENT ON COLUMN telefones.tel_principal     IS 'TRUE indica que este é o telefone de contato principal do usuário.';
-COMMENT ON COLUMN telefones.tel_criado_em     IS 'Timestamp de criação do registro.';
-COMMENT ON COLUMN telefones.tel_atualizado_em IS 'Timestamp da última atualização.';
+COMMENT ON TABLE  livraria_gestao.telefones                   IS 'Objetos de valor de telefone vinculados a um usuário. Um usuário pode ter N telefones, mas apenas um principal.';
+COMMENT ON COLUMN livraria_gestao.telefones.tel_id            IS 'Chave primária interna. Nunca exposta nas rotas HTTP.';
+COMMENT ON COLUMN livraria_gestao.telefones.tel_uuid          IS 'Identificador público (UUID v4). Retornado nas rotas HTTP.';
+COMMENT ON COLUMN livraria_gestao.telefones.usu_id            IS 'FK para usuarios — dono do telefone.';
+COMMENT ON COLUMN livraria_gestao.telefones.ttp_id            IS 'FK para tipos_telefones (celular, residencial, comercial…).';
+COMMENT ON COLUMN livraria_gestao.telefones.tel_ddd           IS 'Código DDD de 2 dígitos (somente números).';
+COMMENT ON COLUMN livraria_gestao.telefones.tel_numero        IS 'Número local com 8 ou 9 dígitos (somente números, sem formatação).';
+COMMENT ON COLUMN livraria_gestao.telefones.tel_principal     IS 'TRUE indica que este é o telefone de contato principal do usuário.';
+COMMENT ON COLUMN livraria_gestao.telefones.tel_criado_em      IS 'Timestamp de criação do telefone.';
+COMMENT ON COLUMN livraria_gestao.telefones.tel_atualizado_em  IS 'Timestamp da última atualização (mantido via trigger).';
 
 
--- Índices de acesso frequente
-CREATE INDEX IF NOT EXISTS idx_telefones_usuario   ON telefones (usu_id);
-CREATE INDEX IF NOT EXISTS idx_telefones_principal ON telefones (usu_id) WHERE tel_principal = TRUE;
+-- -----------------------------------------------------------------------------
+-- Índices de busca frequente
+-- -----------------------------------------------------------------------------
+CREATE INDEX IF NOT EXISTS idx_telefones_usuario ON livraria_gestao.telefones(usu_id);
+CREATE INDEX IF NOT EXISTS idx_telefones_tipo ON livraria_gestao.telefones(ttp_id);
 
 
--- Trigger de atualização automática de tel_atualizado_em
--- E atualizamos a função para incluir telefones
-CREATE OR REPLACE FUNCTION fn_atualizar_timestamp()
+-- -----------------------------------------------------------------------------
+-- Trigger: atualiza tel_atualizado_em automaticamente em cada UPDATE
+-- -----------------------------------------------------------------------------
+DROP TRIGGER IF EXISTS tg_telefones_atualizado_em ON livraria_gestao.telefones;
+CREATE TRIGGER tg_telefones_atualizado_em
+    BEFORE UPDATE ON livraria_gestao.telefones
+    FOR EACH ROW
+    EXECUTE FUNCTION livraria_gestao.fn_atualizar_timestamp();
+
+CREATE OR REPLACE FUNCTION livraria_gestao.fn_atualizar_timestamp()
 RETURNS TRIGGER LANGUAGE plpgsql AS $$
 BEGIN
     IF TG_TABLE_NAME = 'usuarios' THEN NEW.usu_atualizado_em := NOW(); END IF;
@@ -86,8 +87,8 @@ BEGIN
 END;
 $$;
 
-DROP TRIGGER IF EXISTS tg_telefones_atualizado_em ON telefones;
+DROP TRIGGER IF EXISTS tg_telefones_atualizado_em ON livraria_gestao.telefones;
 CREATE TRIGGER tg_telefones_atualizado_em
-    BEFORE UPDATE ON telefones
+    BEFORE UPDATE ON livraria_gestao.telefones
     FOR EACH ROW
-    EXECUTE FUNCTION fn_atualizar_timestamp();
+    EXECUTE FUNCTION livraria_gestao.fn_atualizar_timestamp();
