@@ -50,5 +50,10 @@ export function registrarRotasClientes(app: IRouter): void {
   app.get('/clientes', autenticacaoMiddleware, adminOnlyMiddleware, (requisicao, resposta) =>
     ControladorConsultaClientes.consultarClientes(requisicao, resposta),
   );
+
+  // Rota de detalhe de cliente por UUID (RF0024)
+  app.get('/clientes/:uuid', autenticacaoMiddleware, adminOnlyMiddleware, (requisicao, resposta) =>
+    ControladorConsultaClientes.obterClientePorUuid(requisicao, resposta),
+  );
 }
 

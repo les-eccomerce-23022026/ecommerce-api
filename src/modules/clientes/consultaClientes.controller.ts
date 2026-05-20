@@ -9,6 +9,26 @@ const { servicoConsultaClientes } = di;
  */
 export class ControladorConsultaClientes {
   /**
+   * Obtém detalhes de um cliente por UUID (RF0024).
+   */
+  public static async obterClientePorUuid(requisicao: Request, resposta: Response): Promise<Response> {
+    try {
+      const { uuid } = requisicao.params;
+
+      const cliente = await servicoConsultaClientes.obterClientePorUuid(uuid);
+
+      if (!cliente) {
+        return RespostaPadrao.enviarErro(resposta, 404, 'Cliente não encontrado.');
+      }
+
+      return RespostaPadrao.enviarSucesso(resposta, 200, cliente);
+    } catch (erro) {
+      const mensagem = RespostaPadrao.obterMensagemErro(erro, 'Erro ao obter cliente.');
+      return RespostaPadrao.enviarErro(resposta, 400, mensagem);
+    }
+  }
+
+  /**
    * Lista clientes com filtros opcionais (RF0024).
    */
   public static async consultarClientes(requisicao: Request, resposta: Response): Promise<Response> {

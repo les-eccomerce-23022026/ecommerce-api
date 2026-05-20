@@ -34,6 +34,39 @@ export class ServicoConsultaClientes {
   }
 
   /**
+   * Obtém detalhes de um cliente por UUID (RF0024).
+   */
+  async obterClientePorUuid(uuid: string): Promise<{
+    uuid: string;
+    nome: string;
+    email: string;
+    cpf?: string;
+    cnpj?: string;
+    tipoPessoa?: string;
+    ativo: boolean;
+    criadoEm: Date;
+    isAdminMestre?: boolean;
+  } | null> {
+    const cliente = await this.repositorioUsuarios.buscarPorUuid(uuid);
+    
+    if (!cliente) {
+      return null;
+    }
+
+    return {
+      uuid: cliente.uuid,
+      nome: cliente.nome,
+      email: cliente.email,
+      cpf: cliente.cpf,
+      cnpj: cliente.cnpj,
+      tipoPessoa: cliente.tipoPessoa,
+      ativo: cliente.ativo,
+      criadoEm: cliente.criadoEm || new Date(),
+      isAdminMestre: cliente.isAdminMestre
+    };
+  }
+
+  /**
    * Consulta clientes com filtros e paginação (RF0024).
    */
   async consultarClientes(filtros: IFiltrosConsultaClientes): Promise<IResultadoConsultaClientes> {
