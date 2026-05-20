@@ -266,4 +266,58 @@ export class ControladorLivros {
       RespostaPadrao.enviarErro(res, 500, msg);
     }
   };
+
+  inativarLivro = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { uuid } = req.params;
+      const { motivo, categoriaInativacao } = req.body;
+
+      if (!motivo) {
+        RespostaPadrao.enviarErro(res, 400, 'Motivo da inativação é obrigatório.');
+        return;
+      }
+
+      const livroInativado = await this.servico.inativarLivro(uuid, motivo, categoriaInativacao);
+      RespostaPadrao.enviarSucesso(res, 200, livroInativado);
+    } catch (err: unknown) {
+      const msg = RespostaPadrao.obterMensagemErro(err, 'Erro ao inativar livro');
+      Logger.error(`[ControladorLivros.inativarLivro] Erro: ${msg}`, err instanceof Error ? err.stack : String(err));
+      RespostaPadrao.enviarErro(res, 500, msg);
+    }
+  };
+
+  ativarLivro = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { uuid } = req.params;
+      const { motivo, categoriaAtivacao } = req.body;
+
+      if (!motivo) {
+        RespostaPadrao.enviarErro(res, 400, 'Motivo da ativação é obrigatório.');
+        return;
+      }
+
+      const livroAtivado = await this.servico.ativarLivro(uuid, motivo, categoriaAtivacao);
+      RespostaPadrao.enviarSucesso(res, 200, livroAtivado);
+    } catch (err: unknown) {
+      const msg = RespostaPadrao.obterMensagemErro(err, 'Erro ao ativar livro');
+      Logger.error(`[ControladorLivros.ativarLivro] Erro: ${msg}`, err instanceof Error ? err.stack : String(err));
+      RespostaPadrao.enviarErro(res, 500, msg);
+    }
+  };
+
+  detalhesAdmin = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { uuid } = req.params;
+      const livro = await this.servico.obterPorUuid(uuid);
+      if (!livro) {
+        RespostaPadrao.enviarErro(res, 404, 'Livro não encontrado');
+        return;
+      }
+      RespostaPadrao.enviarSucesso(res, 200, livro);
+    } catch (err: unknown) {
+      const msg = RespostaPadrao.obterMensagemErro(err, 'Erro ao obter livro');
+      Logger.error(`[ControladorLivros.detalhesAdmin] Erro: ${msg}`, err instanceof Error ? err.stack : String(err));
+      RespostaPadrao.enviarErro(res, 500, msg);
+    }
+  };
 }

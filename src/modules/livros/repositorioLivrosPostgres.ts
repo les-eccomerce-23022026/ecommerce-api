@@ -353,4 +353,22 @@ export class RepositorioLivrosPostgres {
     }
     return livroAtualizado;
   }
+
+  async inativarLivro(uuid: string): Promise<void> {
+    const sql = `
+      UPDATE livros
+      SET liv_ativo = FALSE, liv_atualizado_em = CURRENT_TIMESTAMP
+      WHERE liv_uuid = $1
+    `;
+    await this.db.executar(sql, [uuid]);
+  }
+
+  async ativarLivro(uuid: string): Promise<void> {
+    const sql = `
+      UPDATE livros
+      SET liv_ativo = TRUE, liv_atualizado_em = CURRENT_TIMESTAMP
+      WHERE liv_uuid = $1
+    `;
+    await this.db.executar(sql, [uuid]);
+  }
 }

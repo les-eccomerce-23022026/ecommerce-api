@@ -38,6 +38,27 @@ export function registrarRotasLivros(router: Router): void {
     controller.atualizarLivro.bind(controller),
   );
 
+  router.patch(
+    '/admin/livros/:uuid([0-9a-fA-F-]{36})/inativar',
+    autenticacaoMiddleware,
+    adminOnlyMiddleware,
+    controller.inativarLivro.bind(controller),
+  );
+
+  router.patch(
+    '/admin/livros/:uuid([0-9a-fA-F-]{36})/ativar',
+    autenticacaoMiddleware,
+    adminOnlyMiddleware,
+    controller.ativarLivro.bind(controller),
+  );
+
+  router.get(
+    '/admin/livros/:uuid([0-9a-fA-F-]{36})',
+    autenticacaoMiddleware,
+    adminOnlyMiddleware,
+    controller.detalhesAdmin.bind(controller),
+  );
+
   router.post(
     '/admin/livros/lote',
     autenticacaoMiddleware,

@@ -205,6 +205,38 @@ export class ServicoLivros {
     return this.bulkInsert.inserirEditorasEmLote(editoras);
   }
 
+  async inativarLivro(uuid: string, motivo: string, categoriaInativacao?: string): Promise<ILivroCatalogoDto> {
+    const livro = await this.repo.obterPorUuid(uuid);
+    if (!livro) {
+      throw new Error('Livro não encontrado.');
+    }
+    if (!livro.status || livro.status === 'Inativo') {
+      throw new Error('Livro já está inativo.');
+    }
+
+    await this.repo.inativarLivro(uuid);
+    return this.repo.obterPorUuid(uuid).then((l) => {
+      if (!l) throw new Error('Erro ao recuperar livro após inativação');
+      return l;
+    });
+  }
+
+  async ativarLivro(uuid: string, motivo: string, categoriaAtivacao?: string): Promise<ILivroCatalogoDto> {
+    const livro = await this.repo.obterPorUuid(uuid);
+    if (!livro) {
+      throw new Error('Livro não encontrado.');
+    }
+    if (livro.status === 'Ativo') {
+      throw new Error('Livro já está ativo.');
+    }
+
+    await this.repo.ativarLivro(uuid);
+    return this.repo.obterPorUuid(uuid).then((l) => {
+      if (!l) throw new Error('Erro ao recuperar livro após ativação');
+      return l;
+    });
+  }
+
   async atualizarLivroParcial(uuid: string, dados: {
     titulo?: string;
     sinopse?: string;
