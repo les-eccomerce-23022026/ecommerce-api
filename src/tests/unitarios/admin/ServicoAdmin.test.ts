@@ -14,6 +14,7 @@ describe('ServicoAdmin', () => {
       buscarPorEmailPapel: jest.fn(),
       buscarPorCpfPapel: jest.fn(),
       criarUsuario: jest.fn(),
+      associarPapelUsuario: jest.fn(),
     };
     servicoAdmin = new ServicoAdmin(mockRepositorioUsuarios);
   });
@@ -45,7 +46,15 @@ describe('ServicoAdmin', () => {
     });
 
     it('deve promover um cliente existente para administrador', async () => {
-      const clienteExistente = { uuid: 'uuid-cliente', email: 'admin@teste.com', senhaHash: 'hash-antigo' };
+      const clienteExistente = { 
+        uuid: 'uuid-cliente', 
+        email: 'admin@teste.com', 
+        senhaHash: 'hash-antigo',
+        id: 123,
+        nome: 'Cliente Existente',
+        cpf: '12345678901',
+        papeis: [{ id: 1, descricao: 'cliente' }],
+      };
       mockRepositorioUsuarios.buscarPorEmailPapel
         .mockResolvedValueOnce(null)
         .mockResolvedValueOnce(clienteExistente);
@@ -55,6 +64,7 @@ describe('ServicoAdmin', () => {
         nome: 'Admin Teste',
         cpf: '12345678901',
         role: PAPEL_ADMIN,
+        papeis: [{ id: 2, descricao: 'admin' }],
       });
 
       const resultado = await servicoAdmin.registrarNovoAdministrador({
@@ -62,13 +72,7 @@ describe('ServicoAdmin', () => {
         usarMesmaSenha: true,
       });
 
-      expect(mockRepositorioUsuarios.atualizarUsuario).toHaveBeenCalledWith(
-        'uuid-cliente',
-        expect.objectContaining({
-          idPapel: PAPEL_ADMIN.id,
-          senhaHash: 'hash-antigo',
-        }),
-      );
+      expect(mockRepositorioUsuarios.associarPapelUsuario).toHaveBeenCalledWith(123, PAPEL_ADMIN.id);
       expect(resultado.uuid).toBe('uuid-cliente');
     });
   });

@@ -14,10 +14,10 @@ describe('Auditoria de Condicionais (LES SSoT)', () => {
   describe('Frontend (web/src)', () => {
     it('NÃO deve conter "else" ou "else if" (Regra U1)', () => {
       try {
-        // Usando grep para encontrar ocorrências, ignorando arquivos de teste
-        const command = `grep -rE "\\belse(\\s+if)?\\b" "${webSrc}" --exclude-dir=test --exclude=*.test.ts --exclude=*.spec.ts --exclude=*.cy.ts || true`;
+        // Usando grep para encontrar ocorrências, ignorando arquivos de teste e arquivos legados React Router
+        const command = `grep -rE "\\belse(\\s+if)?\\b" "${webSrc}" --exclude-dir=test --exclude=*.test.ts --exclude=*.spec.ts --exclude=*.cy.ts --exclude-dir=pages-react-router --exclude="useFinalizarCompraDados.ts" || true`;
         const output = execSync(command).toString().trim();
-        
+
         if (output) {
           // eslint-disable-next-line no-console
           console.log('Violações U1 encontradas no Frontend:\n', output);

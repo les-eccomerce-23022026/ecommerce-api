@@ -117,8 +117,8 @@ export async function garantirLivroComEstoqueParaCarrinho(
   );
 
   await db.executar(
-    `INSERT INTO estoques (liv_id, etq_quantidade_disponivel, etq_preco_venda, etq_ativo)
-     SELECT l.liv_id, 1000, 49.90, TRUE
+    `INSERT INTO estoques (liv_id, etq_quantidade_disponivel, etq_preco_venda, etq_ativo, loj_id)
+     SELECT l.liv_id, 1000, 49.90, TRUE, 1
      FROM livros l
      WHERE l.liv_isbn = $1::varchar(20)
        AND NOT EXISTS (SELECT 1 FROM estoques e WHERE e.liv_id = l.liv_id)`,
