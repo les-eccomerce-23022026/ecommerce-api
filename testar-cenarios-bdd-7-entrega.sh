@@ -4,6 +4,7 @@
 # Testa todos os cenários BDD via curl no terminal
 
 BASE_URL="http://localhost:3002/api"
+LOJA_ID="${LOJA_ID:-1}"
 COOKIE_JAR_CLIENTE="/tmp/cliente_cookies_bdd.txt"
 COOKIE_JAR_ADMIN="/tmp/admin_cookies_bdd.txt"
 
@@ -13,6 +14,49 @@ VERMELHO='\033[0;31m'
 AMARELO='\033[1;33m'
 AZUL='\033[0;34m'
 NC='\033[0m' # No Color
+
+# Cria entrega e confirma recebimento (status ENTREGUE + data de entrega)
+criar_entrega_e_confirmar() {
+  local venda_uuid="$1"
+  local resposta
+  resposta=$(curl -s -X POST "$BASE_URL/entregas" \
+    -H "Content-Type: application/json" \
+    -b "$COOKIE_JAR_ADMIN" \
+    -d "{
+      \"vendaUuid\": \"$venda_uuid\",
+      \"tipoFrete\": \"PAC\",
+      \"endereco\": \"Endereço de Teste\",
+      \"custo\": 15,
+      \"entregador\": \"Transportadora Padrão\"
+    }")
+  local entrega_uuid
+  entrega_uuid=$(echo "$resposta" | jq -r '.uuid // empty')
+  if [ -z "$entrega_uuid" ]; then
+    echo "$resposta" | jq '.'
+    return 1
+  fi
+  curl -s -X PATCH "$BASE_URL/entregas/$entrega_uuid/confirmar" \
+    -H "Content-Type: application/json" \
+    -b "$COOKIE_JAR_ADMIN" > /dev/null
+  echo "$entrega_uuid"
+}
+
+obter_item_uuid_venda() {
+  local venda_uuid="$1"
+  curl -s -X GET "$BASE_URL/vendas/$venda_uuid" -b "$COOKIE_JAR_CLIENTE" | jq -r '.itens[0].id // empty'
+}
+
+# Simula pedido entregue há mais de 7 dias (RN0043) via Postgres no Docker
+retroceder_data_entrega_8_dias() {
+  local venda_uuid="$1"
+  if docker ps --format '{{.Names}}' 2>/dev/null | grep -qx 'ecm_postgres'; then
+    docker exec ecm_postgres psql -U ecm_user -d ecm_livraria -q -c \
+      "UPDATE livraria_comercial.vendas SET ven_data_hora_entrega = NOW() - INTERVAL '8 days' WHERE ven_uuid = '${venda_uuid}';" \
+      > /dev/null
+    return 0
+  fi
+  return 1
+}
 
 # Limpa cookies
 rm -f $COOKIE_JAR_CLIENTE $COOKIE_JAR_ADMIN
@@ -46,15 +90,16 @@ LOGIN_ADMIN=$(curl -s -X POST "$BASE_URL/auth/login" \
   -H "Content-Type: application/json" \
   -c $COOKIE_JAR_ADMIN \
   -d '{
-    "email": "admin@ecm.com",
-    "senha": "admin123"
+    "email": "admintest@email.com",
+    "senha": "@asdfJKLÇ123"
   }')
 echo "$LOGIN_ADMIN" | jq '.'
 echo ""
 
 # Setup: Obter livro para teste
 echo -e "${AZUL}=== SETUP: Obter livro para teste ===${NC}"
-LIVRO_RESPONSE=$(curl -s -X GET "$BASE_URL/livros" -b $COOKIE_JAR_CLIENTE)
+LIVRO_RESPONSE=$(curl -s -X GET "$BASE_URL/livros" -H "x-loja-id: $LOJA_ID" -b $COOKIE_JAR_CLIENTE)
+# A API já filtra por estoque > 0, então usar o primeiro livro
 LIVRO_UUID=$(echo "$LIVRO_RESPONSE" | jq -r '.livros[0].uuid')
 LIVRO_PRECO=$(echo "$LIVRO_RESPONSE" | jq -r '.livros[0].preco')
 echo "Livro UUID: $LIVRO_UUID"
@@ -132,28 +177,14 @@ if [ -n "$VENDA_UUID_C1" ]; then
     echo -e "${VERMELHO}✗ Status incorreto: $STATUS${NC}"
   fi
   
-  # Setup: Criar entrega para a venda (não é automático)
-  echo -e "${AZUL}=== SETUP: Criar entrega para a venda ===${NC}"
-  CRIAR_ENTREGA=$(curl -s -X POST "$BASE_URL/entregas" \
-    -H "Content-Type: application/json" \
-    -b $COOKIE_JAR_ADMIN \
-    -d "{
-      \"vendaUuid\": \"$VENDA_UUID_C1\",
-      \"tipoFrete\": \"PAC\",
-      \"endereco\": \"Endereço de Teste\",
-      \"custo\": 15,
-      \"entregador\": \"Transportadora Padrão\"
-    }")
-  echo "$CRIAR_ENTREGA" | jq '.'
-  ENTREGA_UUID_C1=$(echo "$CRIAR_ENTREGA" | jq -r '.uuid // empty')
-  echo "Entrega UUID: $ENTREGA_UUID_C1"
-  
-  # Setup: Atualizar status da venda para ENTREGUE para testar cenários de troca
-  echo -e "${AZUL}=== SETUP: Atualizar status da venda para ENTREGUE ===${NC}"
-  ATUALIZAR_STATUS=$(curl -s -X PATCH "$BASE_URL/entregas/$ENTREGA_UUID_C1/confirmar" \
-    -H "Content-Type: application/json" \
-    -b $COOKIE_JAR_ADMIN)
-  echo "$ATUALIZAR_STATUS" | jq '.'
+  # Setup: Criar entrega e confirmar (status ENTREGUE)
+  echo -e "${AZUL}=== SETUP: Criar entrega e confirmar recebimento ===${NC}"
+  ENTREGA_UUID_C1=$(criar_entrega_e_confirmar "$VENDA_UUID_C1")
+  if [ -n "$ENTREGA_UUID_C1" ]; then
+    echo "✓ Entrega confirmada: $ENTREGA_UUID_C1"
+  else
+    echo -e "${VERMELHO}✗ Falha ao confirmar entrega${NC}"
+  fi
   echo ""
 else
   echo -e "${VERMELHO}✗ Falha ao criar venda${NC}"
@@ -199,23 +230,71 @@ echo -e "${VERDE}CENÁRIO 3: Pagamento integral com Cupom de Troca (VARIAÇÃO)$
 echo -e "${VERDE}========================================${NC}"
 echo ""
 
-echo -e "${AMARELO}Dado: Cliente possui cupom de troca de R$ 200,00${NC}"
+echo -e "${AMARELO}Dado: Cliente possui cupom de troca disponível${NC}"
 CUPONS=$(curl -s -X GET "$BASE_URL/cupom/disponiveis" -b $COOKIE_JAR_CLIENTE)
 echo "$CUPONS" | jq '.'
 CUPOM_TROCA_UUID=$(echo "$CUPONS" | jq -r '.dados[] | select(.tipo=="troca") | .uuid' | head -1)
-echo "Cupom Troca UUID: $CUPOM_TROCA_UUID"
+CUPOM_TROCA_CODIGO=$(echo "$CUPONS" | jq -r '.dados[] | select(.tipo=="troca") | .codigo' | head -1)
+CUPOM_TROCA_VALOR=$(echo "$CUPONS" | jq -r '.dados[] | select(.tipo=="troca") | .valorDesconto' | head -1)
+echo "Cupom: $CUPOM_TROCA_CODIGO (saldo R$ $CUPOM_TROCA_VALOR)"
 echo ""
 
-echo -e "${AMARELO}Quando: Cliente aplica o cupom como única forma de pagamento${NC}"
-if [ -n "$CUPOM_TROCA_UUID" ]; then
-  echo "✓ Cupom de troca disponível"
+echo -e "${AMARELO}Quando: Cliente finaliza compra apenas com cupom de troca (100%)${NC}"
+if [ -n "$CUPOM_TROCA_UUID" ] && [ -n "$CUPOM_TROCA_CODIGO" ]; then
+  VENDA_C3=$(curl -s -X POST "$BASE_URL/vendas" \
+    -H "Content-Type: application/json" \
+    -b $COOKIE_JAR_CLIENTE \
+    -d "{
+      \"enderecoUuid\": \"$ENDERECO_UUID\",
+      \"cartaoUuid\": \"$CARTAO_UUID\",
+      \"formaPagamento\": \"cupom\",
+      \"valorTotal\": $CUPOM_TROCA_VALOR,
+      \"valorTotalItens\": $CUPOM_TROCA_VALOR,
+      \"valorFrete\": 0,
+      \"parcelas\": 1,
+      \"itens\": [
+        {
+          \"livroUuid\": \"$LIVRO_UUID\",
+          \"quantidade\": 1,
+          \"precoUnitario\": $CUPOM_TROCA_VALOR
+        }
+      ]
+    }")
+  VENDA_UUID_C3=$(echo "$VENDA_C3" | jq -r '.id // .uuid // empty')
+  PAGAMENTO_C3=$(curl -s -X POST "$BASE_URL/pagamento/processar" \
+    -H "Content-Type: application/json" \
+    -b $COOKIE_JAR_CLIENTE \
+    -d "{
+      \"vendaUuid\": \"$VENDA_UUID_C3\",
+      \"valorTotal\": 0,
+      \"idIntencao\": \"CUPOM-ONLY\",
+      \"segredoConfirmacao\": \"CUPOM-ONLY\",
+      \"pagamentosCartao\": [],
+      \"cuponsAplicados\": [{
+        \"uuid\": \"$CUPOM_TROCA_UUID\",
+        \"codigo\": \"$CUPOM_TROCA_CODIGO\",
+        \"tipo\": \"troca\",
+        \"valor\": $CUPOM_TROCA_VALOR
+      }]
+    }")
+  echo "$PAGAMENTO_C3" | jq '.'
 else
   echo -e "${VERMELHO}✗ Nenhum cupom de troca disponível${NC}"
 fi
 echo ""
 
 echo -e "${AMARELO}Então: Sistema deve autorizar a compra sem solicitar dados de cartão${NC}"
-echo "⚠ NOTA: Este fluxo requer implementação específica de pagamento 100% cupom"
+if echo "$PAGAMENTO_C3" | jq -e '.sucesso == true' > /dev/null 2>&1; then
+  echo "✓ Pagamento 100% cupom aprovado"
+  STATUS_VENDA_C3=$(curl -s -X GET "$BASE_URL/vendas/$VENDA_UUID_C3" -b $COOKIE_JAR_CLIENTE | jq -r '.status // empty')
+  if [ "$STATUS_VENDA_C3" = "APROVADA" ]; then
+    echo "✓ Venda com status APROVADA"
+  else
+    echo -e "${AMARELO}⚠ Status da venda: $STATUS_VENDA_C3 (esperado: APROVADA)${NC}"
+  fi
+else
+  echo -e "${VERMELHO}✗ Pagamento 100% cupom não foi aprovado${NC}"
+fi
 echo ""
 
 # ========================================
@@ -246,29 +325,16 @@ VENDA_TROCA=$(curl -s -X POST "$BASE_URL/vendas" \
 VENDA_UUID_TROCA=$(echo "$VENDA_TROCA" | jq -r '.id // .uuid // empty')
 echo "Venda UUID para troca: $VENDA_UUID_TROCA"
 
-# Setup: Criar entrega para a venda de troca
+# Setup: Entregar pedido para habilitar troca
 if [ -n "$VENDA_UUID_TROCA" ]; then
-  echo -e "${AZUL}=== SETUP: Criar entrega para venda de troca ===${NC}"
-  CRIAR_ENTREGA_TROCA=$(curl -s -X POST "$BASE_URL/entregas" \
-    -H "Content-Type: application/json" \
-    -b $COOKIE_JAR_ADMIN \
-    -d "{
-      \"vendaUuid\": \"$VENDA_UUID_TROCA\",
-      \"tipoFrete\": \"PAC\",
-      \"endereco\": \"Endereço de Teste\",
-      \"custo\": 15,
-      \"entregador\": \"Transportadora Padrão\"
-    }")
-  echo "$CRIAR_ENTREGA_TROCA" | jq '.'
-  ENTREGA_UUID_TROCA=$(echo "$CRIAR_ENTREGA_TROCA" | jq -r '.uuid // empty')
-  echo "Entrega UUID para troca: $ENTREGA_UUID_TROCA"
-  
-  # Setup: Atualizar status da venda para ENTREGUE para testar cenários de troca
-  echo -e "${AZUL}=== SETUP: Atualizar status da venda para ENTREGUE ===${NC}"
-  ATUALIZAR_STATUS_TROCA=$(curl -s -X PATCH "$BASE_URL/entregas/$ENTREGA_UUID_TROCA/confirmar" \
-    -H "Content-Type: application/json" \
-    -b $COOKIE_JAR_ADMIN)
-  echo "$ATUALIZAR_STATUS_TROCA" | jq '.'
+  echo -e "${AZUL}=== SETUP: Entregar pedido para testes de troca ===${NC}"
+  ENTREGA_UUID_TROCA=$(criar_entrega_e_confirmar "$VENDA_UUID_TROCA")
+  ITEM_UUID_TROCA=$(obter_item_uuid_venda "$VENDA_UUID_TROCA")
+  if [ -n "$ENTREGA_UUID_TROCA" ]; then
+    echo "✓ Pedido ENTREGUE — entrega: $ENTREGA_UUID_TROCA | item: $ITEM_UUID_TROCA"
+  else
+    echo -e "${VERMELHO}✗ Falha ao entregar pedido de troca${NC}"
+  fi
   echo ""
 fi
 echo ""
@@ -282,8 +348,7 @@ echo -e "${VERDE}========================================${NC}"
 echo ""
 
 echo -e "${AMARELO}Dado: Cliente possui pedido com status ENTREGUE${NC}"
-echo "⚠ NOTA: Pedido atual está em EM PROCESSAMENTO"
-echo "⚠ Para testar este cenário, o pedido precisa estar ENTREGUE"
+echo "✓ Pedido entregue no setup"
 echo ""
 
 echo -e "${AMARELO}Quando: Seleciona opção 'Solicitar Troca' para item específico${NC}"
@@ -291,18 +356,23 @@ if [ -n "$VENDA_UUID_TROCA" ]; then
   TROCA_SOLICITACAO=$(curl -s -X POST "$BASE_URL/vendas/$VENDA_UUID_TROCA/troca" \
     -H "Content-Type: application/json" \
     -b $COOKIE_JAR_CLIENTE \
-    -d '{
-      "motivo": "Produto não atendeu expectativas",
-      "itensUuids": []
-    }')
+    -d "{
+      \"motivo\": \"Produto não atendeu expectativas\",
+      \"itensUuids\": [\"$ITEM_UUID_TROCA\"]
+    }")
   echo "$TROCA_SOLICITACAO" | jq '.'
 else
   echo -e "${VERMELHO}✗ Venda UUID não disponível${NC}"
 fi
 echo ""
 
-echo -e "${AMARELO}Então: Status da solicitação deve ser TROCA EM ANÁLISE${NC}"
-echo "⚠ NOTA: Validar status após implementação completa"
+echo -e "${AMARELO}Então: Status da solicitação deve ser EM TROCA${NC}"
+STATUS_TROCA_C4=$(echo "$TROCA_SOLICITACAO" | jq -r '.status // empty')
+if [ "$STATUS_TROCA_C4" = "EM TROCA" ]; then
+  echo "✓ Status correto: EM TROCA"
+else
+  echo -e "${VERMELHO}✗ Status incorreto: $STATUS_TROCA_C4 (esperado: EM TROCA)${NC}"
+fi
 echo ""
 
 # ========================================
@@ -394,32 +464,17 @@ VENDA_UUID_REJEICAO=$(echo "$VENDA_REJEICAO" | jq -r '.id // .uuid // empty')
 echo "Venda UUID para rejeição: $VENDA_UUID_REJEICAO"
 
 if [ -n "$VENDA_UUID_REJEICAO" ]; then
-  # Criar entrega e confirmar
-  CRIAR_ENTREGA_REJEICAO=$(curl -s -X POST "$BASE_URL/entregas" \
-    -H "Content-Type: application/json" \
-    -b $COOKIE_JAR_ADMIN \
-    -d "{
-      \"vendaUuid\": \"$VENDA_UUID_REJEICAO\",
-      \"tipoFrete\": \"PAC\",
-      \"endereco\": \"Endereço de Teste\",
-      \"custo\": 15,
-      \"entregador\": \"Transportadora Padrão\"
-    }")
-  ENTREGA_UUID_REJEICAO=$(echo "$CRIAR_ENTREGA_REJEICAO" | jq -r '.uuid // empty')
-  
-  # Confirmar entrega
-  curl -s -X PATCH "$BASE_URL/entregas/$ENTREGA_UUID_REJEICAO/confirmar" \
-    -H "Content-Type: application/json" \
-    -b $COOKIE_JAR_ADMIN > /dev/null
-  
+  criar_entrega_e_confirmar "$VENDA_UUID_REJEICAO" > /dev/null
+  ITEM_UUID_REJEICAO=$(obter_item_uuid_venda "$VENDA_UUID_REJEICAO")
+
   # Solicitar troca
   curl -s -X POST "$BASE_URL/vendas/$VENDA_UUID_REJEICAO/troca" \
     -H "Content-Type: application/json" \
     -b $COOKIE_JAR_CLIENTE \
-    -d '{
-      "motivo": "Produto com defeito",
-      "itensUuids": []
-    }' > /dev/null
+    -d "{
+      \"motivo\": \"Produto com defeito\",
+      \"itensUuids\": [\"$ITEM_UUID_REJEICAO\"]
+    }" > /dev/null
 fi
 echo ""
 
@@ -467,32 +522,64 @@ echo -e "${VERDE}CENÁRIO 7: Prazo de arrependimento expirado (EXCEÇÃO)${NC}"
 echo -e "${VERDE}========================================${NC}"
 echo ""
 
+echo -e "${AZUL}=== SETUP: Pedido entregue há mais de 7 dias ===${NC}"
+VENDA_C7=$(curl -s -X POST "$BASE_URL/vendas" \
+  -H "Content-Type: application/json" \
+  -b $COOKIE_JAR_CLIENTE \
+  -d "{
+    \"enderecoUuid\": \"$ENDERECO_UUID\",
+    \"cartaoUuid\": \"$CARTAO_UUID\",
+    \"formaPagamento\": \"cartao\",
+    \"valorTotal\": 64.9,
+    \"valorTotalItens\": 49.9,
+    \"valorFrete\": 15,
+    \"parcelas\": 1,
+    \"itens\": [
+      {
+        \"livroUuid\": \"$LIVRO_UUID\",
+        \"quantidade\": 1,
+        \"precoUnitario\": 49.9
+      }
+    ]
+  }")
+VENDA_UUID_C7=$(echo "$VENDA_C7" | jq -r '.id // .uuid // empty')
+echo "Venda UUID prazo: $VENDA_UUID_C7"
+
+if [ -n "$VENDA_UUID_C7" ]; then
+  criar_entrega_e_confirmar "$VENDA_UUID_C7" > /dev/null
+  if retroceder_data_entrega_8_dias "$VENDA_UUID_C7"; then
+    echo "✓ Data de entrega retrocedida 8 dias (RN0043)"
+  else
+    echo -e "${AMARELO}⚠ Container ecm_postgres indisponível — não foi possível retroceder data${NC}"
+  fi
+fi
+echo ""
+
 echo -e "${AMARELO}Dado: Pedido foi entregue há mais de 7 dias${NC}"
-echo "⚠ NOTA: Este cenário requer manipulação manual da data no banco"
-echo "⚠ Testando validação temporal de solicitação de troca..."
+echo "✓ Pré-condição configurada no setup"
 echo ""
 
 echo -e "${AMARELO}Quando: Cliente tenta solicitar troca após prazo${NC}"
-if [ -n "$VENDA_UUID_TROCA" ]; then
-  TROCA_VALIDACAO=$(curl -s -X POST "$BASE_URL/vendas/$VENDA_UUID_TROCA/troca" \
+if [ -n "$VENDA_UUID_C7" ]; then
+  ITEM_UUID_C7=$(obter_item_uuid_venda "$VENDA_UUID_C7")
+  TROCA_VALIDACAO=$(curl -s -X POST "$BASE_URL/vendas/$VENDA_UUID_C7/troca" \
     -H "Content-Type: application/json" \
     -b $COOKIE_JAR_CLIENTE \
-    -d '{
-      "motivo": "Teste prazo expirado",
-      "itensUuids": []
-    }')
+    -d "{
+      \"motivo\": \"Teste prazo expirado\",
+      \"itensUuids\": [\"$ITEM_UUID_C7\"]
+    }")
   echo "$TROCA_VALIDACAO" | jq '.'
   
-  # Verificar se retorna erro de prazo
   if echo "$TROCA_VALIDACAO" | jq -e '.erro' > /dev/null; then
     MENSAGEM_ERRO=$(echo "$TROCA_VALIDACAO" | jq -r '.erro')
     if echo "$MENSAGEM_ERRO" | grep -qi "7 dias\|expirado\|prazo"; then
-      echo "✓ Validacao temporal funcionando: $MENSAGEM_ERRO"
+      echo "✓ Validação temporal funcionando: $MENSAGEM_ERRO"
     else
-      echo -e "${AMARELO}⚠ Erro retornado mas não é de prazo: $MENSAGEM_ERRO${NC}"
+      echo -e "${VERMELHO}✗ Erro retornado mas não é de prazo: $MENSAGEM_ERRO${NC}"
     fi
   else
-    echo -e "${AMARELO}⚠ Troca aceita (pode estar dentro do prazo de 7 dias)${NC}"
+    echo -e "${VERMELHO}✗ Troca aceita fora do prazo (esperado bloqueio)${NC}"
   fi
 else
   echo -e "${VERMELHO}✗ Venda UUID não disponível${NC}"
@@ -500,7 +587,7 @@ fi
 echo ""
 
 echo -e "${AMARELO}Então: Sistema deve bloquear ação e informar prazo legal expirado${NC}"
-echo "✓ Validado acima (requer data antiga no banco para teste completo)"
+echo "✓ Validado acima"
 echo ""
 
 # ========================================
