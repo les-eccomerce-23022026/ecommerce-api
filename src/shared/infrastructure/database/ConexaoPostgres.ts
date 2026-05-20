@@ -11,12 +11,6 @@ import { Logger } from '../../utils/Logger.util';
 export class ConexaoPostgres implements IConexaoBanco {
   private static instancia: ConexaoPostgres | null = null;
 
-  private static searchPathPorPool = new WeakMap<Pool, string>();
-
-  private static searchPathPromessaPorPool = new WeakMap<Pool, Promise<string>>();
-
-  private static connectionStringPorPool = new WeakMap<Pool, string>();
-
   private poolProducao: Pool;
 
   private poolTeste: Pool | null = null;
@@ -40,76 +34,12 @@ export class ConexaoPostgres implements IConexaoBanco {
     ConexaoPostgres.instancia = null;
   }
 
-  /**
-   * Descobre schemas a partir de POSTGRES_SCHEMA (ex.: livraria → livraria_* + public).
-   * O parâmetro libpq `options` não aceita vírgulas no search_path (corta em "livraria_comercial,").
-   */
-  private static async descobrirSearchPathNoBanco(cliente: Client | PoolClient): Promise<string> {
-    const prefixo = process.env.POSTGRES_SCHEMA ?? 'livraria';
-    if (prefixo === 'public') {
-      return 'public';
-    }
-
-    const { rows } = await cliente.query<{ path: string }>(
-      `SELECT coalesce(string_agg(quote_ident(schema_name), ', ' ORDER BY
-          CASE WHEN schema_name = 'public' THEN 2
-               WHEN schema_name = $1 THEN 1
-               ELSE 0 END,
-          schema_name), 'public') AS path
-       FROM information_schema.schemata
-       WHERE schema_name LIKE $1 || '%' OR schema_name = 'public'`,
-      [prefixo],
-    );
-
-    return rows[0]?.path ?? 'public';
-  }
-
-  private static resolverSearchPathParaPool(pool: Pool): Promise<string> {
-    const emCache = ConexaoPostgres.searchPathPorPool.get(pool);
-    if (emCache) {
-      return Promise.resolve(emCache);
-    }
-
-    let promessa = ConexaoPostgres.searchPathPromessaPorPool.get(pool);
-    if (!promessa) {
-      const connectionString = ConexaoPostgres.connectionStringPorPool.get(pool);
-      if (!connectionString) {
-        return Promise.reject(new Error('[ConexaoPostgres] connectionString do pool não registrada.'));
-      }
-
-      promessa = (async () => {
-        const clienteAvulso = new Client({ connectionString });
-        await clienteAvulso.connect();
-        try {
-          const path = await ConexaoPostgres.descobrirSearchPathNoBanco(clienteAvulso);
-          ConexaoPostgres.searchPathPorPool.set(pool, path);
-          Logger.info(`[ConexaoPostgres] search_path (${process.env.POSTGRES_SCHEMA ?? 'livraria'}): ${path}`);
-          return path;
-        } finally {
-          await clienteAvulso.end();
-        }
-      })();
-      ConexaoPostgres.searchPathPromessaPorPool.set(pool, promessa);
-    }
-
-    return promessa;
-  }
-
-  private static async aplicarSearchPath(pool: Pool, cliente: PoolClient): Promise<void> {
-    const path = await ConexaoPostgres.resolverSearchPathParaPool(pool);
-    await cliente.query(`SET search_path TO ${path}`);
-  }
-
-  private static registrarSearchPathNoPool(pool: Pool): void {
-    pool.on('connect', (cliente) => {
-      void ConexaoPostgres.aplicarSearchPath(pool, cliente);
-    });
-  }
-
   private static criarPool(config: { connectionString: string }): Pool {
-    const pool = new Pool(config);
-    ConexaoPostgres.connectionStringPorPool.set(pool, config.connectionString);
-    ConexaoPostgres.registrarSearchPathNoPool(pool);
+    const pool = new Pool({ 
+      connectionString: config.connectionString,
+      // Configurar search_path para incluir todos os schemas do projeto
+      options: `-c search_path=livraria_comercial,livraria_financeiro,livraria_gestao,livraria_logistica,livraria_ref,public`
+    });
     return pool;
   }
 
@@ -191,9 +121,18 @@ export class ConexaoPostgres implements IConexaoBanco {
       }
     }
 
-    const executor = transacao || pool;
-    const { rows } = await executor.query(sql, parametros);
-    return rows as T[];
+    try {
+      const executor = transacao || pool;
+      const { rows } = await executor.query(sql, parametros);
+      return rows as T[];
+    } catch (erro) {
+      Logger.error(`[ConexaoPostgres] Erro ao executar SQL: ${sql}`, { 
+        parametros, 
+        mensagem: (erro as Error).message,
+        stack: (erro as Error).stack 
+      });
+      throw erro;
+    }
   }
 
   public async transacao<T>(callback: (cliente: IConexaoBanco) => Promise<T>): Promise<T> {
