@@ -127,7 +127,7 @@ function montarFreteOpcoesResposta(
   }));
 }
 
-function montarRespostaCheckoutJson(
+async function montarRespostaCheckoutJson(
   deps: DepsObterInfo,
   params: {
     cepQ: string;
@@ -138,18 +138,23 @@ function montarRespostaCheckoutJson(
 ) {
   const { cepQ, pesoNum, opcoes, blocoCliente } = params;
   const freteOpcoes = montarFreteOpcoesResposta(opcoes);
+  
+  // Buscar cupons promocionais do banco
+  const cuponsPromocionais = await deps.repoPagamentos.listarCuponsPromocionais();
+  const cuponsPromocionaisFormatados = cuponsPromocionais.map((c) => ({
+    uuid: c.uuid,
+    codigo: c.codigo,
+    tipo: 'promocional' as const,
+    valor: c.valorDesconto,
+    descricao: `${c.valorDesconto}% de desconto`,
+  }));
+
   return {
     enderecosCliente: blocoCliente.enderecosCliente,
     cartoesCliente: blocoCliente.cartoesCliente,
     politicaParcelamentoCartao: { ...POLITICA_PARCELAMENTO_CARTAO_PADRAO },
     cuponsDisponiveis: [
-      {
-        uuid: uuidv4(),
-        codigo: 'DESCONTO10',
-        tipo: 'promocional',
-        valor: 10,
-        descricao: '10% de desconto (simulado)',
-      },
+      ...cuponsPromocionaisFormatados,
       ...blocoCliente.cuponsTroca,
     ],
     bandeirasPermitidas: ['Visa', 'Mastercard', 'Elo', 'American Express', 'Hipercard'],
@@ -181,7 +186,8 @@ export async function executarObterPagamentoInfo(req: Request, res: Response, de
       valorTotalItens: valorItensNum !== undefined && Number.isFinite(valorItensNum) ? valorItensNum : undefined,
     });
     const blocoCliente = await coletarBlocoClienteCheckoutSeguro(deps, req.usuario?.uuid);
-    res.status(200).json(montarRespostaCheckoutJson(deps, { cepQ, pesoNum, opcoes, blocoCliente }));
+    const respostaJson = await montarRespostaCheckoutJson(deps, { cepQ, pesoNum, opcoes, blocoCliente });
+    res.status(200).json(respostaJson);
   } catch (erro) {
     res.status(500).json({ erro: (erro as Error).message });
   }

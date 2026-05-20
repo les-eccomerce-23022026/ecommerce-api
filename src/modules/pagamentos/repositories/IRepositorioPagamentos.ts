@@ -51,6 +51,14 @@ export interface IRepositorioPagamentos {
     ativo: boolean;
   }>>;
 
+  listarCuponsPromocionais(): Promise<Array<{
+    uuid: string;
+    codigo: string;
+    valorDesconto: number;
+    valorMinimo: number;
+    ativo: boolean;
+  }>>;
+
   /** Retorna o ID interno (BIGSERIAL) do usuário pelo UUID público. */
   obterUsuarioIdInternoPorUuid(usuarioUuid: string): Promise<number | null>;
 }

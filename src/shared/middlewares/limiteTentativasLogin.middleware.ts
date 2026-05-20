@@ -12,6 +12,7 @@ import { Request, Response, NextFunction } from 'express';
 export const limiteTentativasLogin = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutos
   max: 5, // Limite de 5 tentativas
+  skip: () => process.env.NODE_ENV === 'test', // Desabilita em ambiente de teste
   message: {
     sucesso: false,
     mensagem: 'Muitas tentativas de login. Tente novamente em alguns minutos.',

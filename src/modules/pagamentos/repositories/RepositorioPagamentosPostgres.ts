@@ -330,13 +330,15 @@ export class RepositorioPagamentosPostgres implements IRepositorioPagamentos {
     ativo: boolean;
   }>> {
     const query = `
-      SELECT c.cpt_uuid AS uuid,
-             c.cpt_codigo AS codigo,
-             c.cpt_valor AS "valorAtual",
-             (c.cpt_status = 'DISPONIVEL') AS ativo
-      FROM livraria_comercial.cupons_troca c
-      JOIN livraria_gestao.clientes cl ON cl.cli_id = c.cpt_cliente_id
-      WHERE cl.usu_id = $1
+      SELECT c.cup_uuid AS uuid,
+             c.cup_codigo AS codigo,
+             c.cup_valor_desconto AS "valorAtual",
+             c.cup_ativo AS ativo
+      FROM livraria_comercial.cupom c
+      JOIN livraria_gestao.clientes cl ON cl.cli_id = (
+        SELECT cli_id FROM livraria_gestao.clientes WHERE usu_id = $1 LIMIT 1
+      )
+      WHERE c.cup_tipo = 'troca' AND c.cup_ativo = true
     `;
     const rows = await this.db.executar<{
       uuid: string;
@@ -350,6 +352,32 @@ export class RepositorioPagamentosPostgres implements IRepositorioPagamentos {
       valorAtual: Number(r.valorAtual),
       ativo: r.ativo,
     }));
+  }
+
+  public async listarCuponsPromocionais(): Promise<Array<{
+    uuid: string;
+    codigo: string;
+    valorDesconto: number;
+    valorMinimo: number;
+    ativo: boolean;
+  }>> {
+    const query = `
+      SELECT cup_uuid AS uuid,
+             cup_codigo AS codigo,
+             cup_valor_desconto AS "valorDesconto",
+             cup_valor_minimo AS "valorMinimo",
+             cup_ativo AS ativo
+      FROM livraria_comercial.cupom
+      WHERE cup_tipo = 'promocional' AND cup_ativo = true
+    `;
+    const rows = await this.db.executar<{
+      uuid: string;
+      codigo: string;
+      valorDesconto: number;
+      valorMinimo: number;
+      ativo: boolean;
+    }>(query);
+    return rows;
   }
 
   public async obterUsuarioIdInternoPorUuid(usuarioUuid: string): Promise<number | null> {

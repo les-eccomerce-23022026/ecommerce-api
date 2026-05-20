@@ -9,7 +9,8 @@ import { Logger } from '@/shared/utils/Logger.util';
  */
 export class ControladorTestesAdmin {
   /**
-   * Cria um cupom de troca para um cliente específico (apenas testes).
+   * Cria um cupom (troca ou promocional) para testes.
+   * Suporta tanto cupons de troca quanto promocionais usando a tabela unificada.
    */
   public static async criarCupomTroca(requisicao: Request, resposta: Response): Promise<Response> {
     const ambienteTeste = process.env.NODE_ENV === 'test';
@@ -22,27 +23,57 @@ export class ControladorTestesAdmin {
     }
 
     try {
-      const { clienteId, codigo, valor } = requisicao.body;
+      const { clienteId, codigo, valor, tipo = 'troca', valorMinimo = 0 } = requisicao.body;
 
-      if (!clienteId || !codigo || valor === undefined) {
+      if (!codigo || valor === undefined) {
         return RespostaPadrao.enviarErro(
           resposta,
           400,
-          'Campos obrigatórios: clienteId, codigo, valor',
+          'Campos obrigatórios: codigo, valor',
+        );
+      }
+
+      if (tipo === 'troca' && !clienteId) {
+        return RespostaPadrao.enviarErro(
+          resposta,
+          400,
+          'clienteId é obrigatório para cupons de troca',
+        );
+      }
+
+      if (tipo !== 'troca' && tipo !== 'promocional') {
+        return RespostaPadrao.enviarErro(
+          resposta,
+          400,
+          'Tipo de cupom inválido. Use "troca" ou "promocional".',
         );
       }
 
       const db = ConexaoPostgres.obterInstancia();
-      await db.executar(`
-        INSERT INTO livraria_comercial.cupons_troca (cpt_cliente_id, cpt_codigo, cpt_valor, cpt_valido_ate, cpt_status)
-        VALUES ($1, $2, $3, CURRENT_DATE + INTERVAL '365 days', 'DISPONIVEL')
-        ON CONFLICT (cpt_codigo) DO UPDATE
-        SET cpt_valor = EXCLUDED.cpt_valor, cpt_status = 'DISPONIVEL'
-      `, [clienteId, codigo, valor]);
 
-      return RespostaPadrao.enviarSucesso(resposta, 201, { mensagem: 'Cupom de troca criado com sucesso.' });
+      // Para cupons promocionais, não precisa de clienteId
+      if (tipo === 'promocional') {
+        await db.executar(`
+          INSERT INTO livraria_comercial.cupom (cup_codigo, cup_tipo, cup_valor_desconto, cup_valor_minimo, cup_valido_ate, cup_ativo)
+          VALUES ($1, 'promocional', $2, $3, CURRENT_DATE + INTERVAL '365 days', true)
+          ON CONFLICT (cup_codigo) DO UPDATE
+          SET cup_valor_desconto = EXCLUDED.cup_valor_desconto, cup_ativo = true
+        `, [codigo, valor, valorMinimo]);
+      } else {
+        // Para cupons de troca, insere na tabela unificada usando o clienteId
+        await db.executar(`
+          INSERT INTO livraria_comercial.cupom (cup_codigo, cup_tipo, cup_valor_desconto, cup_valor_minimo, cup_valido_ate, cup_ativo)
+          SELECT $1, 'troca', $2, $3, CURRENT_DATE + INTERVAL '365 days', true
+          FROM livraria_gestao.clientes
+          WHERE cli_id = $4
+          ON CONFLICT (cup_codigo) DO UPDATE
+          SET cup_valor_desconto = EXCLUDED.cup_valor_desconto, cup_ativo = true
+        `, [codigo, valor, valorMinimo, clienteId]);
+      }
+
+      return RespostaPadrao.enviarSucesso(resposta, 201, { mensagem: `Cupom de ${tipo} criado com sucesso.` });
     } catch (erro) {
-      const mensagem = RespostaPadrao.obterMensagemErro(erro, 'Erro ao criar cupom de troca.');
+      const mensagem = RespostaPadrao.obterMensagemErro(erro, 'Erro ao criar cupom.');
       return RespostaPadrao.enviarErro(resposta, 500, mensagem);
     }
   }
