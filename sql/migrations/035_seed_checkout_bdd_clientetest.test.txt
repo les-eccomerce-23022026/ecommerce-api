@@ -1,5 +1,0 @@
-BEGIN
-INSERT 0 5
-NOTICE:  Usuário clientetest@email.com não encontrado em livraria_comercial.usuarios — seed ignorado
-DO
-COMMIT

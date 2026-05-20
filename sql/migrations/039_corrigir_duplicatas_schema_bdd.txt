@@ -1,9 +1,0 @@
-NOTICE:  column "loj_id" of relation "intencao_pagamento" already exists, skipping
-ALTER TABLE
-UPDATE 0
-NOTICE:  table "estados" does not exist, skipping
-DROP TABLE
-NOTICE:  table "tipos_logradouros" does not exist, skipping
-DROP TABLE
-NOTICE:  table "tipos_residencias" does not exist, skipping
-DROP TABLE

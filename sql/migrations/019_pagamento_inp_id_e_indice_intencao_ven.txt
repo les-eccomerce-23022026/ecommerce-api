@@ -1,2 +1,0 @@
-Migration 019: coluna pagamento.inp_id (FK intencao_pagamento), índice único parcial e idx em intencao_pagamento(ven_id).
-Executar o .sql correspondente no ambiente (dev/test/prod).
