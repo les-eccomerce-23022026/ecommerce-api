@@ -10,6 +10,7 @@ import { validarCpf } from '@/shared/utils/validacao-cpf.util';
 import { PAPEL_CLIENTE } from '@/shared/types/papeis';
 import { ClientesUtils } from './clientesUtils.service';
 import { ClientesEnderecoService } from './clientesEndereco.service';
+import { limparDocumento } from '@/shared/validators/validadorDocumento';
 
 export class ClientesCadastroService {
   constructor(
@@ -20,19 +21,25 @@ export class ClientesCadastroService {
   ) {}
 
   public async realizarCadastroPublico(dados: ICriarClienteDto) {
-    await this.validarDadosCadastro(dados);
+    // Normalizar CPF antes de validações para consistência com o banco
+    const cpfNormalizado = dados.cpf ? limparDocumento(dados.cpf) : dados.cpf;
+    const dadosNormalizados = { ...dados, cpf: cpfNormalizado };
 
-    const senhaHash = await bcrypt.hash(dados.senha, 12);
+    await this.validarDadosCadastro(dadosNormalizados);
+
+    const senhaHash = await bcrypt.hash(dadosNormalizados.senha, 12);
     const usuario = await this.repositorioUsuarios.criarUsuario({
-      nome: dados.nome,
-      email: dados.email,
-      cpf: dados.cpf,
+      nome: dadosNormalizados.nome,
+      email: dadosNormalizados.email,
+      cpf: dadosNormalizados.cpf,
       senhaHash,
       role: PAPEL_CLIENTE,
+      papeis: [PAPEL_CLIENTE],
+      isAdminMestre: false,
     });
 
-    await this.processarAdicaoPerfilETelefone(usuario.id, dados);
-    await this.processarAdicaoEnderecosIniciais(usuario.id, dados);
+    await this.processarAdicaoPerfilETelefone(usuario.id, dadosNormalizados);
+    await this.processarAdicaoEnderecosIniciais(usuario.id, dadosNormalizados);
 
     return {
       uuid: usuario.uuid,
@@ -45,7 +52,7 @@ export class ClientesCadastroService {
   private async validarDadosCadastro(dados: ICriarClienteDto) {
     if (dados.senha !== dados.confirmacaoSenha) throw new Error('Senha e confirmação não conferem.');
     if (!verificarForcaSenha(dados.senha)) throw new Error('Senha fraca.');
-    if (process.env.NODE_ENV !== 'test' && !validarCpf(dados.cpf)) throw new Error('CPF inválido.');
+    if (!validarCpf(dados.cpf)) throw new Error('CPF inválido.');
 
     const [porEmail, porCpf] = await Promise.all([
       this.repositorioUsuarios.buscarPorEmail(dados.email),

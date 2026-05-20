@@ -2,7 +2,7 @@ import bcrypt from 'bcryptjs';
 import { IRepositorioUsuarios } from '@/modules/usuarios/IRepositorioUsuarios';
 import { IRepositorioPerfilCliente } from '@/shared/types/IRepositorioPerfilCliente';
 import { IRepositorioTelefoneUsuario } from '@/shared/types/IRepositorioTelefoneUsuario';
-import { IUsuario } from '@/modules/usuarios/Iusuario.entity';
+import { IUsuario } from '@/modules/usuarios/IUsuario.entity';
 import { IRepositorioEnderecoUsuario } from '@/shared/types/IRepositorioEnderecoUsuario';
 import {
   ICriarClienteDto,
@@ -13,6 +13,15 @@ import { IPerfilCliente } from '@/shared/types/IPerfilCliente';
 import { GestaoEnderecoCliente } from '@/modules/clientes/gestaoIdentidadeClienteEndereco.service';
 import { mapearTipoTelefone, normalizarDigitos } from '@/modules/clientes/gestaoIdentidadeClienteTexto.util';
 import { realizarCadastroPublicoCliente } from '@/modules/clientes/gestaoIdentidadeClienteCadastroPublico.util';
+
+function parsearDataNascimentoSomenteData(valor: string): Date {
+  const partes = valor.trim().split('-').map(Number);
+  if (partes.length !== 3 || partes.some((n) => !Number.isFinite(n))) {
+    throw new Error('Data de nascimento inválida.');
+  }
+  const [ano, mes, dia] = partes;
+  return new Date(ano, mes - 1, dia);
+}
 
 type DepsOperacoes = {
   repositorioUsuarios: IRepositorioUsuarios;
@@ -124,7 +133,7 @@ export class GestaoIdentidadeClienteOperacoes {
       idUsuario: usuarioNoBanco.id,
       genero: dados.genero !== undefined ? dados.genero : perfilExistente?.genero,
       dataNascimento:
-        dados.dataNascimento !== undefined ? new Date(dados.dataNascimento) : perfilExistente?.dataNascimento,
+        dados.dataNascimento !== undefined ? parsearDataNascimentoSomenteData(dados.dataNascimento) : perfilExistente?.dataNascimento,
     };
     if (perfilExistente) {
       await this.deps.repositorioPerfil.atualizar(perfilAtualizado);

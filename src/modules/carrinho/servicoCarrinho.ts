@@ -39,7 +39,12 @@ export class ServicoCarrinho {
     };
   }
 
-  async alterarItem(usuUuid: string, livroUuid: string, quantidade: number): Promise<ICarrinhoResposta> {
+  async alterarItem(
+    usuUuid: string,
+    livroUuid: string,
+    quantidade: number,
+    lojIdAtual?: number,
+  ): Promise<ICarrinhoResposta> {
     const usuId = await this.repo.obterUsuIdPorUuid(usuUuid);
     if (!usuId) throw new Error('Usuário não encontrado');
 
@@ -54,7 +59,7 @@ export class ServicoCarrinho {
       }
     }
 
-    await this.repo.upsertQuantidade(usuId, livId, quantidade);
+    await this.repo.upsertQuantidade(usuId, livId, quantidade, lojIdAtual);
     return this.montarResposta(usuUuid);
   }
 

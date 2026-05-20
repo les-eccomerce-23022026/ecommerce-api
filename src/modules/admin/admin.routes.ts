@@ -1,6 +1,7 @@
 import { IRouter } from 'express';
 import { ControladorAdmin } from '@/modules/admin/admin.controller';
 import { ControladorAdminPainel } from '@/modules/admin/controladorAdminPainel';
+import { ControladorTestesAdmin } from '@/modules/admin/controladorTestesAdmin';
 import { ServicoDashboardAdmin } from '@/modules/admin/servicoDashboardAdmin';
 import { ServicoPedidosAdmin } from '@/modules/admin/servicoPedidosAdmin';
 import { ConexaoPostgres } from '@/shared/infrastructure/database/ConexaoPostgres';
@@ -100,8 +101,23 @@ export function registrarRotasAdmin(app: IRouter): void {
     (requisicao, resposta) => ControladorAdmin.ativarAdmin(requisicao, resposta),
   );
 
+  // Atualizar dados cadastrais de administrador (PATCH para atualização parcial)
+  app.patch(
+    '/admin/administradores/:uuid',
+    autenticacaoMiddleware,
+    adminOnlyMiddleware,
+    (requisicao, resposta) => ControladorAdmin.atualizarAdmin(requisicao, resposta),
+  );
+
   // Endpoint de Bootstrap EXCLUSIVO para ambiente de testes (sandboxed).
   // NÃO UTILIZA autenticacaoMiddleware ou adminOnlyMiddleware porque seu propósito
   // é justamente criar o primeiro admin nos testes automatizados sem intervenção no DB.
   app.post('/admin/bootstrap', (requisicao, resposta) => ControladorAdmin.bootstrapAdmin(requisicao, resposta));
+
+  // Endpoints EXCLUSIVOS para ambiente de testes (sandboxed).
+  // Protegidos por NODE_ENV=test no controller.
+  // Utilizados para setup de dados de teste sem SQL direto nos testes.
+  app.post('/admin/testes/criar-cupom', autenticacaoMiddleware, adminOnlyMiddleware, (requisicao, resposta) => ControladorTestesAdmin.criarCupomTroca(requisicao, resposta));
+  app.post('/admin/testes/expirar-intencao', autenticacaoMiddleware, adminOnlyMiddleware, (requisicao, resposta) => ControladorTestesAdmin.expirarIntencao(requisicao, resposta));
+  app.post('/admin/testes/mudar-status-venda', autenticacaoMiddleware, adminOnlyMiddleware, (requisicao, resposta) => ControladorTestesAdmin.mudarStatusVenda(requisicao, resposta));
 }

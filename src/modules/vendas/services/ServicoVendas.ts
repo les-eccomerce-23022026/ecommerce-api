@@ -250,4 +250,18 @@ export class ServicoVendas {
     const atualizada = (await this.repositorioVendas.obterPorUuid(vendaUuid))!;
     return { venda: atualizada, cupom: codigoCupom };
   }
+
+  /**
+   * Lista todas as vendas (Admin).
+   */
+  public async listarTodas(limite = 500): Promise<IVenda[]> {
+    return this.repositorioVendas.listarTodas(limite);
+  }
+
+  /**
+   * Atualiza status de uma venda (Admin).
+   */
+  public async atualizarStatus(vendaUuid: string, novoStatus: string): Promise<void> {
+    return this.repositorioVendas.atualizarStatus(vendaUuid, novoStatus);
+  }
 }

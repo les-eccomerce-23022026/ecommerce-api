@@ -77,8 +77,8 @@ export interface IPerfilClienteDto {
   nome: string;
   email: string;
   emailMascarado?: string;
-  cpf: string;
-  cpfMascarado: string;
+  cpf?: string;
+  cpfMascarado?: string;
   genero?: string;
   dataNascimento?: string;
   telefone?: ITelefoneDto;

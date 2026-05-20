@@ -2,6 +2,8 @@ import { IEntregaInputDto, IEntregaOutputDto } from '@/modules/entrega/IEntrega.
 import { IConexaoBanco, DbParametro } from '@/shared/infrastructure/database/IConexaoBanco';
 import { IRepositorioEntrega } from './IRepositorioEntrega';
 import { IRepositorioRastreamento, IRastreamentoInputDto } from '@/modules/logistica-mocks/repositorios/IRepositorioRastreamento';
+import { ContextoRequisicao } from '@/shared/infrastructure/contexto/ContextoRequisicao';
+import { ENTREGA_QUERIES } from '@/modules/entrega/entrega.queries';
 
 /**
  * Implementação do repositório de entregas para PostgreSQL.
@@ -15,32 +17,45 @@ export class RepositorioEntregaPostgres implements IRepositorioEntrega {
     this.repositorioRastreamento = repositorioRastreamento;
   }
 
+  /**
+   * Obtém o loj_id do contexto de requisição.
+   * Se não houver contexto, retorna undefined (compatibilidade com código legado).
+   */
+  private obterLojId(): number | undefined {
+    return ContextoRequisicao.obterLojId();
+  }
+
   public async cadastrar(dados: IEntregaInputDto): Promise<IEntregaOutputDto> {
     // 1. Obter ven_id a partir do vendaUuid
-    const queryVenda = 'SELECT ven_id FROM vendas WHERE ven_uuid = $1';
-    const resVenda = await this.db.executar<{ ven_id: number }>(queryVenda, [dados.vendaUuid]);
+    const resVenda = await this.db.executar<{ ven_id: number }>(ENTREGA_QUERIES.SELECT_VENDA_POR_UUID, [dados.vendaUuid]);
     if (resVenda.length === 0) throw new Error('Venda não encontrada para cadastrar entrega.');
     const venId = resVenda[0].ven_id;
 
     // 2. Obter tfr_id a partir da descrição do frete
-    const queryFrete = 'SELECT tfr_id FROM tipos_frete WHERE tfr_descricao = $1';
-    const resFrete = await this.db.executar<{ tfr_id: number }>(queryFrete, [dados.tipoFrete]);
+    const resFrete = await this.db.executar<{ tfr_id: number }>(ENTREGA_QUERIES.SELECT_FRETE_POR_DESCRICAO, [dados.tipoFrete]);
     if (resFrete.length === 0) throw new Error(`Tipo de frete '${dados.tipoFrete}' não suportado.`);
     const tfrId = resFrete[0].tfr_id;
 
+    const loj_id = this.obterLojId() ?? 1;
+
     // 3. Inserir a entrega
-    const queryInsert = `
-      INSERT INTO entregas (ven_id, tfr_id, ent_endereco_json, ent_custo, ent_entregador)
-      VALUES ($1, $2, $3, $4, $5)
-      RETURNING ent_uuid, ent_criado_em
-    `;
-    const valores: DbParametro[] = [
+    let queryInsert = ENTREGA_QUERIES.INSERT_ENTREGA_BASE;
+    let valores: DbParametro[] = [
       venId,
       tfrId,
       JSON.stringify(dados.endereco),
       dados.custo,
       dados.entregador || null,
     ];
+
+    // Incluir loj_id (sempre obrigatório após migration 030)
+    queryInsert += ENTREGA_QUERIES.INSERT_ENTREGA_COM_LOJA;
+    valores.push(loj_id);
+
+    queryInsert += ENTREGA_QUERIES.INSERT_ENTREGA_VALUES_BASE;
+    queryInsert += ENTREGA_QUERIES.INSERT_ENTREGA_VALUES_COM_LOJA;
+
+    queryInsert += ENTREGA_QUERIES.INSERT_ENTREGA_RETORNO;
 
     const rows = await this.db.executar<{ ent_uuid: string; ent_criado_em: string }>(queryInsert, valores);
     const row = rows[0];
@@ -70,14 +85,17 @@ export class RepositorioEntregaPostgres implements IRepositorioEntrega {
   }
 
   public async obterPorUuid(uuid: string): Promise<IEntregaOutputDto | null> {
-    const query = `
-      SELECT e.ent_uuid, e.ent_endereco_json, e.ent_custo, e.ent_entregador, e.ent_criado_em,
-             v.ven_uuid as "vendaUuid", t.tfr_descricao as "tipoFrete"
-      FROM entregas e
-      JOIN vendas v ON e.ven_id = v.ven_id
-      JOIN tipos_frete t ON e.tfr_id = t.tfr_id
-      WHERE e.ent_uuid = $1
-    `;
+    const loj_id = this.obterLojId();
+    
+    let query = ENTREGA_QUERIES.SELECT_ENTREGA_POR_UUID;
+    const parametros: DbParametro[] = [uuid];
+
+    // Se multi-tenancy estiver habilitado, filtrar por loj_id na entrega
+    if (loj_id) {
+      query += ENTREGA_QUERIES.FILTRO_LOJ_ID;
+      parametros.push(loj_id);
+    }
+
     const rows = await this.db.executar<{
       ent_uuid: string;
       ent_endereco_json: object;
@@ -86,7 +104,7 @@ export class RepositorioEntregaPostgres implements IRepositorioEntrega {
       ent_criado_em: string;
       vendaUuid: string;
       tipoFrete: string;
-    }>(query, [uuid]);
+    }>(query, parametros);
 
     if (rows.length === 0) return null;
     const r = rows[0];
@@ -108,15 +126,19 @@ export class RepositorioEntregaPostgres implements IRepositorioEntrega {
   }
 
   public async listarPorVendaUuid(vendaUuid: string): Promise<IEntregaOutputDto[]> {
-    const query = `
-      SELECT e.ent_uuid, e.ent_endereco_json, e.ent_custo, e.ent_entregador, e.ent_criado_em,
-             v.ven_uuid as "vendaUuid", t.tfr_descricao as "tipoFrete"
-      FROM entregas e
-      JOIN vendas v ON e.ven_id = v.ven_id
-      JOIN tipos_frete t ON e.tfr_id = t.tfr_id
-      WHERE v.ven_uuid = $1
-      ORDER BY e.ent_criado_em DESC
-    `;
+    const loj_id = this.obterLojId();
+    
+    let query = ENTREGA_QUERIES.SELECT_ENTREGAS_POR_VENDA_UUID;
+    const parametros: DbParametro[] = [vendaUuid];
+
+    // Se multi-tenancy estiver habilitado, filtrar por loj_id na entrega
+    if (loj_id) {
+      query += ENTREGA_QUERIES.FILTRO_LOJ_ID;
+      parametros.push(loj_id);
+    }
+
+    query += ENTREGA_QUERIES.ORDER_BY_CRIADO_EM_DESC;
+
     const rows = await this.db.executar<{
       ent_uuid: string;
       ent_endereco_json: object;
@@ -125,7 +147,7 @@ export class RepositorioEntregaPostgres implements IRepositorioEntrega {
       ent_criado_em: string;
       vendaUuid: string;
       tipoFrete: string;
-    }>(query, [vendaUuid]);
+    }>(query, parametros);
 
     // Buscar códigos de rastreamento para todas as entregas
     const entregasComRastreamento = await Promise.all(
@@ -150,11 +172,6 @@ export class RepositorioEntregaPostgres implements IRepositorioEntrega {
   }
 
   public async atualizarEndereco(uuid: string, novoEndereco: object): Promise<void> {
-    const query = `
-      UPDATE entregas 
-      SET ent_endereco_json = $1
-      WHERE ent_uuid = $2
-    `;
-    await this.db.executar(query, [JSON.stringify(novoEndereco), uuid]);
+    await this.db.executar(ENTREGA_QUERIES.UPDATE_ENDERECO, [JSON.stringify(novoEndereco), uuid]);
   }
 }

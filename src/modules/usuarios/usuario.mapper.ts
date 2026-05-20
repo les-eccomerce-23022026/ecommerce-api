@@ -1,4 +1,4 @@
-import { IUsuario } from '@/modules/usuarios/Iusuario.entity';
+import { IUsuario } from '@/modules/usuarios/IUsuario.entity';
 import { PAPEL_CLIENTE, PAPEL_ADMIN } from '@/shared/types/papeis';
 
 /** Tipo que representa uma linha bruta retornada pelo banco de dados */
@@ -8,19 +8,28 @@ export class UsuarioMapper {
   /**
    * Mapeia linha do banco para a entidade IUsuario.
    */
-  public static mapearParaEntidade(row: LinhaResultadoUsuario): IUsuario {
+  public static mapearParaEntidade(row: LinhaResultadoUsuario, papeis?: LinhaResultadoUsuario[]): IUsuario {
+    const papeisArray = papeis || [];
+    const papelPrincipal = papeisArray.length > 0 ? papeisArray[0] : row;
+    
     return {
       id: Number(row.id),
       uuid: row.uuid as string,
       nome: row.nome as string,
       email: row.email as string,
-      cpf: row.cpf as string,
+      cpf: row.cpf as string | undefined,
+      cnpj: row.cnpj as string | undefined,
+      tipoPessoa: row.tipoPessoa as 'PF' | 'PJ' | undefined,
       senhaHash: row.senhaHash as string,
       idPapel: Number(row.idPapel),
       role: {
-        id: Number(row.idPapel),
-        descricao: (row.papelDescricao as string) || (Number(row.idPapel) === PAPEL_ADMIN.id ? PAPEL_ADMIN.descricao : PAPEL_CLIENTE.descricao),
+        id: Number(papelPrincipal.id) || Number(row.idPapel),
+        descricao: (papelPrincipal.descricao as string) || (Number(row.idPapel) === PAPEL_ADMIN.id ? PAPEL_ADMIN.descricao : PAPEL_CLIENTE.descricao),
       },
+      papeis: papeisArray.map((p) => ({
+        id: Number(p.id),
+        descricao: p.descricao as string,
+      })),
       telefoneRapido: row.telefoneRapido as string,
       ativo: row.ativo as boolean,
       isAdminMestre: row.isAdminMestre as boolean,

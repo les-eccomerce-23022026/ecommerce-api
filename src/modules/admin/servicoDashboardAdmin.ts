@@ -59,7 +59,7 @@ export class ServicoDashboardAdmin {
     const pedidosPendentes = await this.consultas.obterScalarInt(
       `SELECT COUNT(*)::int AS c
        FROM vendas v
-       JOIN status_vendas s ON v.stv_id = s.stv_id
+       JOIN status_venda s ON v.stv_id = s.stv_id
        WHERE s.stv_descricao = 'EM PROCESSAMENTO'`,
       [],
     );
@@ -67,7 +67,7 @@ export class ServicoDashboardAdmin {
     const trocasSolicitadas = await this.consultas.obterScalarInt(
       `SELECT COUNT(*)::int AS c
        FROM vendas v
-       JOIN status_vendas s ON v.stv_id = s.stv_id
+       JOIN status_venda s ON v.stv_id = s.stv_id
        WHERE s.stv_descricao IN ('EM TROCA', 'TROCA AUTORIZADA')`,
       [],
     );
@@ -111,7 +111,7 @@ export class ServicoDashboardAdmin {
     const cntDevolucoes = await this.consultas.obterScalarInt(
       `SELECT COUNT(*)::int AS c
        FROM vendas v
-       JOIN status_vendas s ON v.stv_id = s.stv_id
+       JOIN status_venda s ON v.stv_id = s.stv_id
        WHERE s.stv_descricao IN ('EM TROCA', 'REPROVADA')`,
       [],
     );

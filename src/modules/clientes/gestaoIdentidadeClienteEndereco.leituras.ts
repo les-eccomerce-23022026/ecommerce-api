@@ -27,8 +27,8 @@ export class GestaoEnderecoLeituras {
     return result.length > 0 ? result[0] : null;
   }
 
-  public async obterCepPorId(idCep: number): Promise<IRowCep | null> {
-    const query = `SELECT cep_numero as "numCep" FROM ceps WHERE cep_id = $1`;
+  public async obterCepPorId(idCep: string | number): Promise<IRowCep | null> {
+    const query = `SELECT cep_numero as "numCep" FROM ceps WHERE cep_numero = $1`;
     const result = await this.db.executar<IRowCep>(query, [idCep]);
     return result.length > 0 ? result[0] : null;
   }

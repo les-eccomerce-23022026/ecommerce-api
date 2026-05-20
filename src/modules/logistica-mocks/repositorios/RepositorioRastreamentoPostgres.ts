@@ -13,7 +13,7 @@ export class RepositorioRastreamentoPostgres implements IRepositorioRastreamento
 
   public async cadastrar(dados: IRastreamentoInputDto): Promise<IRastreamentoOutputDto> {
     const query = `
-      INSERT INTO rastreamentos (ent_uuid, ras_codigo, ras_transportadora, ras_data_entrega_prevista)
+      INSERT INTO livraria_logistica.rastreamentos (ent_uuid, ras_codigo, ras_transportadora, ras_data_entrega_prevista)
       VALUES ($1, $2, $3, $4)
       RETURNING ras_uuid, ras_data_criacao
     `;
@@ -40,7 +40,7 @@ export class RepositorioRastreamentoPostgres implements IRepositorioRastreamento
   public async obterPorUuid(uuid: string): Promise<IRastreamentoOutputDto | null> {
     const query = `
       SELECT ras_uuid, ent_uuid, ras_codigo, ras_transportadora, ras_data_criacao, ras_data_entrega_prevista
-      FROM rastreamentos
+      FROM livraria_logistica.rastreamentos
       WHERE ras_uuid = $1
     `;
     const rows = await this.db.executar<{
@@ -68,7 +68,7 @@ export class RepositorioRastreamentoPostgres implements IRepositorioRastreamento
   public async obterPorCodigo(codigo: string): Promise<IRastreamentoOutputDto | null> {
     const query = `
       SELECT ras_uuid, ent_uuid, ras_codigo, ras_transportadora, ras_data_criacao, ras_data_entrega_prevista
-      FROM rastreamentos
+      FROM livraria_logistica.rastreamentos
       WHERE ras_codigo = $1
     `;
     const rows = await this.db.executar<{
@@ -96,9 +96,9 @@ export class RepositorioRastreamentoPostgres implements IRepositorioRastreamento
   public async listarPorEntrega(entUuid: string): Promise<IRastreamentoOutputDto[]> {
     const query = `
       SELECT ras_uuid, ent_uuid, ras_codigo, ras_transportadora, ras_data_criacao, ras_data_entrega_prevista
-      FROM rastreamentos
+      FROM livraria_logistica.rastreamentos
       WHERE ent_uuid = $1
-      ORDER BY ras_criado_em DESC
+      ORDER BY ras_data_criacao DESC
     `;
     const rows = await this.db.executar<{
       ras_uuid: string;
@@ -122,10 +122,10 @@ export class RepositorioRastreamentoPostgres implements IRepositorioRastreamento
   public async listarEmAndamento(): Promise<IRastreamentoOutputDto[]> {
     const query = `
       SELECT ras_uuid, ent_uuid, ras_codigo, ras_transportadora, ras_data_criacao, ras_data_entrega_prevista
-      FROM rastreamentos
+      FROM livraria_logistica.rastreamentos
       WHERE ras_uuid NOT IN (
         SELECT DISTINCT ras_uuid 
-        FROM eventos_rastreamento 
+        FROM livraria_logistica.eventos_rastreamento 
         WHERE ere_codigo IN ('BDE', 'delivered')
       )
       ORDER BY ras_data_criacao ASC

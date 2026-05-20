@@ -12,6 +12,14 @@ import {
 } from '@/shared/types/db-rows.types';
 
 export class ClientesUtils {
+  /** Formata Date para YYYY-MM-DD no fuso local (evita off-by-one em UTC). */
+  public static formatarDataSomente(data: Date): string {
+    const ano = data.getFullYear();
+    const mes = String(data.getMonth() + 1).padStart(2, '0');
+    const dia = String(data.getDate()).padStart(2, '0');
+    return `${ano}-${mes}-${dia}`;
+  }
+
   public static mapearTipoTelefone(tipo: string): number {
     const mapeamentoTipos: Record<string, number> = {
       celular: 1,
@@ -144,25 +152,25 @@ export class ClientesUtils {
     return Number(novo[0].bai_id);
   }
 
-  public static async obterOuCriarCep(db: IConexaoBanco, cep: string, idCidade: number, idBairro: number): Promise<number> {
+  public static async obterOuCriarCep(db: IConexaoBanco, cep: string, idCidade: number, idBairro: number): Promise<string> {
     const cepLimpo = cep.replace(/\D/g, '');
-    const query = `SELECT cep_id FROM ceps WHERE cep_numero = $1 LIMIT 1`;
-    const existente = await db.executar<IRowIdSimples>(query, [cepLimpo]);
+    const query = `SELECT cep_numero FROM ceps WHERE cep_numero = $1 LIMIT 1`;
+    const existente = await db.executar<any>(query, [cepLimpo]);
     if (existente.length > 0) {
-      return Number(existente[0].cep_id);
+      return existente[0].cep_numero;
     }
     try {
-      const insertQuery = `INSERT INTO ceps (cep_numero, cid_id, bai_id) VALUES ($1, $2, $3) RETURNING cep_id`;
-      const novo = await db.executar<IRowIdSimples>(insertQuery, [cepLimpo, idCidade, idBairro]);
-      return Number(novo[0].cep_id);
+      const insertQuery = `INSERT INTO ceps (cep_numero, cid_id, bai_id) VALUES ($1, $2, $3) RETURNING cep_numero`;
+      const novo = await db.executar<any>(insertQuery, [cepLimpo, idCidade, idBairro]);
+      return novo[0].cep_numero;
     } catch (err: unknown) {
       if (err && typeof err === 'object' && 'message' in err) {
         const error = err as { message: string; code?: string };
         // Se der erro de unicidade, buscar o que já existe
         if (error.message.includes('unique constraint') || error.code === '23505') {
-          const queryRebusca = `SELECT cep_id FROM ceps WHERE cep_numero = $1 LIMIT 1`;
-          const rebuasca = await db.executar<IRowIdSimples>(queryRebusca, [cepLimpo]);
-          return Number(rebuasca[0].cep_id);
+          const queryRebusca = `SELECT cep_numero FROM ceps WHERE cep_numero = $1 LIMIT 1`;
+          const rebuasca = await db.executar<any>(queryRebusca, [cepLimpo]);
+          return rebuasca[0].cep_numero;
         }
       }
       throw err;
@@ -184,9 +192,9 @@ export class ClientesUtils {
     return result.length > 0 ? result[0] : null;
   }
 
-  public static async obterCepPorId(db: IConexaoBanco, idCep: number): Promise<IRowCep | null> {
-    const query = `SELECT cep_numero as "numCep" FROM ceps WHERE cep_id = $1`;
-    const result = await db.executar<IRowCep>(query, [idCep]);
+  public static async obterCepPorId(db: IConexaoBanco, cep: string): Promise<IRowCep | null> {
+    const query = `SELECT cep_numero as "numCep" FROM ceps WHERE cep_numero = $1`;
+    const result = await db.executar<IRowCep>(query, [cep]);
     return result.length > 0 ? result[0] : null;
   }
 

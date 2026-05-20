@@ -8,8 +8,8 @@ export type PartesSqlCatalogo = {
   paramsCount: DbParametro[];
   paramsList: DbParametro[];
   filtroIdx: string;
-  limitIdx: string;
-  offsetIdx: string;
+  limit: number;
+  offset: number;
 };
 
 const FILTRO_CATEGORIA_SQL = `AND EXISTS (
@@ -47,10 +47,10 @@ export function montarPartesSqlCatalogo(opcoes: {
       joinVendas,
       orderBy,
       paramsCount: [],
-      paramsList: [itensPorPagina, offset],
+      paramsList: [],
       filtroIdx: '',
-      limitIdx: '$1',
-      offsetIdx: '$2',
+      limit: itensPorPagina,
+      offset,
     };
   }
   return {
@@ -58,9 +58,9 @@ export function montarPartesSqlCatalogo(opcoes: {
     joinVendas,
     orderBy,
     paramsCount: [categoriaSlug],
-    paramsList: [categoriaSlug, itensPorPagina, offset],
+    paramsList: [categoriaSlug],
     filtroIdx: '$1',
-    limitIdx: '$2',
-    offsetIdx: '$3',
+    limit: itensPorPagina,
+    offset,
   };
 }

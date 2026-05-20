@@ -32,7 +32,10 @@ export class ServicoPedidosAdmin {
       throw new Error('Pedido não encontrado.');
     }
     const statusAtual = venda.status.trim().toUpperCase();
-    const statusPermitidos = new Set(['EM PROCESSAMENTO', 'APROVADA']);
+    if (process.env.NODE_ENV === 'test') {
+      console.log(`[DEBUG-DESPACHO] Pedido ${vendaUuid} Status Atual no BD: "${venda.status}" (Trimmed: "${statusAtual}")`);
+    }
+    const statusPermitidos = new Set(['EM PROCESSAMENTO', 'APROVADA', 'APROVADO']);
     if (!statusPermitidos.has(statusAtual)) {
       throw new Error('Somente pedidos em processamento ou aprovados podem ser despachados.');
     }
@@ -112,7 +115,8 @@ export class ServicoPedidosAdmin {
     if (!venda) {
       throw new Error('Pedido não encontrado.');
     }
-    if (venda.status !== 'EM TRÂNSITO') {
+    const statusAtual = venda.status.trim().toUpperCase();
+    if (statusAtual !== 'EM TRÂNSITO') {
       throw new Error('Somente pedidos em trânsito podem ter entrega confirmada.');
     }
 

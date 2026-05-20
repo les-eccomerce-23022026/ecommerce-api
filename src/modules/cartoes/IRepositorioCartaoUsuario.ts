@@ -40,13 +40,13 @@ export class RepositorioCartaoUsuario implements IRepositorioCartaoUsuario {
 
   async criar(cartao: Omit<ICartaoUsuario, 'id' | 'uuid'>): Promise<ICartaoUsuario> {
     const query = `
-      INSERT INTO cartoes (
+      INSERT INTO livraria_financeiro.cartoes (
         usu_id, ban_id, crt_token,
         crt_final, crt_nome_impresso, crt_validade, crt_principal
       ) VALUES ($1, $2, $3, $4, $5, $6, $7)
       RETURNING crt_id AS "id", crt_uuid AS "uuid", usu_id AS "idUsuario",
                 ban_id AS "idBandeira",
-                (SELECT ban_descricao FROM bandeiras_cartao WHERE ban_id = cartoes.ban_id) AS "bandeira",
+                (SELECT ban_descricao FROM livraria_financeiro.bandeiras_cartao WHERE ban_id = livraria_financeiro.cartoes.ban_id) AS "bandeira",
                 crt_token AS "token",
                 crt_final AS "ultimosDigitosCartao", crt_nome_impresso AS "nomeImpresso",
                 crt_validade AS "validade", crt_principal AS "principal"
@@ -74,8 +74,8 @@ export class RepositorioCartaoUsuario implements IRepositorioCartaoUsuario {
              c.crt_nome_impresso AS "nomeImpresso", c.crt_validade AS "validade", 
              c.crt_principal AS "principal", c.crt_criado_em AS "criadoEm", 
              c.crt_atualizado_em AS "atualizadoEm"
-      FROM cartoes c
-      JOIN bandeiras_cartao b ON c.ban_id = b.ban_id
+      FROM livraria_financeiro.cartoes c
+      JOIN livraria_financeiro.bandeiras_cartao b ON c.ban_id = b.ban_id
       WHERE c.crt_uuid = $1
     `;
     const rows = await this.pool.executar<LinhaCartao>(query, [uuid]);
@@ -91,8 +91,8 @@ export class RepositorioCartaoUsuario implements IRepositorioCartaoUsuario {
              c.crt_nome_impresso AS "nomeImpresso", c.crt_validade AS "validade", 
              c.crt_principal AS "principal", c.crt_criado_em AS "criadoEm", 
              c.crt_atualizado_em AS "atualizadoEm"
-      FROM cartoes c
-      JOIN bandeiras_cartao b ON c.ban_id = b.ban_id
+      FROM livraria_financeiro.cartoes c
+      JOIN livraria_financeiro.bandeiras_cartao b ON c.ban_id = b.ban_id
       WHERE c.usu_id = $1
       ORDER BY c.crt_principal DESC, c.crt_criado_em DESC
     `;
@@ -101,7 +101,7 @@ export class RepositorioCartaoUsuario implements IRepositorioCartaoUsuario {
   }
 
   async buscarIdBandeiraPorUuid(uuidBandeira: string): Promise<number | null> {
-    const query = 'SELECT ban_id FROM bandeiras_cartao WHERE ban_uuid = $1';
+    const query = 'SELECT ban_id FROM livraria_financeiro.bandeiras_cartao WHERE ban_uuid = $1';
     const rows = await this.pool.executar<{ ban_id: number }>(query, [uuidBandeira]);
     if (rows.length === 0) return null;
     return rows[0].ban_id;
@@ -150,7 +150,7 @@ export class RepositorioCartaoUsuario implements IRepositorioCartaoUsuario {
 
     valores.push(uuid);
     const query = `
-      UPDATE cartoes
+      UPDATE livraria_financeiro.cartoes
       SET ${campos.join(', ')}
       WHERE crt_uuid = $${contador}
     `;
@@ -160,19 +160,23 @@ export class RepositorioCartaoUsuario implements IRepositorioCartaoUsuario {
   }
 
   async excluir(uuid: string): Promise<boolean> {
-    const query = 'DELETE FROM cartoes WHERE crt_uuid = $1';
+    const query = 'DELETE FROM livraria_financeiro.cartoes WHERE crt_uuid = $1';
     await this.pool.executar(query, [uuid]);
     return true;
   }
 
   async definirComoPrincipal(uuid: string, idUsuario: number): Promise<boolean> {
     // 1. Remove principal de todos os outros cartões do usuário
-    await this.pool.executar('UPDATE cartoes SET crt_principal = false WHERE usu_id = $1', [idUsuario]);
+    await this.pool.executar(
+      'UPDATE livraria_financeiro.cartoes SET crt_principal = false WHERE usu_id = $1',
+      [idUsuario],
+    );
 
     if (!uuid) return true;
 
     // 2. Define o cartão específico como principal
-    const query = 'UPDATE cartoes SET crt_principal = true WHERE crt_uuid = $1 AND usu_id = $2';
+    const query =
+      'UPDATE livraria_financeiro.cartoes SET crt_principal = true WHERE crt_uuid = $1 AND usu_id = $2';
     await this.pool.executar(query, [uuid, idUsuario]);
 
     return true;

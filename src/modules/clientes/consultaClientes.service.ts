@@ -13,7 +13,7 @@ export interface IResultadoConsultaClientes {
     uuid: string;
     nome: string;
     email: string;
-    cpf: string;
+    cpf?: string;
     ativo: boolean;
     criadoEm: Date;
   }>;

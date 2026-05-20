@@ -31,4 +31,9 @@ export function registrarRotasVendas(router: Router): void {
   router.patch('/admin/pedidos/:uuid/autorizar-troca', autenticacaoMiddleware, adminOnlyMiddleware, controller.autorizarTroca);
   router.patch('/admin/pedidos/:uuid/rejeitar-troca', autenticacaoMiddleware, adminOnlyMiddleware, controller.rejeitarTroca);
   router.patch('/admin/pedidos/:uuid/confirmar-recebimento', autenticacaoMiddleware, adminOnlyMiddleware, controller.confirmarRecebimentoTroca);
+
+  // Admin - Pedidos (Listar e Gerenciar Status)
+  router.get('/admin/pedidos', autenticacaoMiddleware, adminOnlyMiddleware, controller.listarPedidosAdmin);
+  router.patch('/admin/pedidos/:uuid/despachar', autenticacaoMiddleware, adminOnlyMiddleware, controller.despacharPedido);
+  router.patch('/admin/pedidos/:uuid/entrega', autenticacaoMiddleware, adminOnlyMiddleware, controller.confirmarEntrega);
 }

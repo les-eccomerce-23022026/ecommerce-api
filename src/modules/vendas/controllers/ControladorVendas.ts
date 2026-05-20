@@ -169,4 +169,42 @@ export class ControladorVendas {
       res.status(400).json({ erro: (err as Error).message });
     }
   };
+
+  /**
+   * Listar pedidos admin: GET /admin/pedidos
+   */
+  public listarPedidosAdmin = async (_req: Request, res: Response) => {
+    try {
+      const pedidos = await this.servicoVendas.listarTodas();
+      res.json(pedidos);
+    } catch (err: unknown) {
+      res.status(400).json({ erro: (err as Error).message });
+    }
+  };
+
+  /**
+   * Despachar pedido: PATCH /admin/pedidos/:uuid/despachar
+   */
+  public despacharPedido = async (req: Request, res: Response) => {
+    try {
+      const { uuid } = req.params;
+      await this.servicoVendas.atualizarStatus(uuid, 'EM TRÂNSITO');
+      res.json({ status: 'EM TRÂNSITO' });
+    } catch (err: unknown) {
+      res.status(400).json({ erro: (err as Error).message });
+    }
+  };
+
+  /**
+   * Confirmar entrega: PATCH /admin/pedidos/:uuid/entrega
+   */
+  public confirmarEntrega = async (req: Request, res: Response) => {
+    try {
+      const { uuid } = req.params;
+      await this.servicoVendas.atualizarStatus(uuid, 'Entregue');
+      res.json({ status: 'Entregue' });
+    } catch (err: unknown) {
+      res.status(400).json({ erro: (err as Error).message });
+    }
+  };
 }

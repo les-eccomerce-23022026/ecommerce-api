@@ -204,4 +204,40 @@ export class ServicoLivros {
   async criarEditorasEmLote(editoras: Array<{ nome: string; cnpj: string }>): Promise<number[]> {
     return this.bulkInsert.inserirEditorasEmLote(editoras);
   }
+
+  async atualizarLivroParcial(uuid: string, dados: {
+    titulo?: string;
+    sinopse?: string;
+    imagemUrl?: string;
+    ano?: number;
+    edicao?: string;
+    numeroPaginas?: number;
+    altura?: number;
+    largura?: number;
+    peso?: number;
+    profundidade?: number;
+    codigoBarras?: string;
+    quantidadeEstoque?: number;
+    precoVenda?: number;
+    valorCusto?: number;
+  }): Promise<ILivroCatalogoDto> {
+    // Validações de negócio
+    if (dados.precoVenda !== undefined && dados.precoVenda <= 0) {
+      throw new Error('Preço de venda deve ser maior que zero.');
+    }
+    if (dados.valorCusto !== undefined && dados.valorCusto <= 0) {
+      throw new Error('Valor de custo deve ser maior que zero.');
+    }
+    if (dados.quantidadeEstoque !== undefined && dados.quantidadeEstoque < 0) {
+      throw new Error('Quantidade em estoque não pode ser negativa.');
+    }
+    if (dados.numeroPaginas !== undefined && dados.numeroPaginas <= 0) {
+      throw new Error('Número de páginas deve ser maior que zero.');
+    }
+    if (dados.ano !== undefined && (dados.ano < 1900 || dados.ano > 2100)) {
+      throw new Error('Ano deve estar entre 1900 e 2100.');
+    }
+
+    return this.repo.atualizarLivroParcial(uuid, dados);
+  }
 }

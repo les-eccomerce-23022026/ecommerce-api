@@ -21,6 +21,7 @@ import {
   mascararEmail,
   converterTelefoneParaDto,
 } from '@/modules/clientes/gestaoIdentidadeClienteTexto.util';
+import { ClientesUtils } from '@/modules/clientes/clientesUtils.service';
 
 /**
  * Serviço responsável pelo fluxo de cadastro público de clientes.
@@ -160,9 +161,11 @@ export class GestaoIdentidadeCliente {
       email: usuario.email,
       emailMascarado: mascararEmail(usuario.email),
       cpf: usuario.cpf,
-      cpfMascarado: mascararCpf(usuario.cpf),
+      cpfMascarado: usuario.cpf ? mascararCpf(usuario.cpf) : undefined,
       genero: perfil?.genero,
-      dataNascimento: perfil?.dataNascimento ? perfil.dataNascimento.toISOString().split('T')[0] : undefined,
+      dataNascimento: perfil?.dataNascimento
+        ? ClientesUtils.formatarDataSomente(perfil.dataNascimento)
+        : undefined,
       telefone: telefonePrincipal ? converterTelefoneParaDto(telefonePrincipal) : undefined,
       enderecos: enderecosDto,
       cartoes: cartoesDto,

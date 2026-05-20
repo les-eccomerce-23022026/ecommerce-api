@@ -27,7 +27,7 @@ function validarSenhaECpfCadastroPublico(dados: ICriarClienteDto): void {
       'Senha fraca. É necessário pelo menos 8 caracteres, incluindo maiúsculas, minúsculas e caractere especial.',
     );
   }
-  if (process.env.NODE_ENV !== 'test' && !validarCpf(dados.cpf)) {
+  if (!validarCpf(dados.cpf)) {
     throw new Error('CPF inválido. Certifique-se de que o formato e os dígitos estão corretos.');
   }
 }
@@ -109,6 +109,8 @@ export async function realizarCadastroPublicoCliente(
     cpf: dados.cpf,
     senhaHash,
     role: PAPEL_CLIENTE,
+    papeis: [PAPEL_CLIENTE],
+    isAdminMestre: false,
   });
   await persistirPerfilOpcional(deps, usuario.id, dados);
   await persistirTelefonePrincipalSeInformado(deps, usuario.id, dados);

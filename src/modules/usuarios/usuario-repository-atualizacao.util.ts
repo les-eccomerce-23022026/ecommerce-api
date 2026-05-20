@@ -1,4 +1,4 @@
-import type { IUsuario } from '@/modules/usuarios/Iusuario.entity';
+import { IUsuario } from '@/modules/usuarios/IUsuario.entity';
 import type { DbParametro } from '@/shared/infrastructure/database/IConexaoBanco';
 
 export type ClausulasAtualizacaoUsuario = {

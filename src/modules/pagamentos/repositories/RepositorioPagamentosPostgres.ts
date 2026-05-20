@@ -4,6 +4,7 @@ import { FormaPagamento, TipoPagamento } from '../entities/FormaPagamento';
 /* eslint-disable max-lines */
 import { CartaoCredito } from '../entities/CartaoCredito';
 import { StatusPagamento } from '../entities/IPagamento';
+import { ContextoRequisicao } from '@/shared/infrastructure/contexto/ContextoRequisicao';
 
 /**
  * Implementação do repositório de pagamentos para PostgreSQL.
@@ -13,6 +14,14 @@ export class RepositorioPagamentosPostgres implements IRepositorioPagamentos {
 
   constructor(db: IConexaoBanco) {
     this.db = db;
+  }
+
+  /**
+   * Obtém o loj_id do contexto de requisição.
+   * Se não houver contexto, retorna undefined (compatibilidade com código legado).
+   */
+  private obterLojId(): number | undefined {
+    return ContextoRequisicao.obterLojId();
   }
 
   public async obterVenIdPorVendaUuid(vendaUuid: string): Promise<number | null> {
@@ -51,16 +60,18 @@ export class RepositorioPagamentosPostgres implements IRepositorioPagamentos {
     const stpId = statusRes[0].stp_id;
 
     const inpId = opcoes?.inpIdIntencao;
+    const loj_id = this.obterLojId() ?? 1;
 
     // Inserir pagamento
     const pagamentoQuery = `
-      INSERT INTO pagamento (ven_id, tpg_id, stp_id, pag_valor, pag_detalhes_cupom, pag_processado_em, inp_id)
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      INSERT INTO pagamento (ven_id, tpg_id, stp_id, pag_valor, pag_detalhes_cupom, pag_processado_em, inp_id, loj_id)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
       RETURNING pag_id, pag_uuid, pag_criado_em
     `;
     const pagamentoValues: DbParametro[] = [
-      venId, tpgId, stpId, dados.valor, dados.formaPagamento.getDetalhes(), dados.processadoEm || null, inpId ?? null
+      venId, tpgId, stpId, dados.valor, dados.formaPagamento.getDetalhes(), dados.processadoEm || null, inpId ?? null, loj_id
     ];
+
     const pagamentoRows = await this.db.executar<{
       pag_id: number; pag_uuid: string; pag_criado_em: string;
     }>(pagamentoQuery, pagamentoValues);
@@ -69,12 +80,12 @@ export class RepositorioPagamentosPostgres implements IRepositorioPagamentos {
     // Inserir cartão se existir
     if (dados.cartao) {
       const cartaoQuery = `
-        INSERT INTO cartao_pagamento (pag_id, cpp_numero_tokenizado, cpp_nome_titular, cpp_validade, cpp_bandeira)
-        VALUES ($1, $2, $3, $4, $5)
+        INSERT INTO cartao_pagamento (pag_id, cpp_numero_tokenizado, cpp_nome_titular, cpp_validade, cpp_bandeira, loj_id)
+        VALUES ($1, $2, $3, $4, $5, $6)
       `;
       await this.db.executar(cartaoQuery, [
         row.pag_id, dados.cartao.getNumeroTokenizado(), dados.cartao.getNomeTitular(),
-        dados.cartao.getValidade(), dados.cartao.getBandeira()
+        dados.cartao.getValidade(), dados.cartao.getBandeira(), loj_id
       ]);
     }
 
@@ -82,7 +93,9 @@ export class RepositorioPagamentosPostgres implements IRepositorioPagamentos {
   }
 
   public async obterPorUuid(uuid: string): Promise<IPagamento | null> {
-    const query = `
+    const loj_id = this.obterLojId();
+    
+    let query = `
       SELECT p.pag_uuid, p.pag_valor, p.pag_detalhes_cupom, p.pag_criado_em, p.pag_processado_em,
              tp.tpg_descricao, sp.stp_descricao, v.ven_uuid,
              c.cpp_numero_tokenizado, c.cpp_nome_titular, c.cpp_validade, c.cpp_bandeira
@@ -93,13 +106,21 @@ export class RepositorioPagamentosPostgres implements IRepositorioPagamentos {
       LEFT JOIN cartao_pagamento c ON p.pag_id = c.pag_id
       WHERE p.pag_uuid = $1
     `;
+    const parametros: DbParametro[] = [uuid];
+
+    // Se multi-tenancy estiver habilitado, filtrar por loj_id na venda
+    if (loj_id) {
+      query += ` AND v.loj_id = $2`;
+      parametros.push(loj_id);
+    }
+
     const rows = await this.db.executar<{
       pag_uuid: string; pag_valor: number; pag_detalhes_cupom: string | null;
       pag_criado_em: string; pag_processado_em: string | null;
       tpg_descricao: string; stp_descricao: string; ven_uuid: string;
       cpp_numero_tokenizado: string | null; cpp_nome_titular: string | null;
       cpp_validade: string | null; cpp_bandeira: string | null;
-    }>(query, [uuid]);
+    }>(query, parametros);
 
     if (rows.length === 0) return null;
 
@@ -145,7 +166,9 @@ export class RepositorioPagamentosPostgres implements IRepositorioPagamentos {
   }
 
   public async listarPorVenda(vendaUuid: string): Promise<IPagamento[]> {
-    const query = `
+    const loj_id = this.obterLojId();
+    
+    let query = `
       SELECT 
         p.pag_uuid, p.pag_valor, p.pag_detalhes_cupom, p.pag_criado_em, p.pag_processado_em,
         tp.tpg_descricao, sp.stp_descricao, v.ven_uuid,
@@ -156,15 +179,24 @@ export class RepositorioPagamentosPostgres implements IRepositorioPagamentos {
       JOIN vendas v ON p.ven_id = v.ven_id
       LEFT JOIN cartao_pagamento c ON p.pag_id = c.pag_id
       WHERE v.ven_uuid = $1
-      ORDER BY p.pag_criado_em ASC
     `;
+    const parametros: DbParametro[] = [vendaUuid];
+
+    // Se multi-tenancy estiver habilitado, filtrar por loj_id na venda
+    if (loj_id) {
+      query += ` AND v.loj_id = $2`;
+      parametros.push(loj_id);
+    }
+
+    query += ` ORDER BY p.pag_criado_em ASC`;
+
     const rows = await this.db.executar<{
       pag_uuid: string; pag_valor: number; pag_detalhes_cupom: string | null;
       pag_criado_em: string; pag_processado_em: string | null;
       tpg_descricao: string; stp_descricao: string; ven_uuid: string;
       cpp_numero_tokenizado: string | null; cpp_nome_titular: string | null;
       cpp_validade: string | null; cpp_bandeira: string | null;
-    }>(query, [vendaUuid]);
+    }>(query, parametros);
 
     return rows.map((r) => {
       const formaPagamento = new FormaPagamento(r.tpg_descricao as TipoPagamento, r.pag_detalhes_cupom || undefined);
@@ -202,7 +234,9 @@ export class RepositorioPagamentosPostgres implements IRepositorioPagamentos {
     }
   ): Promise<void> {
     const q = `
-      INSERT INTO pagamento_pix_simulado (pag_id, ppx_copia_cola, ppx_qr_base64, ppx_expira_em, ppx_segredo_confirmacao)
+      INSERT INTO livraria_financeiro.pagamento_pix_simulado (
+        pag_id, pps_codigo_copia_cola, pps_codigo_qr, pps_expiracao_em, pps_segredo_confirmacao
+      )
       VALUES ($1, $2, $3, $4, $5)
     `;
     await this.db.executar(q, [
@@ -221,24 +255,24 @@ export class RepositorioPagamentosPostgres implements IRepositorioPagamentos {
     segredoConfirmacao: string;
   } | null> {
     const query = `
-      SELECT ppx.ppx_copia_cola, ppx.ppx_qr_base64, ppx.ppx_expira_em, ppx.ppx_segredo_confirmacao
-      FROM pagamento_pix_simulado ppx
-      JOIN pagamento p ON ppx.pag_id = p.pag_id
+      SELECT pps.pps_codigo_copia_cola, pps.pps_codigo_qr, pps.pps_expiracao_em, pps.pps_segredo_confirmacao
+      FROM livraria_financeiro.pagamento_pix_simulado pps
+      JOIN livraria_financeiro.pagamento p ON pps.pag_id = p.pag_id
       WHERE p.pag_uuid = $1
     `;
     const rows = await this.db.executar<{
-      ppx_copia_cola: string;
-      ppx_qr_base64: string | null;
-      ppx_expira_em: string;
-      ppx_segredo_confirmacao: string;
+      pps_codigo_copia_cola: string;
+      pps_codigo_qr: string | null;
+      pps_expiracao_em: string;
+      pps_segredo_confirmacao: string;
     }>(query, [pagUuid]);
     if (rows.length === 0) return null;
     const r = rows[0];
     return {
-      copiaCola: r.ppx_copia_cola,
-      qrBase64: r.ppx_qr_base64,
-      expiraEm: new Date(r.ppx_expira_em),
-      segredoConfirmacao: r.ppx_segredo_confirmacao
+      copiaCola: r.pps_codigo_copia_cola,
+      qrBase64: r.pps_codigo_qr,
+      expiraEm: new Date(r.pps_expiracao_em),
+      segredoConfirmacao: r.pps_segredo_confirmacao
     };
   }
 
@@ -249,14 +283,28 @@ export class RepositorioPagamentosPostgres implements IRepositorioPagamentos {
     usuarioId: number;
     ativo: boolean;
   } | null> {
-    const query = 'SELECT ctr_id as id, ctr_codigo as codigo, ctr_valor_atual as "valorAtual", usu_id as "usuarioId", ctr_ativo as ativo FROM cupons_troca WHERE ctr_codigo = $1';
+    const query = `
+      SELECT c.cpt_id AS id,
+             c.cpt_codigo AS codigo,
+             c.cpt_valor AS "valorAtual",
+             cl.usu_id AS "usuarioId",
+             (c.cpt_status = 'DISPONIVEL') AS ativo
+      FROM livraria_comercial.cupons_troca c
+      JOIN livraria_gestao.clientes cl ON cl.cli_id = c.cpt_cliente_id
+      WHERE c.cpt_codigo = $1
+    `;
     const rows = await this.db.executar<{ id: number; codigo: string; valorAtual: number; usuarioId: number; ativo: boolean }>(query, [codigo]);
     return rows[0] ?? null;
   }
 
   public async atualizarSaldoCupomTroca(id: number, novoSaldo: number): Promise<void> {
-    const query = 'UPDATE cupons_troca SET ctr_valor_atual = $1, ctr_atualizado_em = NOW(), ctr_ativo = $2 WHERE ctr_id = $3';
-    await this.db.executar(query, [novoSaldo, novoSaldo > 0, id]);
+    const query = `
+      UPDATE livraria_comercial.cupons_troca
+      SET cpt_valor = $1::NUMERIC,
+          cpt_status = CASE WHEN $1::NUMERIC > 0 THEN 'DISPONIVEL' ELSE 'UTILIZADO' END
+      WHERE cpt_id = $2::BIGINT
+    `;
+    await this.db.executar(query, [novoSaldo, id]);
   }
 
   public async criarCupomTroca(dados: {
@@ -265,25 +313,42 @@ export class RepositorioPagamentosPostgres implements IRepositorioPagamentos {
     valor: number;
   }): Promise<string> {
     const query = `
-      INSERT INTO cupons_troca (usu_id, ctr_codigo, ctr_valor_original, ctr_valor_atual)
-      VALUES ($1, $2, $3, $3)
-      RETURNING ctr_uuid
+      INSERT INTO livraria_comercial.cupons_troca (cpt_cliente_id, cpt_codigo, cpt_valor, cpt_valido_ate, cpt_status)
+      SELECT c.cli_id, $2, $3, CURRENT_DATE + INTERVAL '365 days', 'DISPONIVEL'
+      FROM livraria_gestao.clientes c
+      WHERE c.usu_id = $1
+      RETURNING cpt_uuid
     `;
-    const rows = await this.db.executar<{ ctr_uuid: string }>(query, [dados.usuarioId, dados.codigo, dados.valor]);
-    return rows[0].ctr_uuid;
+    const rows = await this.db.executar<{ cpt_uuid: string }>(query, [dados.usuarioId, dados.codigo, dados.valor]);
+    return rows[0].cpt_uuid;
   }
 
   public async listarCuponsTrocaPorUsuario(usuarioId: number): Promise<Array<{
+    uuid: string;
     codigo: string;
     valorAtual: number;
     ativo: boolean;
   }>> {
-    const query = 'SELECT ctr_codigo as codigo, ctr_valor_atual as "valorAtual", ctr_ativo as ativo FROM cupons_troca WHERE usu_id = $1';
-    const rows = await this.db.executar<{ codigo: string; valorAtual: number; ativo: boolean }>(query, [usuarioId]);
-    return rows.map(r => ({
+    const query = `
+      SELECT c.cpt_uuid AS uuid,
+             c.cpt_codigo AS codigo,
+             c.cpt_valor AS "valorAtual",
+             (c.cpt_status = 'DISPONIVEL') AS ativo
+      FROM livraria_comercial.cupons_troca c
+      JOIN livraria_gestao.clientes cl ON cl.cli_id = c.cpt_cliente_id
+      WHERE cl.usu_id = $1
+    `;
+    const rows = await this.db.executar<{
+      uuid: string;
+      codigo: string;
+      valorAtual: number;
+      ativo: boolean;
+    }>(query, [usuarioId]);
+    return rows.map((r) => ({
+      uuid: r.uuid,
       codigo: r.codigo,
       valorAtual: Number(r.valorAtual),
-      ativo: r.ativo
+      ativo: r.ativo,
     }));
   }
 

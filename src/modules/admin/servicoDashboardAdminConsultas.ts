@@ -8,7 +8,7 @@ export class DashboardAdminConsultas {
     return this.obterScalarInt(
       `SELECT COUNT(*)::int AS c
        FROM vendas v
-       JOIN status_vendas s ON v.stv_id = s.stv_id
+       JOIN status_venda s ON v.stv_id = s.stv_id
        WHERE s.stv_descricao = $1`,
       [descricao],
     );

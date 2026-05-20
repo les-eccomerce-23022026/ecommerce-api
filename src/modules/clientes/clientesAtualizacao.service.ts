@@ -3,7 +3,7 @@ import { IRepositorioUsuarios } from '@/modules/usuarios/IRepositorioUsuarios';
 import { IRepositorioPerfilCliente } from '@/shared/types/IRepositorioPerfilCliente';
 import { IRepositorioTelefoneUsuario } from '@/shared/types/IRepositorioTelefoneUsuario';
 import { IRepositorioEnderecoUsuario } from '@/shared/types/IRepositorioEnderecoUsuario';
-import { IUsuario } from '@/modules/usuarios/Iusuario.entity';
+import { IUsuario } from '@/modules/usuarios/IUsuario.entity';
 import {
   IAtualizarClienteDto,
   IEnderecoDto,
@@ -12,6 +12,15 @@ import { IPerfilCliente } from '@/shared/types/IPerfilCliente';
 import { ITelefoneUsuario } from '@/shared/types/ITelefoneUsuario';
 import { ClientesUtils } from './clientesUtils.service';
 import { ClientesEnderecoService } from './clientesEndereco.service';
+
+function parsearDataNascimentoSomenteData(valor: string): Date {
+  const partes = valor.trim().split('-').map(Number);
+  if (partes.length !== 3 || partes.some((n) => !Number.isFinite(n))) {
+    throw new Error('Data de nascimento inválida.');
+  }
+  const [ano, mes, dia] = partes;
+  return new Date(ano, mes - 1, dia);
+}
 
 export class ClientesAtualizacaoService {
   constructor(
@@ -108,7 +117,9 @@ export class ClientesAtualizacaoService {
       idUsuario,
       genero: dados.genero !== undefined ? dados.genero : perfilExistente?.genero,
       dataNascimento:
-        dados.dataNascimento !== undefined ? new Date(dados.dataNascimento) : perfilExistente?.dataNascimento,
+        dados.dataNascimento !== undefined
+          ? parsearDataNascimentoSomenteData(dados.dataNascimento)
+          : perfilExistente?.dataNascimento,
     };
 
     if (perfilExistente) {

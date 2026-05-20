@@ -2,8 +2,8 @@ export const COTACAO_FRETE_QUERIES = {
   INSERT_BASE: `
     INSERT INTO cotacao_frete (
       cfr_provedor, cfr_estado, cfr_cep_origem, cfr_cep_destino, cfr_peso_kg, cfr_valor_itens,
-      cfr_tipo_servico, cfr_valor, cfr_prazo_texto, cfr_expira_em
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      cfr_tipo_servico, cfr_valor, cfr_prazo_texto, cfr_expira_em, loj_id
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
     RETURNING cfr_id, cfr_uuid
   `,
   INSERT_SIMULADA: `

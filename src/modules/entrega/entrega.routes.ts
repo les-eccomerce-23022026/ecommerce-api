@@ -6,13 +6,15 @@ import { RepositorioEntregaPostgres } from '@/modules/entrega/RepositorioEntrega
 import { ServicoEntrega } from '@/modules/entrega/ServicoEntrega';
 import { ControladorEntrega } from '@/modules/entrega/ControladorEntrega';
 import { ServicoNotificacaoEmail } from './adapters/ServicoNotificacaoEmail';
+import { RepositorioRastreamentoPostgres } from '@/modules/logistica-mocks/repositorios/RepositorioRastreamentoPostgres';
 
 /**
  * Registra as rotas do módulo de entrega.
  */
 export function registrarRotasEntrega(router: Router): void {
   const db = ConexaoPostgres.obterInstancia();
-  const repoEntrega = new RepositorioEntregaPostgres(db);
+  const repoRastreamento = new RepositorioRastreamentoPostgres(db);
+  const repoEntrega = new RepositorioEntregaPostgres(db, repoRastreamento);
   const repoVendas = new RepositorioVendasPostgres(db);
   const servicoNotificacao = new ServicoNotificacaoEmail();
   const servico = new ServicoEntrega(repoEntrega, repoVendas, servicoNotificacao);

@@ -60,7 +60,7 @@ export class ClientesEnderecoService {
     const [cidade, bairro, cep, pais, tipoResidencia, logradouro] = await Promise.all([
       ClientesUtils.obterCidadePorId(this.db, endereco.idCidade),
       ClientesUtils.obterBairroPorId(this.db, endereco.idBairro),
-      ClientesUtils.obterCepPorId(this.db, endereco.idCep),
+      ClientesUtils.obterCepPorId(this.db, String(endereco.idCep)),
       ClientesUtils.obterPaisPorId(this.db, endereco.idPais),
       ClientesUtils.obterTipoResidenciaPorId(this.db, endereco.idTipoResidencia),
       ClientesUtils.obterLogradouroPorId(this.db, endereco.idLogradouro),

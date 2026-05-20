@@ -32,7 +32,12 @@ export class ControladorCarrinho {
         res.status(parsed.status).json({ erro: parsed.mensagem });
         return;
       }
-      const dados = await this.servico.alterarItem(usuUuid, parsed.livroUuid, parsed.quantidade);
+      const dados = await this.servico.alterarItem(
+        usuUuid,
+        parsed.livroUuid,
+        parsed.quantidade,
+        req.usuario?.loj_id_atual,
+      );
       res.status(200).json(dados);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Erro ao atualizar carrinho';

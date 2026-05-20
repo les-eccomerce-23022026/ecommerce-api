@@ -2,7 +2,7 @@ import { IRepositorioEnderecoUsuario } from '@/shared/types/IRepositorioEndereco
 import { IEnderecoDto } from '@/modules/clientes/Iclientes.dto';
 import { IConexaoBanco } from '@/shared/infrastructure/database/IConexaoBanco';
 import { IEnderecoUsuario } from '@/shared/types/IEnderecoUsuario';
-import { IUsuario } from '@/modules/usuarios/Iusuario.entity';
+import { IUsuario } from '@/modules/usuarios/IUsuario.entity';
 import { IRowIdSimples } from '@/shared/types/db-rows.types';
 import { GestaoEnderecoLeituras } from '@/modules/clientes/gestaoIdentidadeClienteEndereco.leituras';
 import { mapearEnderecoUsuarioParaDto } from '@/modules/clientes/gestaoIdentidadeClienteEndereco.dto.mapper';
@@ -39,6 +39,9 @@ export class GestaoEnderecoCliente {
   }
 
   private async obterOuCriarLogradouro(tipoLogradouro: string, nomeLogradouro: string): Promise<number> {
+    if (!nomeLogradouro) {
+      throw new Error('Logradouro é obrigatório.');
+    }
     const queryBuscar = `
       SELECT l.log_id
       FROM logradouros l
@@ -60,9 +63,15 @@ export class GestaoEnderecoCliente {
   }
 
   public async garantirLocalidade(cidade: string, siglaEstado: string): Promise<number> {
+    if (!cidade) throw new Error('Cidade é obrigatória.');
+    if (!siglaEstado) throw new Error('Estado é obrigatório.');
+
     const queryEstado = `SELECT est_id FROM estados WHERE est_sigla = $1 LIMIT 1`;
     const estadoResult = await this.db.executar<IRowIdSimples>(queryEstado, [siglaEstado.toUpperCase().trim()]);
     const idEstado = estadoResult.length > 0 ? Number(estadoResult[0].est_id) : null;
+    if (!idEstado) {
+       throw new Error(`Estado com sigla ${siglaEstado} não encontrado.`);
+    }
     const query = `SELECT cid_id FROM cidades WHERE cid_nome_norm = UPPER(TRIM($1)) AND (est_id = $2 OR $2 IS NULL) LIMIT 1`;
     const existente = await this.db.executar<IRowIdSimples>(query, [cidade, idEstado]);
     if (existente.length > 0) {
@@ -74,6 +83,7 @@ export class GestaoEnderecoCliente {
   }
 
   public async obterOuCriarBairro(bairro: string, idCidade: number): Promise<number> {
+    if (!bairro) throw new Error('Bairro é obrigatório.');
     const query = `SELECT bai_id FROM bairros WHERE bai_nome_norm = UPPER(TRIM($1)) AND cid_id = $2 LIMIT 1`;
     const existente = await this.db.executar<IRowIdSimples>(query, [bairro, idCidade]);
     if (existente.length > 0) {
@@ -84,24 +94,25 @@ export class GestaoEnderecoCliente {
     return Number(novo[0].bai_id);
   }
 
-  public async obterOuCriarCep(cep: string, idCidade: number, idBairro: number): Promise<number> {
+  public async obterOuCriarCep(cep: string, idCidade: number, idBairro: number): Promise<string> {
+    if (!cep) throw new Error('CEP é obrigatório.');
     const cepLimpo = cep.replace(/\D/g, '');
-    const query = `SELECT cep_id FROM ceps WHERE cep_numero = $1 LIMIT 1`;
-    const existente = await this.db.executar<IRowIdSimples>(query, [cepLimpo]);
+    const query = `SELECT cep_numero FROM ceps WHERE cep_numero = $1 LIMIT 1`;
+    const existente = await this.db.executar<any>(query, [cepLimpo]);
     if (existente.length > 0) {
-      return Number(existente[0].cep_id);
+      return existente[0].cep_numero;
     }
     try {
-      const insertQuery = `INSERT INTO ceps (cep_numero, cid_id, bai_id) VALUES ($1, $2, $3) RETURNING cep_id`;
-      const novo = await this.db.executar<IRowIdSimples>(insertQuery, [cepLimpo, idCidade, idBairro]);
-      return Number(novo[0].cep_id);
+      const insertQuery = `INSERT INTO ceps (cep_numero, cid_id, bai_id) VALUES ($1, $2, $3) RETURNING cep_numero`;
+      const novo = await this.db.executar<any>(insertQuery, [cepLimpo, idCidade, idBairro]);
+      return novo[0].cep_numero;
     } catch (err: unknown) {
       if (err && typeof err === 'object' && 'message' in err) {
         const error = err as { message: string; code?: string };
         if (error.message.includes('unique constraint') || error.code === '23505') {
-          const queryRebusca = `SELECT cep_id FROM ceps WHERE cep_numero = $1 LIMIT 1`;
-          const rebuasca = await this.db.executar<IRowIdSimples>(queryRebusca, [cepLimpo]);
-          return Number(rebuasca[0].cep_id);
+          const queryRebusca = `SELECT cep_numero FROM ceps WHERE cep_numero = $1 LIMIT 1`;
+          const rebuasca = await this.db.executar<any>(queryRebusca, [cepLimpo]);
+          return rebuasca[0].cep_numero;
         }
       }
       throw err;
@@ -118,6 +129,13 @@ export class GestaoEnderecoCliente {
     tipo: 'cobranca' | 'entrega',
     principal: boolean = false,
   ): Promise<IEnderecoDto> {
+    if (!enderecoDto.logradouro) throw new Error('Logradouro é obrigatório.');
+    if (!enderecoDto.numero) throw new Error('Número é obrigatório.');
+    if (!enderecoDto.bairro) throw new Error('Bairro é obrigatório.');
+    if (!enderecoDto.cep) throw new Error('CEP é obrigatório.');
+    if (!enderecoDto.cidade) throw new Error('Cidade é obrigatória.');
+    if (!enderecoDto.estado) throw new Error('Estado é obrigatório.');
+
     const idTipoResidencia = await GestaoEnderecoCliente.obterIdTipoResidencia(
       this.db,
       enderecoDto.tipoResidencia || 'Casa',

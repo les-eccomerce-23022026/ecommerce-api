@@ -45,6 +45,7 @@ export interface IRepositorioPagamentos {
   }): Promise<string>;
 
   listarCuponsTrocaPorUsuario(usuarioId: number): Promise<Array<{
+    uuid: string;
     codigo: string;
     valorAtual: number;
     ativo: boolean;

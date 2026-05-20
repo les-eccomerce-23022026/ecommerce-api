@@ -68,9 +68,11 @@ export class ClientesConsultaService {
       email: usuario.email,
       emailMascarado: ClientesUtils.mascararEmail(usuario.email),
       cpf: usuario.cpf,
-      cpfMascarado: ClientesUtils.mascararCpf(usuario.cpf),
+      cpfMascarado: usuario.cpf ? ClientesUtils.mascararCpf(usuario.cpf) : undefined,
       genero: perfil?.genero,
-      dataNascimento: perfil?.dataNascimento ? perfil.dataNascimento.toISOString().split('T')[0] : undefined, // Formato YYYY-MM-DD
+      dataNascimento: perfil?.dataNascimento
+        ? ClientesUtils.formatarDataSomente(perfil.dataNascimento)
+        : undefined,
       telefone: telefonePrincipal ? ClientesUtils.converterTelefoneParaDto(telefonePrincipal) : undefined,
       enderecos: enderecosDto,
       cartoes: cartoesDto,

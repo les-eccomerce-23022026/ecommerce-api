@@ -4,6 +4,7 @@ import type {
   IRepositorioIntencaoPagamento,
   IntencaoPagamentoPersistida
 } from './IRepositorioIntencaoPagamento';
+import { ContextoRequisicao } from '@/shared/infrastructure/contexto/ContextoRequisicao';
 
 const PROVEDOR_SIMULADO = 'simulado';
 
@@ -14,17 +15,27 @@ export class RepositorioIntencaoPagamentoPostgres implements IRepositorioIntenca
     this.db = db;
   }
 
+  /**
+   * Obtém o loj_id do contexto de requisição.
+   * Se não houver contexto, retorna undefined (compatibilidade com código legado).
+   */
+  private obterLojId(): number | undefined {
+    return ContextoRequisicao.obterLojId();
+  }
+
   public async inserirSimulado(dados: {
     inpUuid: string;
     valor: number;
     hashSegredo: string;
     expiraEm: Date;
   }): Promise<void> {
+    const loj_id = this.obterLojId() ?? 1;
+    
     const insertIntencao = `
       INSERT INTO intencao_pagamento (
-        inp_uuid, inp_valor, inp_moeda, inp_provedor, inp_estado, inp_hash_segredo, inp_expira_em
+        inp_uuid, inp_valor, inp_moeda, inp_provedor, inp_estado, inp_hash_segredo, inp_expira_em, loj_id
       )
-      VALUES ($1, $2, 'BRL', $3, $4, $5, $6)
+      VALUES ($1, $2, 'BRL', $3, $4, $5, $6, $7)
       RETURNING inp_id
     `;
     const valores: DbParametro[] = [
@@ -33,8 +44,10 @@ export class RepositorioIntencaoPagamentoPostgres implements IRepositorioIntenca
       PROVEDOR_SIMULADO,
       EstadosIntencaoPagamento.CRIADA,
       dados.hashSegredo,
-      dados.expiraEm
+      dados.expiraEm,
+      loj_id
     ];
+
     const rows = await this.db.executar<{ inp_id: number }>(insertIntencao, valores);
     const inpId = rows[0]?.inp_id;
     if (inpId === undefined) {
@@ -47,7 +60,9 @@ export class RepositorioIntencaoPagamentoPostgres implements IRepositorioIntenca
   }
 
   public async obterPorUuid(inpUuid: string): Promise<IntencaoPagamentoPersistida | null> {
-    const q = `
+    const loj_id = this.obterLojId();
+    
+    let q = `
       SELECT i.inp_id, i.inp_uuid, i.inp_valor, i.inp_provedor, i.inp_estado, i.inp_hash_segredo,
              i.inp_criado_em, i.inp_expira_em, i.inp_tentativas_confirmacao, i.ven_id,
              v.ven_uuid AS venda_uuid
@@ -55,6 +70,14 @@ export class RepositorioIntencaoPagamentoPostgres implements IRepositorioIntenca
       LEFT JOIN vendas v ON v.ven_id = i.ven_id
       WHERE i.inp_uuid = $1
     `;
+    const parametros: DbParametro[] = [inpUuid];
+
+    // Se multi-tenancy estiver habilitado, filtrar por loj_id na venda
+    if (loj_id) {
+      q += ` AND (i.loj_id = $2 OR v.loj_id = $2)`;
+      parametros.push(loj_id);
+    }
+
     const rows = await this.db.executar<{
       inp_id: number;
       inp_uuid: string;
@@ -67,7 +90,7 @@ export class RepositorioIntencaoPagamentoPostgres implements IRepositorioIntenca
       inp_tentativas_confirmacao: number;
       ven_id: number | null;
       venda_uuid: string | null;
-    }>(q, [inpUuid]);
+    }>(q, parametros);
     const r = rows[0];
     if (!r) {
       return null;
