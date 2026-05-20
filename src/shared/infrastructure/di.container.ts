@@ -1,5 +1,6 @@
 import { FabricaConexaoBanco } from '@/shared/infrastructure/database/FabricaConexaoBanco';
 import { RepositorioUsuarios } from '@/modules/usuarios/usuario.repository';
+import { RepositorioRefreshTokenPostgres } from '@/modules/auth/RepositorioRefreshTokenPostgres';
 import { GestaoIdentidadeCliente } from '@/modules/clientes/clientes.service';
 import { ServicoConsultaClientes } from '@/modules/clientes/consultaClientes.service';
 import { ServicoCartoes } from '@/modules/cartoes/cartoes.service';
@@ -19,6 +20,7 @@ class ContainerDI {
 
   // Repositórios
   public static readonly repoUsuarios = new RepositorioUsuarios(ContainerDI.db);
+  public static readonly repoRefreshTokens = new RepositorioRefreshTokenPostgres(ContainerDI.db);
 
   public static readonly repoEndereco = new RepositorioEnderecoUsuarioPostgres(ContainerDI.db);
 
@@ -44,7 +46,10 @@ class ContainerDI {
 
   public static readonly servicoAdmin = new ServicoAdmin(ContainerDI.repoUsuarios);
 
-  public static readonly servicoAutenticacao = new ServicoAutenticacao(ContainerDI.repoUsuarios);
+  public static readonly servicoAutenticacao = new ServicoAutenticacao(
+    ContainerDI.repoUsuarios,
+    ContainerDI.repoRefreshTokens
+  );
 
   // Controllers (se houver injeção via construtor, instanciaríamos aqui)
 }

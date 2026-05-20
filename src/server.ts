@@ -37,7 +37,9 @@ const porta = process.env.PORTA_HTTP!;
 const app = criarAplicacao();
 
 // Instanciar simulador de atualização de rastreamento (apenas em desenvolvimento)
+// TEMPORARIAMENTE DESABILITADO PARA INVESTIGAR ERRO DE CONEXAO
 let simulador: SimuladorAtualizacaoRastreamento | null = null;
+/*
 if (process.env.NODE_ENV === 'development') {
   try {
     const db = ConexaoPostgres.obterInstancia();
@@ -56,12 +58,14 @@ if (process.env.NODE_ENV === 'development') {
     Logger.debug('[Server] Detalhes do erro ao iniciar simulador:', erro as any);
   }
 }
+*/
 
 app.listen(Number(porta), () => {
   Logger.info(`Servidor iniciado na porta ${porta}`);
 });
 
-// Parar simulador ao encerrar o servidor
+// Parar simulador ao encerrar o servidor (temporariamente desabilitado)
+/*
 process.on('SIGTERM', () => {
   if (simulador) {
     simulador.parar();
@@ -75,4 +79,5 @@ process.on('SIGINT', () => {
     Logger.info('[Server] Simulador de atualização de rastreamento parado');
   }
 });
+*/
 

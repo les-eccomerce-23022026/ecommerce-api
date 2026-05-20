@@ -11,7 +11,11 @@ declare global {
         id: number;
         email: string;
         role: string;
+        papeis?: string[];
         isAdminMestre?: boolean;
+        loj_ids?: number[];
+        loj_id_principal?: number;
+        loj_id_atual?: number;
       };
     }
   }
