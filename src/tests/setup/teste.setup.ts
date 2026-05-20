@@ -9,8 +9,14 @@ import { config } from 'dotenv';
 config({ path: '.env.test' });
 config();
 
-// Para testes, força localhost
-process.env.POSTGRES_HOST = 'localhost';
+// Garante ambiente de teste e banco de integração (porta 5433), mesmo quando o Supertest perde o AsyncLocalStorage
+process.env.NODE_ENV = 'test';
+process.env.DEFAULT_LOJA_ID = process.env.DEFAULT_LOJA_ID ?? '1';
+process.env.POSTGRES_HOST = process.env.POSTGRES_HOST_TEST ?? 'localhost';
+process.env.POSTGRES_PORT = process.env.POSTGRES_PORT_TEST ?? '5433';
+process.env.POSTGRES_USER = process.env.POSTGRES_USER_TEST ?? 'ecm_user_test';
+process.env.POSTGRES_PASSWORD = process.env.POSTGRES_PASSWORD_TEST ?? 'ecm_senha_test';
+process.env.POSTGRES_DB = process.env.POSTGRES_DB_TEST ?? 'ecm_livraria_test';
 
 const variaveisObrigatorias = [
   'DB_TYPE',
