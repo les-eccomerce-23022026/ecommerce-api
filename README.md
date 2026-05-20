@@ -73,6 +73,45 @@ docker compose up -d --build app
 
 **NÃO rode o backend diretamente no host com `npm run dev` quando estiver usando Docker.** Isso causa conflitos de porta (3000) e inconsistência entre o código no host e o container.
 
+### Contrato de portas (Docker vs host)
+
+O descompasso mais comum em dev é confundir **a porta em que o Express escuta** com **a porta publicada no host pelo Docker**. Use duas variáveis no `.env` (ver [`.env.example`](.env.example)):
+
+| Variável | Onde vale | Padrão | Uso |
+|----------|-----------|--------|-----|
+| `PORTA_HTTP` | Container / host sem Docker | `3000` | Porta em que o Express **escuta** (`server.ts`) |
+| `PORTA_HTTP_EXTERNA` | Host (Docker dev) | `3002` | Porta para browser, curl, Postman (`localhost:3002`) |
+| `PORTA_HTTP_TEST_EXTERNA` | Host (`docker-compose.test.yml`) | `3003` | Stack de testes isolada |
+
+O `docker-compose.yml` publica **`${PORTA_HTTP_EXTERNA}:${PORTA_HTTP}`** (ex.: `3002:3000`). Se alterar `PORTA_HTTP` no `.env`, não edite o compose manualmente — recrie o serviço:
+
+```bash
+docker compose up -d app
+```
+
+**URLs da API:**
+
+| Modo | Base URL |
+|------|----------|
+| Com Docker (recomendado) | `http://localhost:${PORTA_HTTP_EXTERNA:-3002}/api` |
+| Sem Docker (`npm run dev`) | `http://localhost:${PORTA_HTTP:-3000}/api` |
+
+O healthcheck do serviço `app` valida HTTP na `PORTA_HTTP` **dentro** do container. O script [`iniciar-docker.sh`](iniciar-docker.sh) confere a resposta na porta externa após subir os containers.
+
+**Diagnóstico rápido** (`curl: (56) Conexão fechada`):
+
+```bash
+docker port ecm_app
+# Esperado: 3000/tcp -> 0.0.0.0:3002
+
+docker logs ecm_app --tail 5
+# Esperado: Servidor iniciado na porta 3000
+
+curl -I http://localhost:3002/api
+```
+
+Mais detalhes e troubleshooting: [DOCKER.md](DOCKER.md).
+
 ---
 
 ### Iniciar localmente (sem Docker - não recomendado)
@@ -99,21 +138,55 @@ A API sobe em `http://localhost:${PORTA_HTTP:-3000}` (prefixo `/api`). Variávei
 
 - Base de API consumida pelo frontend: `/api`.
 - Sessão principal via cookie HttpOnly (`les_token` por padrão).
-- Para desenvolvimento local, o frontend usa proxy Vite (`localhost:5173 -> localhost:3000`).
-- Para detalhes do cliente web e variáveis `VITE_*`: consulte [`../web/README.md`](../web/README.md).
+- Com backend em Docker, o frontend deve apontar para `http://localhost:3002` (ou `PORTA_HTTP_EXTERNA`); sem Docker, para `http://localhost:3000` (`PORTA_HTTP`). Ver contrato de portas acima.
+- Para detalhes do cliente web, proxy Next e variáveis de ambiente: [`../web/README.md`](../web/README.md).
 
 ---
 
-## 3. Credenciais de administrador
+## 3. Credenciais de login (desenvolvimento e BDD)
 
-| Perfil | E-mail | Senha | Observação |
-|--------|--------|-------|------------|
-| **Administrador mestre** | `admin@livraria.com.br` | `Admin@123` | Criado pelo seed SQL (`002_seed_usuario_admin_inicial.sql`). `isAdminMestre: true`. |
-| **Outro administrador** | `admintest@email.com` | `@asdfJKLÇ123` | Seed de testes (`005_seed_usuarios_teste.sql`). Admin comum (sem mestre). |
+Usuários criados pelos seeds em `sql/modelagem-dados/dml/` e migrations (`008_seed_dados_teste_bdd.sql`, `025`–`038`). Após `./scripts/setup-db.sh`, use `POST /api/auth/login` com `{ "email", "senha" }`.
 
-**Bootstrap só para testes** (com header `x-use-test-db: true`): `POST /api/admin/bootstrap` — recria/atualiza o mestre `admin@livraria.com.br` com senha `Admin@123`.
+### Clientes
 
-**Cliente de teste (seed):** `clientetest@email.com` / `@asdfJKLÇ123`.
+| Nome | E-mail | Senha | Origem | Dados extras (após setup) |
+|------|--------|-------|--------|---------------------------|
+| **Cliente Teste** | `clientetest@email.com` | `@asdfJKLÇ123` | `005_seed_usuarios_teste.sql`, `008_seed_dados_teste_bdd.sql` | Endereço principal, cartões salvos (`025`, `026`), massa de checkout BDD (`035`, `038`) |
+
+### Administradores
+
+| Nome | E-mail | Senha | Perfil | Origem |
+|------|--------|-------|--------|--------|
+| **Administrador Mestre** | `admin@livraria.com.br` | `Admin@123` | `isAdminMestre: true` — gestão de outros admins | `002_seed_usuario_admin_inicial.sql` |
+| **Admin Teste** | `admintest@email.com` | `@asdfJKLÇ123` | Admin comum (sem mestre) | `005_seed_usuarios_teste.sql`, `008_seed_dados_teste_bdd.sql` |
+
+### Exemplo de login
+
+Com Docker (`PORTA_HTTP_EXTERNA=3002`):
+
+```bash
+# Cliente
+curl -s -X POST http://localhost:3002/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"clientetest@email.com","senha":"@asdfJKLÇ123"}'
+
+# Administrador (comum ou mestre)
+curl -s -X POST http://localhost:3002/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admintest@email.com","senha":"@asdfJKLÇ123"}'
+```
+
+Sem Docker, troque `3002` por `3000` (ou o valor de `PORTA_HTTP` no `.env`).
+
+### Cypress e CI
+
+Os testes E2E usam por padrão `clientetest@email.com` e `admintest@email.com` (senha `@asdfJKLÇ123`). Sobrescreva com `CYPRESS_CLIENTE_EMAIL`, `CYPRESS_CLIENTE_SENHA`, `CYPRESS_ADMIN_EMAIL`, `CYPRESS_ADMIN_SENHA`.
+
+### Bootstrap (somente `NODE_ENV=test`)
+
+`POST /api/admin/bootstrap` — recria/atualiza o mestre `admin@livraria.com.br` com senha `Admin@123`. Exige header `x-test-bootstrap-key` igual a `TEST_BOOTSTRAP_KEY` e, em integração, `x-use-test-db: true` com `ENABLE_TEST_DB_SWITCH=true`.
+
+> **Segurança:** senhas acima são apenas para ambiente local/CI. Altere o mestre após o primeiro deploy em produção.
 
 ---
 
@@ -205,6 +278,7 @@ npm run test:coverage
 | `npm run test:coverage` | Testes + cobertura |
 | `./scripts/setup-db.sh` | DDL/DML/migrations no Postgres dev |
 | `./scripts/reset-db.sh` | Limpa volumes Docker e recria banco (ver script) |
+| `./iniciar-docker.sh` | Sobe compose, valida API na `PORTA_HTTP_EXTERNA` e roda setup do banco |
 
 ---
 

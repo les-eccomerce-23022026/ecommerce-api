@@ -35,7 +35,20 @@ services:
     container_name: ecm_app
     restart: unless-stopped
     ports:
-      - "3002:3002"
+      # host:container — valores em .env (PORTA_HTTP_EXTERNA / PORTA_HTTP)
+      - "${PORTA_HTTP_EXTERNA:-3002}:${PORTA_HTTP:-3000}"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "const p=process.env.PORTA_HTTP||'3000';require('http').get('http://127.0.0.1:'+p+'/api',r=>process.exit(r.statusCode<500?0:1)).on('error',()=>process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
     volumes:
       - .:/app
       - /app/node_modules
@@ -46,7 +59,13 @@ services:
         condition: service_healthy
     environment:
       - NODE_ENV=development
+      - DEFAULT_LOJA_ID=1
+      - MULTI_TENANCY_ENABLED=true
       - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=ecm_user
+      - POSTGRES_PASSWORD=ecm_senha
+      - POSTGRES_DB=ecm_livraria
     deploy:
       resources:
         limits:

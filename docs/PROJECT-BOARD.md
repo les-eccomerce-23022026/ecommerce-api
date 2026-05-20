@@ -7,9 +7,9 @@
 
 ## Board Kanban
 
-| 📛 Todo (0) | 🔄 In Progress (0) | ✅ Done (37) |
+| 📛 Todo (0) | 🔄 In Progress (0) | ✅ Done (38) |
 | --- | --- | --- |
-|  |  | B14 · [BACKEND] Gateway Real (Stripe) |
+|  |  | B38 · [BACKEND] Refresh Token e Rate Limiting |
 |  |  | B2 · [BACKEND] Dockerização e Ambiente Dev |
 |  |  | B3 · [BACKEND] Modelagem SQL e Normalização |
 |  |  | B4 · [BACKEND] Infraestrutura de Repositórios PG |
@@ -90,6 +90,7 @@
 | B35 | BACKEND | Infraestrutura de Testes Avançada | Base resiliente para prevenir regressões em produção. |
 | B36 | BACKEND | Schema `les` e Padrões Arquiteturais | Organização patrimonial dos dados e padronização técnica. |
 | B37 | BACKEND | Sandbox de Falhas Determinística | Gatilhos de falha determinística para testes E2E resilientes. |
+| B38 | BACKEND | Refresh Token e Rate Limiting | Implementado: refresh token (long-lived), rate limiting no login, retry automático no frontend e correção de bug em renovarToken(). |
 
 ---
 

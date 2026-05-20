@@ -9,6 +9,8 @@ services:
       POSTGRES_DB: ecm_livraria_test
       POSTGRES_USER: ecm_user_test
       POSTGRES_PASSWORD: ecm_senha_test
+      DEFAULT_LOJA_ID: "1"
+      MULTI_TENANCY_ENABLED: "true"
     ports:
       - "5433:5432"
     healthcheck:
@@ -16,6 +18,43 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    networks:
+      - ecm_test_network
+
+  app_test:
+    build:
+      context: .
+      target: development
+      dockerfile: Dockerfile
+    container_name: ecm_app_test
+    restart: unless-stopped
+    ports:
+      - "${PORTA_HTTP_TEST_EXTERNA:-3003}:${PORTA_HTTP:-3000}"
+    volumes:
+      - .:/app
+      - /app/node_modules
+    env_file:
+      - .env
+    depends_on:
+      postgres_test:
+        condition: service_healthy
+    environment:
+      - NODE_ENV=test
+      - DEFAULT_LOJA_ID=1
+      - MULTI_TENANCY_ENABLED=true
+      - POSTGRES_HOST=postgres_test
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=ecm_user_test
+      - POSTGRES_PASSWORD=ecm_senha_test
+      - POSTGRES_DB=ecm_livraria_test
     deploy:
       resources:
         limits:
