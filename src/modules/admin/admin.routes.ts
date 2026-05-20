@@ -13,6 +13,9 @@ import { ServicoMockCorreios } from '@/modules/logistica-mocks/servicoMockCorrei
 import { ServicoMockLoggi } from '@/modules/logistica-mocks/servicoMockLoggi';
 import { RepositorioRastreamentoPostgres } from '@/modules/logistica-mocks/repositorios/RepositorioRastreamentoPostgres';
 import { RepositorioEventoRastreamentoPostgres } from '@/modules/logistica-mocks/repositorios/RepositorioEventoRastreamentoPostgres';
+import { RepositorioEstoque } from '@/modules/estoque/repositorioEstoque';
+import { ServicoEstoque } from '@/modules/estoque/servicoEstoque';
+import { ControladorEstoque } from '@/modules/estoque/controladorEstoque';
 import { autenticacaoMiddleware } from '@/shared/middlewares/autenticacao.middleware';
 import { 
   adminOnlyMiddleware, 
@@ -36,6 +39,11 @@ export function registrarRotasAdmin(app: IRouter): void {
   const servicoPedidosAdmin = new ServicoPedidosAdmin(repoVendas, servicoEntrega, servicoMockCorreios, servicoMockLoggi);
   const servicoDashboardAdmin = new ServicoDashboardAdmin(db);
   const controladorPainel = new ControladorAdminPainel(servicoDashboardAdmin, servicoPedidosAdmin);
+  
+  // Estoque
+  const repoEstoque = new RepositorioEstoque(db);
+  const servicoEstoque = new ServicoEstoque(repoEstoque);
+  const controladorEstoque = new ControladorEstoque(servicoEstoque);
 
   app.get(
     '/admin/dashboard',
@@ -120,4 +128,33 @@ export function registrarRotasAdmin(app: IRouter): void {
   app.post('/admin/testes/criar-cupom', autenticacaoMiddleware, adminOnlyMiddleware, (requisicao, resposta) => ControladorTestesAdmin.criarCupomTroca(requisicao, resposta));
   app.post('/admin/testes/expirar-intencao', autenticacaoMiddleware, adminOnlyMiddleware, (requisicao, resposta) => ControladorTestesAdmin.expirarIntencao(requisicao, resposta));
   app.post('/admin/testes/mudar-status-venda', autenticacaoMiddleware, adminOnlyMiddleware, (requisicao, resposta) => ControladorTestesAdmin.mudarStatusVenda(requisicao, resposta));
+
+  // Rotas de Estoque
+  app.get(
+    '/admin/estoque',
+    autenticacaoMiddleware,
+    adminOnlyMiddleware,
+    controladorEstoque.listarEstoque,
+  );
+
+  app.get(
+    '/admin/estoque/critico',
+    autenticacaoMiddleware,
+    adminOnlyMiddleware,
+    controladorEstoque.listarEstoqueCritico,
+  );
+
+  app.get(
+    '/admin/estoque/kpis',
+    autenticacaoMiddleware,
+    adminOnlyMiddleware,
+    controladorEstoque.obterKpis,
+  );
+
+  app.post(
+    '/admin/estoque/entrada',
+    autenticacaoMiddleware,
+    adminOnlyMiddleware,
+    controladorEstoque.registrarEntrada,
+  );
 }
