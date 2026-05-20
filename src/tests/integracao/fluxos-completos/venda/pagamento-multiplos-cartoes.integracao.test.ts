@@ -1,7 +1,7 @@
 import request from 'supertest';
 import express from 'express';
-import { configurarTesteIntegracao } from '@/tests/utils/setup-integracao.util';
-import { registrarCliente, realizarLogin, gerarCpfValidoUnico } from '@/tests/utils/requisicoes-api.util';
+import { configurarTesteIntegracao } from '@/tests/helpers/setup-integracao.util';
+import { registrarCliente, realizarLogin, gerarCpfValidoUnico } from '@/tests/helpers/requisicoes-api.util';
 
 /**
  * Testes E2E para vendas usando rotas HTTP.

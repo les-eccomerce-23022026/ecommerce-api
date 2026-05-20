@@ -1,5 +1,5 @@
-import { configurarTesteIntegracao } from '@/tests/utils/setup-integracao.util';
-import { registrarCliente, realizarLogin, obterTokenAdmin, registrarAdmin } from '@/tests/utils/requisicoes-api.util';
+import { configurarTesteIntegracao } from '@/tests/helpers/setup-integracao.util';
+import { registrarCliente, realizarLogin, obterTokenAdmin, registrarAdmin } from '@/tests/helpers/requisicoes-api.util';
 import request from 'supertest';
 
 // Testes de integração que simulam o fluxo completo do domínio admin,

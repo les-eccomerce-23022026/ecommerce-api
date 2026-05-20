@@ -1,7 +1,7 @@
 import request from 'supertest';
 import { Application } from 'express';
 import type { IConexaoBanco } from '@/shared/infrastructure/database/IConexaoBanco';
-import { configurarTesteIntegracao } from '@/tests/utils/setup-integracao.util';
+import { configurarTesteIntegracao } from '@/tests/helpers/setup-integracao.util';
 
 describe('Integração - Módulo de Mocks de Logística', () => {
   const contexto = configurarTesteIntegracao(true); // transação por teste com SAVEPOINT

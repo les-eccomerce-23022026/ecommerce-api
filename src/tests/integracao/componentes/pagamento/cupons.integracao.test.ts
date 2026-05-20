@@ -1,6 +1,6 @@
 import request from 'supertest';
-import { configurarTesteIntegracao } from '@/tests/utils/setup-integracao.util';
-import { obterTokenCliente, obterTokenAdmin, criarCupomTrocaTeste } from '@/tests/utils/requisicoes-api.util';
+import { configurarTesteIntegracao } from '@/tests/helpers/setup-integracao.util';
+import { obterTokenCliente, obterTokenAdmin, criarCupomTrocaTeste } from '@/tests/helpers/requisicoes-api.util';
 
 describe('Integração - Cupom', () => {
   const contexto = configurarTesteIntegracao(true);
@@ -39,8 +39,8 @@ describe('Integração - Cupom', () => {
         .set('Authorization', `Bearer ${tokenCliente}`);
 
       expect(res.status).toBe(200);
-      expect(res.body.dados).toBeDefined();
       expect(Array.isArray(res.body.dados)).toBe(true);
+      expect(res.body.dados.length).toBeGreaterThanOrEqual(0);
     });
 
     it('[RNF0037] deve retornar 401 sem token', async () => {
@@ -152,15 +152,28 @@ describe('Integração - Cupom', () => {
     it('[RN0036] deve gerar novo cupom quando valor de troca excede total utilizado', async () => {
       // 1. Criar cupom de troca com valor 100
       const tokenAdmin = await obterTokenAdmin(contexto.app);
-      await request(contexto.app)
-        .post('/api/admin/testes/criar-cupom')
-        .set('Authorization', `Bearer ${tokenAdmin}`)
-        .send({
-          codigo: 'TROCA100',
-          tipo: 'troca',
-          valorDesconto: 100,
-          valorMinimo: 0,
-        });
+      
+      // Buscar cli_id do cliente para cupom de troca
+      const clienteRes = await contexto.db!.executar<{ cli_id: number }>(
+        `SELECT c.cli_id FROM livraria_gestao.clientes c
+         JOIN livraria_gestao.usuarios u ON u.usu_id = c.usu_id
+         WHERE u.usu_email = 'clientetest@email.com'`
+      );
+      
+      if (clienteRes.length > 0) {
+        const cliId = clienteRes[0].cli_id;
+        
+        await request(contexto.app)
+          .post('/api/admin/testes/criar-cupom')
+          .set('Authorization', `Bearer ${tokenAdmin}`)
+          .send({
+            clienteId: cliId,
+            codigo: 'TROCA100',
+            tipo: 'troca',
+            valor: 100,
+            valorMinimo: 0,
+          });
+      }
 
       // 2. Listar cupons para verificar que TROCA100 existe
       const resListar = await request(contexto.app)
@@ -179,7 +192,7 @@ describe('Integração - Cupom', () => {
       
       // 4. Verificar que cupom de troca existe e tem valor correto
       expect(cupomTroca.tipo).toBe('troca');
-      expect(cupomTroca.valorDesconto).toBe(100);
+      expect(cupomTroca.valor).toBe(100);
     });
   });
 
@@ -194,7 +207,7 @@ describe('Integração - Cupom', () => {
         .send({
           codigo: 'PROMO10',
           tipo: 'promocional',
-          valorDesconto: 10,
+          valor: 10,
           valorMinimo: 0,
         });
 
@@ -204,7 +217,7 @@ describe('Integração - Cupom', () => {
         .send({
           codigo: 'PROMO20',
           tipo: 'promocional',
-          valorDesconto: 20,
+          valor: 20,
           valorMinimo: 0,
         });
 
@@ -224,8 +237,8 @@ describe('Integração - Cupom', () => {
         .set('Authorization', `Bearer ${tokenCliente}`)
         .send({ codigo: 'PROMO20' });
 
-      // Se o sistema permitir apenas 1 cupom promocional, deve retornar erro
-      // Se permitir substituição, deve retornar sucesso com o novo cupom
+      // Se o sistema permitir apenas 1 cupom promocional, deve retornar erro (400)
+      // Se permitir substituição, deve retornar sucesso (200) com o novo cupom
       expect([200, 400]).toContain(res2.status);
     });
 
@@ -233,15 +246,27 @@ describe('Integração - Cupom', () => {
       // 1. Criar cupom de troca e cupom promocional
       const tokenAdmin = await obterTokenAdmin(contexto.app);
       
-      await request(contexto.app)
-        .post('/api/admin/testes/criar-cupom')
-        .set('Authorization', `Bearer ${tokenAdmin}`)
-        .send({
-          codigo: 'TROCA50',
-          tipo: 'troca',
-          valorDesconto: 50,
-          valorMinimo: 0,
-        });
+      // Buscar cli_id do cliente para cupom de troca
+      const clienteRes = await contexto.db!.executar<{ cli_id: number }>(
+        `SELECT c.cli_id FROM livraria_gestao.clientes c
+         JOIN livraria_gestao.usuarios u ON u.usu_id = c.usu_id
+         WHERE u.usu_email = 'clientetest@email.com'`
+      );
+      
+      if (clienteRes.length > 0) {
+        const cliId = clienteRes[0].cli_id;
+        
+        await request(contexto.app)
+          .post('/api/admin/testes/criar-cupom')
+          .set('Authorization', `Bearer ${tokenAdmin}`)
+          .send({
+            clienteId: cliId,
+            codigo: 'TROCA50',
+            tipo: 'troca',
+            valor: 50,
+            valorMinimo: 0,
+          });
+      }
 
       await request(contexto.app)
         .post('/api/admin/testes/criar-cupom')
@@ -249,7 +274,7 @@ describe('Integração - Cupom', () => {
         .send({
           codigo: 'PROMO30',
           tipo: 'promocional',
-          valorDesconto: 30,
+          valor: 30,
           valorMinimo: 0,
         });
 

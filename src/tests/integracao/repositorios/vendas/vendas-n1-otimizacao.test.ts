@@ -1,6 +1,6 @@
 /* eslint-disable max-lines */
 import { RepositorioVendasPostgres } from '@/modules/vendas/repositories/RepositorioVendasPostgres';
-import { configurarTesteIntegracao } from '@/tests/utils/setup-integracao.util';
+import { configurarTesteIntegracao } from '@/tests/helpers/setup-integracao.util';
 
 describe('Integração - RepositorioVendasPostgres - Correção N+1 Queries', () => {
   const contexto = configurarTesteIntegracao();

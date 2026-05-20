@@ -1,10 +1,10 @@
 import request from 'supertest';
-import { configurarTesteIntegracao } from '@/tests/utils/setup-integracao.util';
+import { configurarTesteIntegracao } from '@/tests/helpers/setup-integracao.util';
 import {
   obterTokenAdmin,
   obterTokenCliente,
   realizarLogin,
-} from '@/tests/utils/requisicoes-api.util';
+} from '@/tests/helpers/requisicoes-api.util';
 import { criarAdminComumObterToken } from '@/tests/helpers/admin-testes.helper';
 
 /**

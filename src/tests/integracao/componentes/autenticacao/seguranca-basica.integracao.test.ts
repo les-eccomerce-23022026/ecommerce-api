@@ -1,6 +1,6 @@
 import request from 'supertest';
-import { configurarTesteIntegracao } from '@/tests/utils/setup-integracao.util';
-import { obterTokenAdmin, registrarCliente, realizarLogin, gerarCpfValidoUnico } from '@/tests/utils/requisicoes-api.util';
+import { configurarTesteIntegracao } from '@/tests/helpers/setup-integracao.util';
+import { obterTokenAdmin, registrarCliente, realizarLogin, gerarCpfValidoUnico } from '@/tests/helpers/requisicoes-api.util';
 
 /**
  * Testes de integração para segurança básica.
@@ -255,9 +255,9 @@ describe('Integração - Segurança Básica', () => {
           confirmacaoSenha: 'SenhaForte@123',
         });
 
-      // O sistema deve aceitar (201) ou rejeitar (400), mas não executar o script
-      expect([201, 400]).toContain(res.status);
-      expect(res.status).not.toBe(500); // Não deve causar erro interno
+      // O sistema deve aceitar (201) ou rejeitar (400) sanitização, mas não executar o script
+      expect(res.status).not.toBe(500); // Não deve causar erro interno (XSS executado)
+      expect([201, 400]).toContain(res.status); // Aceita sanitizado (201) ou rejeita (400)
     });
 
     it('[SEGURANÇA] deve sanitizar entrada HTML em título de livro', async () => {
@@ -277,9 +277,9 @@ describe('Integração - Segurança Básica', () => {
           categoria: 'ficcao',
         });
 
-      // O sistema deve aceitar (201) ou rejeitar (400), mas não executar o script
-      expect([201, 400]).toContain(res.status);
-      expect(res.status).not.toBe(500); // Não deve causar erro interno
+      // O sistema deve aceitar (201) ou rejeitar (400) sanitização, mas não executar o script
+      expect(res.status).not.toBe(500); // Não deve causar erro interno (XSS executado)
+      expect([201, 400]).toContain(res.status); // Aceita sanitizado (201) ou rejeita (400)
     });
   });
 

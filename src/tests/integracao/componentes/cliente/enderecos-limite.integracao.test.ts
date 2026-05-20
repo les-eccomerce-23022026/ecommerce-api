@@ -1,6 +1,6 @@
 import request from 'supertest';
-import { configurarTesteIntegracao } from '@/tests/utils/setup-integracao.util';
-import { registrarCliente, realizarLogin, gerarCpfValidoUnico } from '@/tests/utils/requisicoes-api.util';
+import { configurarTesteIntegracao } from '@/tests/helpers/setup-integracao.util';
+import { registrarCliente, realizarLogin, gerarCpfValidoUnico } from '@/tests/helpers/requisicoes-api.util';
 
 describe('Integração - Restrição de Quantidade de Endereços', () => {
   const contexto = configurarTesteIntegracao();

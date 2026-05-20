@@ -1,5 +1,5 @@
 import request from 'supertest';
-import { configurarTesteIntegracao } from '@/tests/utils/setup-integracao.util';
+import { configurarTesteIntegracao } from '@/tests/helpers/setup-integracao.util';
 import { di } from '@/shared/infrastructure/di.container';
 
 describe('TDD - Validação de Correções (Infra e Rotas)', () => {

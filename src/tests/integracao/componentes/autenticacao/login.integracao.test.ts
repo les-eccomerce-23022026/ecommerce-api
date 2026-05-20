@@ -1,6 +1,6 @@
 import request from 'supertest';
-import { configurarTesteIntegracao } from '@/tests/utils/setup-integracao.util';
-import { obterTokenAdmin, registrarCliente } from '@/tests/utils/requisicoes-api.util';
+import { configurarTesteIntegracao } from '@/tests/helpers/setup-integracao.util';
+import { obterTokenAdmin, registrarCliente } from '@/tests/helpers/requisicoes-api.util';
 
 describe('Integração - Autenticação', () => {
   const contexto = configurarTesteIntegracao(true);
@@ -28,6 +28,8 @@ describe('Integração - Autenticação', () => {
       expect(res.body.dados.user.nome).toBe('Cliente Auth Teste');
       expect(res.body.dados.user.role).toBe('cliente');
       expect(res.body.dados.token).toBeDefined();
+      expect(typeof res.body.dados.token).toBe('string');
+      expect(res.body.dados.token.length).toBeGreaterThan(0);
     });
 
     it('[RF0038] deve autenticar admin com credenciais válidas', async () => {
@@ -42,6 +44,8 @@ describe('Integração - Autenticação', () => {
       expect(res.body.dados.user.email).toBe('admin@livraria.com.br');
       expect(res.body.dados.user.role).toBe('admin');
       expect(res.body.dados.token).toBeDefined();
+      expect(typeof res.body.dados.token).toBe('string');
+      expect(res.body.dados.token.length).toBeGreaterThan(0);
     });
 
     it('[RNF0037] deve retornar 401 para credenciais inválidas', async () => {

@@ -1,6 +1,6 @@
 import request from 'supertest';
-import { configurarTesteIntegracao } from '@/tests/utils/setup-integracao.util';
-import { registrarCliente, realizarLogin, gerarCpfValidoUnico } from '@/tests/utils/requisicoes-api.util';
+import { configurarTesteIntegracao } from '@/tests/helpers/setup-integracao.util';
+import { registrarCliente, realizarLogin, gerarCpfValidoUnico } from '@/tests/helpers/requisicoes-api.util';
 
 // Testes de integração que simulam fluxos completos do domínio cliente,
 // cobrindo o ciclo de vida da conta desde o registro até a inativação,

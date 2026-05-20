@@ -2,18 +2,6 @@ import request from 'supertest';
 import { Application } from 'express';
 import { payloadPedidoValido } from '@/tests/helpers/pedido-venda.helper';
 
-async function logApi(reqPromise: Promise<import('supertest').Response>) {
-  const res = await reqPromise;
-  // Comentado para evitar lint errors
-  // console.log(`\n🚀 [API CALL] ${req.method} ${req.url}`);
-  // if (req._data) {
-  //   console.log(`📦 PAYLOAD: ${JSON.stringify(req._data).substring(0, 200)}`);
-  // }
-  // const count = Array.isArray(res.body) ? res.body.length : (res.body ? 1 : 0);
-  // console.log(`✅ RESPONSE COUNT: ${count}`);
-  return res;
-}
-
 const cartaoCheckout = {
   numero: '4111111111111111',
   nomeTitular: 'Cliente Fluxo Admin',
@@ -35,10 +23,10 @@ export async function criarVendaPedido(
   opcoes?: Parameters<typeof payloadPedidoValido>[0],
 ): Promise<VendaCriada> {
   const body = payloadPedidoValido(opcoes);
-  const res = await logApi(request(app)
+  const res = await request(app)
     .post('/api/vendas')
     .set('Authorization', `Bearer ${tokenCliente}`)
-    .send(body));
+    .send(body);
 
   if (res.status !== 201) {
     throw new Error(`Falha ao criar venda: ${res.status} ${JSON.stringify(res.body)}`);
@@ -59,7 +47,7 @@ export async function aprovarPagamentoDaVenda(
   vendaUuid: string,
   valorTotal: number,
 ): Promise<string> {
-  const resSel = await logApi(request(app)
+  const resSel = await request(app)
     .post('/api/pagamentos/selecionar')
     .set('Authorization', `Bearer ${tokenCliente}`)
     .send({
@@ -67,7 +55,7 @@ export async function aprovarPagamentoDaVenda(
       valor: valorTotal,
       tipoPagamento: 'cartao_credito',
       cartao: cartaoCheckout,
-    }));
+    });
 
   if (resSel.status !== 201) {
     throw new Error(`Selecionar pagamento: ${resSel.status} ${JSON.stringify(resSel.body)}`);
@@ -75,9 +63,9 @@ export async function aprovarPagamentoDaVenda(
 
   const pagamentoUuid = resSel.body.id as string;
 
-  const resProc = await logApi(request(app)
+  const resProc = await request(app)
     .post(`/api/pagamentos/${pagamentoUuid}/processar`)
-    .set('Authorization', `Bearer ${tokenCliente}`));
+    .set('Authorization', `Bearer ${tokenCliente}`);
 
   if (resProc.status !== 200 || resProc.body.status !== 'APROVADO') {
     throw new Error(`Processar pagamento: ${resProc.status} ${JSON.stringify(resProc.body)}`);

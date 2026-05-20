@@ -1,6 +1,6 @@
 import request from 'supertest';
-import { configurarTesteIntegracao } from '@/tests/utils/setup-integracao.util';
-import { obterTokenAdmin, registrarCliente, registrarAdmin } from '@/tests/utils/requisicoes-api.util';
+import { configurarTesteIntegracao } from '@/tests/helpers/setup-integracao.util';
+import { obterTokenAdmin, registrarCliente, registrarAdmin } from '@/tests/helpers/requisicoes-api.util';
 
 /**
  * Testes de integração para validação de dados.

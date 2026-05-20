@@ -2,8 +2,8 @@
 // Teste de integração com múltiplos cenários - arquivo aceita ser mais longo
 import request from 'supertest';
 import { Application } from 'express';
-import { configurarTesteIntegracao } from '@/tests/utils/setup-integracao.util';
-import { obterTokenAdmin, obterTokenCliente } from '@/tests/utils/requisicoes-api.util';
+import { configurarTesteIntegracao } from '@/tests/helpers/setup-integracao.util';
+import { obterTokenAdmin, obterTokenCliente } from '@/tests/helpers/requisicoes-api.util';
 import { payloadPedidoValido } from '@/tests/helpers/pedido-venda.helper';
 import { v4 as uuidv4 } from 'uuid';
 

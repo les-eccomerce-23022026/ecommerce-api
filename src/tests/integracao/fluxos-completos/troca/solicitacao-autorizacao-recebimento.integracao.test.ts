@@ -1,6 +1,6 @@
 import request from 'supertest';
-import { configurarTesteIntegracao } from '@/tests/utils/setup-integracao.util';
-import { obterTokenCliente, obterTokenAdmin, mudarStatusVendaTeste } from '@/tests/utils/requisicoes-api.util';
+import { configurarTesteIntegracao } from '@/tests/helpers/setup-integracao.util';
+import { obterTokenCliente, obterTokenAdmin, mudarStatusVendaTeste } from '@/tests/helpers/requisicoes-api.util';
 import { LIVRO_UUID_TESTE } from '@/tests/helpers/pedido-venda.helper';
 
 describe('Integração - Troca e Devolução (Sprint 2)', () => {

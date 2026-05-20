@@ -1,7 +1,15 @@
 import request from 'supertest';
-import { configurarTesteIntegracao } from '@/tests/utils/setup-integracao.util';
-import { obterTokenCliente } from '@/tests/utils/requisicoes-api.util';
+import { configurarTesteIntegracao } from '@/tests/helpers/setup-integracao.util';
+import { obterTokenCliente } from '@/tests/helpers/requisicoes-api.util';
 import { LIVRO_UUID_TESTE } from '@/tests/helpers/pedido-venda.helper';
+
+/**
+ * Gera um UUID v4 aleatório para uso em testes
+ * Evita colisões em execução paralela
+ */
+function gerarUuidAleatorio(): string {
+  return crypto.randomUUID();
+}
 
 describe('Integração - Módulo de Entrega', () => {
   const contexto = configurarTesteIntegracao(true);
@@ -182,7 +190,8 @@ describe('Integração - Módulo de Entrega', () => {
       .set('Authorization', `Bearer ${token}`)
       .send({ novaData: '2026-06-01' });
 
-    // Reagendamento pode não estar implementado ou exigir permissão específica
+    // Reagendamento por cliente pode não estar implementado (404) ou exigir permissão específica (401/403)
+    // Se implementado, pode exigir campo 'endereco' no payload (400) ou aceitar (204)
     expect([204, 400, 401, 403, 404]).toContain(resReagendarCliente.status);
   });
 });

@@ -1,5 +1,5 @@
 import { RepositorioPagamentosPostgres } from '@/modules/pagamentos/repositories/RepositorioPagamentosPostgres';
-import { configurarTesteIntegracao } from '@/tests/utils/setup-integracao.util';
+import { configurarTesteIntegracao } from '@/tests/helpers/setup-integracao.util';
 
 describe('Integração - RepositorioPagamentosPostgres - Correção N+1 Query', () => {
   const contexto = configurarTesteIntegracao();

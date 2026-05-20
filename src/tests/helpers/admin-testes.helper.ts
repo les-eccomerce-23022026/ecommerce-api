@@ -1,6 +1,6 @@
 import request from 'supertest';
 import { Application } from 'express';
-import { realizarLogin } from '@/tests/utils/requisicoes-api.util';
+import { realizarLogin } from '@/tests/helpers/requisicoes-api.util';
 import { validarCpf } from '@/shared/utils/validacao-cpf.util';
 
 const SENHA_ADMIN_COMUM = 'SenhaAdminComum@123';
@@ -28,18 +28,6 @@ function gerarCpfValidoUnico(): string {
   return '529.982.247-25';
 }
 
-async function logApi(reqPromise: Promise<import('supertest').Response>) {
-  const res = await reqPromise;
-  // Comentado para evitar lint errors
-  // console.log(`\n🚀 [API CALL] ${req.method} ${req.url}`);
-  // if (req._data) {
-  //   console.log(`📦 PAYLOAD: ${JSON.stringify(req._data).substring(0, 200)}`);
-  // }
-  // const count = Array.isArray(res.body) ? res.body.length : (res.body ? 1 : 0);
-  // console.log(`✅ RESPONSE COUNT: ${count}`);
-  return res;
-}
-
 /**
  * Cria um administrador não-mestre via API (token do mestre) e retorna token + e-mail.
  * CPF é variado para evitar colisão quando vários admins são criados na mesma suíte.
@@ -52,7 +40,7 @@ export async function criarAdminComumObterToken(
   const email = `admin.comum.${id}@test.integracao.local`;
   const cpf = gerarCpfValidoUnico();
 
-  const res = await logApi(request(app)
+  const res = await request(app)
     .post('/api/admin/registro')
     .set('Authorization', `Bearer ${tokenMestre}`)
     .send({
@@ -61,7 +49,7 @@ export async function criarAdminComumObterToken(
       cpf,
       senha: SENHA_ADMIN_COMUM,
       confirmacaoSenha: SENHA_ADMIN_COMUM,
-    }));
+    });
 
   if (res.status !== 201) {
     throw new Error(`Falha ao criar admin comum: ${res.status} ${JSON.stringify(res.body)}`);

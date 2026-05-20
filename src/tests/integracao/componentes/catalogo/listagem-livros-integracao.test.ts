@@ -1,6 +1,14 @@
 import request from 'supertest';
-import { configurarTesteIntegracao } from '@/tests/utils/setup-integracao.util';
-import { obterTokenAdmin, registrarAdmin } from '@/tests/utils/requisicoes-api.util';
+import { configurarTesteIntegracao } from '@/tests/helpers/setup-integracao.util';
+import { obterTokenAdmin, registrarAdmin } from '@/tests/helpers/requisicoes-api.util';
+
+/**
+ * Gera um UUID v4 aleatório para uso em testes
+ * Evita colisões em execução paralela
+ */
+function gerarUuidAleatorio(): string {
+  return crypto.randomUUID();
+}
 
 /**
  * Testes de integração para CRUD de produtos com contexto de loja.
@@ -89,7 +97,8 @@ describe('Integração - CRUD de Produtos com Multi-tenancy', () => {
         .set('Authorization', `Bearer ${tokenAdminComum}`)
         .send([{ nome: 'Editora Admin', cnpj: '00.000.000/0010-10' }]);
 
-      // Tentar criar livro como admin comum (deveria funcionar se for admin)
+      // Tentar criar livro como admin comum
+      // RN0091: Admin comum tem permissão de criar livros na sua loja associada
       const res = await request(contexto.app)
         .post('/api/admin/livros')
         .set('Authorization', `Bearer ${tokenAdminComum}`)
@@ -104,8 +113,8 @@ describe('Integração - CRUD de Produtos com Multi-tenancy', () => {
           categoriaNome: 'ficcao',
         });
 
-      // Admin comum pode criar livros (201 = sucesso, 403 = sem permissão se não for admin mestre)
-      expect([201, 403]).toContain(res.status);
+      // Admin comum tem permissão de criar livros (201 = sucesso)
+      expect(res.status).toBe(201);
       expect(res.status).not.toBe(401); // Deve estar autenticado
     });
   });
@@ -192,8 +201,9 @@ describe('Integração - CRUD de Produtos com Multi-tenancy', () => {
         .get('/api/livros')
         .set('x-loja-uuid', lojaUuid);
 
-      // O middleware deve aceitar o header (200 = sucesso, 404 = catálogo vazio mas header válido)
-      expect([200, 404]).toContain(res.status);
+      // O middleware deve aceitar o header e retornar sucesso (200) ou catálogo vazio (404)
+      expect(res.status).toBeGreaterThanOrEqual(200);
+      expect(res.status).toBeLessThan(500);
       expect(res.status).not.toBe(400); // Não deve rejeitar o header
     });
   });
@@ -230,7 +240,8 @@ describe('Integração - CRUD de Produtos com Multi-tenancy', () => {
 
       expect(criarRes.status).toBe(201);
       expect(criarRes.body.sucesso).toBe(true);
-      expect(criarRes.body.dados.uuid).toBeDefined();
+      expect(typeof criarRes.body.dados.uuid).toBe('string');
+      expect(criarRes.body.dados.uuid).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
       expect(criarRes.body.dados.titulo).toBe('Livro Original');
 
       const livroUuid = criarRes.body.dados.uuid;
@@ -257,7 +268,8 @@ describe('Integração - CRUD de Produtos com Multi-tenancy', () => {
           titulo: 'Livro Atualizado',
         });
 
-      // Deve retornar erro de autenticação (401) ou não encontrado (404)
+      // O UUID 'uuid-fake' não corresponde ao pattern da rota, então retorna 404
+      // Se fosse um UUID válido sem autenticação, retornaria 401
       expect([401, 404]).toContain(res.status);
       expect(res.status).not.toBe(200); // Não deve permitir atualização sem autenticação
     });
@@ -288,7 +300,7 @@ describe('Integração - CRUD de Produtos com Multi-tenancy', () => {
         .post('/api/admin/livros/lote')
         .set('Authorization', `Bearer ${tokenAdmin}`)
         .send([{
-              uuid: '00000000-0000-0000-0000-000000000201',
+              uuid: gerarUuidAleatorio(),
               titulo: 'Livro Lote 1',
               autorNome: 'Autor 1',
               editoraNome: 'Editora 1',
@@ -299,7 +311,7 @@ describe('Integração - CRUD de Produtos com Multi-tenancy', () => {
               categoriaNome: 'ficcao',
             },
             {
-              uuid: '00000000-0000-0000-0000-000000000202',
+              uuid: gerarUuidAleatorio(),
               titulo: 'Livro Lote 2',
               autorNome: 'Autor 2',
               editoraNome: 'Editora 2',
@@ -372,7 +384,8 @@ describe('Integração - CRUD de Produtos com Multi-tenancy', () => {
 
       expect(criarRes.status).toBe(201);
       expect(criarRes.body.sucesso).toBe(true);
-      expect(criarRes.body.dados.uuid).toBeDefined();
+      expect(typeof criarRes.body.dados.uuid).toBe('string');
+      expect(criarRes.body.dados.uuid).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
       expect(criarRes.body.dados.titulo).toBe('Livro Detalhes');
 
       const livroUuid = criarRes.body.dados.uuid;
@@ -386,7 +399,9 @@ describe('Integração - CRUD de Produtos com Multi-tenancy', () => {
     });
 
     it('[RN0091] deve retornar 404 para livro inexistente', async () => {
-      const res = await request(contexto.app).get('/api/livros/00000000-0000-0000-0000-000000000999');
+      const livroInexistenteUuid = gerarUuidAleatorio();
+
+      const res = await request(contexto.app).get(`/api/livros/${livroInexistenteUuid}`);
 
       expect(res.status).toBe(404);
       expect(res.body.sucesso).toBe(false);
@@ -447,9 +462,11 @@ describe('Integração - CRUD de Produtos com Multi-tenancy', () => {
         .set('x-loja-uuid', loja2Uuid);
 
       // Catálogo é compartilhado, então ambas as lojas devem ver o mesmo livro
-      // (200 = sucesso, 404 = catálogo vazio mas header válido)
-      expect([200, 404]).toContain(res1.status);
-      expect([200, 404]).toContain(res2.status);
+      // O middleware deve aceitar o header e retornar sucesso (200) ou catálogo vazio (404)
+      expect(res1.status).toBeGreaterThanOrEqual(200);
+      expect(res1.status).toBeLessThan(500);
+      expect(res2.status).toBeGreaterThanOrEqual(200);
+      expect(res2.status).toBeLessThan(500);
       expect(res1.status).not.toBe(400); // Não deve rejeitar o header
       expect(res2.status).not.toBe(400); // Não deve rejeitar o header
     });

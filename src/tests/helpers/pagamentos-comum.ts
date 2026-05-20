@@ -1,5 +1,5 @@
 import request from 'supertest';
-import { configurarTesteIntegracao } from '@/tests/utils/setup-integracao.util';
+import { configurarTesteIntegracao } from '@/tests/helpers/setup-integracao.util';
 import { LIVRO_UUID_TESTE } from '@/tests/helpers/pedido-venda.helper';
 
 export type ContextoPagamentosIntegracao = ReturnType<typeof configurarTesteIntegracao>;

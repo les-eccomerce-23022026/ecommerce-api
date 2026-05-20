@@ -1,6 +1,14 @@
 import request from 'supertest';
-import { configurarTesteIntegracao } from '@/tests/utils/setup-integracao.util';
-import { obterTokenCliente } from '@/tests/utils/requisicoes-api.util';
+import { configurarTesteIntegracao } from '@/tests/helpers/setup-integracao.util';
+import { obterTokenCliente, registrarCliente, gerarCpfValidoUnico } from '@/tests/helpers/requisicoes-api.util';
+
+/**
+ * Gera um UUID v4 aleatório para uso em testes
+ * Evita colisões em execução paralela
+ */
+function gerarUuidAleatorio(): string {
+  return crypto.randomUUID();
+}
 
 describe('Integração - Cartões de Crédito', () => {
   const contexto = configurarTesteIntegracao(false);
@@ -32,7 +40,8 @@ describe('Integração - Cartões de Crédito', () => {
         });
 
       expect(res.status).toBe(201);
-      expect(res.body.dados).toBeDefined();
+      expect(res.body.sucesso).toBe(true);
+      expect(res.body.dados.uuid).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
       expect(res.body.dados.ultimosDigitosCartao).toBe('1111');
       expect(res.body.dados.nomeImpresso).toBe('Cliente Teste');
     });
@@ -154,8 +163,10 @@ describe('Integração - Cartões de Crédito', () => {
     });
 
     it('[RNF0037] deve retornar 400 para cartão inexistente', async () => {
+      const cartaoInexistenteUuid = gerarUuidAleatorio();
+
       const res = await request(contexto.app)
-        .patch('/api/clientes/perfil/cartoes/00000000-0000-0000-0000-000000000000')
+        .patch(`/api/clientes/perfil/cartoes/${cartaoInexistenteUuid}`)
         .set('Authorization', `Bearer ${tokenCliente}`)
         .send({ nomeImpresso: 'Novo Titular' });
 
@@ -189,8 +200,10 @@ describe('Integração - Cartões de Crédito', () => {
     });
 
     it('[RNF0037] deve retornar 200 para cartão inexistente (idempotente)', async () => {
+      const cartaoInexistenteUuid = gerarUuidAleatorio();
+
       const res = await request(contexto.app)
-        .delete('/api/clientes/perfil/cartoes/00000000-0000-0000-0000-000000000000')
+        .delete(`/api/clientes/perfil/cartoes/${cartaoInexistenteUuid}`)
         .set('Authorization', `Bearer ${tokenCliente}`);
 
       expect(res.status).toBe(200);
@@ -271,13 +284,14 @@ describe('Integração - Cartões de Crédito', () => {
       }
     });
 
-    it('deve rejeitar cartões com bandeiras não permitidas', async () => {
-      // Tentar criar cartão com UUID de bandeira inválido
-      const uuidInvalido = '00000000-0000-0000-0000-000000000000';
+    it('[L5] deve rejeitar cartão com bandeira UUID inválido', async () => {
+      const token = await obterTokenCliente(contexto.app);
+
+      const uuidInvalido = gerarUuidAleatorio();
 
       const res = await request(contexto.app)
         .post('/api/clientes/perfil/cartoes')
-        .set('Authorization', `Bearer ${tokenCliente}`)
+        .set('Authorization', `Bearer ${token}`)
         .send({
           uuidBandeira: uuidInvalido,
           token: 'tok_test_invalido',
@@ -288,7 +302,8 @@ describe('Integração - Cartões de Crédito', () => {
           principal: false,
         });
 
-      // Deve retornar erro (400 ou 404)
+      // Deve retornar erro: 400 (bad request - UUID inválido) ou 404 (bandeira não encontrada)
+      expect(res.status).not.toBe(201);
       expect([400, 404]).toContain(res.status);
     });
   });

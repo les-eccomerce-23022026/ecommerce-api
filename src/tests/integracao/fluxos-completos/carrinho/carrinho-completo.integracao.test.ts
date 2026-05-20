@@ -1,8 +1,8 @@
 import request from 'supertest';
 import { Application } from 'express';
 import type { IConexaoBanco } from '@/shared/infrastructure/database/IConexaoBanco';
-import { configurarTesteIntegracao } from '@/tests/utils/setup-integracao.util';
-import { obterTokenCliente } from '@/tests/utils/requisicoes-api.util';
+import { configurarTesteIntegracao } from '@/tests/helpers/setup-integracao.util';
+import { obterTokenCliente } from '@/tests/helpers/requisicoes-api.util';
 import {
   garantirTabelaCarrinhoItens,
   garantirLivroComEstoqueParaCarrinho,

@@ -1,6 +1,6 @@
 import request from 'supertest';
-import { configurarTesteIntegracao } from '@/tests/utils/setup-integracao.util';
-import { obterTokenCliente, realizarLogin } from '@/tests/utils/requisicoes-api.util';
+import { configurarTesteIntegracao } from '@/tests/helpers/setup-integracao.util';
+import { obterTokenCliente, realizarLogin } from '@/tests/helpers/requisicoes-api.util';
 
 /**
  * PATCH /api/clientes/seguranca/alterar-senha (RF0028).

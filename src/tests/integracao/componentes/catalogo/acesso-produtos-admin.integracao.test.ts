@@ -1,6 +1,6 @@
 import request from 'supertest';
-import { configurarTesteIntegracao } from '@/tests/utils/setup-integracao.util';
-import { obterTokenAdmin, registrarAdmin, registrarCliente, realizarLogin } from '@/tests/utils/requisicoes-api.util';
+import { configurarTesteIntegracao } from '@/tests/helpers/setup-integracao.util';
+import { obterTokenAdmin, registrarAdmin, registrarCliente, realizarLogin } from '@/tests/helpers/requisicoes-api.util';
 import { di } from '@/shared/infrastructure/di.container';
 
 /**
@@ -23,7 +23,6 @@ describe('Integração - Acesso a Produtos por Tipo de Admin', () => {
         .post('/api/admin/livros')
         .set('Authorization', `Bearer ${tokenMestre}`)
         .send({
-          uuid: '00000000-0000-0000-0000-000000000100',
           titulo: 'Livro Admin Mestre',
           autorNome: 'Autor Teste',
           editoraNome: 'Editora Teste',
@@ -323,8 +322,9 @@ describe('Integração - Acesso a Produtos por Tipo de Admin', () => {
         .set('x-loja-uuid', lojaUuid);
 
       // Middleware deve aceitar o header (200 = sucesso, 404 = catálogo vazio mas header válido)
+      // Se retornar 400, significa que o middleware está rejeitando o header inválidamente
+      expect(res.status).not.toBe(400);
       expect([200, 404]).toContain(res.status);
-      expect(res.status).not.toBe(400); // Não deve rejeitar o header
     });
 
     it('[RN0091] admin deve conseguir ver catálogo com contexto de loja', async () => {
@@ -348,8 +348,9 @@ describe('Integração - Acesso a Produtos por Tipo de Admin', () => {
         .set('x-loja-uuid', lojaUuid);
 
       // Middleware deve aceitar o header (200 = sucesso, 404 = catálogo vazio mas header válido)
+      // Se retornar 400, significa que o middleware está rejeitando o header inválidamente
+      expect(res.status).not.toBe(400);
       expect([200, 404]).toContain(res.status);
-      expect(res.status).not.toBe(400); // Não deve rejeitar o header
     });
   });
 

@@ -1,6 +1,14 @@
 import request from 'supertest';
-import { configurarTesteIntegracao } from '@/tests/utils/setup-integracao.util';
-import { obterTokenCliente } from '@/tests/utils/requisicoes-api.util';
+import { configurarTesteIntegracao } from '@/tests/helpers/setup-integracao.util';
+import { obterTokenCliente } from '@/tests/helpers/requisicoes-api.util';
+
+/**
+ * Gera um UUID v4 aleatório para uso em testes
+ * Evita colisões em execução paralela
+ */
+function gerarUuidAleatorio(): string {
+  return crypto.randomUUID();
+}
 
 describe('Integração - Clientes (Endereços)', () => {
   const contexto = configurarTesteIntegracao();
@@ -28,7 +36,9 @@ describe('Integração - Clientes (Endereços)', () => {
 
       expect(resposta.status).toBe(201);
       expect(resposta.body.sucesso).toBe(true);
-      expect(resposta.body.dados.uuid).toBeDefined();
+      expect(typeof resposta.body.dados.uuid).toBe('string');
+      expect(resposta.body.dados.uuid).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+      expect(resposta.body.dados.uuid).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
       expect(resposta.body.dados.apelido).toBe(novoEndereco.apelido);
     });
 
@@ -98,8 +108,10 @@ describe('Integração - Clientes (Endereços)', () => {
 
     it('deve falhar ao tentar remover um endereço inexistente', async () => {
       const token = await obterTokenCliente(contexto.app);
+      const enderecoInexistenteUuid = gerarUuidAleatorio();
+
       const resposta = await request(contexto.app)
-        .delete('/api/clientes/perfil/enderecos/00000000-0000-0000-0000-000000000000')
+        .delete(`/api/clientes/perfil/enderecos/${enderecoInexistenteUuid}`)
         .set('Authorization', `Bearer ${token}`);
 
       expect(resposta.status).toBe(404);

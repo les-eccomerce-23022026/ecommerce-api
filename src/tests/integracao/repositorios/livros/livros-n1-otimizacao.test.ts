@@ -1,5 +1,5 @@
 import { RepositorioLivrosPostgres } from '@/modules/livros/repositorioLivrosPostgres';
-import { configurarTesteIntegracao } from '@/tests/utils/setup-integracao.util';
+import { configurarTesteIntegracao } from '@/tests/helpers/setup-integracao.util';
 
 describe('Integração - RepositorioLivrosPostgres - Correção Conversões e ORDER BY', () => {
   const contexto = configurarTesteIntegracao();

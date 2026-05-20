@@ -1,11 +1,11 @@
 import request from 'supertest';
-import { configurarTesteIntegracao } from '@/tests/utils/setup-integracao.util';
-import { obterTokenCliente } from '@/tests/utils/requisicoes-api.util';
+import { configurarTesteIntegracao } from '@/tests/helpers/setup-integracao.util';
+import { obterTokenCliente } from '@/tests/helpers/requisicoes-api.util';
 import {
   prepararTabelasPagamentoIntegracao,
   criarVendaPagamentos,
   registrarIntencaoPagamentos,
-} from '../../helpers/pagamentos-comum';
+} from '@/tests/helpers/pagamentos-comum';
 
 describe('Integração - Pagamentos (info, intenção e processar)', () => {
   const contexto = configurarTesteIntegracao();

@@ -1,6 +1,6 @@
 import request from 'supertest';
-import { configurarTesteIntegracao } from '@/tests/utils/setup-integracao.util';
-import { obterTokenCliente, obterTokenAdmin } from '@/tests/utils/requisicoes-api.util';
+import { configurarTesteIntegracao } from '@/tests/helpers/setup-integracao.util';
+import { obterTokenCliente, obterTokenAdmin } from '@/tests/helpers/requisicoes-api.util';
 
 describe('Integração - Clientes (Perfil)', () => {
   const contexto = configurarTesteIntegracao();
@@ -14,10 +14,12 @@ describe('Integração - Clientes (Perfil)', () => {
 
       expect(resposta.status).toBe(200);
       expect(resposta.body.sucesso).toBe(true);
-      expect(resposta.body.dados.uuid).toBeDefined();
+      expect(typeof resposta.body.dados.uuid).toBe('string');
+      expect(resposta.body.dados.uuid).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
       expect(resposta.body.dados.nome).toBe('Cliente Teste');
       expect(resposta.body.dados.email).toBe('cliente.teste@email.com');
-      expect(resposta.body.dados.cpf).toBeDefined();
+      expect(typeof resposta.body.dados.cpf).toBe('string');
+      expect(resposta.body.dados.cpf).toMatch(/^\d{3}\.\d{3}\.\d{3}-\d{2}$/);
     });
 
     it('deve falhar na obtenção do perfil sem token', async () => {
