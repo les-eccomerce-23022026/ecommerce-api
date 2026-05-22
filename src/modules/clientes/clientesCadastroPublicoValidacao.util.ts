@@ -1,5 +1,6 @@
 const CAMPOS_USUARIO = ['nome', 'cpf', 'email', 'senha', 'confirmacaoSenha'] as const;
 const CAMPOS_ENDERECO = ['logradouro', 'numero', 'bairro', 'cep', 'cidade', 'estado'] as const;
+const CAMPOS_LOJA = ['nomeFantasiaLoja', 'tipoPessoaLoja'] as const;
 
 function camposFaltantes(obj: Record<string, unknown>, campos: readonly string[]): string[] {
   return campos.filter((campo) => !obj[campo]);
@@ -32,5 +33,20 @@ export function obterErroValidacaoCadastroPublico(dados: Record<string, unknown>
   if (faltEnt.length > 0) {
     return `Campos obrigatórios do endereço de entrega ausentes: ${faltEnt.join(', ')}`;
   }
+
+  // Validação de dados de loja (opcional)
+  if (!dados.querSerAdmin) {
+    return null;
+  }
+
+  const faltandoLoja = camposFaltantes(dados, CAMPOS_LOJA);
+  if (faltandoLoja.length > 0) {
+    return `Campos obrigatórios da loja ausentes: ${faltandoLoja.join(', ')}`;
+  }
+
+  if (dados.tipoPessoaLoja === 'PJ' && !dados.cnpjLoja) {
+    return 'CNPJ é obrigatório para pessoa jurídica (tipoPessoaLoja = PJ)';
+  }
+
   return null;
 }

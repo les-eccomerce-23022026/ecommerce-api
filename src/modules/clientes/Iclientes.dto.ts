@@ -35,6 +35,10 @@ export interface ICriarClienteDto {
   enderecoCobranca?: IEnderecoDto;
   enderecoEntrega?: IEnderecoDto;
   enderecoEntregaIgualCobranca?: boolean;
+  querSerAdmin?: boolean;
+  nomeFantasiaLoja?: string;
+  tipoPessoaLoja?: 'PF' | 'PJ';
+  cnpjLoja?: string;
 }
 
 /**

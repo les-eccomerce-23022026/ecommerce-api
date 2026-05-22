@@ -12,4 +12,5 @@ export interface IListagemCatalogoLivros {
 export interface ICategoriaMenuDto {
   slug: string;
   nome: string;
+  contadorProdutos: number;
 }

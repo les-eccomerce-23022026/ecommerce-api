@@ -43,6 +43,27 @@ export class ControladorClientes {
     try {
       const dados = requisicao.body ?? {};
       const erroValidacao = obterErroValidacaoCadastroPublico(dados);
+      // #region agent log
+      const cob = dados.enderecoCobranca as Record<string, unknown> | undefined;
+      fetch('http://127.0.0.1:7252/ingest/8c947da7-7023-400a-ab71-9b9c5909fd2b', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'cfd192' },
+        body: JSON.stringify({
+          sessionId: 'cfd192',
+          runId: 'pre-fix',
+          hypothesisId: 'H4-H6',
+          location: 'clientes.controller.ts:realizarCadastroPublico',
+          message: 'cadastro publico payload check',
+          data: {
+            erroValidacao,
+            cpfLen: typeof dados.cpf === 'string' ? dados.cpf.length : 0,
+            cobNumero: cob?.numero,
+            cobEstado: cob?.estado,
+          },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+      // #endregion
       if (erroValidacao) {
         return RespostaPadrao.enviarErro(resposta, 400, erroValidacao);
       }
