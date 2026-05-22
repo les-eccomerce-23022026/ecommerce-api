@@ -1,8 +1,11 @@
 -- =============================================================================
 -- DML 005 — Seed de usuários de teste (Cliente e Admin)
 -- Senha para ambos: "@asdfJKLÇ123"
--- O hash antigo deu erro no compare por algum problema de encoding. Este deve funcionar: 
+-- O hash antigo deu erro no compare por algum problema de encoding. Este deve funcionar:
 -- Hash real node bcrypt: $2b$10$GaOa1GtR//oZ7.lI3y.7/uT25D7Px3T.54NuII0z/laURHdAIw59W
+-- =============================================================================
+-- NOTA: O usuário admin@livraria.com.br não é criado aqui pois é gerado
+-- dinamicamente pelo helper de testes (obterTokenAdmin) com hash correto
 -- =============================================================================
 
 DO $$
@@ -40,7 +43,7 @@ BEGIN
     RETURNING usu_id INTO v_id_usuario_cli;
 
     IF v_id_usuario_cli IS NULL THEN
-        SELECT usu_id INTO v_id_usuario_cli FROM livraria_gestao.usuarios 
+        SELECT usu_id INTO v_id_usuario_cli FROM livraria_gestao.usuarios
         WHERE usu_email = 'clientetest@email.com' AND pap_id = v_id_papel_cliente;
     END IF;
 

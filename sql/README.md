@@ -130,6 +130,23 @@ Para evitar colisão de nomes em `JOIN`s e no mapeamento para o domínio, cada t
 
 ---
 
+## Snapshots DDL (versionamento da estrutura)
+
+A estrutura vigente do Postgres (schemas `livraria_*` + `public`) é versionada em [`snapshots/`](snapshots/):
+
+- **`schema_canonico.sql`** — estado atual para revisão em PR
+- **`historico/schema_*.sql`** — backups datados para rollback
+
+```bash
+cd backend
+npm run db:snapshot:historico   # antes de DDL/migration
+npm run db:snapshot             # após migration estável
+```
+
+Ver [`snapshots/README.md`](snapshots/README.md) e ADR [`0012-snapshots-ddl-versionados-git.md`](../../documentacao-exigida/adr/0012-snapshots-ddl-versionados-git.md).
+
+---
+
 ## Diagrama ER (PlantUML)
 
 O arquivo `schema_ecm.puml` contém o diagrama entidade-relacionamento completo do banco de dados em formato PlantUML. Para visualizar:

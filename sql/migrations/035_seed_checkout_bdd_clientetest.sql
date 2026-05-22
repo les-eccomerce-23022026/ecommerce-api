@@ -1,17 +1,9 @@
 -- Migration 035: Dados de checkout para clientetest@email.com (cenários BDD 7ª entrega)
--- Endereço, cartão e bandeiras necessários para finalizar compra
+-- Endereço necessário para finalizar compra
+-- NOTA: Bandeiras de cartão são criadas em dml/004_seeds_bandeiras_cartao.sql
+-- NOTA: Cartões são criados em migrations/026_seed_segundo_cartao_clientetest.sql
 
 BEGIN;
-
--- Bandeiras de cartão (RN0025)
-INSERT INTO livraria_financeiro.bandeiras_cartao (ban_descricao, ban_uuid)
-VALUES
-    ('Visa', 'd30d587f-8140-469d-a5fc-8e0c998c72f4'),
-    ('Mastercard', 'd6eac520-7651-4ae9-84d5-b0bbf269be2e'),
-    ('Elo', '21317eba-311d-4bb8-9054-6debff64f2da'),
-    ('American Express', '01fd90d0-0c72-4787-8667-965b2c39f75f'),
-    ('Hipercard', '02cacd79-1ec5-44c5-9142-486cb4bc82f1')
-ON CONFLICT (ban_descricao) DO UPDATE SET ban_uuid = EXCLUDED.ban_uuid;
 
 DO $$
 DECLARE
@@ -24,7 +16,6 @@ DECLARE
     v_bai_id           INTEGER;
     v_cep_numero      VARCHAR(8);
     v_pai_id           INTEGER;
-    v_ban_visa_id      INTEGER;
 BEGIN
     SELECT usu_id INTO v_usu_id
     FROM livraria_gestao.usuarios
@@ -113,24 +104,7 @@ BEGIN
         );
     END IF;
 
-    -- Cartão Visa principal (split / checkout)
-    SELECT ban_id INTO v_ban_visa_id
-    FROM livraria_financeiro.bandeiras_cartao
-    WHERE ban_descricao = 'Visa'
-    LIMIT 1;
-
-    IF v_ban_visa_id IS NOT NULL AND NOT EXISTS (
-        SELECT 1 FROM livraria_financeiro.cartoes
-        WHERE usu_id = v_usu_id AND crt_final = '0002'
-    ) THEN
-        INSERT INTO livraria_financeiro.cartoes (
-            usu_id, ban_id, crt_token, crt_final, crt_nome_impresso, crt_validade, crt_principal
-        ) VALUES (
-            v_usu_id, v_ban_visa_id,
-            'tok_sim_e2e_primeiro_cartao_visa0002',
-            '0002', 'CLIENTE TESTE VISA', DATE '2029-06-01', TRUE
-        );
-    END IF;
+    -- NOTA: Cartões são criados em migrations/026_seed_segundo_cartao_clientetest.sql
 
     RAISE NOTICE 'Seed checkout BDD aplicado para usu_id=%', v_usu_id;
 END $$;

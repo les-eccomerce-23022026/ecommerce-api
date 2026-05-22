@@ -1,3 +1,4 @@
+-- DEPRECADO: use sql/migrations/048_criar_tabela_notificacoes.sql (setup-db e paridade test)
 -- Tabela de Notificações
 -- Armazena notificações para exibir badge no header do cliente
 -- Substitui envio de e-mail por sistema testável via E2E
