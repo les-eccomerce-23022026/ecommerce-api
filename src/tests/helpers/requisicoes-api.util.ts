@@ -239,6 +239,9 @@ export async function obterTokenAdmin(app: Application): Promise<string> {
     await repositorioUsuarios.atualizarUsuario(adminExistente.uuid, {
       senhaHash: senhaHashAdmin,
     });
+    // Garante que o admin tenha ambos os papéis associados
+    await repositorioUsuarios.associarPapelUsuario(adminExistente.id, PAPEL_CLIENTE.id);
+    await repositorioUsuarios.associarPapelUsuario(adminExistente.id, PAPEL_ADMIN.id);
   }
 
   const maximoTentativas = 5;

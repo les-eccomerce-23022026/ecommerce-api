@@ -2,9 +2,7 @@
  * Helpers para montagem de payloads de pedido (vendas) nos testes de integração.
  */
 
-export const LIVRO_UUID_TESTE = '550e8400-e29b-41d4-a716-446655440000';
-
-export function payloadPedidoValido(opcoes?: {
+export function payloadPedidoValido(livroUuid: string, opcoes?: {
   precoUnitario?: number;
   quantidade?: number;
   valorFrete?: number;
@@ -18,7 +16,7 @@ export function payloadPedidoValido(opcoes?: {
   const total = totalItens + frete;
 
   return {
-    itens: [{ livroUuid: LIVRO_UUID_TESTE, quantidade: qtd, precoUnitario: preco }],
+    itens: [{ livroUuid, quantidade: qtd, precoUnitario: preco }],
     valorTotalItens: totalItens,
     valorFrete: frete,
     valorTotal: total,

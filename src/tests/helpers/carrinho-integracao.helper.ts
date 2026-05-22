@@ -71,9 +71,17 @@ export async function garantirLivroComEstoqueParaCarrinho(
     [],
   );
   if (existentes.length > 0) {
+    // Resetar estoque para valor conhecido (1000) para garantir previsibilidade nos testes
+    const livUuid = existentes[0].liv_uuid;
+    await db.executar(
+      `UPDATE estoques 
+       SET etq_quantidade_disponivel = 1000 
+       WHERE liv_id = (SELECT liv_id FROM livros WHERE liv_uuid = $1)`,
+      [livUuid]
+    );
     return {
-      livUuid: existentes[0].liv_uuid,
-      estoque: Number(existentes[0].estoque),
+      livUuid,
+      estoque: 1000,
     };
   }
 

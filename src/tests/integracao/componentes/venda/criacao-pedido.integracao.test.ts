@@ -2,7 +2,8 @@ import request from 'supertest';
 import { Application } from 'express';
 import { configurarTesteIntegracao } from '@/tests/helpers/setup-integracao.util';
 import { obterTokenCliente } from '@/tests/helpers/requisicoes-api.util';
-import { LIVRO_UUID_TESTE, payloadPedidoValido } from '@/tests/helpers/pedido-venda.helper';
+import { payloadPedidoValido } from '@/tests/helpers/pedido-venda.helper';
+import { garantirLivroComEstoqueParaCarrinho } from '@/tests/helpers/carrinho-integracao.helper';
 
 const EMAIL_CLIENTE_B = 'cliente.b.pedido@email.com';
 const CPF_CLIENTE_B = '529.982.247-25';
@@ -16,10 +17,17 @@ describe('Integração — Vendas / pedido do cliente', () => {
   const contexto = configurarTesteIntegracao();
   let app: Application;
   let tokenCliente: string;
+  let livroUuid: string;
 
   beforeAll(async () => {
     app = contexto.app;
     tokenCliente = await obterTokenCliente(app);
+  });
+
+  beforeEach(async () => {
+    // Criar livro dinamicamente para isolamento do teste (escopo já iniciado no beforeEach)
+    const livro = await garantirLivroComEstoqueParaCarrinho(contexto.db!);
+    livroUuid = livro.livUuid;
   });
 
   let tokenClienteB: string;
@@ -31,7 +39,7 @@ describe('Integração — Vendas / pedido do cliente', () => {
   describe('POST /api/vendas', () => {
     describe('cenários felizes', () => {
       it('[RF0033][RF0037][RN0038] cria pedido com status EM PROCESSAMENTO e totais coerentes', async () => {
-        const body = payloadPedidoValido({ precoUnitario: 50, quantidade: 1, valorFrete: 10 });
+        const body = payloadPedidoValido(livroUuid, { precoUnitario: 50, quantidade: 1, valorFrete: 10 });
 
         const res = await request(app)
           .post('/api/vendas')
@@ -47,7 +55,7 @@ describe('Integração — Vendas / pedido do cliente', () => {
       });
 
       it('[RF0025] permite consultar o mesmo pedido em GET /vendas/:uuid', async () => {
-        const body = payloadPedidoValido({ precoUnitario: 30, quantidade: 2, valorFrete: 5 });
+        const body = payloadPedidoValido(livroUuid, { precoUnitario: 30, quantidade: 2, valorFrete: 5 });
         const criado = await request(app)
           .post('/api/vendas')
           .set('Authorization', `Bearer ${tokenCliente}`)
@@ -67,7 +75,7 @@ describe('Integração — Vendas / pedido do cliente', () => {
 
     describe('cenários de falha', () => {
       it('[RNF0037] retorna 401 sem token', async () => {
-        const res = await request(app).post('/api/vendas').send(payloadPedidoValido());
+        const res = await request(app).post('/api/vendas').send(payloadPedidoValido(livroUuid));
 
         expect(res.status).toBe(401);
         expect(res.body.sucesso).toBe(false);
@@ -93,7 +101,7 @@ describe('Integração — Vendas / pedido do cliente', () => {
           .post('/api/vendas')
           .set('Authorization', `Bearer ${tokenCliente}`)
           .send({
-            itens: [{ livroUuid: LIVRO_UUID_TESTE, quantidade: 1, precoUnitario: 10 }],
+            itens: [{ livroUuid, quantidade: 1, precoUnitario: 10 }],
             valorTotalItens: 10,
             valorFrete: 0,
             valorTotal: 0,
@@ -107,7 +115,7 @@ describe('Integração — Vendas / pedido do cliente', () => {
         const res = await request(app)
           .post('/api/vendas')
           .set('Authorization', `Bearer ${tokenCliente}`)
-          .send(payloadPedidoValido({ precoUnitario: 50, quantidade: 1, valorFrete: 10, parcelas: 2 }));
+          .send(payloadPedidoValido(livroUuid, { precoUnitario: 50, quantidade: 1, valorFrete: 10, parcelas: 2 }));
 
         expect(res.status).toBe(400);
         expect(res.body.erro).toMatch(/RN0069/i);
@@ -118,7 +126,7 @@ describe('Integração — Vendas / pedido do cliente', () => {
           .post('/api/vendas')
           .set('Authorization', `Bearer ${tokenCliente}`)
           .send({
-            ...payloadPedidoValido({ precoUnitario: 50, quantidade: 1, valorFrete: 10 }),
+            ...payloadPedidoValido(livroUuid, { precoUnitario: 50, quantidade: 1, valorFrete: 10 }),
             pagamentos: [
               { tipo: 'cartao', valor: 55 },
               { tipo: 'cartao', valor: 5 }, // Invalida RN0034 (mínimo 10)
@@ -137,7 +145,7 @@ describe('Integração — Vendas / pedido do cliente', () => {
       const criado = await request(app)
         .post('/api/vendas')
         .set('Authorization', `Bearer ${tokenCliente}`)
-        .send(payloadPedidoValido({ precoUnitario: 20, quantidade: 1, valorFrete: 5 }));
+        .send(payloadPedidoValido(livroUuid, { precoUnitario: 20, quantidade: 1, valorFrete: 5 }));
 
       expect(criado.status).toBe(201);
       const vendaUuid = criado.body.id as string;
@@ -175,7 +183,7 @@ describe('Integração — Vendas / pedido do cliente', () => {
       await request(app)
         .post('/api/vendas')
         .set('Authorization', `Bearer ${tokenCliente}`)
-        .send(payloadPedidoValido({ precoUnitario: 40, quantidade: 1, valorFrete: 5 }));
+        .send(payloadPedidoValido(livroUuid, { precoUnitario: 40, quantidade: 1, valorFrete: 5 }));
 
       const res = await request(app)
         .get('/api/minhas-vendas')
@@ -198,30 +206,12 @@ describe('Integração — Vendas / pedido do cliente', () => {
   });
 
   describe('[L2] Baixa de estoque após pagamento aprovado', () => {
-    let livroExiste = false;
-
-    beforeAll(async () => {
-      const estoqueRes = await contexto.db!.executar<{ etq_quantidade_disponivel: number }>(
-        `SELECT etq_quantidade_disponivel FROM livraria_comercial.estoques 
-         WHERE liv_id = (SELECT liv_id FROM livraria_comercial.livros WHERE liv_uuid = $1)`,
-        [LIVRO_UUID_TESTE]
-      );
-      livroExiste = !!(estoqueRes && estoqueRes.length > 0);
-    });
-
-    // eslint-disable-next-line jest/no-disabled-tests
-    it.skip('[L2] deve baixar estoque após pagamento aprovado - REQUER LIVRO UUID_TESTE NO BANCO', async () => {
-      // Este teste requer que o livro LIVRO_UUID_TESTE exista no banco de dados
-      // Se o livro não existir, o teste não pode ser executado
-      if (!livroExiste) {
-        return;
-      }
-
+    it('[L2] deve baixar estoque após pagamento aprovado', async () => {
       // 1. Obter estoque inicial do livro
       const estoqueInicialRes = await contexto.db!.executar<{ etq_quantidade_disponivel: number }>(
         `SELECT etq_quantidade_disponivel FROM livraria_comercial.estoques 
          WHERE liv_id = (SELECT liv_id FROM livraria_comercial.livros WHERE liv_uuid = $1)`,
-        [LIVRO_UUID_TESTE]
+        [livroUuid]
       );
 
       expect(estoqueInicialRes).toBeDefined();
@@ -234,7 +224,7 @@ describe('Integração — Vendas / pedido do cliente', () => {
       const resVenda = await request(app)
         .post('/api/vendas')
         .set('Authorization', `Bearer ${tokenCliente}`)
-        .send(payloadPedidoValido({ precoUnitario: 50, quantidade: quantidadeVenda, valorFrete: 10 }));
+        .send(payloadPedidoValido(livroUuid, { precoUnitario: 50, quantidade: quantidadeVenda, valorFrete: 10 }));
 
       expect(resVenda.status).toBe(201);
 
@@ -255,6 +245,7 @@ describe('Integração — Vendas / pedido do cliente', () => {
         .post('/api/pagamento/processar')
         .set('Authorization', `Bearer ${tokenCliente}`)
         .send({
+          vendaUuid,
           valorTotal: 110,
           idIntencao,
           segredoConfirmacao,
@@ -270,7 +261,7 @@ describe('Integração — Vendas / pedido do cliente', () => {
       const estoqueFinalRes = await contexto.db!.executar<{ etq_quantidade_disponivel: number }>(
         `SELECT etq_quantidade_disponivel FROM livraria_comercial.estoques 
          WHERE liv_id = (SELECT liv_id FROM livraria_comercial.livros WHERE liv_uuid = $1)`,
-        [LIVRO_UUID_TESTE]
+        [livroUuid]
       );
 
       expect(estoqueFinalRes).toBeDefined();

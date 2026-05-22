@@ -29,6 +29,7 @@ describe('ServicoPagamentos (TDD)', () => {
       provedorPagamentoMock as IProvedorPagamento,
       repositorioIntencaoMock as IRepositorioIntencaoPagamento,
       repositorioVendasMock as IRepositorioVendas,
+      undefined,
     );
   });
 
