@@ -38,6 +38,7 @@ scripts
 .gemini
 TASKS.md
 CHANGES.md
+*.old
 
 github-projects
 
