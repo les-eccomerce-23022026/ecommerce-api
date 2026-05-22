@@ -35,7 +35,6 @@ export class ClientesCadastroService {
       senhaHash,
       role: PAPEL_CLIENTE,
       papeis: [PAPEL_CLIENTE],
-      isAdminMestre: false,
     });
 
     await this.processarAdicaoPerfilETelefone(usuario.id, dadosNormalizados);

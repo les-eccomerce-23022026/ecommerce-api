@@ -45,7 +45,6 @@ export class ServicoConsultaClientes {
     tipoPessoa?: string;
     ativo: boolean;
     criadoEm: Date;
-    isAdminMestre?: boolean;
   } | null> {
     const cliente = await this.repositorioUsuarios.buscarPorUuid(uuid);
     
@@ -62,7 +61,6 @@ export class ServicoConsultaClientes {
       tipoPessoa: cliente.tipoPessoa,
       ativo: cliente.ativo,
       criadoEm: cliente.criadoEm || new Date(),
-      isAdminMestre: cliente.isAdminMestre
     };
   }
 

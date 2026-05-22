@@ -48,16 +48,20 @@ export class RepositorioLivrosPostgres {
 
   async listarCategoriasComLivrosNoCatalogo(): Promise<ICategoriaMenuDto[]> {
     const sql = `
-      SELECT DISTINCT c.cat_slug AS slug, c.cat_nome AS nome
+      SELECT 
+        c.cat_slug AS slug, 
+        c.cat_nome AS nome,
+        COUNT(DISTINCT l.liv_id) AS contador_produtos
       FROM categorias c
       INNER JOIN livro_categorias lc ON lc.cat_id = c.cat_id
       INNER JOIN livros l ON l.liv_id = lc.liv_id AND l.liv_ativo = TRUE
       INNER JOIN estoques e ON e.liv_id = l.liv_id AND e.etq_ativo = TRUE AND e.etq_quantidade_disponivel > 0
       WHERE c.cat_ativo = TRUE AND c.cat_slug IS NOT NULL AND btrim(c.cat_slug) <> ''
+      GROUP BY c.cat_slug, c.cat_nome
       ORDER BY c.cat_nome ASC
     `;
-    const rows = await this.db.executar<{ slug: string; nome: string }>(sql, []);
-    return rows.map((r) => ({ slug: r.slug, nome: r.nome }));
+    const rows = await this.db.executar<{ slug: string; nome: string; contador_produtos: string }>(sql, []);
+    return rows.map((r) => ({ slug: r.slug, nome: r.nome, contadorProdutos: Number(r.contador_produtos) }));
   }
 
   async listarCatalogo(opcoes: {

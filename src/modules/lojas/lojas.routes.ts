@@ -1,7 +1,7 @@
 import { IRouter } from 'express';
 import { ControladorLojas } from './controladorLojas';
 import { autenticacaoMiddleware } from '@/shared/middlewares/autenticacao.middleware';
-import { adminOnlyMiddleware, adminMestreOnlyMiddleware } from '@/shared/middlewares/autorizacao.middleware';
+import { adminOnlyMiddleware } from '@/shared/middlewares/autorizacao.middleware';
 
 /**
  * Registra as rotas de lojas.
@@ -12,12 +12,11 @@ export function registrarRotasLojas(app: IRouter): void {
     ControladorLojas.obterLojaPorUuid(requisicao, resposta),
   );
 
-  // Criar loja (apenas admin mestre)
+  // Criar loja (apenas admin)
   app.post(
     '/admin/lojas',
     autenticacaoMiddleware,
     adminOnlyMiddleware,
-    adminMestreOnlyMiddleware,
     (requisicao, resposta) => ControladorLojas.criarLoja(requisicao, resposta),
   );
 
@@ -29,12 +28,11 @@ export function registrarRotasLojas(app: IRouter): void {
     (requisicao, resposta) => ControladorLojas.listarLojas(requisicao, resposta),
   );
 
-  // Associar admin a loja (apenas admin mestre)
+  // Associar admin a loja (apenas admin)
   app.post(
     '/admin/lojas/associar-admin',
     autenticacaoMiddleware,
     adminOnlyMiddleware,
-    adminMestreOnlyMiddleware,
     (requisicao, resposta) => ControladorLojas.associarAdminALoja(requisicao, resposta),
   );
 }

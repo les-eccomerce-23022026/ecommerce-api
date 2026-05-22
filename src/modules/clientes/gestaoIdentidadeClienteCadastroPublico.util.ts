@@ -6,7 +6,7 @@ import type { IRepositorioEnderecoUsuario } from '@/shared/types/IRepositorioEnd
 import type { ICriarClienteDto } from '@/modules/clientes/Iclientes.dto';
 import { verificarForcaSenha } from '@/shared/utils/senha.util';
 import { validarCpf } from '@/shared/utils/validacao-cpf.util';
-import { PAPEL_CLIENTE } from '@/shared/types/papeis';
+import { PAPEL_CLIENTE, PAPEL_ADMIN } from '@/shared/types/papeis';
 import type { GestaoEnderecoCliente } from '@/modules/clientes/gestaoIdentidadeClienteEndereco.service';
 import { mapearTipoTelefone } from '@/modules/clientes/gestaoIdentidadeClienteTexto.util';
 
@@ -103,18 +103,30 @@ export async function realizarCadastroPublicoCliente(
   validarSenhaECpfCadastroPublico(dados);
   await garantirEmailECpfLivresCadastro(deps, dados);
   const senhaHash = await bcrypt.hash(dados.senha, 12);
+  
+  // Determinar papel do usuário baseado em querSerAdmin
+  const role = dados.querSerAdmin ? PAPEL_ADMIN : PAPEL_CLIENTE;
+  const papeis = dados.querSerAdmin ? [PAPEL_ADMIN, PAPEL_CLIENTE] : [PAPEL_CLIENTE];
+  
   const usuario = await deps.repositorioUsuarios.criarUsuario({
     nome: dados.nome,
     email: dados.email,
     cpf: dados.cpf,
     senhaHash,
-    role: PAPEL_CLIENTE,
-    papeis: [PAPEL_CLIENTE],
-    isAdminMestre: false,
+    role,
+    papeis,
   });
+  
   await persistirPerfilOpcional(deps, usuario.id, dados);
   await persistirTelefonePrincipalSeInformado(deps, usuario.id, dados);
   await persistirEnderecosPosCadastro(deps, usuario.id, dados);
+  
+  // TODO: Criar loja se dados fornecidos (implementação futura)
+  if (dados.querSerAdmin && dados.nomeFantasiaLoja) {
+    // Implementar criação de loja aqui
+    // Precisará adicionar dependência de repositório de lojas
+  }
+  
   return {
     uuid: usuario.uuid,
     nome: usuario.nome,
