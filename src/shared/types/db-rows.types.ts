@@ -63,7 +63,6 @@ export interface IRowUsuarioPapel {
   idPapel?: string | number;
   role?: string;
   ativo?: boolean | string;
-  isAdminMestre?: boolean | string;
   genero?: string;
   dataNascimento?: string | Date;
   criadoEm?: string | Date;

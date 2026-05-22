@@ -1,36 +1,36 @@
 import { Router } from 'express';
 import { UsuarioPapeisController } from './usuarioPapeis.controller';
 import { autenticacaoMiddleware } from '@/shared/middlewares/autenticacao.middleware';
-import { adminMestreOnlyMiddleware } from '@/shared/middlewares/autorizacao.middleware';
+import { adminOnlyMiddleware } from '@/shared/middlewares/autorizacao.middleware';
 
 const router = Router();
 
 /**
  * Rotas para gerenciar papéis de usuários.
- * Todas as rotas requerem autenticação e permissão de admin mestre.
+ * Todas as rotas requerem autenticação e permissão de admin.
  */
 
 /**
  * POST /api/usuarios/papeis/associar
  * Associa um papel a um usuário.
- * Requer: autenticação, admin mestre
+ * Requer: autenticação, admin
  */
 router.post(
   '/associar',
   autenticacaoMiddleware,
-  adminMestreOnlyMiddleware,
+  adminOnlyMiddleware,
   UsuarioPapeisController.associarPapel,
 );
 
 /**
  * POST /api/usuarios/papeis/remover
  * Remove um papel de um usuário.
- * Requer: autenticação, admin mestre
+ * Requer: autenticação, admin
  */
 router.post(
   '/remover',
   autenticacaoMiddleware,
-  adminMestreOnlyMiddleware,
+  adminOnlyMiddleware,
   UsuarioPapeisController.removerPapel,
 );
 

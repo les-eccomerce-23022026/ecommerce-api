@@ -41,7 +41,6 @@ CREATE TABLE IF NOT EXISTS livraria_gestao.usuarios (
     loj_id              BIGINT,                 -- Multi-tenancy (migration 030)
     usu_criado_em       TIMESTAMPTZ     NOT NULL    DEFAULT NOW(),
     usu_atualizado_em   TIMESTAMPTZ     NOT NULL    DEFAULT NOW(),
-    usu_is_admin_mestre BOOLEAN         NOT NULL    DEFAULT FALSE,
 
     CONSTRAINT uq_usuarios_uuid          UNIQUE (usu_uuid),
     CONSTRAINT uq_usuarios_email         UNIQUE (usu_email),
@@ -66,7 +65,6 @@ COMMENT ON COLUMN livraria_gestao.usuarios.usu_ativo        IS 'Indica se o usu�
 COMMENT ON COLUMN livraria_gestao.usuarios.loj_id           IS 'FK para lojas (multi-tenancy). Migration 030.';
 COMMENT ON COLUMN livraria_gestao.usuarios.usu_criado_em    IS 'Timestamp de criação do registro.';
 COMMENT ON COLUMN livraria_gestao.usuarios.usu_atualizado_em IS 'Timestamp da última atualização (mantido via trigger).';
-COMMENT ON COLUMN livraria_gestao.usuarios.usu_is_admin_mestre IS 'Indica se é admin mestre (pode acessar todas as lojas).';
 
 
 -- -----------------------------------------------------------------------------

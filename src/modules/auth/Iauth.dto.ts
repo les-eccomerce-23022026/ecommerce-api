@@ -17,7 +17,6 @@ export interface IUsuarioAutenticadoDto {
   email: string;
   role: string; // Papel principal (compatibilidade)
   papeis: string[]; // Array de papéis do usuário (cliente, admin, etc.)
-  isAdminMestre?: boolean;
 }
 
 /**

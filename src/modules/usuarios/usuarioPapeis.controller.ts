@@ -14,7 +14,7 @@ export class UsuarioPapeisController {
 
   /**
    * Associa um papel a um usuário.
-   * Requer autenticação e permissão de admin mestre.
+   * Requer autenticação e permissão de administrador.
    */
   public static async associarPapel(
     requisicao: Request,
@@ -25,12 +25,12 @@ export class UsuarioPapeisController {
       const repositorio = requisicao.app.locals.repositorioUsuarios as IRepositorioUsuarios;
       const { usuario } = requisicao;
 
-      // Validar que o usuário autenticado é admin mestre
-      if (!usuario || !usuario.isAdminMestre) {
+      // Validar que o usuário autenticado é administrador
+      if (!usuario || !usuario.papeis?.includes('admin')) {
         return RespostaPadrao.enviarErro(
           resposta,
           403,
-          'Acesso negado. Apenas administradores mestres podem gerenciar papéis de usuários.',
+          'Acesso negado. Apenas administradores podem gerenciar papéis de usuários.',
         );
       }
 
@@ -81,7 +81,7 @@ export class UsuarioPapeisController {
 
   /**
    * Remove um papel de um usuário.
-   * Requer autenticação e permissão de admin mestre.
+   * Requer autenticação e permissão de administrador.
    */
   public static async removerPapel(
     requisicao: Request,
@@ -92,12 +92,12 @@ export class UsuarioPapeisController {
       const repositorio = requisicao.app.locals.repositorioUsuarios as IRepositorioUsuarios;
       const { usuario } = requisicao;
 
-      // Validar que o usuário autenticado é admin mestre
-      if (!usuario || !usuario.isAdminMestre) {
+      // Validar que o usuário autenticado é administrador
+      if (!usuario || !usuario.papeis?.includes('admin')) {
         return RespostaPadrao.enviarErro(
           resposta,
           403,
-          'Acesso negado. Apenas administradores mestres podem gerenciar papéis de usuários.',
+          'Acesso negado. Apenas administradores podem gerenciar papéis de usuários.',
         );
       }
 

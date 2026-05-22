@@ -38,7 +38,7 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
     const cpfNormalizado = cpf ? limparDocumento(cpf) : null;
     const cnpjNormalizado = cnpj ? limparDocumento(cnpj) : null;
 
-    const values = [nome, email, cpfNormalizado, cnpjNormalizado, tipoPessoa || 'PF', senhaHash, idPapel, dados.isAdminMestre ?? false, lojId];
+    const values = [nome, email, cpfNormalizado, cnpjNormalizado, tipoPessoa || 'PF', senhaHash, idPapel, lojId];
     const rows = await this.db.executar(USUARIO_QUERIES.INSERT, values);
     
     const usuarioCriadoRow = rows[0] as LinhaResultadoUsuario;
@@ -72,7 +72,12 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
     const rows = await this.db.executar(query, [email, idPapel]);
 
     if (rows.length === 0) return undefined;
-    return UsuarioMapper.mapearParaEntidade(rows[0] as LinhaResultadoUsuario);
+    
+    const usuarioRow = rows[0] as LinhaResultadoUsuario;
+    const usuarioId = Number(usuarioRow.id) as number;
+    const papeisRows = await this.db.executar(USUARIO_QUERIES.SELECT_PAPEIS_USUARIO, [usuarioId]);
+    
+    return UsuarioMapper.mapearParaEntidade(usuarioRow, papeisRows as LinhaResultadoUsuario[]);
   }
 
   public async buscarTodosPorEmail(email: string): Promise<IUsuario[]> {
@@ -104,7 +109,12 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
     const rows = await this.db.executar(query, [cpfNormalizado]);
 
     if (rows.length === 0) return undefined;
-    return UsuarioMapper.mapearParaEntidade(rows[0] as LinhaResultadoUsuario);
+    
+    const usuarioRow = rows[0] as LinhaResultadoUsuario;
+    const usuarioId = Number(usuarioRow.id) as number;
+    const papeisRows = await this.db.executar(USUARIO_QUERIES.SELECT_PAPEIS_USUARIO, [usuarioId]);
+    
+    return UsuarioMapper.mapearParaEntidade(usuarioRow, papeisRows as LinhaResultadoUsuario[]);
   }
 
   public async buscarPorCpfPapel(cpf: string, idPapel: number): Promise<IUsuario | undefined> {
@@ -113,7 +123,12 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
     const rows = await this.db.executar(query, [cpfNormalizado, idPapel]);
 
     if (rows.length === 0) return undefined;
-    return UsuarioMapper.mapearParaEntidade(rows[0] as LinhaResultadoUsuario);
+    
+    const usuarioRow = rows[0] as LinhaResultadoUsuario;
+    const usuarioId = Number(usuarioRow.id) as number;
+    const papeisRows = await this.db.executar(USUARIO_QUERIES.SELECT_PAPEIS_USUARIO, [usuarioId]);
+    
+    return UsuarioMapper.mapearParaEntidade(usuarioRow, papeisRows as LinhaResultadoUsuario[]);
   }
 
   public async buscarPorUuid(uuid: string): Promise<IUsuario | undefined> {
@@ -233,7 +248,23 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
     valores.push(limite, offset);
 
     const rows = await this.db.executar(query, valores);
-    return rows.map(row => UsuarioMapper.mapearParaEntidade(row as LinhaResultadoUsuario));
+    
+    // Buscar papéis para cada usuário
+    const usuariosComPapeis = await Promise.all(
+      rows.map(async (row) => {
+        const usuarioRow = row as LinhaResultadoUsuario;
+        const usuarioId = Number(usuarioRow.id) as number;
+        
+        const papeisRows = await this.db.executar(
+          USUARIO_QUERIES.SELECT_PAPEIS_USUARIO, 
+          [usuarioId]
+        );
+        
+        return UsuarioMapper.mapearParaEntidade(usuarioRow, papeisRows as LinhaResultadoUsuario[]);
+      })
+    );
+    
+    return usuariosComPapeis;
   }
 
   public async contarClientesComFiltros(filtros: Omit<IFiltrosConsultaClientes, 'offset' | 'limite'>): Promise<number> {

@@ -39,7 +39,6 @@ export async function autenticacaoMiddleware(
       sub: string;
       email: string;
       role: string;
-      isAdminMestre?: boolean;
       loj_ids?: number[];
       loj_id_principal?: number;
       ip?: string;
@@ -79,23 +78,25 @@ export async function autenticacaoMiddleware(
       return;
     }
 
-    // Determinar loj_id atual: do header x-loja-id ou usar loja principal
+    // Determinar loj_id atual: do header x-loja-id, cookie x-loja-id, ou usar loja principal
     const loj_id_header = req.headers['x-loja-id'] as string | undefined;
+    const loj_id_cookie = req.cookies?.['x-loja-id'] as string | undefined;
+    const loj_id_contexto = loj_id_header || loj_id_cookie;
     let loj_id_atual: number;
     
-    if (loj_id_header) {
-      const loj_id_header_num = parseInt(loj_id_header);
-      if (isNaN(loj_id_header_num)) {
-        Logger.warn(`[auth] loj_id inválido no header: ${loj_id_header}`);
+    if (loj_id_contexto) {
+      const loj_id_num = parseInt(loj_id_contexto);
+      if (isNaN(loj_id_num)) {
+        Logger.warn(`[auth] loj_id inválido: ${loj_id_contexto}`);
         res.status(400).json({
-          mensagem: 'loj_id inválido no header.',
+          mensagem: 'loj_id inválido.',
           sucesso: false,
         });
         return;
       }
-      loj_id_atual = loj_id_header_num;
+      loj_id_atual = loj_id_num;
       
-      // Validar se loj_id do header está no array de loj_ids acessíveis
+      // Validar se loj_id está no array de loj_ids acessíveis
       // JWT converte numbers para strings no payload, então convertemos de volta
       const loj_ids_numbers = decodificado.loj_ids?.map(id => typeof id === 'string' ? parseInt(id) : id);
       if (loj_ids_numbers && !loj_ids_numbers.includes(loj_id_atual)) {
@@ -126,7 +127,6 @@ export async function autenticacaoMiddleware(
         email: decodificado.email,
         role: decodificado.role,
         papeis: (usuario.papeis ?? []).map((p) => p.descricao).filter(Boolean),
-        isAdminMestre: decodificado.isAdminMestre,
         loj_ids: decodificado.loj_ids || [loj_id_atual],
         loj_id_principal: decodificado.loj_id_principal || loj_id_atual,
         loj_id_atual: loj_id_atual,

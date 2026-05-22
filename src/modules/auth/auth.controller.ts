@@ -120,7 +120,6 @@ export class ControladorAutenticacao {
           email: usuarioBD.email,
           role: usuarioBD.role.descricao,
           papeis: usuarioBD.papeis.map((p) => p.descricao),
-          isAdminMestre: !!usuarioBD.isAdminMestre,
         }
       });
     } catch (erro) {

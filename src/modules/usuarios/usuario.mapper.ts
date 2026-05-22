@@ -23,16 +23,15 @@ export class UsuarioMapper {
       senhaHash: row.senhaHash as string,
       idPapel: Number(row.idPapel),
       role: {
-        id: Number(papelPrincipal.id) || Number(row.idPapel),
+        id: Number(papelPrincipal.id ?? row.idPapel),
         descricao: (papelPrincipal.descricao as string) || (Number(row.idPapel) === PAPEL_ADMIN.id ? PAPEL_ADMIN.descricao : PAPEL_CLIENTE.descricao),
       },
       papeis: papeisArray.map((p) => ({
         id: Number(p.id),
         descricao: p.descricao as string,
       })),
-      telefoneRapido: row.telefoneRapido as string,
+      telefoneRapido: row.telefoneRapido as string | undefined,
       ativo: row.ativo as boolean,
-      isAdminMestre: row.isAdminMestre as boolean,
       genero: row.genero as string,
       dataNascimento: row.dataNascimento ? new Date(row.dataNascimento as string) : undefined,
       criadoEm: row.criadoEm ? new Date(row.criadoEm as string) : undefined,

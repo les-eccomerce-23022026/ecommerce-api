@@ -18,8 +18,7 @@ import { ServicoEstoque } from '@/modules/estoque/servicoEstoque';
 import { ControladorEstoque } from '@/modules/estoque/controladorEstoque';
 import { autenticacaoMiddleware } from '@/shared/middlewares/autenticacao.middleware';
 import { 
-  adminOnlyMiddleware, 
-  adminMestreOnlyMiddleware 
+  adminOnlyMiddleware
 } from '@/shared/middlewares/autorizacao.middleware';
 
 /**
@@ -78,7 +77,6 @@ export function registrarRotasAdmin(app: IRouter): void {
     '/admin/administradores',
     autenticacaoMiddleware,
     adminOnlyMiddleware,
-    adminMestreOnlyMiddleware,
     (requisicao, resposta) => ControladorAdmin.listarAdmins(requisicao, resposta),
   );
 
@@ -87,7 +85,6 @@ export function registrarRotasAdmin(app: IRouter): void {
     '/admin/registro',
     autenticacaoMiddleware,
     adminOnlyMiddleware,
-    adminMestreOnlyMiddleware,
     (requisicao, resposta) => ControladorAdmin.registrarAdmin(requisicao, resposta),
   );
 
@@ -96,7 +93,6 @@ export function registrarRotasAdmin(app: IRouter): void {
     '/admin/administradores/:uuid/inativar',
     autenticacaoMiddleware,
     adminOnlyMiddleware,
-    adminMestreOnlyMiddleware,
     (requisicao, resposta) => ControladorAdmin.inativarAdmin(requisicao, resposta),
   );
 
@@ -105,7 +101,6 @@ export function registrarRotasAdmin(app: IRouter): void {
     '/admin/administradores/:uuid/ativar',
     autenticacaoMiddleware,
     adminOnlyMiddleware,
-    adminMestreOnlyMiddleware,
     (requisicao, resposta) => ControladorAdmin.ativarAdmin(requisicao, resposta),
   );
 

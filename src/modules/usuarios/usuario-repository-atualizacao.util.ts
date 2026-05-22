@@ -24,7 +24,6 @@ const CAMPOS_USUARIO_ATUALIZAVEIS: EntradaCampo[] = [
     valor: (d) => (d.idPapel ?? d.role?.id) as number,
   },
   { ativo: (d) => d.ativo !== undefined, coluna: 'usu_ativo', valor: (d) => d.ativo! },
-  { ativo: (d) => d.isAdminMestre !== undefined, coluna: 'usu_is_admin_mestre', valor: (d) => d.isAdminMestre! },
   { ativo: (d) => Boolean(d.genero), coluna: 'usu_genero', valor: (d) => d.genero! },
   { ativo: (d) => Boolean(d.dataNascimento), coluna: 'usu_data_nascimento', valor: (d) => d.dataNascimento! },
 ];

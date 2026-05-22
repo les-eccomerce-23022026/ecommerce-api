@@ -61,27 +61,6 @@ export function adminOnlyMiddleware(
 }
 
 /**
- * Middleware para garantir que o usuário autenticado seja o Administrador Mestre.
- */
-export function adminMestreOnlyMiddleware(
-  req: Request,
-  res: Response,
-  next: NextFunction,
-): void {
-  const { usuario } = req;
-
-  if (!usuario || !usuario.isAdminMestre) {
-    res.status(403).json({
-      mensagem: 'Acesso negado. Esta rota é restrita ao Administrador Mestre.',
-      sucesso: false,
-    });
-    return;
-  }
-
-  next();
-}
-
-/**
  * Middleware para garantir que o usuário autenticado seja um Cliente.
  */
 export function clienteOnlyMiddleware(

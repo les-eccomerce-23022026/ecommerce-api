@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import { di } from '@/shared/infrastructure/di.container';
 import { RespostaPadrao } from '@/shared/errors/Iresposta-padrao';
-import { PAPEL_ADMIN } from '@/shared/types/papeis';
+import { PAPEL_ADMIN, PAPEL_CLIENTE } from '@/shared/types/papeis';
 import { validarDocumento, limparDocumento } from '@/shared/validators/validadorDocumento';
 import { Logger } from '@/shared/utils/Logger.util';
 
@@ -103,11 +103,11 @@ export class ControladorAdmin {
       }
 
       const usuarioLogado = requisicao.usuario;
-      if (usuarioLogado && uuid !== usuarioLogado.uuid && !usuarioLogado.isAdminMestre) {
+      if (usuarioLogado && uuid !== usuarioLogado.uuid && !usuarioLogado.papeis?.includes('admin')) {
         return RespostaPadrao.enviarErro(
           resposta,
           403,
-          'Acesso negado. Apenas o próprio administrador ou o Administrador Mestre podem alterar este cadastro.',
+          'Acesso negado. Apenas o próprio administrador pode alterar este cadastro.',
         );
       }
 
@@ -299,19 +299,17 @@ export class ControladorAdmin {
           senhaHash: hash,
           idPapel: PAPEL_ADMIN.id,
           ativo: true,
-          isAdminMestre: true,
         });
         return RespostaPadrao.enviarSucesso(resposta, 200, { mensagem: 'Administrador de teste resetado e atualizado com sucesso.' });
       }
 
       await di.repoUsuarios.criarUsuario({
-        nome: 'Administrador Mestre (Testes)',
+        nome: 'Administrador (Testes)',
         email,
         cpf: '000.000.000-00',
         senhaHash: hash,
         role: PAPEL_ADMIN,
-        papeis: [PAPEL_ADMIN],
-        isAdminMestre: true,
+        papeis: [PAPEL_CLIENTE, PAPEL_ADMIN],
       });
 
       return RespostaPadrao.enviarSucesso(resposta, 201, { mensagem: 'Administrador de teste criado com sucesso.' });

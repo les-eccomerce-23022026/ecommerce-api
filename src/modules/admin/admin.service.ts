@@ -248,8 +248,7 @@ export class ServicoAdmin {
       tipoPessoa: dados.tipoPessoa || 'PF',
       senhaHash,
       role: PAPEL_ADMIN,
-      papeis: [PAPEL_ADMIN],
-      isAdminMestre: false,
+      papeis: [PAPEL_CLIENTE, PAPEL_ADMIN],
     });
 
     return {

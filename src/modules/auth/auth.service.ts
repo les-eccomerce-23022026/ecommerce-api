@@ -147,7 +147,6 @@ export class ServicoAutenticacao {
       email: usuarioAutenticado.email,
       role: papelLogin,
       papeis: usuarioAutenticado.papeis.map((p) => p.descricao),
-      isAdminMestre: !!usuarioAutenticado.isAdminMestre,
     };
 
     const segredo = process.env.JWT_SEGREDO;
@@ -183,7 +182,6 @@ export class ServicoAutenticacao {
         email: usuarioAutenticado.email,
         role: papelLogin,
         papeis: usuarioAutenticado.papeis.map((p) => p.descricao),
-        isAdminMestre: !!usuarioAutenticado.isAdminMestre,
         loj_ids: loj_ids,
         loj_id_principal: loj_id_principal,
         // IP e fingerprint para proteção contra replay attack
@@ -284,7 +282,6 @@ export class ServicoAutenticacao {
         email: usuario.email,
         role: papelLogin,
         papeis: usuario.papeis.map((p: { descricao: string }) => p.descricao),
-        isAdminMestre: !!usuario.isAdminMestre,
         loj_ids: loj_ids,
         loj_id_principal: loj_id_principal,
         ip: ipAddress,
@@ -302,7 +299,6 @@ export class ServicoAutenticacao {
       email: usuario.email,
       role: papelLogin,
       papeis: usuario.papeis.map((p: { descricao: string }) => p.descricao),
-      isAdminMestre: !!usuario.isAdminMestre,
     };
 
     return {

@@ -18,7 +18,6 @@ export interface IUsuario {
   papeis: IPapelUsuario[]; // Array de papéis do usuário (cliente, admin, etc.)
   telefoneRapido?: string;
   ativo: boolean;
-  isAdminMestre: boolean;
   genero?: string;
   dataNascimento?: Date;
   criadoEm?: Date;

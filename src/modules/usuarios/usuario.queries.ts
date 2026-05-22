@@ -4,7 +4,7 @@ export const USUARIO_QUERIES = {
            u.usu_email AS "email", u.usu_cpf AS "cpf", u.usu_cnpj AS "cnpj", u.usu_tipo_pessoa AS "tipoPessoa",
            u.usu_senha_hash AS "senhaHash", 
            u.pap_id AS "idPapel", u.usu_telefone_rapido AS "telefoneRapido", 
-           u.usu_ativo AS "ativo", u.usu_is_admin_mestre AS "isAdminMestre",
+           u.usu_ativo AS "ativo",
            u.usu_genero AS "genero", u.usu_data_nascimento AS "dataNascimento",
            u.usu_criado_em AS "criadoEm", u.usu_atualizado_em AS "atualizadoEm"
     FROM livraria_gestao.usuarios u
@@ -30,21 +30,21 @@ export const USUARIO_QUERIES = {
     WHERE usu_id = $1 AND pap_id = $2
   `,
   INSERT: `
-    INSERT INTO livraria_gestao.usuarios (usu_nome, usu_email, usu_cpf, usu_cnpj, usu_tipo_pessoa, usu_senha_hash, pap_id, usu_is_admin_mestre, loj_id)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+    INSERT INTO livraria_gestao.usuarios (usu_nome, usu_email, usu_cpf, usu_cnpj, usu_tipo_pessoa, usu_senha_hash, pap_id, loj_id)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
     RETURNING usu_id AS "id", usu_uuid AS "uuid", usu_nome AS "nome", 
               usu_email AS "email", usu_cpf AS "cpf", usu_cnpj AS "cnpj", usu_tipo_pessoa AS "tipoPessoa",
               usu_senha_hash AS "senhaHash", 
               pap_id AS "idPapel", usu_telefone_rapido AS "telefoneRapido", 
-              usu_ativo AS "ativo", usu_is_admin_mestre AS "isAdminMestre",
+              usu_ativo AS "ativo",
               usu_criado_em AS "criadoEm", usu_atualizado_em AS "atualizadoEm"
- `,
+  `,
   SELECT_USUARIOS_POR_PAPEL: `
     SELECT u.usu_id AS "id", u.usu_uuid AS "uuid", u.usu_nome AS "nome", 
            u.usu_email AS "email", u.usu_cpf AS "cpf", u.usu_cnpj AS "cnpj", u.usu_tipo_pessoa AS "tipoPessoa",
            u.usu_senha_hash AS "senhaHash", 
            u.pap_id AS "idPapel", u.usu_telefone_rapido AS "telefoneRapido", 
-           u.usu_ativo AS "ativo", u.usu_is_admin_mestre AS "isAdminMestre",
+           u.usu_ativo AS "ativo",
            u.usu_genero AS "genero", u.usu_data_nascimento AS "dataNascimento",
            u.usu_criado_em AS "criadoEm", u.usu_atualizado_em AS "atualizadoEm",
            p.pap_descricao AS "papelDescricao"
