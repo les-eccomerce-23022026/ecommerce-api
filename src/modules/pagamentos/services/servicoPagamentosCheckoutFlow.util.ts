@@ -19,6 +19,7 @@ export type DepsCheckoutPagamentos = {
   repositorioIntencao: IRepositorioIntencaoPagamento;
   repositorioVendas: IRepositorioVendas;
   provedorPagamento: IProvedorPagamento;
+  db?: any;
 };
 
 function validarVinculoVendaCheckout(registro: IntencaoPagamentoPersistida, vendaUuid?: string): void {
@@ -62,7 +63,7 @@ async function persistirSeCheckoutAprovado(
   if (cuponsAplicados && cuponsAplicados.length > 0) {
     await processarSaldosCuponsTroca(deps.repositorioPagamentos, cuponsAplicados);
   }
-  await sincronizarStatusVendaAposPagamentos(deps.repositorioPagamentos, deps.repositorioVendas, v);
+  await sincronizarStatusVendaAposPagamentos(deps.repositorioPagamentos, deps.repositorioVendas, v, deps.db);
   return pagamentosUuids;
 }
 

@@ -14,6 +14,7 @@ import { IPagamentoInputDto, IResultadoDefinirMetodoLiquidacao } from '../entiti
 import type { IProvedorPagamento } from '../provedoresPagamento/IProvedorPagamento';
 import type { ResultadoIntencaoPagamento } from '../provedoresPagamento/DadosConfirmacaoProvedor';
 import type { IRepositorioIntencaoPagamento } from '../intencaoPagamento/IRepositorioIntencaoPagamento';
+import type { IConexaoBanco } from '@/shared/infrastructure/database/IConexaoBanco';
 
 /**
  * Serviço responsável pela lógica de negócios dos pagamentos (Livraria e-commerce).
@@ -24,6 +25,7 @@ export class ServicoPagamentos {
     private readonly provedorPagamento: IProvedorPagamento,
     private readonly repositorioIntencao: IRepositorioIntencaoPagamento,
     private readonly repositorioVendas: IRepositorioVendas,
+    private readonly db?: IConexaoBanco,
   ) {}
 
   public async registrarIntencaoPagamento(valorTotal: number): Promise<ResultadoIntencaoPagamento> {
@@ -84,6 +86,7 @@ export class ServicoPagamentos {
       repositorioIntencao: this.repositorioIntencao,
       repositorioVendas: this.repositorioVendas,
       provedorPagamento: this.provedorPagamento,
+      db: this.db,
     };
     return confirmarAutorizacaoFinanceiraCheckoutServico(deps, corpo);
   }

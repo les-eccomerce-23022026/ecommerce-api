@@ -5,6 +5,7 @@ import { FormaPagamento, TipoPagamento } from '../entities/FormaPagamento';
 import { CartaoCredito } from '../entities/CartaoCredito';
 import { StatusPagamento } from '../entities/IPagamento';
 import { ContextoRequisicao } from '@/shared/infrastructure/contexto/ContextoRequisicao';
+import { Logger } from '@/shared/utils/Logger.util';
 
 /**
  * Implementação do repositório de pagamentos para PostgreSQL.
@@ -329,16 +330,16 @@ export class RepositorioPagamentosPostgres implements IRepositorioPagamentos {
     valorAtual: number;
     ativo: boolean;
   }>> {
+    // Busca cupons de troca da tabela específica cupons_troca, vinculados ao cliente
+    Logger.info('[listarCuponsTrocaPorUsuario] Buscando cupons de troca', { usuarioId });
     const query = `
-      SELECT c.cup_uuid AS uuid,
-             c.cup_codigo AS codigo,
-             c.cup_valor_desconto AS "valorAtual",
-             c.cup_ativo AS ativo
-      FROM livraria_comercial.cupom c
-      JOIN livraria_gestao.clientes cl ON cl.cli_id = (
-        SELECT cli_id FROM livraria_gestao.clientes WHERE usu_id = $1 LIMIT 1
-      )
-      WHERE c.cup_tipo = 'troca' AND c.cup_ativo = true
+      SELECT ct.cpt_uuid AS uuid,
+             ct.cpt_codigo AS codigo,
+             ct.cpt_valor AS "valorAtual",
+             (ct.cpt_status = 'DISPONIVEL') AS ativo
+      FROM livraria_comercial.cupons_troca ct
+      JOIN livraria_gestao.clientes c ON c.cli_id = ct.cpt_cliente_id
+      WHERE c.usu_id = $1
     `;
     const rows = await this.db.executar<{
       uuid: string;
@@ -346,6 +347,7 @@ export class RepositorioPagamentosPostgres implements IRepositorioPagamentos {
       valorAtual: number;
       ativo: boolean;
     }>(query, [usuarioId]);
+    Logger.info('[listarCuponsTrocaPorUsuario] Cupons encontrados', { quantidade: rows.length });
     return rows.map((r) => ({
       uuid: r.uuid,
       codigo: r.codigo,

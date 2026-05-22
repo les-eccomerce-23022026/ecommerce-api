@@ -3,6 +3,8 @@ import type { IRepositorioPagamentos, IPagamento } from '@/modules/pagamentos/re
 import { TipoPagamento } from '@/modules/pagamentos/entities/FormaPagamento';
 import { StatusPagamento } from '@/modules/pagamentos/entities/IPagamento';
 import type { IProvedorPagamento } from '@/modules/pagamentos/provedoresPagamento/IProvedorPagamento';
+import { RepositorioEstoque } from '@/modules/estoque/repositorioEstoque';
+import type { IConexaoBanco } from '@/shared/infrastructure/database/IConexaoBanco';
 
 const MAPA_SATISFACAO_PAGAMENTO: Record<TipoPagamento, (p: IPagamento) => boolean> = {
   [TipoPagamento.CUPOM_PROMOCIONAL]: (p) =>
@@ -22,6 +24,7 @@ export async function sincronizarStatusVendaAposPagamentos(
   repositorioPagamentos: IRepositorioPagamentos,
   repositorioVendas: IRepositorioVendas,
   vendaUuid: string,
+  db?: IConexaoBanco,
 ): Promise<void> {
   const pagamentos = await repositorioPagamentos.listarPorVenda(vendaUuid);
   if (pagamentos.length === 0) return;
@@ -34,7 +37,17 @@ export async function sincronizarStatusVendaAposPagamentos(
     return;
   }
   if (pagamentos.every((p) => pagamentoSatisfeitoParaVenda(p))) {
+    const vendaAnterior = await repositorioVendas.obterPorUuid(vendaUuid);
+    const statusAnterior = vendaAnterior?.status;
     await repositorioVendas.atualizarStatus(vendaUuid, 'APROVADA');
+    
+    // Baixar estoque apenas se o status mudou para APROVADA e db foi fornecido
+    if (db && statusAnterior !== 'APROVADA' && vendaAnterior?.itens) {
+      const repositorioEstoque = new RepositorioEstoque(db);
+      for (const item of vendaAnterior.itens) {
+        await repositorioEstoque.baixarEstoque(item.livroUuid, item.quantidade);
+      }
+    }
   }
 }
 

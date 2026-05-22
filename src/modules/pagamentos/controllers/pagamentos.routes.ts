@@ -21,7 +21,7 @@ export function registrarRotasPagamentos(router: Router): void {
   const repositorioIntencao = new RepositorioIntencaoPagamentoPostgres(db);
   const repositorioVendas = new RepositorioVendasPostgres(db);
   const provedorPagamento = FabricaProvedorPagamento.criar(repositorioIntencao);
-  const servico = new ServicoPagamentos(repo, provedorPagamento, repositorioIntencao, repositorioVendas);
+  const servico = new ServicoPagamentos(repo, provedorPagamento, repositorioIntencao, repositorioVendas, db);
   const repoCotacaoFrete = new RepositorioCotacaoFretePostgres(db);
   const provedorFrete = FabricaProvedorFrete.criar();
   const servicoFrete = new ServicoFrete(provedorFrete, repoCotacaoFrete);
