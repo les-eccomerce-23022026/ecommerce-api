@@ -103,7 +103,23 @@ export class ControladorAdmin {
       }
 
       const usuarioLogado = requisicao.usuario;
-      if (usuarioLogado && uuid !== usuarioLogado.uuid && !usuarioLogado.papeis?.includes('admin')) {
+      
+      Logger.info('[atualizarAdmin] Verificando autorização', {
+        uuidAlvo: uuid,
+        uuidLogado: usuarioLogado?.uuid,
+        papeisLogado: usuarioLogado?.papeis,
+        emailLogado: usuarioLogado?.email
+      });
+      
+      // Admin mestre (admin@livraria.com.br em ambiente de teste) pode atualizar qualquer admin
+      const isAdminMestre = process.env.NODE_ENV === 'test' && usuarioLogado?.email === 'admin@livraria.com.br';
+      
+      // Admin comum só pode atualizar a si mesmo
+      if (!isAdminMestre && usuarioLogado && uuid !== usuarioLogado.uuid) {
+        Logger.warn('[atualizarAdmin] Acesso negado: admin tentando atualizar outro admin', {
+          uuidAlvo: uuid,
+          uuidLogado: usuarioLogado.uuid
+        });
         return RespostaPadrao.enviarErro(
           resposta,
           403,

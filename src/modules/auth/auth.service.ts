@@ -9,14 +9,14 @@ import type { ICriarRefreshTokenDto } from '@/modules/auth/IRepositorioRefreshTo
 import { PAPEL_ADMIN, PAPEL_CLIENTE } from '@/shared/types/papeis';
 import { Logger } from '@/shared/utils/Logger.util';
 
-/** Define o papel exposto no login conforme vínculos ativos (RN: cliente tem prioridade quando ambos existem). */
+/** Define o papel exposto no login conforme vínculos ativos (admin tem prioridade quando ambos existem). */
 function resolverPapelLogin(usuario: IUsuario): string {
   const descricoes = usuario.papeis.map((p) => p.descricao);
-  if (descricoes.includes(PAPEL_CLIENTE.descricao)) {
-    return PAPEL_CLIENTE.descricao;
-  }
   if (descricoes.includes(PAPEL_ADMIN.descricao)) {
     return PAPEL_ADMIN.descricao;
+  }
+  if (descricoes.includes(PAPEL_CLIENTE.descricao)) {
+    return PAPEL_CLIENTE.descricao;
   }
   return usuario.role.descricao;
 }
@@ -98,15 +98,25 @@ export class ServicoAutenticacao {
     );
 
     const validas = validacoes.filter((v) => v.senhaValida);
+    
+    Logger.info('[autenticar] Usuários válidos encontrados', { 
+      quantidade: validas.length,
+      emails: validas.map(v => v.usuario.email)
+    });
+    
+    // Prioridade: admin (com ou sem cliente) > cliente > qualquer outro
+    const matchAdmin = validas.find((v) =>
+      v.usuario.papeis.some((p) => p.descricao === PAPEL_ADMIN.descricao),
+    );
     const matchCliente = validas.find((v) =>
       v.usuario.papeis.some((p) => p.descricao === PAPEL_CLIENTE.descricao),
     );
-    const matchAdminSomente = validas.find(
-      (v) =>
-        v.usuario.papeis.some((p) => p.descricao === PAPEL_ADMIN.descricao) &&
-        !v.usuario.papeis.some((p) => p.descricao === PAPEL_CLIENTE.descricao),
-    );
-    const match = matchCliente ?? matchAdminSomente ?? validas[0];
+    const match = matchAdmin ?? matchCliente ?? validas[0];
+    
+    Logger.info('[autenticar] Usuário selecionado', {
+      email: match?.usuario.email,
+      papeis: match?.usuario.papeis.map(p => p.descricao)
+    });
 
     if (!match) {
       Logger.debug(`[auth.service] Senha inválida para o usuário: ${dadosLogin.email}`);

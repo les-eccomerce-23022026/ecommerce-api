@@ -48,8 +48,17 @@ export class ServicoAdmin {
    * @param uuid UUID do administrador a ser inativado.
    */
   public async inativarAdministrador(uuid: string): Promise<void> {
+    Logger.info('[inativarAdministrador] Iniciando inativação', { uuid });
     const admin = await this.repositorioUsuarios.buscarPorUuid(uuid);
-    if (!admin || admin.role.id !== PAPEL_ADMIN.id) {
+    
+    if (!admin) {
+      Logger.warn('[inativarAdministrador] Administrador não encontrado', { uuid });
+      throw new Error('Administrador não encontrado.');
+    }
+    
+    const temPapelAdmin = admin.papeis.some(p => p.id === PAPEL_ADMIN.id);
+    if (!temPapelAdmin) {
+      Logger.warn('[inativarAdministrador] Usuário não tem papel admin', { uuid, papeis: admin.papeis.map(p => p.descricao) });
       throw new Error('Administrador não encontrado.');
     }
 
@@ -66,8 +75,17 @@ export class ServicoAdmin {
    * @param uuid UUID do administrador a ser ativado.
    */
   public async ativarAdministrador(uuid: string): Promise<void> {
+    Logger.info('[ativarAdministrador] Iniciando ativação', { uuid });
     const admin = await this.repositorioUsuarios.buscarPorUuid(uuid);
-    if (!admin || admin.role.id !== PAPEL_ADMIN.id) {
+    
+    if (!admin) {
+      Logger.warn('[ativarAdministrador] Administrador não encontrado', { uuid });
+      throw new Error('Administrador não encontrado.');
+    }
+    
+    const temPapelAdmin = admin.papeis.some(p => p.id === PAPEL_ADMIN.id);
+    if (!temPapelAdmin) {
+      Logger.warn('[ativarAdministrador] Usuário não tem papel admin', { uuid, papeis: admin.papeis.map(p => p.descricao) });
       throw new Error('Administrador não encontrado.');
     }
 
@@ -86,8 +104,17 @@ export class ServicoAdmin {
    * @param dados Dados parciais para atualização.
    */
   public async atualizarAdministrador(uuid: string, dados: { nome?: string; email?: string; cpf?: string }): Promise<IListaAdminDto> {
+    Logger.info('[atualizarAdministrador] Iniciando atualização', { uuid, dados });
     const admin = await this.repositorioUsuarios.buscarPorUuid(uuid);
-    if (!admin || admin.role.id !== PAPEL_ADMIN.id) {
+    
+    if (!admin) {
+      Logger.warn('[atualizarAdministrador] Administrador não encontrado', { uuid });
+      throw new Error('Administrador não encontrado.');
+    }
+    
+    const temPapelAdmin = admin.papeis.some(p => p.id === PAPEL_ADMIN.id);
+    if (!temPapelAdmin) {
+      Logger.warn('[atualizarAdministrador] Usuário não tem papel admin', { uuid, papeis: admin.papeis.map(p => p.descricao) });
       throw new Error('Administrador não encontrado.');
     }
 
@@ -218,6 +245,11 @@ export class ServicoAdmin {
         });
       }
       
+      // Atualizar o role principal para admin
+      await this.repositorioUsuarios.atualizarUsuario(existenteClientePorEmail.uuid, {
+        idPapel: PAPEL_ADMIN.id,
+      });
+      
       // Associar papel admin ao usuário existente (sistema de múltiplos papéis)
       await this.repositorioUsuarios.associarPapelUsuario(existenteClientePorEmail.id, PAPEL_ADMIN.id);
       
@@ -227,7 +259,8 @@ export class ServicoAdmin {
       Logger.info('[registrarNovoAdministrador] Papel admin associado ao cliente com sucesso', { 
         uuid: usuario.uuid, 
         email: usuario.email,
-        papeis: usuario.papeis.map(p => p.descricao)
+        papeis: usuario.papeis.map(p => p.descricao),
+        rolePrincipal: usuario.role.descricao
       });
       
       return {

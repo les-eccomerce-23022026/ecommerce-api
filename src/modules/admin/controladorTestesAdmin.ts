@@ -60,15 +60,14 @@ export class ControladorTestesAdmin {
           SET cup_valor_desconto = EXCLUDED.cup_valor_desconto, cup_ativo = true
         `, [codigo, valor, valorMinimo]);
       } else {
-        // Para cupons de troca, insere na tabela unificada usando o clienteId
+        // Para cupons de troca, insere na tabela específica cupons_troca
+        Logger.info('[criarCupomTroca] Criando cupom de troca na tabela cupons_troca', { codigo, valor, clienteId });
         await db.executar(`
-          INSERT INTO livraria_comercial.cupom (cup_codigo, cup_tipo, cup_valor_desconto, cup_valor_minimo, cup_valido_ate, cup_ativo)
-          SELECT $1, 'troca', $2, $3, CURRENT_DATE + INTERVAL '365 days', true
-          FROM livraria_gestao.clientes
-          WHERE cli_id = $4
-          ON CONFLICT (cup_codigo) DO UPDATE
-          SET cup_valor_desconto = EXCLUDED.cup_valor_desconto, cup_ativo = true
-        `, [codigo, valor, valorMinimo, clienteId]);
+          INSERT INTO livraria_comercial.cupons_troca (cpt_cliente_id, cpt_codigo, cpt_valor, cpt_valido_ate, cpt_status)
+          VALUES ($1, $2, $3, CURRENT_DATE + INTERVAL '365 days', 'DISPONIVEL')
+          ON CONFLICT (cpt_codigo) DO UPDATE
+          SET cpt_valor = EXCLUDED.cpt_valor, cpt_status = 'DISPONIVEL'
+        `, [clienteId, codigo, valor]);
       }
 
       return RespostaPadrao.enviarSucesso(resposta, 201, { mensagem: `Cupom de ${tipo} criado com sucesso.` });

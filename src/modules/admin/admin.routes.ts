@@ -17,8 +17,9 @@ import { RepositorioEstoque } from '@/modules/estoque/repositorioEstoque';
 import { ServicoEstoque } from '@/modules/estoque/servicoEstoque';
 import { ControladorEstoque } from '@/modules/estoque/controladorEstoque';
 import { autenticacaoMiddleware } from '@/shared/middlewares/autenticacao.middleware';
-import { 
-  adminOnlyMiddleware
+import {
+  adminOnlyMiddleware,
+  adminMestreOnlyMiddleware
 } from '@/shared/middlewares/autorizacao.middleware';
 
 /**
@@ -72,19 +73,19 @@ export function registrarRotasAdmin(app: IRouter): void {
     controladorPainel.confirmarEntregaPedido,
   );
 
-  // Listagem de administradores
+  // Listagem de administradores (apenas admin mestre)
   app.get(
     '/admin/administradores',
     autenticacaoMiddleware,
-    adminOnlyMiddleware,
+    adminMestreOnlyMiddleware,
     (requisicao, resposta) => ControladorAdmin.listarAdmins(requisicao, resposta),
   );
 
-  // Registro de novo administrador
+  // Registro de novo administrador (apenas admin mestre)
   app.post(
     '/admin/registro',
     autenticacaoMiddleware,
-    adminOnlyMiddleware,
+    adminMestreOnlyMiddleware,
     (requisicao, resposta) => ControladorAdmin.registrarAdmin(requisicao, resposta),
   );
 

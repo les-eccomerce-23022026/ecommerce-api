@@ -10,7 +10,11 @@ export class UsuarioMapper {
    */
   public static mapearParaEntidade(row: LinhaResultadoUsuario, papeis?: LinhaResultadoUsuario[]): IUsuario {
     const papeisArray = papeis || [];
-    const papelPrincipal = papeisArray.length > 0 ? papeisArray[0] : row;
+    
+    // Prioridade: admin > cliente > qualquer outro
+    const papelAdmin = papeisArray.find((p) => p.descricao === PAPEL_ADMIN.descricao);
+    const papelCliente = papeisArray.find((p) => p.descricao === PAPEL_CLIENTE.descricao);
+    const papelPrincipal = papelAdmin ?? papelCliente ?? (papeisArray.length > 0 ? papeisArray[0] : row);
     
     return {
       id: Number(row.id),

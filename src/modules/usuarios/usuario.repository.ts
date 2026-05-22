@@ -30,7 +30,7 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
   }
 
   public async criarUsuario(dados: IDadosCriarUsuario): Promise<IUsuario> {
-    const { nome, email, cpf, cnpj, tipoPessoa, senhaHash, role } = dados;
+    const { nome, email, cpf, cnpj, tipoPessoa, senhaHash, role, papeis } = dados;
     const idPapel = role?.id ?? PAPEL_CLIENTE.id;
     const lojId = dados.lojId ?? this.obterLojId() ?? 1;
 
@@ -44,8 +44,12 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
     const usuarioCriadoRow = rows[0] as LinhaResultadoUsuario;
     const usuarioId = Number(usuarioCriadoRow.id);
 
-    // Também associa o papel na tabela muitos-para-muitos
-    await this.associarPapelUsuario(usuarioId, idPapel);
+    // Associa os papéis na tabela muitos-para-muitos
+    // Se papeis foi fornecido, usa todos; caso contrário, usa apenas o role principal
+    const papeisParaAssociar = papeis && papeis.length > 0 ? papeis : [role ?? PAPEL_CLIENTE];
+    for (const papel of papeisParaAssociar) {
+      await this.associarPapelUsuario(usuarioId, papel.id);
+    }
 
     return this.buscarPorUuid(usuarioCriadoRow.uuid as string) as Promise<IUsuario>;
   }

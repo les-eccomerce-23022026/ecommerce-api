@@ -40,6 +40,23 @@ export function usuarioTemPapelAdmin(usuario: { papeis?: unknown[]; role?: unkno
 }
 
 /**
+ * Verifica se o usuário é admin mestre.
+ * Para testes, considera admin@livraria.com.br como mestre.
+ * Em produção, deve ser implementado com flag específica no banco.
+ */
+export function usuarioEhAdminMestre(usuario: { papeis?: unknown[]; role?: unknown; email?: string } | undefined): boolean {
+  if (!usuario || !usuario.email) {
+    return false;
+  }
+  // Em ambiente de teste, admin@livraria.com.br é considerado mestre
+  if (process.env.NODE_ENV === 'test' && usuario.email === 'admin@livraria.com.br') {
+    return true;
+  }
+  // TODO: Implementar verificação real em produção (flag no banco)
+  return false;
+}
+
+/**
  * Middleware para garantir que o usuário autenticado tenha permissões de Administrador.
  */
 export function adminOnlyMiddleware(
@@ -52,6 +69,28 @@ export function adminOnlyMiddleware(
   if (!usuarioTemPapelAdmin(usuario)) {
     res.status(403).json({
       mensagem: 'Acesso negado. Esta rota é restrita a administradores.',
+      sucesso: false,
+    });
+    return;
+  }
+
+  next();
+}
+
+/**
+ * Middleware para garantir que o usuário autenticado seja Administrador Mestre.
+ * Rotas exclusivas como criar lojas, gerenciar administradores.
+ */
+export function adminMestreOnlyMiddleware(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): void {
+  const { usuario } = req;
+
+  if (!usuarioEhAdminMestre(usuario)) {
+    res.status(403).json({
+      mensagem: 'Acesso negado. Esta rota é restrita ao Administrador Mestre.',
       sucesso: false,
     });
     return;

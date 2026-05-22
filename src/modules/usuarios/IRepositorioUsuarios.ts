@@ -2,7 +2,7 @@ import { IUsuario } from '@/modules/usuarios/IUsuario.entity';
 import { IPapelUsuario } from '@/shared/types/Ipapel-usuario';
 
 /** Dados de entrada para criação de usuário, sem campos gerados automaticamente */
-export type IDadosCriarUsuario = Omit<IUsuario, 'uuid' | 'ativo' | 'id' | 'idPapel'> & { role?: IPapelUsuario; lojId?: number };
+export type IDadosCriarUsuario = Omit<IUsuario, 'uuid' | 'ativo' | 'id' | 'idPapel'> & { role?: IPapelUsuario; papeis?: IPapelUsuario[]; lojId?: number };
 
 export interface IFiltrosConsultaClientes {
   nome?: string;
