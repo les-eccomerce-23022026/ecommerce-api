@@ -33,6 +33,9 @@ exports
 .github
 scripts
 .agents
+.windsurf
+.cursor
+.gemini
 TASKS.md
 CHANGES.md
 
