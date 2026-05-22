@@ -230,4 +230,17 @@ export class RepositorioEstoque {
     const result = await this.db.executar<{ total: string }>(sql, params);
     return Number(result[0].total);
   }
+
+  async baixarEstoque(livroUuid: string, quantidade: number): Promise<void> {
+    const lojId = this.obterLojId() || 1;
+
+    await this.db.executar(`
+      UPDATE estoques
+      SET etq_quantidade_disponivel = etq_quantidade_disponivel - $1,
+          etq_atualizado_em = CURRENT_TIMESTAMP
+      WHERE liv_id = (SELECT liv_id FROM livros WHERE liv_uuid = $2)
+        AND etq_ativo = TRUE
+        AND loj_id = $3
+    `, [quantidade, livroUuid, lojId]);
+  }
 }
