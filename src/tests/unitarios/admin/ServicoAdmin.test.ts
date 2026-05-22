@@ -1,5 +1,5 @@
 import { ServicoAdmin } from '@/modules/admin/admin.service';
-import { PAPEL_ADMIN } from '@/shared/types/papeis';
+import { PAPEL_ADMIN, PAPEL_CLIENTE } from '@/shared/types/papeis';
 
 describe('ServicoAdmin', () => {
   let servicoAdmin: ServicoAdmin;
@@ -28,7 +28,7 @@ describe('ServicoAdmin', () => {
       confirmacaoSenha: 'Senha123!',
     };
 
-    it('deve criar um novo administrador do zero', async () => {
+    it('deve criar um novo administrador do zero com papéis de cliente e admin', async () => {
       mockRepositorioUsuarios.buscarPorEmailPapel.mockResolvedValue(null);
       mockRepositorioUsuarios.buscarPorCpfPapel.mockResolvedValue(null);
       mockRepositorioUsuarios.criarUsuario.mockResolvedValue({
@@ -37,23 +37,29 @@ describe('ServicoAdmin', () => {
         email: dadosCriacao.email,
         cpf: dadosCriacao.cpf,
         role: PAPEL_ADMIN,
+        papeis: [PAPEL_CLIENTE, PAPEL_ADMIN],
       });
 
       const resultado = await servicoAdmin.registrarNovoAdministrador(dadosCriacao);
 
-      expect(mockRepositorioUsuarios.criarUsuario).toHaveBeenCalled();
+      expect(mockRepositorioUsuarios.criarUsuario).toHaveBeenCalledWith(
+        expect.objectContaining({
+          role: PAPEL_ADMIN,
+          papeis: [PAPEL_CLIENTE, PAPEL_ADMIN],
+        })
+      );
       expect(resultado.uuid).toBe('uuid-novo');
     });
 
     it('deve promover um cliente existente para administrador', async () => {
-      const clienteExistente = { 
-        uuid: 'uuid-cliente', 
-        email: 'admin@teste.com', 
+      const clienteExistente = {
+        uuid: 'uuid-cliente',
+        email: 'admin@teste.com',
         senhaHash: 'hash-antigo',
         id: 123,
         nome: 'Cliente Existente',
         cpf: '12345678901',
-        papeis: [{ id: 1, descricao: 'cliente' }],
+        papeis: [{ id: 2, descricao: 'cliente' }],
       };
       mockRepositorioUsuarios.buscarPorEmailPapel
         .mockResolvedValueOnce(null)
@@ -64,7 +70,7 @@ describe('ServicoAdmin', () => {
         nome: 'Admin Teste',
         cpf: '12345678901',
         role: PAPEL_ADMIN,
-        papeis: [{ id: 2, descricao: 'admin' }],
+        papeis: [{ id: 2, descricao: 'cliente' }, { id: 1, descricao: 'admin' }],
       });
 
       const resultado = await servicoAdmin.registrarNovoAdministrador({

@@ -78,7 +78,39 @@ export async function iniciarEscopoIsolamentoIntegracao(
     `INSERT INTO livraria_comercial.grupos_precificacao (gpr_descricao, gpr_margem_lucro_percentual) VALUES
        ('Grupo 1', 50.00), ('Varejo', 30.00), ('Padrão', 50.00)
      ON CONFLICT (gpr_descricao) DO NOTHING`,
-    'grupos_precificacao_teste',
+    'grupos_precificacao',
+  );
+
+  // Tabela de notificações para testes de integração
+  await executarSqlOpcional(
+    `CREATE TABLE IF NOT EXISTS livraria_comercial.notificacoes (
+      not_uuid UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      not_usuario_uuid UUID NOT NULL,
+      not_venda_uuid UUID,
+      not_tipo VARCHAR(50) NOT NULL,
+      not_titulo VARCHAR(255) NOT NULL,
+      not_mensagem TEXT NOT NULL,
+      not_codigo_rastreio VARCHAR(50),
+      not_lida BOOLEAN DEFAULT FALSE,
+      not_criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      not_atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )`,
+    'tabela_notificacoes',
+  );
+
+  await executarSqlOpcional(
+    `CREATE INDEX IF NOT EXISTS idx_notificacoes_usuario_uuid ON livraria_comercial.notificacoes(not_usuario_uuid)`,
+    'idx_notificacoes_usuario',
+  );
+
+  await executarSqlOpcional(
+    `CREATE INDEX IF NOT EXISTS idx_notificacoes_venda_uuid ON livraria_comercial.notificacoes(not_venda_uuid)`,
+    'idx_notificacoes_venda',
+  );
+
+  await executarSqlOpcional(
+    `CREATE INDEX IF NOT EXISTS idx_notificacoes_lida ON livraria_comercial.notificacoes(not_lida)`,
+    'idx_notificacoes_lida',
   );
 
   await executarSqlOpcional(

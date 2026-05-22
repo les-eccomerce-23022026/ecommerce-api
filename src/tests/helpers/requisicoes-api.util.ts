@@ -160,7 +160,6 @@ export async function obterTokenCliente(
       senhaHash,
       role: PAPEL_CLIENTE,
       papeis: [PAPEL_CLIENTE],
-      isAdminMestre: false,
     });
     usuarioId = usuario.id;
 
@@ -172,10 +171,9 @@ export async function obterTokenCliente(
     });
   } else {
     // Garante que a senha é 'SenhaForte@123' e que o papel seja apenas cliente na transação atual
-    await repositorioUsuarios.atualizarUsuario(clienteExistente.uuid, { 
+    await repositorioUsuarios.atualizarUsuario(clienteExistente.uuid, {
       senhaHash,
       idPapel: PAPEL_CLIENTE.id,
-      isAdminMestre: false
     });
     
     // Remove TODOS os papéis existentes e garante que apenas cliente esteja ativo
@@ -227,21 +225,19 @@ export async function obterTokenAdmin(app: Application): Promise<string> {
 
   if (!adminExistente) {
     await repositorioUsuarios.criarUsuario({
-      nome: 'Administrador Mestre',
+      nome: 'Administrador',
       email: 'admin@livraria.com.br',
       cpf: '000.000.000-00',
       senhaHash: senhaHashAdmin,
       role: PAPEL_ADMIN,
-      papeis: [PAPEL_ADMIN],
-      isAdminMestre: true,
+      papeis: [PAPEL_CLIENTE, PAPEL_ADMIN],
     });
   } else {
     // Atualiza o hash dentro da transação de isolamento para garantir que a senha
     // conhecida ('Admin@123') seja usada, independentemente do que foi seedado no banco.
     // A mudança é revertida ao final do teste junto com a transação.
-    await repositorioUsuarios.atualizarUsuario(adminExistente.uuid, { 
+    await repositorioUsuarios.atualizarUsuario(adminExistente.uuid, {
       senhaHash: senhaHashAdmin,
-      isAdminMestre: true 
     });
   }
 

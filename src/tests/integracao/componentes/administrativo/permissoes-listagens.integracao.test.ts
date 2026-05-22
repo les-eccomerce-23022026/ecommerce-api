@@ -15,14 +15,16 @@ describe('Integração — Administrador comum (listagens e restrições)', () =
   const contexto = configurarTesteIntegracao();
 
   describe('Autenticação e papel', () => {
-    it('identifica mestre com isAdminMestre true no login', async () => {
+    it('identifica administrador com papel admin no login', async () => {
       const res = await realizarLogin(contexto.app, 'admin@livraria.com.br', 'Admin@123');
 
       expect(res.status).toBe(200);
-      expect(res.body.dados.user.isAdminMestre).toBe(true);
+      expect(res.body.dados.user.role).toBe('admin');
+      expect(res.body.dados.user.papeis).toContain('admin');
+      expect(res.body.dados.user.papeis).toContain('cliente');
     });
 
-    it('identifica administrador comum com isAdminMestre false', async () => {
+    it('identifica administrador com papéis corretos', async () => {
       const tokenMestre = await obterTokenAdmin(contexto.app);
       const { token, email } = await criarAdminComumObterToken(contexto.app, tokenMestre);
 
@@ -31,11 +33,13 @@ describe('Integração — Administrador comum (listagens e restrições)', () =
         .set('Authorization', `Bearer ${token}`);
 
       expect(me.status).toBe(200);
-      expect(me.body.dados.user.isAdminMestre).toBe(false);
+      expect(me.body.dados.user.role).toBe('admin');
+      expect(me.body.dados.user.papeis).toContain('admin');
+      expect(me.body.dados.user.papeis).toContain('cliente');
       expect(me.body.dados.user.email).toBe(email);
     });
 
-    it('expõe isAdminMestre em GET /api/auth/me para o mestre', async () => {
+    it('expõe papéis corretos em GET /api/auth/me para o administrador', async () => {
       const resLogin = await realizarLogin(contexto.app, 'admin@livraria.com.br', 'Admin@123');
       const token = resLogin.body.dados.token as string;
 
@@ -44,7 +48,9 @@ describe('Integração — Administrador comum (listagens e restrições)', () =
         .set('Authorization', `Bearer ${token}`);
 
       expect(me.status).toBe(200);
-      expect(me.body.dados.user.isAdminMestre).toBe(true);
+      expect(me.body.dados.user.role).toBe('admin');
+      expect(me.body.dados.user.papeis).toContain('admin');
+      expect(me.body.dados.user.papeis).toContain('cliente');
     });
   });
 

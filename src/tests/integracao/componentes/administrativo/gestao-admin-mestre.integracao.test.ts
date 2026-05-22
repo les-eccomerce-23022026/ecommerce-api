@@ -3,18 +3,18 @@ import { configurarTesteIntegracao } from '@/tests/helpers/setup-integracao.util
 import { obterTokenAdmin, realizarLogin } from '@/tests/helpers/requisicoes-api.util';
 
 /**
- * Administrador mestre: gestão de outros administradores (rotas /api/admin/* com adminMestreOnly).
+ * Gestão de administradores (rotas /api/admin/*).
  */
-describe('Integração — Administrador mestre (gestão de admins)', () => {
+describe('Integração — Gestão de Administradores', () => {
   const contexto = configurarTesteIntegracao();
 
   describe('GET /api/admin/administradores', () => {
-    it('retorna 200 e lista com ao menos o mestre', async () => {
-      const tokenMestre = await obterTokenAdmin(contexto.app);
+    it('retorna 200 e lista com ao menos um administrador', async () => {
+      const tokenAdmin = await obterTokenAdmin(contexto.app);
 
       const res = await request(contexto.app)
         .get('/api/admin/administradores')
-        .set('Authorization', `Bearer ${tokenMestre}`);
+        .set('Authorization', `Bearer ${tokenAdmin}`);
 
       expect(res.status).toBe(200);
       expect(res.body.sucesso).toBe(true);
@@ -26,11 +26,11 @@ describe('Integração — Administrador mestre (gestão de admins)', () => {
   describe('POST /api/admin/registro', () => {
     describe('cenários de falha (validação)', () => {
       it('retorna 400 quando faltam campos obrigatórios (nome)', async () => {
-        const tokenMestre = await obterTokenAdmin(contexto.app);
+        const tokenAdmin = await obterTokenAdmin(contexto.app);
 
         const res = await request(contexto.app)
           .post('/api/admin/registro')
-          .set('Authorization', `Bearer ${tokenMestre}`)
+          .set('Authorization', `Bearer ${tokenAdmin}`)
           .send({
             cpf: '222.333.444-55',
             email: `sem.nome.${Date.now()}@test.local`,
@@ -43,12 +43,12 @@ describe('Integração — Administrador mestre (gestão de admins)', () => {
       });
 
       it('retorna 400 ao duplicar e-mail de administrador existente', async () => {
-        const tokenMestre = await obterTokenAdmin(contexto.app);
+        const tokenAdmin = await obterTokenAdmin(contexto.app);
         const email = `admin.dup.${Date.now()}@test.local`;
 
         const primeiro = await request(contexto.app)
           .post('/api/admin/registro')
-          .set('Authorization', `Bearer ${tokenMestre}`)
+          .set('Authorization', `Bearer ${tokenAdmin}`)
           .send({
             nome: 'Admin Dup A',
             cpf: '529.982.247-25',
@@ -60,7 +60,7 @@ describe('Integração — Administrador mestre (gestão de admins)', () => {
 
         const segundo = await request(contexto.app)
           .post('/api/admin/registro')
-          .set('Authorization', `Bearer ${tokenMestre}`)
+          .set('Authorization', `Bearer ${tokenAdmin}`)
           .send({
             nome: 'Admin Dup B',
             cpf: '123.456.789-09',
@@ -76,31 +76,31 @@ describe('Integração — Administrador mestre (gestão de admins)', () => {
   });
 
   describe('PATCH inativar / ativar administrador', () => {
-    it('retorna 403 ao tentar inativar o próprio usuário mestre', async () => {
-      const tokenMestre = await obterTokenAdmin(contexto.app);
+    it('retorna 403 ao tentar inativar o próprio usuário', async () => {
+      const tokenAdmin = await obterTokenAdmin(contexto.app);
 
       const me = await request(contexto.app)
         .get('/api/auth/me')
-        .set('Authorization', `Bearer ${tokenMestre}`);
+        .set('Authorization', `Bearer ${tokenAdmin}`);
 
-      const uuidMestre = me.body.dados.user.uuid as string;
+      const uuidAdmin = me.body.dados.user.uuid as string;
 
       const res = await request(contexto.app)
-        .patch(`/api/admin/administradores/${uuidMestre}/inativar`)
-        .set('Authorization', `Bearer ${tokenMestre}`);
+        .patch(`/api/admin/administradores/${uuidAdmin}/inativar`)
+        .set('Authorization', `Bearer ${tokenAdmin}`);
 
       expect(res.status).toBe(403);
       expect(res.body.mensagem).toMatch(/inativar a si mesmo/i);
     });
 
     it('inativa outro admin, bloqueia login e reativa com sucesso', async () => {
-      const tokenMestre = await obterTokenAdmin(contexto.app);
+      const tokenAdmin = await obterTokenAdmin(contexto.app);
       const email = `admin.ciclo.${Date.now()}@test.local`;
       const senha = 'CicloAdmin@123';
 
       const reg = await request(contexto.app)
         .post('/api/admin/registro')
-        .set('Authorization', `Bearer ${tokenMestre}`)
+        .set('Authorization', `Bearer ${tokenAdmin}`)
         .send({
           nome: 'Admin Ciclo Vida',
           cpf: '123.456.789-09',
@@ -114,7 +114,7 @@ describe('Integração — Administrador mestre (gestão de admins)', () => {
 
       const inat = await request(contexto.app)
         .patch(`/api/admin/administradores/${uuidAlvo}/inativar`)
-        .set('Authorization', `Bearer ${tokenMestre}`);
+        .set('Authorization', `Bearer ${tokenAdmin}`);
 
       expect(inat.status).toBe(200);
 
@@ -123,7 +123,7 @@ describe('Integração — Administrador mestre (gestão de admins)', () => {
 
       const ativ = await request(contexto.app)
         .patch(`/api/admin/administradores/${uuidAlvo}/ativar`)
-        .set('Authorization', `Bearer ${tokenMestre}`);
+        .set('Authorization', `Bearer ${tokenAdmin}`);
 
       expect(ativ.status).toBe(200);
 

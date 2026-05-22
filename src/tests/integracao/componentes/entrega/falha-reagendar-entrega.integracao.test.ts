@@ -13,11 +13,7 @@ describe('Integração - Fluxo de Falha e Reagendamento de Entrega (Sprint 3)', 
     tokenAdmin = await obterTokenAdmin(contexto.app);
   });
 
-  it('deve agendar entrega e simular notificação de rastreio (S3-A)', async () => {
-    // Espionamos o console.info do adapter (já que não temos um mock injetável no teste via supertest)
-    // Em um cenário real de TDD rigoroso, usaríamos um container de DI para trocar o adapter no teste.
-    const spyNotificacao = jest.spyOn(console, 'info').mockImplementation();
-
+  it('deve agendar entrega e validar criação de notificação (S3-A)', async () => {
     // 1. Criar venda
     const resVenda = await request(contexto.app)
       .post('/api/vendas')
@@ -43,10 +39,16 @@ describe('Integração - Fluxo de Falha e Reagendamento de Entrega (Sprint 3)', 
       });
 
     expect(resEntrega.status).toBe(201);
-    expect(spyNotificacao).toHaveBeenCalledWith(expect.stringContaining('[NOTIFICAÇÃO]'));
-    expect(spyNotificacao).toHaveBeenCalledWith(expect.stringContaining(resEntrega.body.uuid));
 
-    spyNotificacao.mockRestore();
+    // 3. Validar criação de notificação no banco de dados
+    const notificacoes = await contexto.db!.executar<{ not_uuid: string; not_tipo: string }>(
+      `SELECT not_uuid, not_tipo FROM livraria_comercial.notificacoes 
+       WHERE not_venda_uuid = $1`,
+      [vendaUuid]
+    );
+
+    expect(notificacoes.length).toBeGreaterThan(0);
+    expect(notificacoes[0].not_tipo).toBe('RASTREIO');
   });
 
   it('deve registrar falha na entrega e reagendar com novo endereço (S3-C)', async () => {
