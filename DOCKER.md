@@ -57,6 +57,30 @@ docker logs ecm_app -f
 docker exec -it ecm_app sh
 ```
 
+## Fluxo de desenvolvimento — versionamento DDL (snapshots)
+
+Quando alterar estrutura do Postgres (`sql/migrations/`, DDL), use snapshots versionados no Git para rollback e diff em PR.
+
+**Pré-requisito:** `docker compose up -d postgres`
+
+| Momento | Comando (em `backend/`) |
+|---------|-------------------------|
+| Antes da migration | `npm run db:snapshot:historico` |
+| Aplicar com rollback automático | `npm run db:migrate:segura -- sql/migrations/NNN_descricao.sql` |
+| Após migration OK (manual) | `npm run db:snapshot` |
+| Ver diff no Git | `npm run db:snapshot:diff` |
+| Deu errado — voltar estrutura | `npm run db:restore:schema -- --confirmar` |
+
+Da raiz do monorepo os mesmos comandos funcionam (`npm run db:snapshot`, etc.).
+
+**Artefatos:** `sql/snapshots/schema_canonico.sql` (PR) e `sql/snapshots/historico/schema_*.sql` (restore).
+
+**Restore destrutivo** exige `--confirmar` ou `CONFIRMAR_RESTORE=sim`. Restaura só estrutura — reaplique seeds com `npm run db:setup` se precisar de dados.
+
+Documentação completa: [`sql/snapshots/README.md`](sql/snapshots/README.md) · ADR [`0012-snapshots-ddl-versionados-git.md`](../documentacao-exigida/adr/0012-snapshots-ddl-versionados-git.md).
+
+**Antes de `db:reset:all` na raiz:** rode `npm run db:snapshot:historico` se tiver alterações locais em migrations.
+
 ## Importante
 
 **NÃO rode o backend diretamente no host com `npm run dev` quando estiver usando Docker.** Isso causa conflitos de porta (3000) e inconsistência entre o código no host e o container.
