@@ -9,4 +9,11 @@ export interface IServicoNotificacao {
    * @param vendaUuid UUID da venda para referência.
    */
   enviarNotificacaoRastreio(email: string, codigoRastreio: string, vendaUuid: string): Promise<void>;
+
+  /**
+   * Envia uma notificação solicitando reconfirmação de endereço ao cliente.
+   * @param email Destinatário.
+   * @param vendaUuid UUID da venda para referência.
+   */
+  enviarNotificacaoReconfirmacaoEndereco(email: string, vendaUuid: string): Promise<void>;
 }

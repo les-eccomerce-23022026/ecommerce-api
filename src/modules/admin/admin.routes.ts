@@ -9,6 +9,7 @@ import { RepositorioVendasPostgres } from '@/modules/vendas/repositories/Reposit
 import { RepositorioEntregaPostgres } from '@/modules/entrega/RepositorioEntregaPostgres';
 import { ServicoEntrega } from '@/modules/entrega/ServicoEntrega';
 import { ServicoNotificacaoEmail } from '@/modules/entrega/adapters/ServicoNotificacaoEmail';
+import { RepositorioNotificacoes } from '@/modules/entrega/RepositorioNotificacoes';
 import { ServicoMockCorreios } from '@/modules/logistica-mocks/servicoMockCorreios';
 import { ServicoMockLoggi } from '@/modules/logistica-mocks/servicoMockLoggi';
 import { RepositorioRastreamentoPostgres } from '@/modules/logistica-mocks/repositorios/RepositorioRastreamentoPostgres';
@@ -32,11 +33,12 @@ export function registrarRotasAdmin(app: IRouter): void {
   const repoRastreamento = new RepositorioRastreamentoPostgres(db);
   const repoEventoRastreamento = new RepositorioEventoRastreamentoPostgres(db);
   const repoEntrega = new RepositorioEntregaPostgres(db, repoRastreamento);
-  const servicoNotificacao = new ServicoNotificacaoEmail();
+  const repoNotificacoes = new RepositorioNotificacoes(db);
+  const servicoNotificacao = new ServicoNotificacaoEmail(repoNotificacoes);
   const servicoEntrega = new ServicoEntrega(repoEntrega, repoVendas, servicoNotificacao);
   const servicoMockCorreios = new ServicoMockCorreios(repoRastreamento, repoEventoRastreamento);
   const servicoMockLoggi = new ServicoMockLoggi(repoRastreamento, repoEventoRastreamento);
-  const servicoPedidosAdmin = new ServicoPedidosAdmin(repoVendas, servicoEntrega, servicoMockCorreios, servicoMockLoggi);
+  const servicoPedidosAdmin = new ServicoPedidosAdmin(repoVendas, servicoEntrega, servicoMockCorreios, servicoMockLoggi, servicoNotificacao);
   const servicoDashboardAdmin = new ServicoDashboardAdmin(db);
   const controladorPainel = new ControladorAdminPainel(servicoDashboardAdmin, servicoPedidosAdmin);
   
@@ -71,6 +73,27 @@ export function registrarRotasAdmin(app: IRouter): void {
     autenticacaoMiddleware,
     adminOnlyMiddleware,
     controladorPainel.confirmarEntregaPedido,
+  );
+
+  app.put(
+    '/admin/pedidos/:uuid/falha-entrega',
+    autenticacaoMiddleware,
+    adminOnlyMiddleware,
+    controladorPainel.marcarFalhaEntrega,
+  );
+
+  app.put(
+    '/admin/pedidos/:uuid/redespachar',
+    autenticacaoMiddleware,
+    adminOnlyMiddleware,
+    controladorPainel.redespacharPedido,
+  );
+
+  app.post(
+    '/admin/pedidos/:uuid/solicitar-reconfirmacao-endereco',
+    autenticacaoMiddleware,
+    adminOnlyMiddleware,
+    controladorPainel.solicitarReconfirmacaoEndereco,
   );
 
   // Listagem de administradores (apenas admin mestre)

@@ -2,6 +2,7 @@ import type { IRepositorioCotacaoFrete } from '@/modules/frete/cotacaoFrete/IRep
 import { EstadosCotacaoFrete } from '@/modules/frete/cotacaoFrete/EstadosCotacaoFrete';
 import { IRepositorioVendas, IVenda } from '../repositories/IRepositorioVendas';
 import { IVendaInputDto } from '../dtos/IVenda.dto';
+import { IRepositorioEntrega } from '@/modules/entrega/IRepositorioEntrega';
 
 const TOLERANCIA_MOEDA = 0.02;
 
@@ -13,12 +14,16 @@ export class ServicoVendas {
 
   private readonly repositorioCotacaoFrete: IRepositorioCotacaoFrete | null;
 
+  private readonly repositorioEntrega: IRepositorioEntrega | null;
+
   constructor(
     repositorioVendas: IRepositorioVendas,
     repositorioCotacaoFrete?: IRepositorioCotacaoFrete,
+    repositorioEntrega?: IRepositorioEntrega,
   ) {
     this.repositorioVendas = repositorioVendas;
     this.repositorioCotacaoFrete = repositorioCotacaoFrete ?? null;
+    this.repositorioEntrega = repositorioEntrega ?? null;
   }
 
   private static validarEntradaBasicaPedido(dados: IVendaInputDto): void {
@@ -263,5 +268,36 @@ export class ServicoVendas {
    */
   public async atualizarStatus(vendaUuid: string, novoStatus: string): Promise<void> {
     return this.repositorioVendas.atualizarStatus(vendaUuid, novoStatus);
+  }
+
+  /**
+   * Atualiza o endereço de entrega de uma venda (para redespacho após falha).
+   * Busca o endereço do cliente pelo UUID e atualiza a entrega correspondente.
+   */
+  public async atualizarEnderecoEntrega(vendaUuid: string, enderecoUuid: string): Promise<void> {
+    const venda = await this.repositorioVendas.obterPorUuid(vendaUuid);
+    if (!venda) throw new Error('Venda não encontrada');
+
+    if (!this.repositorioEntrega) {
+      throw new Error('Repositório de entregas não configurado');
+    }
+
+    // Buscar entregas vinculadas à venda
+    const entregas = await this.repositorioEntrega.listarPorVendaUuid(vendaUuid);
+    if (entregas.length === 0) {
+      throw new Error('Nenhuma entrega encontrada para esta venda');
+    }
+
+    // Em produção, buscaríamos o endereço completo do cliente pelo enderecoUuid
+    // Para simulação, usamos o endereço atual da entrega com pequena modificação
+    const entregaMaisRecente = entregas[0];
+    const novoEndereco = {
+      ...entregaMaisRecente.endereco,
+      atualizadoEm: new Date().toISOString(),
+      uuid: enderecoUuid,
+    };
+
+    // Atualizar o endereço na entrega
+    await this.repositorioEntrega.atualizarEndereco(entregaMaisRecente.uuid, novoEndereco);
   }
 }

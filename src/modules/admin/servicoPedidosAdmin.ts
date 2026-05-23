@@ -3,6 +3,7 @@ import { ServicoEntrega } from '@/modules/entrega/ServicoEntrega';
 import { vendaParaPayloadPedidoAdmin } from '@/modules/admin/mappers/pedido-admin.mapper';
 import { ServicoMockCorreios } from '@/modules/logistica-mocks/servicoMockCorreios';
 import { ServicoMockLoggi } from '@/modules/logistica-mocks/servicoMockLoggi';
+import { IServicoNotificacao } from '@/modules/entrega/ports/IServicoNotificacao';
 
 const ENDERECO_PADRAO_ADMIN = {
   logradouro: 'Despacho administrativo',
@@ -19,6 +20,7 @@ export class ServicoPedidosAdmin {
     private readonly servicoEntrega: ServicoEntrega,
     private readonly servicoMockCorreios: ServicoMockCorreios,
     private readonly servicoMockLoggi: ServicoMockLoggi,
+    private readonly servicoNotificacao: IServicoNotificacao,
   ) {}
 
   async listarPedidos(): Promise<Record<string, unknown>[]> {
@@ -131,5 +133,109 @@ export class ServicoPedidosAdmin {
     const atualizada = await this.repositorioVendas.obterPorUuid(vendaUuid);
     if (!atualizada) throw new Error('Pedido não encontrado após confirmação.');
     return vendaParaPayloadPedidoAdmin(atualizada);
+  }
+
+  async marcarFalhaEntrega(vendaUuid: string, motivo: string): Promise<Record<string, unknown>> {
+    const venda = await this.repositorioVendas.obterPorUuid(vendaUuid);
+    if (!venda) {
+      throw new Error('Pedido não encontrado.');
+    }
+    const statusAtual = venda.status.trim().toUpperCase();
+    if (statusAtual !== 'EM TRÂNSITO') {
+      throw new Error('Somente pedidos em trânsito podem ter falha de entrega marcada.');
+    }
+
+    // Atualizar status para FALHOU
+    await this.repositorioVendas.atualizarStatus(vendaUuid, 'FALHOU');
+
+    // Registrar falha na entrega
+    const entregas = await this.servicoEntrega.listarPorVenda(vendaUuid);
+    if (entregas.length > 0) {
+      const entregaMaisRecente = entregas[0];
+      await this.servicoEntrega.registrarFalhaEntrega(entregaMaisRecente.uuid);
+    }
+
+    const atualizada = await this.repositorioVendas.obterPorUuid(vendaUuid);
+    if (!atualizada) throw new Error('Pedido não encontrado após marcar falha.');
+    return vendaParaPayloadPedidoAdmin(atualizada);
+  }
+
+  async redespachar(vendaUuid: string): Promise<Record<string, unknown>> {
+    const venda = await this.repositorioVendas.obterPorUuid(vendaUuid);
+    if (!venda) {
+      throw new Error('Pedido não encontrado.');
+    }
+    const statusAtual = venda.status.trim().toUpperCase();
+    if (statusAtual !== 'FALHOU') {
+      throw new Error('Somente pedidos com falha podem ser redespachados.');
+    }
+
+    // Gerar novo código de rastreamento
+    const tipoFrete = 'SEDEX';
+    const codigoRastreamento = this.gerarCodigoRastreamento(tipoFrete);
+
+    // Calcular frete novamente
+    const calculoFrete = this.servicoMockCorreios.calcularFrete({
+      cepOrigem: '01310-100',
+      cepDestino: '13010-100',
+      peso: 1.0,
+      tipoFrete,
+    });
+
+    // Agendar nova remessa
+    await this.servicoEntrega.agendarRemessa({
+      vendaUuid,
+      tipoFrete,
+      endereco: {
+        logradouro: 'Rua Mockada',
+        numero: '123',
+        cidade: 'Campinas',
+        estado: 'SP',
+        cep: '13010-100',
+      },
+      custo: calculoFrete.valorFrete,
+      entregador: 'Correios',
+      codigoRastreamento,
+    });
+
+    // Adicionar evento de rastreamento
+    await this.servicoMockCorreios.adicionarEventoRastreamento(codigoRastreamento, {
+      codigo: 'PO',
+      descricao: 'Objeto postado',
+      detalhe: 'Objeto redespachado após falha de entrega',
+      data: new Date().toISOString(),
+      local: 'São Paulo/SP',
+    });
+
+    // Atualizar status para EM TRÂNSITO
+    await this.repositorioVendas.atualizarStatus(vendaUuid, 'EM TRÂNSITO');
+
+    const atualizada = await this.repositorioVendas.obterPorUuid(vendaUuid);
+    if (!atualizada) throw new Error('Pedido não encontrado após redespacho.');
+    
+    const payload = vendaParaPayloadPedidoAdmin(atualizada);
+    return {
+      ...payload,
+      codigoRastreamento,
+      prazoEntrega: calculoFrete.prazoEntrega,
+      dataPrevistaEntrega: calculoFrete.dataPrevistaEntrega,
+    };
+  }
+
+  async solicitarReconfirmacaoEndereco(vendaUuid: string): Promise<void> {
+    const venda = await this.repositorioVendas.obterPorUuid(vendaUuid);
+    if (!venda) {
+      throw new Error('Pedido não encontrado.');
+    }
+    const statusAtual = venda.status.trim().toUpperCase();
+    if (statusAtual !== 'FALHOU') {
+      throw new Error('Somente pedidos com falha podem solicitar reconfirmação de endereço.');
+    }
+
+    // Enviar notificação ao cliente solicitando reconfirmação de endereço
+    const email = await this.repositorioVendas.obterEmailUsuarioPorVenda(vendaUuid);
+    if (email) {
+      await this.servicoNotificacao.enviarNotificacaoReconfirmacaoEndereco(email, vendaUuid);
+    }
   }
 }

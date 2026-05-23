@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { ServicoVendas } from '@/modules/vendas/services/ServicoVendas';
 import { PAPEL_ADMIN } from '@/shared/types/papeis';
 import type { IRepositorioPagamentos } from '@/modules/pagamentos/repositories/IRepositorioPagamentos';
+import type { IRepositorioEntrega } from '@/modules/entrega/IRepositorioEntrega';
 
 /**
  * Controlador para requisições de vendas.
@@ -11,9 +12,12 @@ export class ControladorVendas {
 
   private readonly repoPagamentos: IRepositorioPagamentos;
 
-  constructor(servicoVendas: ServicoVendas, repoPagamentos: IRepositorioPagamentos) {
+  private readonly repoEntrega: IRepositorioEntrega | null;
+
+  constructor(servicoVendas: ServicoVendas, repoPagamentos: IRepositorioPagamentos, repoEntrega?: IRepositorioEntrega) {
     this.servicoVendas = servicoVendas;
     this.repoPagamentos = repoPagamentos;
+    this.repoEntrega = repoEntrega ?? null;
   }
 
   /**
@@ -203,6 +207,20 @@ export class ControladorVendas {
       const { uuid } = req.params;
       await this.servicoVendas.atualizarStatus(uuid, 'Entregue');
       res.json({ status: 'Entregue' });
+    } catch (err: unknown) {
+      res.status(400).json({ erro: (err as Error).message });
+    }
+  };
+
+  /**
+   * Atualizar endereço de entrega: PUT /vendas/:uuid/endereco-entrega
+   */
+  public atualizarEnderecoEntrega = async (req: Request, res: Response) => {
+    try {
+      const { uuid } = req.params;
+      const { enderecoUuid } = req.body;
+      await this.servicoVendas.atualizarEnderecoEntrega(uuid, enderecoUuid);
+      res.json({ mensagem: 'Endereço de entrega atualizado com sucesso.' });
     } catch (err: unknown) {
       res.status(400).json({ erro: (err as Error).message });
     }

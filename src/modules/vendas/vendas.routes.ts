@@ -7,6 +7,8 @@ import { ServicoVendas } from '@/modules/vendas/services/ServicoVendas';
 import { RepositorioVendasPostgres } from '@/modules/vendas/repositories/RepositorioVendasPostgres';
 import { RepositorioCotacaoFretePostgres } from '@/modules/frete/cotacaoFrete/RepositorioCotacaoFretePostgres';
 import { RepositorioPagamentosPostgres } from '@/modules/pagamentos/repositories/RepositorioPagamentosPostgres';
+import { RepositorioEntregaPostgres } from '@/modules/entrega/RepositorioEntregaPostgres';
+import { RepositorioRastreamentoPostgres } from '@/modules/logistica-mocks/repositorios/RepositorioRastreamentoPostgres';
 
 /**
  * Registra rotas de vendas no roteador.
@@ -16,8 +18,10 @@ export function registrarRotasVendas(router: Router): void {
   const repo = new RepositorioVendasPostgres(db);
   const repoCotacao = new RepositorioCotacaoFretePostgres(db);
   const repoPagamentos = new RepositorioPagamentosPostgres(db);
-  const servico = new ServicoVendas(repo, repoCotacao);
-  const controller = new ControladorVendas(servico, repoPagamentos);
+  const repoRastreamento = new RepositorioRastreamentoPostgres(db);
+  const repoEntrega = new RepositorioEntregaPostgres(db, repoRastreamento);
+  const servico = new ServicoVendas(repo, repoCotacao, repoEntrega);
+  const controller = new ControladorVendas(servico, repoPagamentos, repoEntrega);
 
   router.post('/vendas', autenticacaoMiddleware, controller.registrarPedidoVenda);
   router.get('/vendas/:uuid', autenticacaoMiddleware, controller.visualizarDetalhesVenda);
@@ -36,4 +40,7 @@ export function registrarRotasVendas(router: Router): void {
   router.get('/admin/pedidos', autenticacaoMiddleware, adminOnlyMiddleware, controller.listarPedidosAdmin);
   router.patch('/admin/pedidos/:uuid/despachar', autenticacaoMiddleware, adminOnlyMiddleware, controller.despacharPedido);
   router.patch('/admin/pedidos/:uuid/entrega', autenticacaoMiddleware, adminOnlyMiddleware, controller.confirmarEntrega);
+
+  // Atualizar endereço de entrega (para redespacho após falha)
+  router.put('/vendas/:uuid/endereco-entrega', autenticacaoMiddleware, controller.atualizarEnderecoEntrega);
 }

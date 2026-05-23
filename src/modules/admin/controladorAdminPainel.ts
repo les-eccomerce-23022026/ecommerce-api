@@ -53,4 +53,38 @@ export class ControladorAdminPainel {
       return RespostaPadrao.enviarErro(res, 400, mensagem);
     }
   };
+
+  public marcarFalhaEntrega = async (req: Request, res: Response): Promise<Response> => {
+    try {
+      const { uuid } = req.params;
+      const { motivo } = req.body;
+      const pedido = await this.servicoPedidosAdmin.marcarFalhaEntrega(uuid, motivo);
+      return res.status(200).json(pedido);
+    } catch (erro) {
+      const mensagem = RespostaPadrao.obterMensagemErro(erro, 'Erro ao marcar falha de entrega.');
+      return RespostaPadrao.enviarErro(res, 400, mensagem);
+    }
+  };
+
+  public redespacharPedido = async (req: Request, res: Response): Promise<Response> => {
+    try {
+      const { uuid } = req.params;
+      const pedido = await this.servicoPedidosAdmin.redespachar(uuid);
+      return res.status(200).json(pedido);
+    } catch (erro) {
+      const mensagem = RespostaPadrao.obterMensagemErro(erro, 'Erro ao redespachar pedido.');
+      return RespostaPadrao.enviarErro(res, 400, mensagem);
+    }
+  };
+
+  public solicitarReconfirmacaoEndereco = async (req: Request, res: Response): Promise<Response> => {
+    try {
+      const { uuid } = req.params;
+      await this.servicoPedidosAdmin.solicitarReconfirmacaoEndereco(uuid);
+      return res.status(200).json({ mensagem: 'Solicitação de reconfirmação de endereço enviada.' });
+    } catch (erro) {
+      const mensagem = RespostaPadrao.obterMensagemErro(erro, 'Erro ao solicitar reconfirmação de endereço.');
+      return RespostaPadrao.enviarErro(res, 400, mensagem);
+    }
+  };
 }

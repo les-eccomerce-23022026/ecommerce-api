@@ -41,6 +41,30 @@ export class ServicoNotificacaoBanco implements IServicoNotificacao {
     await this.repositorioNotificacoes.criar(notificacao);
   }
 
+  async enviarNotificacaoReconfirmacaoEndereco(
+    email: string,
+    vendaUuid: string
+  ): Promise<void> {
+    // Buscar usuário pelo email para obter o UUID
+    const usuario = await this.repositorioNotificacoes.buscarUsuarioPorEmail(email);
+    
+    if (!usuario) {
+      console.warn(`Usuário não encontrado para email: ${email}. Notificação não enviada.`);
+      return;
+    }
+
+    const notificacao: INotificacao = {
+      usuarioUuid: usuario.uuid,
+      vendaUuid,
+      tipo: 'RECONFIRMACAO_ENDERECO',
+      titulo: 'Solicitação de Reconfirmação de Endereço',
+      mensagem: 'Houve uma falha na entrega. Por favor, confirme seu endereço para redespacho.',
+      lida: false,
+    };
+
+    await this.repositorioNotificacoes.criar(notificacao);
+  }
+
   /**
    * Cria notificação de troca autorizada
    */
