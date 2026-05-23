@@ -10,6 +10,7 @@ import { ServicoAutenticacao } from '@/modules/auth/auth.service';
 import { RepositorioEnderecoUsuarioPostgres } from '@/shared/infrastructure/database/RepositorioEnderecoUsuarioPostgres';
 import { RepositorioPerfilClientePostgres } from '@/shared/infrastructure/database/RepositorioPerfilClientePostgres';
 import { RepositorioTelefoneUsuarioPostgres } from '@/shared/infrastructure/database/RepositorioTelefoneUsuarioPostgres';
+import { RepositorioLojasPostgres } from '@/modules/lojas/repositorioLojasPostgres';
 
 /**
  * Contêiner de Injeção de Dependências Manual.
@@ -29,7 +30,9 @@ class ContainerDI {
   public static readonly repoTelefone = new RepositorioTelefoneUsuarioPostgres(ContainerDI.db);
 
   public static readonly repoCartoes = new RepositorioCartaoUsuario(ContainerDI.db);
+public static readonly repoLojas = new RepositorioLojasPostgres(ContainerDI.db);
 
+  
   // Serviços
   public static readonly gestaoIdentidadeCliente = new GestaoIdentidadeCliente(
     ContainerDI.repoUsuarios,

@@ -7,13 +7,17 @@
 BEGIN;
 
 -- ============================================
--- PASSO 1: Criar Lojas A e B para testes
+-- PASSO 1: Criar Lojas A e B para testes com IDs fixos
 -- ============================================
-INSERT INTO livraria_gestao.lojas (loj_uuid, loj_nome, loj_slug, loj_ativo)
+INSERT INTO livraria_gestao.lojas (loj_id, loj_uuid, loj_nome, loj_slug, loj_ativo)
 VALUES 
-  (gen_random_uuid(), 'Loja A Multi-Tenancy', 'loja-a-multi-tenancy', TRUE),
-  (gen_random_uuid(), 'Loja B Multi-Tenancy', 'loja-b-multi-tenancy', TRUE)
-ON CONFLICT (loj_slug) DO NOTHING;
+  (18, gen_random_uuid(), 'Loja A Multi-Tenancy', 'loja-a-multi-tenancy', TRUE),
+  (19, gen_random_uuid(), 'Loja B Multi-Tenancy', 'loja-b-multi-tenancy', TRUE)
+ON CONFLICT (loj_slug) DO UPDATE SET
+  loj_id = EXCLUDED.loj_id,
+  loj_uuid = EXCLUDED.loj_uuid,
+  loj_nome = EXCLUDED.loj_nome,
+  loj_ativo = EXCLUDED.loj_ativo;
 
 -- ============================================
 -- PASSO 2: Criar usuários admin para cada loja
