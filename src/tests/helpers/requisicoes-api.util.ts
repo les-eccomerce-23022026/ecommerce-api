@@ -5,6 +5,7 @@ import { di } from '@/shared/infrastructure/di.container';
 import { PAPEL_ADMIN, PAPEL_CLIENTE } from '@/shared/types/papeis';
 import { ITelefoneDto, IEnderecoDto } from '@/modules/clientes/Iclientes.dto';
 import { validarCpf } from '@/shared/utils/validacao-cpf.util';
+import { gerarCnpjValido } from '@/shared/utils/validacao-cnpj.util';
 
 type DadosCadastroCliente = {
   nome?: string;
@@ -41,6 +42,11 @@ export function gerarCpfValidoUnico(): string {
     }
   }
   return '529.982.247-25';
+}
+
+/** Gera CNPJ válido para testes de integração. */
+export function gerarCnpjValidoUnico(): string {
+  return gerarCnpjValido();
 }
 
 export async function registrarCliente(

@@ -12,7 +12,7 @@ describe('Integração - Cupom', () => {
     tokenCliente = await obterTokenCliente(
       contexto.app,
       'clientetest@email.com',
-      '222.222.222-22',
+      '529.982.247-25',
     );
 
     tokenAdmin = await obterTokenAdmin(contexto.app);

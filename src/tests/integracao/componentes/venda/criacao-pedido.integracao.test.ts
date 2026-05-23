@@ -1,12 +1,11 @@
 import request from 'supertest';
 import { Application } from 'express';
 import { configurarTesteIntegracao } from '@/tests/helpers/setup-integracao.util';
-import { obterTokenCliente } from '@/tests/helpers/requisicoes-api.util';
+import { obterTokenCliente, gerarCpfValidoUnico } from '@/tests/helpers/requisicoes-api.util';
 import { payloadPedidoValido } from '@/tests/helpers/pedido-venda.helper';
 import { garantirLivroComEstoqueParaCarrinho } from '@/tests/helpers/carrinho-integracao.helper';
 
-const EMAIL_CLIENTE_B = 'cliente.b.pedido@email.com';
-const CPF_CLIENTE_B = '529.982.247-25';
+const EMAIL_CLIENTE_B = `cliente.b.pedido.${Date.now()}@email.com`;
 
 
 /**
@@ -33,7 +32,7 @@ describe('Integração — Vendas / pedido do cliente', () => {
   let tokenClienteB: string;
 
   beforeAll(async () => {
-    tokenClienteB = await obterTokenCliente(app, EMAIL_CLIENTE_B, CPF_CLIENTE_B);
+    tokenClienteB = await obterTokenCliente(app, EMAIL_CLIENTE_B, gerarCpfValidoUnico());
   });
 
   describe('POST /api/vendas', () => {

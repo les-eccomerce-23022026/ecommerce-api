@@ -34,7 +34,7 @@ BEGIN
     VALUES (
         'Cliente Teste',
         'clientetest@email.com',
-        '222.222.222-22',
+        '529.982.247-25',
         '$2b$10$GaOa1GtR//oZ7.lI3y.7/uT25D7Px3T.54NuII0z/laURHdAIw59W',
         v_id_papel_cliente,
         TRUE,
