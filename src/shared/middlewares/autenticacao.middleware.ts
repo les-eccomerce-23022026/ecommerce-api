@@ -39,8 +39,8 @@ export async function autenticacaoMiddleware(
       sub: string;
       email: string;
       role: string;
-      loj_ids?: number[];
-      loj_id_principal?: number;
+      lojas?: Array<{ loj_id: number; loj_uuid: string }>;
+      loja_uuid_principal?: string;
       ip?: string;
       fingerprint?: string;
     };
@@ -78,43 +78,54 @@ export async function autenticacaoMiddleware(
       return;
     }
 
-    // Determinar loj_id atual: do header x-loja-id, cookie x-loja-id, ou usar loja principal
-    const loj_id_header = req.headers['x-loja-id'] as string | undefined;
-    const loj_id_cookie = req.cookies?.['x-loja-id'] as string | undefined;
-    const loj_id_contexto = loj_id_header || loj_id_cookie;
+    // Determinar loj_id atual: do header x-loja-uuid, cookie x-loja-uuid, ou usar loja principal
+    const loj_uuid_header = req.headers['x-loja-uuid'] as string | undefined;
+    const loj_uuid_cookie = req.cookies?.['x-loja-uuid'] as string | undefined;
+    const loj_uuid_contexto = loj_uuid_header || loj_uuid_cookie;
     let loj_id_atual: number;
     
-    if (loj_id_contexto) {
-      const loj_id_num = parseInt(loj_id_contexto);
-      if (isNaN(loj_id_num)) {
-        Logger.warn(`[auth] loj_id inválido: ${loj_id_contexto}`);
+    if (loj_uuid_contexto) {
+      // Validar formato UUID
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (!uuidRegex.test(loj_uuid_contexto)) {
+        Logger.warn(`[auth] loj_uuid inválido: ${loj_uuid_contexto}`);
         res.status(400).json({
-          mensagem: 'loj_id inválido.',
+          mensagem: 'loj_uuid inválido.',
           sucesso: false,
         });
         return;
       }
-      loj_id_atual = loj_id_num;
       
-      // Validar se loj_id está no array de loj_ids acessíveis
-      // JWT converte numbers para strings no payload, então convertemos de volta
-      const loj_ids_numbers = decodificado.loj_ids?.map(id => typeof id === 'string' ? parseInt(id) : id);
-      if (loj_ids_numbers && !loj_ids_numbers.includes(loj_id_atual)) {
-        Logger.warn(`[auth] Usuário tentando acessar loja não autorizada: ${loj_id_atual}. loj_ids disponíveis: ${loj_ids_numbers.join(', ')}`);
+      // Validar se loj_uuid está no array de lojas acessíveis
+      const loja_acessivel = decodificado.lojas?.find(l => l.loj_uuid === loj_uuid_contexto);
+      if (!loja_acessivel) {
+        Logger.warn(`[auth] Usuário tentando acessar loja não autorizada: ${loj_uuid_contexto}`);
         res.status(403).json({
           mensagem: 'Acesso não autorizado a esta loja.',
           sucesso: false,
         });
         return;
       }
+      
+      loj_id_atual = loja_acessivel.loj_id;
     } else {
       // Usar loja principal do token ou loja padrão
-      if (decodificado.loj_id_principal) {
-        loj_id_atual = decodificado.loj_id_principal;
+      if (decodificado.loja_uuid_principal) {
+        const loja_principal = decodificado.lojas?.find(l => l.loj_uuid === decodificado.loja_uuid_principal);
+        if (loja_principal) {
+          loj_id_atual = loja_principal.loj_id;
+        } else {
+          const defaultLojaId = process.env.DEFAULT_LOJA_ID;
+          if (!defaultLojaId) {
+            Logger.error('[auth] Variável de ambiente DEFAULT_LOJA_ID é obrigatória quando loja_uuid_principal não está definido');
+            throw new Error('Variável de ambiente DEFAULT_LOJA_ID é obrigatória');
+          }
+          loj_id_atual = parseInt(defaultLojaId);
+        }
       } else {
         const defaultLojaId = process.env.DEFAULT_LOJA_ID;
         if (!defaultLojaId) {
-          Logger.error('[auth] Variável de ambiente DEFAULT_LOJA_ID é obrigatória quando loj_id_principal não está definido');
+          Logger.error('[auth] Variável de ambiente DEFAULT_LOJA_ID é obrigatória quando loja_uuid_principal não está definido');
           throw new Error('Variável de ambiente DEFAULT_LOJA_ID é obrigatória');
         }
         loj_id_atual = parseInt(defaultLojaId);
@@ -127,8 +138,8 @@ export async function autenticacaoMiddleware(
         email: decodificado.email,
         role: decodificado.role,
         papeis: (usuario.papeis ?? []).map((p) => p.descricao).filter(Boolean),
-        loj_ids: decodificado.loj_ids || [loj_id_atual],
-        loj_id_principal: decodificado.loj_id_principal || loj_id_atual,
+        lojas: decodificado.lojas || [{ loj_id: loj_id_atual, loj_uuid: '' }],
+        loja_uuid_principal: decodificado.loja_uuid_principal || '',
         loj_id_atual: loj_id_atual,
       };
 
