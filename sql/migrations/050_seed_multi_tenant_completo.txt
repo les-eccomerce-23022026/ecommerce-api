@@ -1,0 +1,9 @@
+BEGIN
+INSERT 0 3
+NOTICE:  Admin do sistema criado: usu_id=156, email=admin_sistema@livraria.com.br
+DO
+NOTICE:  Admins tenant criados: Centro=157, Norte=158, Sul=159
+DO
+NOTICE:  Clientes criados: Maria=160, João=161, Ana=162, Pedro=163, Carla=164
+DO
+COMMIT
