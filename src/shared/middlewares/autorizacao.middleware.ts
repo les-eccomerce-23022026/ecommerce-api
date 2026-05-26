@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { PAPEL_ADMIN, PAPEL_CLIENTE } from '../types/papeis';
+import { PAPEL_ADMIN, PAPEL_CLIENTE, PAPEL_ADMIN_SISTEMA } from '../types/papeis';
 
 function obterDescricaoPapel(valor: unknown): string | undefined {
   if (typeof valor === 'string') {
@@ -40,20 +40,14 @@ export function usuarioTemPapelAdmin(usuario: { papeis?: unknown[]; role?: unkno
 }
 
 /**
- * Verifica se o usuário é admin mestre.
- * Para testes, considera admin@livraria.com.br como mestre.
- * Em produção, deve ser implementado com flag específica no banco.
+ * Verifica se o usuário é admin sistema.
+ * Verifica se o usuário possui o papel admin_sistema.
  */
-export function usuarioEhAdminMestre(usuario: { papeis?: unknown[]; role?: unknown; email?: string } | undefined): boolean {
-  if (!usuario || !usuario.email) {
+export function usuarioEhAdminSistema(usuario: { papeis?: unknown[]; role?: unknown } | undefined): boolean {
+  if (!usuario) {
     return false;
   }
-  // Em ambiente de teste, admin@livraria.com.br é considerado mestre
-  if (process.env.NODE_ENV === 'test' && usuario.email === 'admin@livraria.com.br') {
-    return true;
-  }
-  // TODO: Implementar verificação real em produção (flag no banco)
-  return false;
+  return possuiPapel(usuario, PAPEL_ADMIN_SISTEMA.descricao);
 }
 
 /**
@@ -78,19 +72,19 @@ export function adminOnlyMiddleware(
 }
 
 /**
- * Middleware para garantir que o usuário autenticado seja Administrador Mestre.
+ * Middleware para garantir que o usuário autenticado seja Administrador do Sistema.
  * Rotas exclusivas como criar lojas, gerenciar administradores.
  */
-export function adminMestreOnlyMiddleware(
+export function adminSistemaOnlyMiddleware(
   req: Request,
   res: Response,
   next: NextFunction,
 ): void {
   const { usuario } = req;
 
-  if (!usuarioEhAdminMestre(usuario)) {
+  if (!usuarioEhAdminSistema(usuario)) {
     res.status(403).json({
-      mensagem: 'Acesso negado. Esta rota é restrita ao Administrador Mestre.',
+      mensagem: 'Acesso negado. Esta rota é restrita ao Administrador do Sistema.',
       sucesso: false,
     });
     return;
