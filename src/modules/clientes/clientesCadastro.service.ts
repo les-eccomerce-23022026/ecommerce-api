@@ -75,7 +75,6 @@ export class ClientesCadastroService {
       await this.repositorioTelefone.criar({
         idUsuario,
         idTipoTelefone: ClientesUtils.mapearTipoTelefone(dados.telefone.tipo),
-        ddd: dados.telefone.ddd,
         numero: dados.telefone.numero,
         principal: true,
       });

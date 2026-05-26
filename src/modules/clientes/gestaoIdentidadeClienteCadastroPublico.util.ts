@@ -9,6 +9,7 @@ import { validarCpf } from '@/shared/utils/validacao-cpf.util';
 import { PAPEL_CLIENTE, PAPEL_ADMIN } from '@/shared/types/papeis';
 import type { GestaoEnderecoCliente } from '@/modules/clientes/gestaoIdentidadeClienteEndereco.service';
 import { mapearTipoTelefone } from '@/modules/clientes/gestaoIdentidadeClienteTexto.util';
+import { ServicoLojas } from '@/modules/lojas/servicoLojas';
 
 export type DepsCadastroPublicoCliente = {
   repositorioUsuarios: IRepositorioUsuarios;
@@ -16,6 +17,7 @@ export type DepsCadastroPublicoCliente = {
   repositorioTelefone: IRepositorioTelefoneUsuario;
   repositorioEndereco: IRepositorioEnderecoUsuario;
   endereco: GestaoEnderecoCliente;
+  servicoLojas?: ServicoLojas;
 };
 
 function validarSenhaECpfCadastroPublico(dados: ICriarClienteDto): void {
@@ -72,7 +74,6 @@ async function persistirTelefonePrincipalSeInformado(
   await deps.repositorioTelefone.criar({
     idUsuario: usuarioId,
     idTipoTelefone: mapearTipoTelefone(dados.telefone.tipo),
-    ddd: dados.telefone.ddd,
     numero: dados.telefone.numero,
     principal: true,
   });
@@ -121,10 +122,25 @@ export async function realizarCadastroPublicoCliente(
   await persistirTelefonePrincipalSeInformado(deps, usuario.id, dados);
   await persistirEnderecosPosCadastro(deps, usuario.id, dados);
   
-  // TODO: Criar loja se dados fornecidos (implementação futura)
-  if (dados.querSerAdmin && dados.nomeFantasiaLoja) {
-    // Implementar criação de loja aqui
-    // Precisará adicionar dependência de repositório de lojas
+  // Criar loja se dados fornecidos e servicoLojas disponível
+  if (dados.querSerAdmin && dados.nomeFantasiaLoja && deps.servicoLojas) {
+    const slug = dados.nomeFantasiaLoja
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+    
+    const cnpj = dados.tipoPessoaLoja === 'PJ' ? (dados.cnpjLoja || '') : '';
+    
+    const lojaCriada = await deps.servicoLojas.criarLoja({
+      nome: dados.nomeFantasiaLoja,
+      slug,
+      cnpj,
+    });
+    
+    // Associar administrador à loja
+    await deps.servicoLojas.associarAdminALoja(usuario.id, lojaCriada.uuid, 'admin');
   }
   
   return {

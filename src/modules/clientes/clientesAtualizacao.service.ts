@@ -137,15 +137,12 @@ export class ClientesAtualizacaoService {
   ) {
     if (!alterando || !dados.telefone) return;
 
-    const ddd = ClientesUtils.normalizarDigitos(dados.telefone.ddd);
     const numero = ClientesUtils.normalizarDigitos(dados.telefone.numero);
 
-    if (ddd.length !== 2) throw new Error('DDD deve conter exatamente 2 dígitos numéricos.');
-    if (numero.length < 8 || numero.length > 9) throw new Error('Número de telefone inválido.');
+    if (numero.length < 10 || numero.length > 11) throw new Error('Telefone deve ter 10 ou 11 dígitos (DDD + número).');
 
     const payload = {
       idTipoTelefone: ClientesUtils.mapearTipoTelefone(dados.telefone.tipo),
-      ddd,
       numero,
     };
 

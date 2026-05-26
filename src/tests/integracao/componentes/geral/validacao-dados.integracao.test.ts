@@ -210,8 +210,7 @@ describe('Integração - Validação de Dados', () => {
       const res = await registrarCliente(contexto.app, {
         telefone: {
           tipo: 'celular',
-          ddd: '99',
-          numero: '12345', // Número muito curto
+          numero: '9912345', // Número muito curto
         },
         email: 'tel.invalido@teste.com',
         limparDados: true,
@@ -226,8 +225,7 @@ describe('Integração - Validação de Dados', () => {
       const res = await registrarCliente(contexto.app, {
         telefone: {
           tipo: 'celular',
-          ddd: '11',
-          numero: '987654321',
+          numero: '11987654321',
         },
         email: 'tel.valido@teste.com',
         limparDados: true,

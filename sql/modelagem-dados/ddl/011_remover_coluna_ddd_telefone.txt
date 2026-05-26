@@ -1,0 +1,14 @@
+BEGIN
+ALTER TABLE
+ALTER TABLE
+UPDATE 38
+NOTICE:  constraint "chk_telefone_ddd_formato" of relation "telefones" does not exist, skipping
+ALTER TABLE
+NOTICE:  constraint "chk_telefone_numero_formato" of relation "telefones" does not exist, skipping
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+COMMENT
+COMMIT

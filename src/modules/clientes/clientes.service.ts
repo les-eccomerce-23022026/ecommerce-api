@@ -22,6 +22,7 @@ import {
   converterTelefoneParaDto,
 } from '@/modules/clientes/gestaoIdentidadeClienteTexto.util';
 import { ClientesUtils } from '@/modules/clientes/clientesUtils.service';
+import { ServicoLojas } from '@/modules/lojas/servicoLojas';
 
 /**
  * Serviço responsável pelo fluxo de cadastro público de clientes.
@@ -43,6 +44,8 @@ export class GestaoIdentidadeCliente {
 
   private readonly operacoes: GestaoIdentidadeClienteOperacoes;
 
+  private readonly servicoLojas?: ServicoLojas;
+
   constructor(
     repositorioUsuarios: IRepositorioUsuarios,
     repositorioPerfil: IRepositorioPerfilCliente,
@@ -50,6 +53,7 @@ export class GestaoIdentidadeCliente {
     repositorioEndereco: IRepositorioEnderecoUsuario,
     repositorioCartoes: IRepositorioCartaoUsuario,
     db: IConexaoBanco,
+    servicoLojas?: ServicoLojas,
   ) {
     this.repositorioUsuarios = repositorioUsuarios;
     this.repositorioPerfil = repositorioPerfil;
@@ -57,6 +61,7 @@ export class GestaoIdentidadeCliente {
     this.repositorioEndereco = repositorioEndereco;
     this.repositorioCartoes = repositorioCartoes;
     this.db = db;
+    this.servicoLojas = servicoLojas;
     this.endereco = new GestaoEnderecoCliente(db, repositorioEndereco);
     this.operacoes = new GestaoIdentidadeClienteOperacoes({
       repositorioUsuarios,
@@ -65,6 +70,7 @@ export class GestaoIdentidadeCliente {
       repositorioEndereco,
       endereco: this.endereco,
       obterPerfil: (uuid) => this.obterPerfil(uuid),
+      servicoLojas: this.servicoLojas,
     });
   }
 

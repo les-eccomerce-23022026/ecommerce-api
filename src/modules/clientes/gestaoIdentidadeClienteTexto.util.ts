@@ -49,7 +49,6 @@ export function converterTelefoneParaDto(telefone: ITelefoneUsuario): ITelefoneD
   };
   return {
     tipo: tipos[telefone.idTipoTelefone] || 'Celular',
-    ddd: telefone.ddd,
     numero: telefone.numero,
     numeroMascarado: mascararNumeroTelefone(telefone.numero),
   };

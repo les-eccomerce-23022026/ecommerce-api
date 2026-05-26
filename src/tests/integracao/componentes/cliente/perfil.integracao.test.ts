@@ -112,7 +112,7 @@ describe('Integração - Clientes (Perfil)', () => {
           .patch('/api/clientes/perfil')
           .set('Authorization', `Bearer ${token}`)
           .send({
-            telefone: { tipo: 'Celular', ddd: '11', numero: '988887777' },
+            telefone: { tipo: 'Celular', numero: '11988887777' },
           });
 
         expect(resposta.status).toBe(400);
@@ -144,7 +144,7 @@ describe('Integração - Clientes (Perfil)', () => {
           .set('Authorization', `Bearer ${token}`)
           .send({
             nome: 'Cliente Com Telefone Novo',
-            telefone: { tipo: 'Celular', ddd: '21', numero: '977776666' },
+            telefone: { tipo: 'Celular', numero: '21977776666' },
             senhaConfirmacao: 'SenhaForte@123',
           });
 

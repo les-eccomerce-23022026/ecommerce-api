@@ -11,6 +11,7 @@ import { RepositorioEnderecoUsuarioPostgres } from '@/shared/infrastructure/data
 import { RepositorioPerfilClientePostgres } from '@/shared/infrastructure/database/RepositorioPerfilClientePostgres';
 import { RepositorioTelefoneUsuarioPostgres } from '@/shared/infrastructure/database/RepositorioTelefoneUsuarioPostgres';
 import { RepositorioLojasPostgres } from '@/modules/lojas/repositorioLojasPostgres';
+import { ServicoLojas } from '@/modules/lojas/servicoLojas';
 
 /**
  * Contêiner de Injeção de Dependências Manual.
@@ -30,10 +31,11 @@ class ContainerDI {
   public static readonly repoTelefone = new RepositorioTelefoneUsuarioPostgres(ContainerDI.db);
 
   public static readonly repoCartoes = new RepositorioCartaoUsuario(ContainerDI.db);
-public static readonly repoLojas = new RepositorioLojasPostgres(ContainerDI.db);
+  public static readonly repoLojas = new RepositorioLojasPostgres(ContainerDI.db);
 
-  
   // Serviços
+  public static readonly servicoLojas = new ServicoLojas(ContainerDI.repoLojas);
+
   public static readonly gestaoIdentidadeCliente = new GestaoIdentidadeCliente(
     ContainerDI.repoUsuarios,
     ContainerDI.repoPerfil,
@@ -41,6 +43,7 @@ public static readonly repoLojas = new RepositorioLojasPostgres(ContainerDI.db);
     ContainerDI.repoEndereco,
     ContainerDI.repoCartoes,
     ContainerDI.db,
+    ContainerDI.servicoLojas,
   );
 
   public static readonly servicoConsultaClientes = new ServicoConsultaClientes(ContainerDI.repoUsuarios);

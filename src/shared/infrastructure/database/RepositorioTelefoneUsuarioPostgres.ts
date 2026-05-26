@@ -25,7 +25,6 @@ export class RepositorioTelefoneUsuarioPostgres implements IRepositorioTelefoneU
       uuid: row.uuid as string,
       idUsuario: Number(row.idUsuario),
       idTipoTelefone: Number(row.idTipoTelefone),
-      ddd: row.ddd as string,
       numero: row.numero as string,
       principal: row.principal as boolean,
       criadoEm: row.criadoEm ? new Date(row.criadoEm as string) : undefined,
@@ -35,13 +34,12 @@ export class RepositorioTelefoneUsuarioPostgres implements IRepositorioTelefoneU
 
   public async criar(telefone: ITelefoneUsuario): Promise<void> {
     const query = `
-      INSERT INTO telefones (usu_id, ttp_id, tel_ddd, tel_numero, tel_principal)
-      VALUES ($1, $2, $3, $4, $5)
+      INSERT INTO telefones (usu_id, ttp_id, tel_numero, tel_principal)
+      VALUES ($1, $2, $3, $4)
     `;
     const valores: any[] = [
       telefone.idUsuario,
       telefone.idTipoTelefone,
-      telefone.ddd,
       telefone.numero,
       telefone.principal,
     ];
@@ -53,7 +51,7 @@ export class RepositorioTelefoneUsuarioPostgres implements IRepositorioTelefoneU
     const query = `
       SELECT tel_id AS "id", tel_uuid AS "uuid",
              usu_id AS "idUsuario", ttp_id AS "idTipoTelefone",
-             tel_ddd AS "ddd", tel_numero AS "numero", tel_principal AS "principal",
+             tel_numero AS "numero", tel_principal AS "principal",
              tel_criado_em AS "criadoEm", tel_atualizado_em AS "atualizadoEm"
       FROM telefones
       WHERE usu_id = $1
@@ -67,12 +65,11 @@ export class RepositorioTelefoneUsuarioPostgres implements IRepositorioTelefoneU
   public async atualizar(telefone: ITelefoneUsuario): Promise<void> {
     const query = `
       UPDATE telefones
-      SET ttp_id = $1, tel_ddd = $2, tel_numero = $3, tel_principal = $4
-      WHERE usu_id = $5 AND tel_uuid = $6
+      SET ttp_id = $1, tel_numero = $2, tel_principal = $3
+      WHERE usu_id = $4 AND tel_uuid = $5
     `;
     const parametros: any[] = [
       telefone.idTipoTelefone,
-      telefone.ddd,
       telefone.numero,
       telefone.principal,
       telefone.idUsuario,

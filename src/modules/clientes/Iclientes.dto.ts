@@ -1,6 +1,5 @@
 export interface ITelefoneDto {
   tipo: string;
-  ddd: string;
   numero: string;
   numeroMascarado?: string;
 }

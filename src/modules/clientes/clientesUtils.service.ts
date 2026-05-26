@@ -91,7 +91,6 @@ export class ClientesUtils {
 
     return {
       tipo: tipos[telefone.idTipoTelefone] || 'Celular',
-      ddd: telefone.ddd,
       numero: telefone.numero,
       numeroMascarado: this.mascararNumeroTelefone(telefone.numero),
     };

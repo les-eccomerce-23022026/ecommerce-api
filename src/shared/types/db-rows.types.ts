@@ -87,7 +87,6 @@ export interface IRowTelefoneUsuario {
   uuid?: string;
   idUsuario?: string | number;
   idTipoTelefone?: string | number;
-  ddd?: string;
   numero?: string;
   principal?: boolean | string;
   criadoEm?: string | Date;

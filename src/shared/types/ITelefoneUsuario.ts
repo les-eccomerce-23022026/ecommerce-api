@@ -3,7 +3,6 @@ export interface ITelefoneUsuario {
   uuid?: string;
   idUsuario: number;
   idTipoTelefone: number;
-  ddd: string;
   numero: string;
   principal: boolean;
   criadoEm?: Date;

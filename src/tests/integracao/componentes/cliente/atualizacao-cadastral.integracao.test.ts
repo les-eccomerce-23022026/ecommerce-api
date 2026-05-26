@@ -238,8 +238,7 @@ describe('Integração - Atualização Cadastral', () => {
           senhaConfirmacao: 'SenhaForte@123',
           telefone: {
             tipo: 'celular',
-            ddd: '11',
-            numero: '999999999',
+            numero: '11999999999',
           },
         });
 

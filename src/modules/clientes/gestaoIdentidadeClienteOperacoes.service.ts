@@ -13,6 +13,7 @@ import { IPerfilCliente } from '@/shared/types/IPerfilCliente';
 import { GestaoEnderecoCliente } from '@/modules/clientes/gestaoIdentidadeClienteEndereco.service';
 import { mapearTipoTelefone, normalizarDigitos } from '@/modules/clientes/gestaoIdentidadeClienteTexto.util';
 import { realizarCadastroPublicoCliente } from '@/modules/clientes/gestaoIdentidadeClienteCadastroPublico.util';
+import { ServicoLojas } from '@/modules/lojas/servicoLojas';
 
 function parsearDataNascimentoSomenteData(valor: string): Date {
   const partes = valor.trim().split('-').map(Number);
@@ -30,15 +31,16 @@ type DepsOperacoes = {
   repositorioEndereco: IRepositorioEnderecoUsuario;
   endereco: GestaoEnderecoCliente;
   obterPerfil: (uuid: string) => Promise<IPerfilClienteDto>;
+  servicoLojas?: ServicoLojas;
 };
 
 export class GestaoIdentidadeClienteOperacoes {
   constructor(private readonly deps: DepsOperacoes) {}
 
   public async realizarCadastroPublico(dados: ICriarClienteDto) {
-    const { repositorioUsuarios, repositorioPerfil, repositorioTelefone, repositorioEndereco, endereco } = this.deps;
+    const { repositorioUsuarios, repositorioPerfil, repositorioTelefone, repositorioEndereco, endereco, servicoLojas } = this.deps;
     return realizarCadastroPublicoCliente(
-      { repositorioUsuarios, repositorioPerfil, repositorioTelefone, repositorioEndereco, endereco },
+      { repositorioUsuarios, repositorioPerfil, repositorioTelefone, repositorioEndereco, endereco, servicoLojas },
       dados,
     );
   }
@@ -152,19 +154,14 @@ export class GestaoIdentidadeClienteOperacoes {
     }
     const telefonesExistentes = await this.deps.repositorioTelefone.buscarPorIdUsuario(usuarioNoBanco.id);
     const telefonePrincipal = telefonesExistentes.find((t) => t.principal) || telefonesExistentes[0];
-    const dddNormalizado = normalizarDigitos(dados.telefone.ddd);
     const numeroNormalizado = normalizarDigitos(dados.telefone.numero);
-    if (dddNormalizado.length !== 2) {
-      throw new Error('DDD deve conter exatamente 2 dígitos numéricos.');
-    }
-    if (numeroNormalizado.length < 8 || numeroNormalizado.length > 9) {
-      throw new Error('Número de telefone deve conter 8 ou 9 dígitos numéricos.');
+    if (numeroNormalizado.length < 10 || numeroNormalizado.length > 11) {
+      throw new Error('Telefone deve ter 10 ou 11 dígitos (DDD + número).');
     }
     if (telefonePrincipal?.uuid) {
       await this.deps.repositorioTelefone.atualizar({
         ...telefonePrincipal,
         idTipoTelefone: mapearTipoTelefone(dados.telefone.tipo),
-        ddd: dddNormalizado,
         numero: numeroNormalizado,
       });
       return;
@@ -172,7 +169,6 @@ export class GestaoIdentidadeClienteOperacoes {
     await this.deps.repositorioTelefone.criar({
       idUsuario: usuarioNoBanco.id,
       idTipoTelefone: mapearTipoTelefone(dados.telefone.tipo),
-      ddd: dddNormalizado,
       numero: numeroNormalizado,
       principal: true,
     });
