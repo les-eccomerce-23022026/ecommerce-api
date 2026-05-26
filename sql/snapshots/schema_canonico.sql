@@ -1,4 +1,4 @@
--- Gerado em: 2026-05-22 14:35:12
+-- Gerado em: 2026-05-25 22:48:51
 -- Fonte: ecm_postgres / ecm_livraria
 -- Comando: npm run db:snapshot
 
@@ -2791,7 +2791,9 @@ CREATE TABLE livraria_gestao.admin_lojas (
     loj_id bigint NOT NULL,
     adl_papel character varying(20) NOT NULL,
     adl_ativo boolean DEFAULT true,
-    adl_criado_em timestamp with time zone DEFAULT now()
+    adl_criado_em timestamp with time zone DEFAULT now(),
+    adl_escopo character varying(20) DEFAULT 'LOJA'::character varying NOT NULL,
+    CONSTRAINT ck_admin_lojas_escopo_valido CHECK (((adl_escopo)::text = ANY ((ARRAY['SISTEMA'::character varying, 'LOJA'::character varying])::text[])))
 );
 
 
@@ -6075,6 +6077,13 @@ CREATE INDEX idx_pagamento_uuid ON livraria_financeiro.pagamento USING btree (pa
 --
 
 CREATE INDEX idx_pagamento_venda ON livraria_financeiro.pagamento USING btree (ven_id);
+
+
+--
+-- Name: idx_admin_lojas_escopo; Type: INDEX; Schema: livraria_gestao; Owner: -
+--
+
+CREATE INDEX idx_admin_lojas_escopo ON livraria_gestao.admin_lojas USING btree (adl_escopo);
 
 
 --
