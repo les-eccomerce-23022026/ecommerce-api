@@ -11,7 +11,7 @@ export const USUARIO_QUERIES = {
  `,
   SELECT_PAPEIS_USUARIO: `
     SELECT p.pap_id AS "id", p.pap_descricao AS "descricao"
-    FROM livraria_comercial.papeis p
+    FROM livraria_gestao.papeis p
     INNER JOIN livraria_gestao.usuario_papeis up ON p.pap_id = up.pap_id
     WHERE up.usu_id = $1 AND up.usp_ativo = TRUE
   `,
@@ -49,7 +49,7 @@ export const USUARIO_QUERIES = {
            u.usu_criado_em AS "criadoEm", u.usu_atualizado_em AS "atualizadoEm",
            p.pap_descricao AS "papelDescricao"
     FROM livraria_gestao.usuarios u
-    JOIN livraria_comercial.papeis p ON u.pap_id = p.pap_id
+    JOIN livraria_gestao.papeis p ON u.pap_id = p.pap_id
     INNER JOIN livraria_gestao.usuario_papeis up ON u.usu_id = up.usu_id
     WHERE up.pap_id = $1 AND up.usp_ativo = TRUE
  `,

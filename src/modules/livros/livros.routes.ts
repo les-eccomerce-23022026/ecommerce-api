@@ -2,6 +2,8 @@ import { Router } from 'express';
 import { ConexaoPostgres } from '@/shared/infrastructure/database/ConexaoPostgres';
 import { autenticacaoMiddleware } from '@/shared/middlewares/autenticacao.middleware';
 import { adminOnlyMiddleware } from '@/shared/middlewares/autorizacao.middleware';
+import { contextoLojaMiddleware } from '@/shared/middlewares/contextoLoja.middleware';
+import { acessoProdutosMiddleware } from '@/shared/middlewares/acessoProdutos.middleware';
 import { RepositorioLivrosPostgres } from '@/modules/livros/repositorioLivrosPostgres';
 import { RepositorioLivrosBulkInsert } from '@/modules/livros/repositorioLivrosBulkInsert';
 import { ServicoLivros } from '@/modules/livros/servicoLivros';
@@ -20,6 +22,7 @@ export function registrarRotasLivros(router: Router): void {
     '/admin/livros',
     autenticacaoMiddleware,
     adminOnlyMiddleware,
+    acessoProdutosMiddleware,
     controller.listarAdmin.bind(controller),
   );
 
@@ -55,6 +58,7 @@ export function registrarRotasLivros(router: Router): void {
     '/admin/livros/:uuid([0-9a-fA-F-]{36})',
     autenticacaoMiddleware,
     adminOnlyMiddleware,
+    acessoProdutosMiddleware,
     controller.detalhesAdmin.bind(controller),
   );
 
@@ -79,6 +83,6 @@ export function registrarRotasLivros(router: Router): void {
     controller.criarEditorasEmLote.bind(controller),
   );
 
-  router.get('/livros', controller.listarCatalogo.bind(controller));
-  router.get('/livros/:uuid([0-9a-fA-F-]{36})', controller.detalhes.bind(controller));
+  router.get('/livros', contextoLojaMiddleware, controller.listarCatalogo.bind(controller));
+  router.get('/livros/:uuid([0-9a-fA-F-]{36})', contextoLojaMiddleware, controller.detalhes.bind(controller));
 }

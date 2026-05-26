@@ -138,4 +138,38 @@ export class ControladorLojas {
       return RespostaPadrao.enviarErro(resposta, 400, mensagem);
     }
   }
+
+  /**
+   * Obtém as lojas do administrador autenticado.
+   * Endpoint: GET /api/admin/lojas/minhas-lojas
+   */
+  public static async obterMinhasLojas(requisicao: Request, resposta: Response): Promise<Response> {
+    try {
+      const usuarioAutenticado = requisicao.usuario;
+
+      if (!usuarioAutenticado) {
+        Logger.warn('[obterMinhasLojas] Usuário não autenticado');
+        return RespostaPadrao.enviarErro(resposta, 401, 'Usuário não autenticado.');
+      }
+
+      const usuarioId = usuarioAutenticado.id;
+
+      Logger.info('[obterMinhasLojas] Buscando lojas do administrador', { usuarioId });
+
+      const lojas = await servicoLojas.buscarLojasDoAdmin(usuarioId);
+
+      Logger.info('[obterMinhasLojas] Lojas do administrador obtidas com sucesso', { 
+        usuarioId,
+        quantidade: lojas.length
+      });
+
+      return RespostaPadrao.enviarSucesso(resposta, 200, lojas);
+    } catch (erro) {
+      Logger.error('[obterMinhasLojas] Erro ao obter lojas do administrador', { 
+        erro: erro instanceof Error ? erro.message : String(erro) 
+      });
+      const mensagem = RespostaPadrao.obterMensagemErro(erro, 'Erro ao obter lojas do administrador.');
+      return RespostaPadrao.enviarErro(resposta, 500, mensagem);
+    }
+  }
 }

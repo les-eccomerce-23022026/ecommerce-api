@@ -29,6 +29,7 @@ function mapRow(r: RowLivro): ILivroCatalogoDto {
     imagem: r.liv_imagem_url ?? undefined,
     isbn: r.liv_isbn,
     estoque: r.etq_quantidade_disponivel,
+    estoqueDisponivel: r.etq_quantidade_disponivel,
     sinopse: r.liv_sinopse ?? undefined,
     status: r.liv_ativo ? 'Ativo' : 'Inativo',
     estrelas: 5,
@@ -41,6 +42,9 @@ export class RepositorioLivrosPostgres {
   /**
    * Obtém o loj_id do contexto de requisição.
    * Se não houver contexto, retorna undefined (compatibilidade com código legado).
+   * 
+   * NOTA: O middleware contextoLojaMiddleware converte loj_uuid para loj_id
+   * e armazena ambos no contexto. Repositórios usam loj_id para performance.
    */
   private obterLojId(): number | undefined {
     return ContextoRequisicao.obterLojId();
@@ -90,8 +94,8 @@ export class RepositorioLivrosPostgres {
 
     const sqlCount = `
       SELECT COUNT(DISTINCT l.liv_id)::text AS c
-      FROM livros l
-      INNER JOIN estoques e ON e.liv_id = l.liv_id
+      FROM livraria_comercial.livros l
+      INNER JOIN livraria_comercial.estoques e ON e.liv_id = l.liv_id
       WHERE l.liv_ativo = TRUE AND e.etq_ativo = TRUE AND e.etq_quantidade_disponivel > 0
       ${filtroCategoria}
       ${filtroLoja}
@@ -110,9 +114,9 @@ export class RepositorioLivrosPostgres {
         e.etq_preco_venda,
         e.etq_quantidade_disponivel,
         l.liv_ativo
-      FROM livros l
-      INNER JOIN autores a ON l.aut_id = a.aut_id
-      INNER JOIN estoques e ON e.liv_id = l.liv_id
+      FROM livraria_comercial.livros l
+      INNER JOIN livraria_comercial.autores a ON l.aut_id = a.aut_id
+      INNER JOIN livraria_comercial.estoques e ON e.liv_id = l.liv_id
       ${joinVendas}
       WHERE l.liv_ativo = TRUE AND e.etq_ativo = TRUE AND e.etq_quantidade_disponivel > 0
       ${filtroCategoria}
@@ -145,9 +149,9 @@ export class RepositorioLivrosPostgres {
         e.etq_preco_venda,
         e.etq_quantidade_disponivel,
         l.liv_ativo
-      FROM livros l
-      INNER JOIN autores a ON l.aut_id = a.aut_id
-      INNER JOIN estoques e ON e.liv_id = l.liv_id
+      FROM livraria_comercial.livros l
+      INNER JOIN livraria_comercial.autores a ON l.aut_id = a.aut_id
+      INNER JOIN livraria_comercial.estoques e ON e.liv_id = l.liv_id
       WHERE l.liv_uuid = $1 AND e.etq_ativo = TRUE
     `;
     
@@ -181,9 +185,9 @@ export class RepositorioLivrosPostgres {
         e.etq_preco_venda,
         e.etq_quantidade_disponivel,
         l.liv_ativo
-      FROM livros l
-      INNER JOIN autores a ON l.aut_id = a.aut_id
-      INNER JOIN estoques e ON e.liv_id = l.liv_id
+      FROM livraria_comercial.livros l
+      INNER JOIN livraria_comercial.autores a ON l.aut_id = a.aut_id
+      INNER JOIN livraria_comercial.estoques e ON e.liv_id = l.liv_id
       WHERE e.etq_ativo = TRUE
     `;
     
@@ -209,7 +213,7 @@ export class RepositorioLivrosPostgres {
   async obterEstoqueDisponivelPorLivId(livId: number): Promise<number | null> {
     const loj_id = this.obterLojId();
     
-    let sql = `SELECT etq_quantidade_disponivel FROM estoques WHERE liv_id = $1 AND etq_ativo = TRUE`;
+    let sql = `SELECT etq_quantidade_disponivel FROM livraria_comercial.estoques WHERE liv_id = $1 AND etq_ativo = TRUE`;
     const parametros: DbParametro[] = [livId];
 
     // Se multi-tenancy estiver habilitado, filtrar por loj_id no estoque
@@ -226,7 +230,7 @@ export class RepositorioLivrosPostgres {
 
   async obterLivIdPorUuid(livUuid: string): Promise<number | null> {
     const rows = await this.db.executar<{ liv_id: number }>(
-      'SELECT liv_id FROM livros WHERE liv_uuid = $1',
+      'SELECT liv_id FROM livraria_comercial.livros WHERE liv_uuid = $1',
       [livUuid] as DbParametro[],
     );
     return rows.length ? rows[0].liv_id : null;

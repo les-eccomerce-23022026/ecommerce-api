@@ -21,7 +21,8 @@ export class RepositorioLojasPostgres {
     const sql = `
       INSERT INTO livraria_gestao.lojas (loj_nome, loj_slug, loj_cnpj)
       VALUES ($1, $2, $3)
-      RETURNING loj_uuid AS "uuid", loj_nome AS "nome", loj_slug AS "slug", loj_cnpj AS "cnpj", loj_ativo AS "ativo"
+      RETURNING loj_uuid AS "uuid", loj_nome AS "nome", loj_slug AS "slug", 
+             COALESCE(TRIM(loj_cnpj), '') AS "cnpj", loj_ativo AS "ativo"
     `;
 
     const values = [dados.nome, dados.slug, dados.cnpj];
@@ -36,7 +37,8 @@ export class RepositorioLojasPostgres {
    */
   public async listarLojas(): Promise<IListaLojaDto[]> {
     const sql = `
-      SELECT loj_uuid AS "uuid", loj_nome AS "nome", loj_slug AS "slug", loj_cnpj AS "cnpj", loj_ativo AS "ativo"
+      SELECT loj_uuid AS "uuid", loj_nome AS "nome", loj_slug AS "slug", 
+             COALESCE(TRIM(loj_cnpj), '') AS "cnpj", loj_ativo AS "ativo"
       FROM livraria_gestao.lojas
       ORDER BY loj_nome
     `;
@@ -50,7 +52,8 @@ export class RepositorioLojasPostgres {
    */
   public async buscarPorUuid(uuid: string): Promise<IListaLojaDto | undefined> {
     const sql = `
-      SELECT loj_uuid AS "uuid", loj_nome AS "nome", loj_slug AS "slug", loj_cnpj AS "cnpj", loj_ativo AS "ativo"
+      SELECT loj_uuid AS "uuid", loj_nome AS "nome", loj_slug AS "slug", 
+             COALESCE(TRIM(loj_cnpj), '') AS "cnpj", loj_ativo AS "ativo"
       FROM livraria_gestao.lojas
       WHERE loj_uuid = $1
     `;
@@ -73,7 +76,8 @@ export class RepositorioLojasPostgres {
    */
   public async buscarPorSlug(slug: string): Promise<IListaLojaDto | undefined> {
     const sql = `
-      SELECT loj_uuid AS "uuid", loj_nome AS "nome", loj_slug AS "slug", loj_cnpj AS "cnpj", loj_ativo AS "ativo"
+      SELECT loj_uuid AS "uuid", loj_nome AS "nome", loj_slug AS "slug", 
+             COALESCE(TRIM(loj_cnpj), '') AS "cnpj", loj_ativo AS "ativo"
       FROM livraria_gestao.lojas
       WHERE loj_slug = $1
     `;
@@ -117,7 +121,8 @@ export class RepositorioLojasPostgres {
    */
   public async buscarLojasDoAdmin(usuarioId: number): Promise<IListaLojaDto[]> {
     const sql = `
-      SELECT l.loj_uuid AS "uuid", l.loj_nome AS "nome", l.loj_slug AS "slug", l.loj_cnpj AS "cnpj", l.loj_ativo AS "ativo"
+      SELECT l.loj_uuid AS "uuid", l.loj_nome AS "nome", l.loj_slug AS "slug", 
+             COALESCE(TRIM(l.loj_cnpj), '') AS "cnpj", l.loj_ativo AS "ativo"
       FROM livraria_gestao.lojas l
       INNER JOIN livraria_gestao.admin_lojas al ON l.loj_id = al.loj_id
       WHERE al.usu_id = $1 AND al.adl_ativo = TRUE

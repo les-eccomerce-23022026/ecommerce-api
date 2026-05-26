@@ -144,8 +144,8 @@ export class ControladorLivros {
         RespostaPadrao.enviarErro(res, 404, 'Livro não encontrado');
         return;
       }
-      // Endpoint público: manter formato antigo para compatibilidade backward
-      res.status(200).json(livro);
+      // Envolver em RespostaPadrao para manter consistência com outros endpoints
+      RespostaPadrao.enviarSucesso(res, 200, livro);
     } catch (err: unknown) {
       const msg = RespostaPadrao.obterMensagemErro(err, 'Erro ao obter livro');
       RespostaPadrao.enviarErro(res, 500, msg);

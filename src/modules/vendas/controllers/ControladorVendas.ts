@@ -22,21 +22,60 @@ export class ControladorVendas {
 
   /**
    * Endpoint para criar uma venda: POST /vendas
+   * Validações de negócio:
+   * - RN0037: Valor total deve ser > 0
+   * - RN0069: Parcelamento só permitido para compras >= R$ 80
+   * - RN0034: Em split de pagamento, cada cartão deve ser >= R$ 10
    */
   public registrarPedidoVenda = async (req: Request, res: Response) => {
     try {
       // Extrai o UUID do usuário do token JWT (anexado pelo middleware de autenticação)
-      const { usuarioUuid } = req.body;
+      const { usuarioUuid, enderecoEntregaUuid, itens, valorFrete, cotacaoUuid, parcelas, pagamentos } = req.body;
+      
       // Se não vier no body, obtém do req.usuario (extraído do JWT pelo middleware)
+      const usuarioUuidFinal = usuarioUuid || req.usuario?.uuid;
+      
+      if (!usuarioUuidFinal) {
+        res.status(401).json({ erro: 'Usuário não autenticado' });
+        return;
+      }
+
+      if (!itens || !Array.isArray(itens) || itens.length === 0) {
+        res.status(400).json({ erro: 'Itens do pedido são obrigatórios' });
+        return;
+      }
+
+      // Calcular valorTotalItens automaticamente
+      const valorTotalItens = itens.reduce((acc: number, item: any) => {
+        if (!item.livroUuid || !item.quantidade || !item.precoUnitario) {
+          throw new Error('Cada item deve conter livroUuid, quantidade e precoUnitario');
+        }
+        return acc + (item.quantidade * item.precoUnitario);
+      }, 0);
+
+      // Usar valorFrete fornecido ou padrão 0
+      const valorFreteFinal = valorFrete || 0;
+
+      // Usar valorTotal fornecido ou calcular automaticamente
+      const valorTotal = req.body.valorTotal !== undefined ? req.body.valorTotal : valorTotalItens + valorFreteFinal;
+
       const vInput = {
-        ...req.body,
-        usuarioUuid: usuarioUuid || req.usuario?.uuid,
+        usuarioUuid: usuarioUuidFinal,
+        itens,
+        valorTotalItens,
+        valorFrete: valorFreteFinal,
+        valorTotal,
+        cotacaoUuid,
+        enderecoEntregaUuid, // Será usado pelo serviço de entrega se necessário
+        parcelas, // Passado para validação RN0069
+        pagamentos, // Passado para validação RN0034
       };
 
       const venda = await this.servicoVendas.registrarPedidoVenda(vInput);
       res.status(201).json(venda);
     } catch (err: unknown) {
       const mensagem = err instanceof Error ? err.message : 'Erro desconhecido';
+      console.error('[ControladorVendas.registrarPedidoVenda] Erro:', mensagem, err);
       res.status(400).json({ erro: mensagem });
     }
   };

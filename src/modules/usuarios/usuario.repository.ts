@@ -170,7 +170,7 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
     valores.push(uuid);
     const idxUuid = valores.length;
     const query = `
-      UPDATE usuarios 
+      UPDATE livraria_gestao.usuarios 
       SET ${campos.join(', ')} 
       WHERE usu_uuid = $${idxUuid}
     `;
@@ -275,7 +275,7 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
     const { nome, cpf, email } = filtros;
     const loj_id = this.obterLojId();
     const valores: DbParametro[] = [PAPEL_CLIENTE.id];
-    let query = 'SELECT COUNT(*) as total FROM usuarios u WHERE pap_id = $1';
+    let query = 'SELECT COUNT(*) as total FROM livraria_gestao.usuarios u WHERE pap_id = $1';
     let contador = 2;
 
     const filtrosMapeados = [ { val: nome, sql: 'u.usu_nome' }, { val: cpf, sql: 'u.usu_cpf' }, { val: email, sql: 'u.usu_email' } ];
@@ -355,6 +355,58 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
         if (transacaoAtiva) {
           await this.db.executar(`ROLLBACK TO SAVEPOINT ${savepoint}`);
         }
+        return [];
+      }
+    };
+
+    const lojasCliente = await executarConsultaOpcional(queryCliente, 'cliente');
+    const lojasAdmin = await executarConsultaOpcional(queryAdmin, 'admin');
+    
+    // Remover duplicatas baseando-se em loj_id
+    const lojasUnicas = new Map<number, number>();
+    [...lojasCliente, ...lojasAdmin].forEach(loj_id => {
+      lojasUnicas.set(loj_id, loj_id);
+    });
+    
+    return Array.from(lojasUnicas.values());
+  }
+
+  /**
+   * Busca UUIDs das lojas do usuário para multi-tenancy.
+   * Retorna array de objetos com loj_id e loj_uuid para uso no token JWT.
+   */
+  public async buscarLojasDoUsuarioComUuids(usuarioId: number): Promise<Array<{ loj_id: number; loj_uuid: string }>> {
+    const queryCliente = `
+      SELECT DISTINCT l.loj_id, l.loj_uuid
+      FROM livraria_gestao.lojas l
+      INNER JOIN livraria_gestao.clientes c ON c.loj_id = l.loj_id
+      WHERE c.usu_id = $1 AND c.loj_id IS NOT NULL
+    `;
+    const queryAdmin = `
+      SELECT DISTINCT l.loj_id, l.loj_uuid
+      FROM livraria_gestao.lojas l
+      INNER JOIN livraria_gestao.admin_lojas al ON al.loj_id = l.loj_id
+      WHERE al.usu_id = $1 AND al.adl_ativo = TRUE
+    `;
+
+    const executarConsultaOpcional = async (sql: string, rotulo: string): Promise<Array<{ loj_id: number; loj_uuid: string }>> => {
+      const transacaoAtiva = obterTransacaoAtual();
+      const savepoint = `sp_lojas_${rotulo}`;
+
+      if (transacaoAtiva) {
+        await this.db.executar(`SAVEPOINT ${savepoint}`);
+      }
+
+      try {
+        const rows = await this.db.executar<{ loj_id: number; loj_uuid: string }>(sql, [usuarioId]);
+        if (transacaoAtiva) {
+          await this.db.executar(`RELEASE SAVEPOINT ${savepoint}`);
+        }
+        return rows.map((row) => ({ loj_id: row.loj_id, loj_uuid: row.loj_uuid }));
+      } catch (erro) {
+        if (transacaoAtiva) {
+          await this.db.executar(`ROLLBACK TO SAVEPOINT ${savepoint}`);
+        }
         if ((erro as { code?: string }).code === '42P01') {
           return [];
         }
@@ -364,7 +416,36 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
 
     const lojasCliente = await executarConsultaOpcional(queryCliente, 'cliente');
     const lojasAdmin = await executarConsultaOpcional(queryAdmin, 'admin');
-    return [...new Set([...lojasCliente, ...lojasAdmin])];
+    
+    // Remover duplicatas baseando-se em loj_id
+    const lojasUnicas = new Map<number, { loj_id: number; loj_uuid: string }>();
+    [...lojasCliente, ...lojasAdmin].forEach(loja => {
+      lojasUnicas.set(loja.loj_id, loja);
+    });
+    
+    return Array.from(lojasUnicas.values());
+  }
+
+  /**
+   * Busca UUID da loja por ID interno.
+   * Usado para fallback quando usuário não tem lojas associadas.
+   */
+  public async buscarLojaUuidPorId(lojId: number): Promise<string | undefined> {
+    const query = `
+      SELECT loj_uuid
+      FROM livraria_gestao.lojas
+      WHERE loj_id = $1
+    `;
+    
+    try {
+      const rows = await this.db.executar<{ loj_uuid: string }>(query, [lojId]);
+      return rows.length > 0 ? rows[0].loj_uuid : undefined;
+    } catch (erro) {
+      if ((erro as { code?: string }).code === '42P01') {
+        return undefined;
+      }
+      throw erro;
+    }
   }
 
   public async associarPapelUsuario(usuarioId: number, papelId: number): Promise<void> {

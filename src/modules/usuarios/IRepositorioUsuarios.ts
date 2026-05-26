@@ -34,6 +34,8 @@ export interface IRepositorioUsuarios {
   contarClientesComFiltros(filtros: Omit<IFiltrosConsultaClientes, 'offset' | 'limite'>): Promise<number>;
   buscarSenhaMestra(idPapel: number): Promise<string | undefined>;
   buscarLojasDoUsuario(usuarioId: number): Promise<number[]>;
+  buscarLojasDoUsuarioComUuids(usuarioId: number): Promise<Array<{ loj_id: number; loj_uuid: string }>>;
+  buscarLojaUuidPorId(lojId: number): Promise<string | undefined>;
   associarPapelUsuario(usuarioId: number, papelId: number): Promise<void>;
   removerPapelUsuario(usuarioId: number, papelId: number): Promise<void>;
   removerTodosPapeisUsuario(usuarioId: number): Promise<void>;

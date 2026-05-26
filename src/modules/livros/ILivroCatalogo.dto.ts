@@ -9,6 +9,7 @@ export interface ILivroCatalogoDto {
   imagem?: string;
   isbn: string;
   estoque: number;
+  estoqueDisponivel: number;
   sinopse?: string;
   status: 'Ativo' | 'Inativo';
   estrelas?: number;

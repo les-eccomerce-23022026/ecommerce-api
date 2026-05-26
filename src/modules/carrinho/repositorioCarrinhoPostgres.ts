@@ -23,7 +23,7 @@ export class RepositorioCarrinhoPostgres {
 
   async obterUsuIdPorUuid(usuUuid: string): Promise<number | null> {
     const rows = await this.db.executar<{ usu_id: number }>(
-      'SELECT usu_id FROM usuarios WHERE usu_uuid = $1',
+      'SELECT usu_id FROM livraria_gestao.usuarios WHERE usu_uuid = $1',
       [usuUuid] as DbParametro[],
     );
     return rows.length ? rows[0].usu_id : null;
@@ -39,10 +39,10 @@ export class RepositorioCarrinhoPostgres {
         l.liv_isbn,
         l.liv_imagem_url,
         e.etq_preco_venda::text
-      FROM carrinho_itens c
-      INNER JOIN usuarios u ON u.usu_id = c.usu_id
-      INNER JOIN livros l ON l.liv_id = c.liv_id
-      INNER JOIN estoques e ON e.liv_id = l.liv_id
+      FROM livraria_comercial.carrinho_itens c
+      INNER JOIN livraria_gestao.usuarios u ON u.usu_id = c.usu_id
+      INNER JOIN livraria_comercial.livros l ON l.liv_id = c.liv_id
+      INNER JOIN livraria_comercial.estoques e ON e.liv_id = l.liv_id
       WHERE u.usu_uuid = $1
     `;
     
@@ -63,13 +63,13 @@ export class RepositorioCarrinhoPostgres {
 
   async removerItem(usuId: number, livId: number): Promise<void> {
     await this.db.executar(
-      'DELETE FROM carrinho_itens WHERE usu_id = $1 AND liv_id = $2',
+      'DELETE FROM livraria_comercial.carrinho_itens WHERE usu_id = $1 AND liv_id = $2',
       [usuId, livId] as DbParametro[],
     );
   }
 
   async limpar(usuId: number): Promise<void> {
-    await this.db.executar('DELETE FROM carrinho_itens WHERE usu_id = $1', [usuId] as DbParametro[]);
+    await this.db.executar('DELETE FROM livraria_comercial.carrinho_itens WHERE usu_id = $1', [usuId] as DbParametro[]);
   }
 
   async upsertQuantidade(
@@ -84,7 +84,7 @@ export class RepositorioCarrinhoPostgres {
     }
     const loj_id = lojIdExplicito ?? this.obterLojId() ?? 1;
     const sql = `
-      INSERT INTO carrinho_itens (usu_id, liv_id, cri_quantidade, loj_id)
+      INSERT INTO livraria_comercial.carrinho_itens (usu_id, liv_id, cri_quantidade, loj_id)
       VALUES ($1, $2, $3, $4)
       ON CONFLICT (usu_id, liv_id) DO UPDATE SET
         cri_quantidade = EXCLUDED.cri_quantidade,

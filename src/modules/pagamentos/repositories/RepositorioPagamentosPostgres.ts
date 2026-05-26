@@ -27,7 +27,7 @@ export class RepositorioPagamentosPostgres implements IRepositorioPagamentos {
 
   public async obterVenIdPorVendaUuid(vendaUuid: string): Promise<number | null> {
     const rows = await this.db.executar<{ ven_id: number }>(
-      'SELECT ven_id FROM vendas WHERE ven_uuid = $1',
+      'SELECT ven_id FROM livraria_comercial.vendas WHERE ven_uuid = $1',
       [vendaUuid]
     );
     return rows[0]?.ven_id ?? null;
@@ -35,7 +35,7 @@ export class RepositorioPagamentosPostgres implements IRepositorioPagamentos {
 
   public async obterPagIdInternoPorUuid(pagUuid: string): Promise<number | null> {
     const rows = await this.db.executar<{ pag_id: number }>(
-      'SELECT pag_id FROM pagamento WHERE pag_uuid = $1',
+      'SELECT pag_id FROM livraria_financeiro.pagamento WHERE pag_uuid = $1',
       [pagUuid]
     );
     return rows[0]?.pag_id ?? null;
@@ -43,7 +43,7 @@ export class RepositorioPagamentosPostgres implements IRepositorioPagamentos {
 
   public async cadastrar(dados: IPagamento, opcoes?: { inpIdIntencao?: number }): Promise<IPagamento> {
     // Obter ID interno da venda
-    const vendaQuery = 'SELECT ven_id FROM vendas WHERE ven_uuid = $1';
+    const vendaQuery = 'SELECT ven_id FROM livraria_comercial.vendas WHERE ven_uuid = $1';
     const vendaRes = await this.db.executar<{ ven_id: number }>(vendaQuery, [dados.vendaUuid]);
     if (vendaRes.length === 0) throw new Error('Venda não encontrada');
     const venId = vendaRes[0].ven_id;
@@ -100,11 +100,11 @@ export class RepositorioPagamentosPostgres implements IRepositorioPagamentos {
       SELECT p.pag_uuid, p.pag_valor, p.pag_detalhes_cupom, p.pag_criado_em, p.pag_processado_em,
              tp.tpg_descricao, sp.stp_descricao, v.ven_uuid,
              c.cpp_numero_tokenizado, c.cpp_nome_titular, c.cpp_validade, c.cpp_bandeira
-      FROM pagamento p
-      JOIN tipo_pagamento tp ON p.tpg_id = tp.tpg_id
-      JOIN status_pagamento sp ON p.stp_id = sp.stp_id
-      JOIN vendas v ON p.ven_id = v.ven_id
-      LEFT JOIN cartao_pagamento c ON p.pag_id = c.pag_id
+      FROM livraria_financeiro.pagamento p
+      JOIN livraria_financeiro.tipo_pagamento tp ON p.tpg_id = tp.tpg_id
+      JOIN livraria_financeiro.status_pagamento sp ON p.stp_id = sp.stp_id
+      JOIN livraria_comercial.vendas v ON p.ven_id = v.ven_id
+      LEFT JOIN livraria_financeiro.cartao_pagamento c ON p.pag_id = c.pag_id
       WHERE p.pag_uuid = $1
     `;
     const parametros: DbParametro[] = [uuid];
@@ -151,16 +151,16 @@ export class RepositorioPagamentosPostgres implements IRepositorioPagamentos {
   }
 
   public async atualizar(uuid: string, dados: IPagamento): Promise<IPagamento> {
-    const idQuery = 'SELECT pag_id FROM pagamento WHERE pag_uuid = $1';
+    const idQuery = 'SELECT pag_id FROM livraria_financeiro.pagamento WHERE pag_uuid = $1';
     const idRes = await this.db.executar<{ pag_id: number }>(idQuery, [uuid]);
     if (idRes.length === 0) throw new Error('Pagamento não encontrado');
     const pagId = idRes[0].pag_id;
 
-    const statusQuery = 'SELECT stp_id FROM status_pagamento WHERE stp_descricao = $1';
+    const statusQuery = 'SELECT stp_id FROM livraria_financeiro.status_pagamento WHERE stp_descricao = $1';
     const statusRes = await this.db.executar<{ stp_id: number }>(statusQuery, [dados.status]);
     const stpId = statusRes[0].stp_id;
 
-    const updateQuery = 'UPDATE pagamento SET stp_id = $1, pag_processado_em = $2 WHERE pag_id = $3';
+    const updateQuery = 'UPDATE livraria_financeiro.pagamento SET stp_id = $1, pag_processado_em = $2 WHERE pag_id = $3';
     await this.db.executar(updateQuery, [stpId, dados.processadoEm || null, pagId]);
 
     return dados;
@@ -174,11 +174,11 @@ export class RepositorioPagamentosPostgres implements IRepositorioPagamentos {
         p.pag_uuid, p.pag_valor, p.pag_detalhes_cupom, p.pag_criado_em, p.pag_processado_em,
         tp.tpg_descricao, sp.stp_descricao, v.ven_uuid,
         c.cpp_numero_tokenizado, c.cpp_nome_titular, c.cpp_validade, c.cpp_bandeira
-      FROM pagamento p
-      JOIN tipo_pagamento tp ON p.tpg_id = tp.tpg_id
-      JOIN status_pagamento sp ON p.stp_id = sp.stp_id
-      JOIN vendas v ON p.ven_id = v.ven_id
-      LEFT JOIN cartao_pagamento c ON p.pag_id = c.pag_id
+      FROM livraria_financeiro.pagamento p
+      JOIN livraria_financeiro.tipo_pagamento tp ON p.tpg_id = tp.tpg_id
+      JOIN livraria_financeiro.status_pagamento sp ON p.stp_id = sp.stp_id
+      JOIN livraria_comercial.vendas v ON p.ven_id = v.ven_id
+      LEFT JOIN livraria_financeiro.cartao_pagamento c ON p.pag_id = c.pag_id
       WHERE v.ven_uuid = $1
     `;
     const parametros: DbParametro[] = [vendaUuid];
@@ -321,6 +321,9 @@ export class RepositorioPagamentosPostgres implements IRepositorioPagamentos {
       RETURNING cpt_uuid
     `;
     const rows = await this.db.executar<{ cpt_uuid: string }>(query, [dados.usuarioId, dados.codigo, dados.valor]);
+    if (rows.length === 0) {
+      throw new Error('Cliente não encontrado ao criar cupom de troca');
+    }
     return rows[0].cpt_uuid;
   }
 
@@ -384,7 +387,7 @@ export class RepositorioPagamentosPostgres implements IRepositorioPagamentos {
 
   public async obterUsuarioIdInternoPorUuid(usuarioUuid: string): Promise<number | null> {
     const rows = await this.db.executar<{ usu_id: number }>(
-      'SELECT usu_id FROM usuarios WHERE usu_uuid = $1',
+      'SELECT usu_id FROM livraria_gestao.usuarios WHERE usu_uuid = $1',
       [usuarioUuid],
     );
     return rows[0]?.usu_id ?? null;

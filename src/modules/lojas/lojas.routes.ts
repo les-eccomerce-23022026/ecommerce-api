@@ -1,7 +1,7 @@
 import { IRouter } from 'express';
 import { ControladorLojas } from './controladorLojas';
 import { autenticacaoMiddleware } from '@/shared/middlewares/autenticacao.middleware';
-import { adminOnlyMiddleware, adminMestreOnlyMiddleware } from '@/shared/middlewares/autorizacao.middleware';
+import { adminOnlyMiddleware, adminSistemaOnlyMiddleware } from '@/shared/middlewares/autorizacao.middleware';
 
 /**
  * Registra as rotas de lojas.
@@ -12,11 +12,11 @@ export function registrarRotasLojas(app: IRouter): void {
     ControladorLojas.obterLojaPorUuid(requisicao, resposta),
   );
 
-  // Criar loja (apenas admin mestre)
+  // Criar loja (apenas admin sistema)
   app.post(
     '/admin/lojas',
     autenticacaoMiddleware,
-    adminMestreOnlyMiddleware,
+    adminSistemaOnlyMiddleware,
     (requisicao, resposta) => ControladorLojas.criarLoja(requisicao, resposta),
   );
 
@@ -28,11 +28,19 @@ export function registrarRotasLojas(app: IRouter): void {
     (requisicao, resposta) => ControladorLojas.listarLojas(requisicao, resposta),
   );
 
-  // Associar admin a loja (apenas admin mestre)
+  // Associar admin a loja (apenas admin sistema)
   app.post(
     '/admin/lojas/associar-admin',
     autenticacaoMiddleware,
-    adminMestreOnlyMiddleware,
+    adminSistemaOnlyMiddleware,
     (requisicao, resposta) => ControladorLojas.associarAdminALoja(requisicao, resposta),
+  );
+
+  // Obter lojas do administrador autenticado
+  app.get(
+    '/admin/lojas/minhas-lojas',
+    autenticacaoMiddleware,
+    adminOnlyMiddleware,
+    (requisicao, resposta) => ControladorLojas.obterMinhasLojas(requisicao, resposta),
   );
 }
