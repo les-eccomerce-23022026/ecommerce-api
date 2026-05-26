@@ -20,7 +20,7 @@ import { ControladorEstoque } from '@/modules/estoque/controladorEstoque';
 import { autenticacaoMiddleware } from '@/shared/middlewares/autenticacao.middleware';
 import {
   adminOnlyMiddleware,
-  adminMestreOnlyMiddleware
+  adminSistemaOnlyMiddleware
 } from '@/shared/middlewares/autorizacao.middleware';
 
 /**
@@ -96,19 +96,19 @@ export function registrarRotasAdmin(app: IRouter): void {
     controladorPainel.solicitarReconfirmacaoEndereco,
   );
 
-  // Listagem de administradores (apenas admin mestre)
+  // Listagem de administradores (apenas admin sistema)
   app.get(
     '/admin/administradores',
     autenticacaoMiddleware,
-    adminMestreOnlyMiddleware,
+    adminSistemaOnlyMiddleware,
     (requisicao, resposta) => ControladorAdmin.listarAdmins(requisicao, resposta),
   );
 
-  // Registro de novo administrador (apenas admin mestre)
+  // Registro de novo administrador (apenas admin sistema)
   app.post(
     '/admin/registro',
     autenticacaoMiddleware,
-    adminMestreOnlyMiddleware,
+    adminSistemaOnlyMiddleware,
     (requisicao, resposta) => ControladorAdmin.registrarAdmin(requisicao, resposta),
   );
 
@@ -147,6 +147,8 @@ export function registrarRotasAdmin(app: IRouter): void {
   app.post('/admin/testes/criar-cupom', autenticacaoMiddleware, adminOnlyMiddleware, (requisicao, resposta) => ControladorTestesAdmin.criarCupomTroca(requisicao, resposta));
   app.post('/admin/testes/expirar-intencao', autenticacaoMiddleware, adminOnlyMiddleware, (requisicao, resposta) => ControladorTestesAdmin.expirarIntencao(requisicao, resposta));
   app.post('/admin/testes/mudar-status-venda', autenticacaoMiddleware, adminOnlyMiddleware, (requisicao, resposta) => ControladorTestesAdmin.mudarStatusVenda(requisicao, resposta));
+  app.post('/admin/testes/preparar-tabelas-pagamento', autenticacaoMiddleware, adminOnlyMiddleware, (requisicao, resposta) => ControladorTestesAdmin.prepararTabelasPagamento(requisicao, resposta));
+  app.post('/admin/testes/obter-cliente-id', autenticacaoMiddleware, adminOnlyMiddleware, (requisicao, resposta) => ControladorTestesAdmin.obterClienteIdPorEmail(requisicao, resposta));
 
   // Rotas de Estoque
   app.get(

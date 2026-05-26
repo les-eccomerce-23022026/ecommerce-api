@@ -7,8 +7,8 @@ export class DashboardAdminConsultas {
   public async contarPorStatus(descricao: string): Promise<number> {
     return this.obterScalarInt(
       `SELECT COUNT(*)::int AS c
-       FROM vendas v
-       JOIN status_venda s ON v.stv_id = s.stv_id
+       FROM livraria_comercial.vendas v
+       JOIN livraria_comercial.status_venda s ON v.stv_id = s.stv_id
        WHERE s.stv_descricao = $1`,
       [descricao],
     );
@@ -16,7 +16,7 @@ export class DashboardAdminConsultas {
 
   public async obterDuasCategorias(): Promise<string[]> {
     const rows = await this.db.executar<{ cat_nome: string }>(
-      `SELECT cat_nome FROM categorias WHERE cat_ativo = TRUE ORDER BY cat_nome ASC LIMIT 2`,
+      `SELECT cat_nome FROM livraria_comercial.categorias WHERE cat_ativo = TRUE ORDER BY cat_nome ASC LIMIT 2`,
       [],
     );
     if (rows.length >= 2) {
@@ -38,11 +38,11 @@ export class DashboardAdminConsultas {
     }
     const rows = await this.db.executar<{ c: number }>(
       `SELECT COALESCE(SUM(iv.itv_quantidade), 0)::int AS c
-       FROM itens_venda iv
-       INNER JOIN vendas ven ON iv.ven_id = ven.ven_id
-       INNER JOIN livros l ON l.liv_uuid = iv.liv_uuid
-       INNER JOIN livro_categorias lc ON lc.liv_id = l.liv_id
-       INNER JOIN categorias cat ON cat.cat_id = lc.cat_id
+       FROM livraria_comercial.itens_venda iv
+       INNER JOIN livraria_comercial.vendas ven ON iv.ven_id = ven.ven_id
+       INNER JOIN livraria_comercial.livros l ON l.liv_uuid = iv.liv_uuid
+       INNER JOIN livraria_comercial.livro_categorias lc ON lc.liv_id = l.liv_id
+       INNER JOIN livraria_comercial.categorias cat ON cat.cat_id = lc.cat_id
        WHERE cat.cat_nome = $1
          AND EXTRACT(YEAR FROM ven.ven_criado_em) = $2
          AND EXTRACT(MONTH FROM ven.ven_criado_em) = $3`,
@@ -58,13 +58,15 @@ export class DashboardAdminConsultas {
       ven_criado_em: string;
     }>(
       `SELECT ven_uuid, ven_total_venda::text, ven_criado_em::text
-       FROM vendas
+       FROM livraria_comercial.vendas
        ORDER BY ven_criado_em DESC
        LIMIT 5`,
       [],
     );
     return rows.map((r) => {
-      const part = r.ven_uuid.split('-')[1] ?? r.ven_uuid;
+      // Extrair segunda parte do UUID (após primeiro hífen) com segurança
+      const partes = r.ven_uuid?.split('-') ?? [];
+      const part = partes.length > 1 ? partes[1] : r.ven_uuid;
       const total = Number(r.ven_total_venda);
       const dataFmt = new Date(r.ven_criado_em).toLocaleString('pt-BR');
       return {

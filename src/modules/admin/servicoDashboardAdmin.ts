@@ -25,14 +25,14 @@ export class ServicoDashboardAdmin {
     const fimMesAnterior = new Date(ano, agora.getMonth(), 0, 23, 59, 59, 999);
     const totalVendasMes = await this.consultas.obterScalar(
       `SELECT COALESCE(SUM(ven_total_venda), 0)::numeric AS v
-       FROM vendas
+       FROM livraria_comercial.vendas
        WHERE ven_criado_em >= $1 AND ven_criado_em <= $2`,
       [inicioMes, fimMes],
     );
 
     const totalVendasMesAnterior = await this.consultas.obterScalar(
       `SELECT COALESCE(SUM(ven_total_venda), 0)::numeric AS v
-       FROM vendas
+       FROM livraria_comercial.vendas
        WHERE ven_criado_em >= $1 AND ven_criado_em <= $2`,
       [inicioMesAnterior, fimMesAnterior],
     );
@@ -40,13 +40,13 @@ export class ServicoDashboardAdmin {
     const pctCrescimentoVendas = percentualCrescimento(totalVendasMes, totalVendasMesAnterior);
 
     const ticketMedio = await this.consultas.obterScalar(
-      `SELECT COALESCE(AVG(ven_total_venda), 0)::numeric AS v FROM vendas`,
+      `SELECT COALESCE(AVG(ven_total_venda), 0)::numeric AS v FROM livraria_comercial.vendas`,
       [],
     );
 
     const ticketMedioMesAnterior = await this.consultas.obterScalar(
       `SELECT COALESCE(AVG(ven_total_venda), 0)::numeric AS v
-       FROM vendas
+       FROM livraria_comercial.vendas
        WHERE ven_criado_em >= $1 AND ven_criado_em <= $2`,
       [inicioMesAnterior, fimMesAnterior],
     );
@@ -58,37 +58,37 @@ export class ServicoDashboardAdmin {
 
     const pedidosPendentes = await this.consultas.obterScalarInt(
       `SELECT COUNT(*)::int AS c
-       FROM vendas v
-       JOIN status_venda s ON v.stv_id = s.stv_id
+       FROM livraria_comercial.vendas v
+       JOIN livraria_comercial.status_venda s ON v.stv_id = s.stv_id
        WHERE s.stv_descricao = 'EM PROCESSAMENTO'`,
       [],
     );
 
     const trocasSolicitadas = await this.consultas.obterScalarInt(
       `SELECT COUNT(*)::int AS c
-       FROM vendas v
-       JOIN status_venda s ON v.stv_id = s.stv_id
+       FROM livraria_comercial.vendas v
+       JOIN livraria_comercial.status_venda s ON v.stv_id = s.stv_id
        WHERE s.stv_descricao IN ('EM TROCA', 'TROCA AUTORIZADA')`,
       [],
     );
 
     const clientesAtivos = await this.consultas.obterScalarInt(
       `SELECT COUNT(*)::int AS c
-       FROM usuarios
+       FROM livraria_gestao.usuarios
        WHERE pap_id = $1 AND usu_ativo = TRUE`,
       [PAPEL_CLIENTE.id] as DbParametro[],
     );
 
     const novosClientesMes = await this.consultas.obterScalarInt(
       `SELECT COUNT(*)::int AS c
-       FROM usuarios
+       FROM livraria_gestao.usuarios
        WHERE pap_id = $1 AND usu_criado_em >= $2 AND usu_criado_em <= $3`,
       [PAPEL_CLIENTE.id, inicioMes, fimMes] as DbParametro[],
     );
 
     const novosClientesMesAnterior = await this.consultas.obterScalarInt(
       `SELECT COUNT(*)::int AS c
-       FROM usuarios
+       FROM livraria_gestao.usuarios
        WHERE pap_id = $1 AND usu_criado_em >= $2 AND usu_criado_em <= $3`,
       [PAPEL_CLIENTE.id, inicioMesAnterior, fimMesAnterior] as DbParametro[],
     );
@@ -97,7 +97,7 @@ export class ServicoDashboardAdmin {
 
     const livrosBaixoEstoque = await this.consultas.obterScalarInt(
       `SELECT COUNT(*)::int AS c
-       FROM estoques e
+       FROM livraria_comercial.estoques e
        WHERE e.etq_ativo = TRUE
          AND e.etq_quantidade_disponivel <= 5`,
       [],
@@ -110,8 +110,8 @@ export class ServicoDashboardAdmin {
     const cntPendentes = await this.consultas.contarPorStatus('EM PROCESSAMENTO');
     const cntDevolucoes = await this.consultas.obterScalarInt(
       `SELECT COUNT(*)::int AS c
-       FROM vendas v
-       JOIN status_venda s ON v.stv_id = s.stv_id
+       FROM livraria_comercial.vendas v
+       JOIN livraria_comercial.status_venda s ON v.stv_id = s.stv_id
        WHERE s.stv_descricao IN ('EM TROCA', 'REPROVADA')`,
       [],
     );
@@ -125,7 +125,7 @@ export class ServicoDashboardAdmin {
         const { ini, fim } = inicioFimMes(d.getFullYear(), d.getMonth());
         const r = await this.consultas.obterScalar(
           `SELECT COALESCE(SUM(ven_total_venda), 0)::numeric AS v
-           FROM vendas
+           FROM livraria_comercial.vendas
            WHERE ven_criado_em >= $1 AND ven_criado_em <= $2`,
           [ini, fim],
         );

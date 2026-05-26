@@ -2,9 +2,10 @@ import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import { di } from '@/shared/infrastructure/di.container';
 import { RespostaPadrao } from '@/shared/errors/Iresposta-padrao';
-import { PAPEL_ADMIN, PAPEL_CLIENTE } from '@/shared/types/papeis';
+import { PAPEL_ADMIN, PAPEL_CLIENTE, PAPEL_ADMIN_SISTEMA } from '@/shared/types/papeis';
 import { validarDocumento, limparDocumento } from '@/shared/validators/validadorDocumento';
 import { Logger } from '@/shared/utils/Logger.util';
+import { usuarioEhAdminSistema } from '@/shared/middlewares/autorizacao.middleware';
 
 const { servicoAdmin } = di;
 
@@ -110,12 +111,12 @@ export class ControladorAdmin {
         papeisLogado: usuarioLogado?.papeis,
         emailLogado: usuarioLogado?.email
       });
-      
-      // Admin mestre (admin@livraria.com.br em ambiente de teste) pode atualizar qualquer admin
-      const isAdminMestre = process.env.NODE_ENV === 'test' && usuarioLogado?.email === 'admin@livraria.com.br';
-      
+
+      // Admin sistema pode atualizar qualquer admin
+      const isAdminSistema = usuarioEhAdminSistema(usuarioLogado);
+
       // Admin comum só pode atualizar a si mesmo
-      if (!isAdminMestre && usuarioLogado && uuid !== usuarioLogado.uuid) {
+      if (!isAdminSistema && usuarioLogado && uuid !== usuarioLogado.uuid) {
         Logger.warn('[atualizarAdmin] Acesso negado: admin tentando atualizar outro admin', {
           uuidAlvo: uuid,
           uuidLogado: usuarioLogado.uuid
@@ -325,7 +326,7 @@ export class ControladorAdmin {
         cpf: '000.000.000-00',
         senhaHash: hash,
         role: PAPEL_ADMIN,
-        papeis: [PAPEL_CLIENTE, PAPEL_ADMIN],
+        papeis: [PAPEL_CLIENTE, PAPEL_ADMIN, PAPEL_ADMIN_SISTEMA],
       });
 
       return RespostaPadrao.enviarSucesso(resposta, 201, { mensagem: 'Administrador de teste criado com sucesso.' });
