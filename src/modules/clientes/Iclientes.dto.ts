@@ -35,6 +35,10 @@ export interface ICriarClienteDto {
   enderecoCobranca?: IEnderecoDto;
   enderecoEntrega?: IEnderecoDto;
   enderecoEntregaIgualCobranca?: boolean;
+  querSerAdmin?: boolean;
+  nomeFantasiaLoja?: string;
+  tipoPessoaLoja?: 'PF' | 'PJ';
+  cnpjLoja?: string;
 }
 
 /**
@@ -62,7 +66,7 @@ export interface IAlterarSenhaDto {
 
 export interface ICartaoDto {
   uuid: string;
-  final: string;
+  ultimosDigitosCartao: string;
   nomeImpresso: string;
   bandeira: string;
   validade: string;
@@ -77,8 +81,8 @@ export interface IPerfilClienteDto {
   nome: string;
   email: string;
   emailMascarado?: string;
-  cpf: string;
-  cpfMascarado: string;
+  cpf?: string;
+  cpfMascarado?: string;
   genero?: string;
   dataNascimento?: string;
   telefone?: ITelefoneDto;

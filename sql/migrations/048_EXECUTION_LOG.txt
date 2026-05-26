@@ -1,0 +1,102 @@
+================================================================================
+MIGRATION 048: Adicionar campo escopo na tabela admin_lojas
+================================================================================
+
+Data de Execução: 2025-05-25 22:48:33 (UTC)
+Status: ✓ SUCESSO
+
+================================================================================
+RESUMO DA ALTERAÇÃO
+================================================================================
+
+Tabela: livraria_gestao.admin_lojas
+Operações:
+  1. Adicionar coluna: adl_escopo VARCHAR(20) NOT NULL DEFAULT 'LOJA'
+  2. Adicionar constraint CHECK: ck_admin_lojas_escopo_valido
+  3. Criar índice: idx_admin_lojas_escopo
+
+Valores Permitidos:
+  - 'SISTEMA': Administrador do sistema (super admin, acesso global)
+  - 'LOJA': Administrador de loja (acesso apenas à loja atribuída)
+
+================================================================================
+PROCEDIMENTO EXECUTADO
+================================================================================
+
+1. Snapshot Histórico (pré-migration):
+   ✓ /home/vinicius/Downloads/estudo/fatec/lab-eng-segunda-noite/backend/sql/snapshots/historico/schema_20260525_224833.sql
+
+2. Execução da Migration:
+   ✓ Arquivo: sql/migrations/048_adicionar_escopo_admin_lojas.sql
+   ✓ Resultado: BEGIN → ALTER TABLE → ALTER TABLE → CREATE INDEX → COMMIT
+   ✓ Tempo: < 1s
+
+3. Verificação Pós-Migration:
+   ✓ Coluna adl_escopo criada com sucesso
+   ✓ Constraint CHECK validando valores ('SISTEMA', 'LOJA')
+   ✓ Índice idx_admin_lojas_escopo criado
+   ✓ Valor padrão 'LOJA' aplicado
+
+4. Snapshot Canônico (pós-migration):
+   ✓ /home/vinicius/Downloads/estudo/fatec/lab-eng-segunda-noite/backend/sql/snapshots/schema_canonico.sql
+   ✓ Histórico: /home/vinicius/Downloads/estudo/fatec/lab-eng-segunda-noite/backend/sql/snapshots/historico/schema_20260525_224850.sql
+
+================================================================================
+ESTRUTURA FINAL DA TABELA
+================================================================================
+
+Table "livraria_gestao.admin_lojas"
+
+Colunas:
+  - adl_id: bigint (PK, SEQUENCE)
+  - usu_id: bigint (FK → usuarios)
+  - loj_id: bigint (FK → lojas)
+  - adl_papel: character varying(20)
+  - adl_ativo: boolean (DEFAULT true)
+  - adl_criado_em: timestamp with time zone (DEFAULT now())
+  - adl_escopo: character varying(20) (DEFAULT 'LOJA', NOT NULL) ← NOVO
+
+Constraints:
+  - admin_lojas_pkey: PRIMARY KEY (adl_id)
+  - uq_admin_loja: UNIQUE (usu_id, loj_id)
+  - ck_admin_lojas_escopo_valido: CHECK (adl_escopo IN ('SISTEMA', 'LOJA')) ← NOVO
+
+Índices:
+  - admin_lojas_pkey (btree)
+  - uq_admin_loja (btree)
+  - idx_admin_lojas_escopo (btree) ← NOVO
+
+Foreign Keys:
+  - fk_admin_lojas_loja: loj_id → lojas(loj_id)
+  - fk_admin_lojas_usuario: usu_id → usuarios(usu_id)
+
+================================================================================
+ROLLBACK (se necessário)
+================================================================================
+
+Restaurar snapshot histórico anterior:
+  docker exec ecm_postgres psql -U ecm_user -d postgres -c "DROP DATABASE ecm_livraria;"
+  docker exec ecm_postgres psql -U ecm_user -d postgres -c "CREATE DATABASE ecm_livraria;"
+  cat sql/snapshots/historico/schema_20260525_224833.sql | docker exec -i ecm_postgres psql -U ecm_user -d ecm_livraria
+
+================================================================================
+PRÓXIMOS PASSOS
+================================================================================
+
+1. Implementar constantes de escopo no backend (TypeScript):
+   - Criar enum ou Record<string, string> para ESCOPO_ADMIN
+   - Usar em validações de autorização
+
+2. Implementar lógica de autorização:
+   - Verificar adl_escopo em queries de admin
+   - Aplicar filtros por loja para ESCOPO_LOJA
+   - Permitir acesso global para ESCOPO_SISTEMA
+
+3. Criar testes:
+   - Testes unitários para validação de escopo
+   - Testes de integração para endpoints de admin
+
+4. Documentar em REGRAS-NEGOCIOS.md:
+   - Regra de negócio sobre escopos de administração
+
+================================================================================

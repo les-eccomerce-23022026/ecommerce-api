@@ -2,7 +2,10 @@ import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import { di } from '@/shared/infrastructure/di.container';
 import { RespostaPadrao } from '@/shared/errors/Iresposta-padrao';
-import { PAPEL_ADMIN } from '@/shared/types/papeis';
+import { PAPEL_ADMIN, PAPEL_CLIENTE, PAPEL_ADMIN_SISTEMA } from '@/shared/types/papeis';
+import { validarDocumento, limparDocumento } from '@/shared/validators/validadorDocumento';
+import { Logger } from '@/shared/utils/Logger.util';
+import { usuarioEhAdminSistema } from '@/shared/middlewares/autorizacao.middleware';
 
 const { servicoAdmin } = di;
 
@@ -71,7 +74,71 @@ export class ControladorAdmin {
   }
 
   /**
+   * Atualiza dados cadastrais de um administrador (atualização parcial).
+   *
+   * @param requisicao Objeto da requisição com UUID em params e dados no body.
+   * @param resposta Objeto da resposta HTTP.
+   */
+  public static async atualizarAdmin(requisicao: Request, resposta: Response): Promise<Response> {
+    try {
+      const { uuid } = requisicao.params;
+      const dados = requisicao.body ?? {};
+      
+      const camposPermitidos = ['nome', 'email', 'cpf'];
+      const camposInvalidos = Object.keys(dados).filter((campo) => !camposPermitidos.includes(campo));
+      
+      if (camposInvalidos.length > 0) {
+        return RespostaPadrao.enviarErro(
+          resposta,
+          400,
+          `Campos não permitidos: ${camposInvalidos.join(', ')}. Campos permitidos: ${camposPermitidos.join(', ')}`,
+        );
+      }
+
+      if (Object.keys(dados).length === 0) {
+        return RespostaPadrao.enviarErro(
+          resposta,
+          400,
+          'Nenhum dado fornecido para atualização.',
+        );
+      }
+
+      const usuarioLogado = requisicao.usuario;
+      
+      Logger.info('[atualizarAdmin] Verificando autorização', {
+        uuidAlvo: uuid,
+        uuidLogado: usuarioLogado?.uuid,
+        papeisLogado: usuarioLogado?.papeis,
+        emailLogado: usuarioLogado?.email
+      });
+
+      // Admin sistema pode atualizar qualquer admin
+      const isAdminSistema = usuarioEhAdminSistema(usuarioLogado);
+
+      // Admin comum só pode atualizar a si mesmo
+      if (!isAdminSistema && usuarioLogado && uuid !== usuarioLogado.uuid) {
+        Logger.warn('[atualizarAdmin] Acesso negado: admin tentando atualizar outro admin', {
+          uuidAlvo: uuid,
+          uuidLogado: usuarioLogado.uuid
+        });
+        return RespostaPadrao.enviarErro(
+          resposta,
+          403,
+          'Acesso negado. Apenas o próprio administrador pode alterar este cadastro.',
+        );
+      }
+
+      const adminAtualizado = await servicoAdmin.atualizarAdministrador(uuid, dados);
+      return RespostaPadrao.enviarSucesso(resposta, 200, adminAtualizado);
+    } catch (erro) {
+      const mensagem = RespostaPadrao.obterMensagemErro(erro, 'Erro ao atualizar administrador.');
+      return RespostaPadrao.enviarErro(resposta, 400, mensagem);
+    }
+  }
+
+  /**
    * Realiza o registro de um novo administrador em rota protegida.
+   * Suporta CPF (PF) ou CNPJ (PJ) baseado no tipo de pessoa.
    *
    * @param requisicao Objeto da requisição HTTP.
    * @param resposta Objeto da resposta HTTP.
@@ -79,16 +146,87 @@ export class ControladorAdmin {
   public static async registrarAdmin(requisicao: Request, resposta: Response): Promise<Response> {
     try {
       const dados = requisicao.body ?? {};
+      
+      Logger.info('[registrarAdmin] Iniciando registro de administrador', { 
+        email: dados.email, 
+        tipoPessoa: dados.tipoPessoa 
+      });
 
-      const camposBaseObrigatorios = ['nome', 'cpf', 'email'];
-      const faltandoBase = camposBaseObrigatorios.filter((campo) => !dados[campo]);
-
-      if (faltandoBase.length > 0) {
+      // Determinar tipo de pessoa (padrão: PF)
+      const tipoPessoa = dados.tipoPessoa || 'PF';
+      
+      if (!['PF', 'PJ'].includes(tipoPessoa)) {
+        Logger.warn('[registrarAdmin] Tipo de pessoa inválido', { tipoPessoa });
         return RespostaPadrao.enviarErro(
           resposta,
           400,
-          `Campos obrigatórios ausentes: ${faltandoBase.join(', ')}`,
+          'Tipo de pessoa inválido. Use "PF" para CPF ou "PJ" para CNPJ.',
         );
+      }
+
+      // Validar que pelo menos um documento é fornecido
+      if (!dados.cpf && !dados.cnpj) {
+        Logger.warn('[registrarAdmin] Nenhum documento fornecido');
+        return RespostaPadrao.enviarErro(
+          resposta,
+          400,
+          'É necessário fornecer pelo menos um documento (CPF ou CNPJ).',
+        );
+      }
+
+      // Validar documento obrigatório baseado no tipo de pessoa
+      if (tipoPessoa === 'PF' && !dados.cpf) {
+        Logger.warn('[registrarAdmin] CPF obrigatório para PF não fornecido');
+        return RespostaPadrao.enviarErro(
+          resposta,
+          400,
+          'CPF é obrigatório para pessoa física (tipoPessoa = PF).',
+        );
+      }
+
+      if (tipoPessoa === 'PJ' && !dados.cnpj) {
+        Logger.warn('[registrarAdmin] CNPJ obrigatório para PJ não fornecido');
+        return RespostaPadrao.enviarErro(
+          resposta,
+          400,
+          'CNPJ é obrigatório para pessoa jurídica (tipoPessoa = PJ).',
+        );
+      }
+
+      // Validar CPF se fornecido
+      if (dados.cpf) {
+        const cpfLimpo = limparDocumento(dados.cpf);
+        Logger.info('[registrarAdmin] Validando CPF', { 
+          cpf: cpfLimpo.substring(0, 3) + '***' 
+        });
+
+        if (!validarDocumento(cpfLimpo, 'PF')) {
+          Logger.warn('[registrarAdmin] CPF inválido', { cpf: cpfLimpo });
+          return RespostaPadrao.enviarErro(
+            resposta,
+            400,
+            'CPF inválido.',
+          );
+        }
+        dados.cpf = cpfLimpo;
+      }
+
+      // Validar CNPJ se fornecido
+      if (dados.cnpj) {
+        const cnpjLimpo = limparDocumento(dados.cnpj);
+        Logger.info('[registrarAdmin] Validando CNPJ', { 
+          cnpj: cnpjLimpo.substring(0, 3) + '***' 
+        });
+
+        if (!validarDocumento(cnpjLimpo, 'PJ')) {
+          Logger.warn('[registrarAdmin] CNPJ inválido', { cnpj: cnpjLimpo });
+          return RespostaPadrao.enviarErro(
+            resposta,
+            400,
+            'CNPJ inválido.',
+          );
+        }
+        dados.cnpj = cnpjLimpo;
       }
 
       // Senha só é obrigatória se NÃO for usar a mesma senha do cliente
@@ -97,6 +235,7 @@ export class ControladorAdmin {
         const faltandoSenha = camposSenha.filter((campo) => !dados[campo]);
         
         if (faltandoSenha.length > 0) {
+          Logger.warn('[registrarAdmin] Senha e confirmação ausentes');
           return RespostaPadrao.enviarErro(
             resposta,
             400,
@@ -105,10 +244,39 @@ export class ControladorAdmin {
         }
       }
 
+      // Adicionar tipo de pessoa aos dados
+      dados.tipoPessoa = tipoPessoa;
+
+      Logger.info('[registrarAdmin] Chamando serviço para criar administrador', { 
+        email: dados.email, 
+        tipoPessoa 
+      });
+
       const adminCriado = await servicoAdmin.registrarNovoAdministrador(dados);
 
-      return RespostaPadrao.enviarSucesso(resposta, 201, adminCriado);
+      Logger.info('[registrarAdmin] Administrador criado com sucesso', {
+        uuid: adminCriado.uuid,
+        email: adminCriado.email,
+        tipoPessoa
+      });
+
+      // Gerar token para o novo administrador
+      const servicoAutenticacao = di.servicoAutenticacao;
+      const resultadoLogin = await servicoAutenticacao.autenticar({
+        email: adminCriado.email,
+        senha: dados.senha,
+      });
+
+      const incluirTokenNoCorpo = process.env.NODE_ENV === 'test';
+      const respostaCorpo = incluirTokenNoCorpo
+        ? { ...adminCriado, token: resultadoLogin.token }
+        : adminCriado;
+
+      return RespostaPadrao.enviarSucesso(resposta, 201, respostaCorpo);
     } catch (erro) {
+      Logger.error('[registrarAdmin] Erro ao registrar administrador', { 
+        erro: erro instanceof Error ? erro.message : String(erro) 
+      });
       const mensagem = RespostaPadrao.obterMensagemErro(erro, 'Erro ao registrar administrador.');
       return RespostaPadrao.enviarErro(resposta, 400, mensagem);
     }
@@ -119,10 +287,23 @@ export class ControladorAdmin {
    * Sem este método, o Cypress não teria como criar o primeiro admin de teste sem usar SQL manual.
    */
   public static async bootstrapAdmin(requisicao: Request, resposta: Response): Promise<Response> {
-    const isTestDb = requisicao.headers['x-use-test-db'] === 'true' || process.env.NODE_ENV === 'test';
-    
-    if (!isTestDb) {
-      return RespostaPadrao.enviarErro(resposta, 403, 'Acesso bloqueado. Este endpoint é exclusivo para configuração de testes.');
+    const ambienteTeste = process.env.NODE_ENV === 'test';
+    if (!ambienteTeste) {
+      return RespostaPadrao.enviarErro(
+        resposta,
+        403,
+        'Acesso bloqueado. Endpoint de bootstrap permitido apenas em NODE_ENV=test.',
+      );
+    }
+
+    const chaveEsperada = process.env.TEST_BOOTSTRAP_KEY;
+    const chaveRecebida = String(requisicao.headers['x-test-bootstrap-key'] ?? '');
+    if (!chaveEsperada || chaveRecebida !== chaveEsperada) {
+      return RespostaPadrao.enviarErro(
+        resposta,
+        403,
+        'Acesso bloqueado. Chave de bootstrap inválida.',
+      );
     }
 
     try {
@@ -135,18 +316,17 @@ export class ControladorAdmin {
           senhaHash: hash,
           idPapel: PAPEL_ADMIN.id,
           ativo: true,
-          isAdminMestre: true,
         });
         return RespostaPadrao.enviarSucesso(resposta, 200, { mensagem: 'Administrador de teste resetado e atualizado com sucesso.' });
       }
 
       await di.repoUsuarios.criarUsuario({
-        nome: 'Administrador Mestre (Testes)',
+        nome: 'Administrador (Testes)',
         email,
         cpf: '000.000.000-00',
         senhaHash: hash,
         role: PAPEL_ADMIN,
-        isAdminMestre: true,
+        papeis: [PAPEL_CLIENTE, PAPEL_ADMIN, PAPEL_ADMIN_SISTEMA],
       });
 
       return RespostaPadrao.enviarSucesso(resposta, 201, { mensagem: 'Administrador de teste criado com sucesso.' });

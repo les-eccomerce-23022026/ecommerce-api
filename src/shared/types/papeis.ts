@@ -1,6 +1,6 @@
 import { IPapelUsuario } from './Ipapel-usuario';
 
-export const PAPEL_CLIENTE: IPapelUsuario = { id: 1, descricao: 'cliente' };
-export const PAPEL_ADMIN: IPapelUsuario = { id: 2, descricao: 'admin' };
-
-export const EMAIL_ADMIN_MESTRE = 'admin@livraria.com.br';
+// IDs alinhados ao seed 003_seed_multi_tenant_completo.sql
+export const PAPEL_ADMIN_SISTEMA: IPapelUsuario = { id: 21623, descricao: 'admin_sistema' };
+export const PAPEL_ADMIN: IPapelUsuario = { id: 21624, descricao: 'admin' };
+export const PAPEL_CLIENTE: IPapelUsuario = { id: 21625, descricao: 'cliente' };

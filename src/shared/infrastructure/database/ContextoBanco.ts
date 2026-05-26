@@ -37,7 +37,7 @@ export function obterContextoAtual(): IContextoBanco | undefined {
   // Se não houver contexto mas houver uma transação global de teste, retorna um contexto fictício
   if (transacaoGlobalParaTestes) {
     return {
-      tipo: 'producao', // Assume produção por padrão para isolamento, ou poderíamos guardar o tipo também
+      tipo: process.env.NODE_ENV === 'test' ? 'teste' : 'producao',
       transacao: transacaoGlobalParaTestes,
     };
   }
@@ -50,7 +50,9 @@ export function obterContextoAtual(): IContextoBanco | undefined {
  * Se não houver contexto (ex: scripts fora do Express), retorna 'producao'.
  */
 export function obterTipoBancoAtual(): TipoAmbienteBanco {
-  return obterContextoAtual()?.tipo ?? 'producao';
+  const store = obterContextoAtual();
+  if (store) return store.tipo;
+  return process.env.NODE_ENV === 'test' ? 'teste' : 'producao';
 }
 
 /**

@@ -1,0 +1,14 @@
+-- Migration: 013_renomear_tabelas_entrega_plural_sem_prefixo.sql
+-- Descrição: NO-OP - Esta migration foi desativada
+-- Data: 2026-03-25
+--
+-- Justificativa:
+--   - As tabelas foram criadas com os nomes corretos nas migrations anteriores:
+--     - Migration 010: ecm_status_venda (schema livraria_comercial)
+--     - Migration 012: tipo_frete, entrega (schema livraria_comercial, sem prefixo ecm_)
+--   - As renomeações desta migration causavam erros porque tentavam renomear
+--     tabelas que não existiam ou que já tinham os nomes corretos
+--   - Esta migration foi substituída pela migration 015 que padroniza a nomenclatura
+--     de todas as tabelas de vendas de forma consistente
+--
+-- Esta migration é mantida apenas para preservar o histórico de versões

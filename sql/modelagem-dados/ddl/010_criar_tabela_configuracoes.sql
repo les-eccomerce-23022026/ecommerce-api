@@ -1,9 +1,10 @@
 -- =============================================================================
--- DDL 010 — Tabela de Configurações do Aplicativo
--- Armazena parâmetros globais, como hashes de senhas mestras para dev.
+-- DDL 010 — Tabela de configurações da aplicação
+-- Sistema: LES – E-Commerce de Livros
+-- Schema: livraria_gestao
 -- =============================================================================
 
-CREATE TABLE IF NOT EXISTS configuracoes_app (
+CREATE TABLE IF NOT EXISTS livraria_gestao.configuracoes_app (
     cfg_id              SERIAL          PRIMARY KEY,
     cfg_chave           VARCHAR(50)     NOT NULL,
     cfg_valor           TEXT            NOT NULL,
@@ -13,7 +14,9 @@ CREATE TABLE IF NOT EXISTS configuracoes_app (
     CONSTRAINT uq_configuracoes_chave UNIQUE (cfg_chave)
 );
 
-COMMENT ON TABLE  configuracoes_app               IS 'Configurações globais do sistema.';
-COMMENT ON COLUMN configuracoes_app.cfg_chave     IS 'Nome único da configuração (ex: SENHA_MESTRA_ADMIN_HASH).';
-COMMENT ON COLUMN configuracoes_app.cfg_valor     IS 'Valor da configuração (pode ser um hash, uma string, etc).';
-COMMENT ON COLUMN configuracoes_app.cfg_descricao IS 'Explicação sobre para que serve esta configuração.';
+COMMENT ON TABLE  livraria_gestao.configuracoes_app               IS 'Configurações globais do sistema.';
+COMMENT ON COLUMN livraria_gestao.configuracoes_app.cfg_id              IS 'Identificador interno da configuração.';
+COMMENT ON COLUMN livraria_gestao.configuracoes_app.cfg_chave           IS 'Chave única da configuração.';
+COMMENT ON COLUMN livraria_gestao.configuracoes_app.cfg_valor           IS 'Valor da configuração (JSON ou texto).';
+COMMENT ON COLUMN livraria_gestao.configuracoes_app.cfg_descricao       IS 'Descrição do propósito da configuração.';
+COMMENT ON COLUMN livraria_gestao.configuracoes_app.cfg_atualizado_em   IS 'Timestamp da última atualização.';

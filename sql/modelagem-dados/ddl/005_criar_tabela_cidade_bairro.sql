@@ -1,53 +1,40 @@
 -- =============================================================================
--- DDL 006 — Tabelas de domínio: cidade e bairro
+-- DDL 005 — Tabelas de cidades e bairros
 -- Sistema: LES – E-Commerce de Livros
--- Objetivo: normalizar `cid_nome` e `bai_nome` de `enderecos`.
--- Nota: usa `gen_random_uuid()` já empregado nos demais DDLs do projeto.
+-- Schema: livraria_ref
 -- =============================================================================
 
--- -----------------------------------------------------------------------------
--- cidades
--- -----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS cidades (
-    cid_id              SERIAL          PRIMARY KEY,
-    cid_uuid            UUID            NOT NULL DEFAULT gen_random_uuid(),
-    cid_nome            VARCHAR(200)    NOT NULL,
-    cid_nome_norm       VARCHAR(200)    NOT NULL,
-    est_id              INTEGER,
-    cid_criado_em       TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
+CREATE TABLE IF NOT EXISTS livraria_ref.cidades (
+    cid_id              SERIAL      PRIMARY KEY,
+    cid_nome            VARCHAR(100) NOT NULL,
+    cid_nome_norm       VARCHAR(100) NOT NULL,
+    est_id              INTEGER     NOT NULL,
 
-    CONSTRAINT uq_cidades_norm_estado UNIQUE (cid_nome_norm, est_id),
+    CONSTRAINT uq_cidades_nome_estado UNIQUE (cid_nome_norm, est_id),
 
-    CONSTRAINT fk_cidades_estados
-        FOREIGN KEY (est_id)
-        REFERENCES estados (est_id)
-        ON UPDATE CASCADE
-        ON DELETE SET NULL
+    CONSTRAINT fk_cidades_estado FOREIGN KEY (est_id) REFERENCES livraria_ref.estados(est_id) ON DELETE RESTRICT
 );
 
-COMMENT ON TABLE cidades IS 'Catálogo normalizado de cidades (nomes normalizados para matching).';
-COMMENT ON COLUMN cidades.cid_nome_norm IS 'Versão normalizada de cid_nome (UPPER(TRIM(...))) usada para unicidade e matching.';
+COMMENT ON TABLE  livraria_ref.cidades                IS 'Cidades brasileiras vinculadas a estados.';
+COMMENT ON COLUMN livraria_ref.cidades.cid_id         IS 'Chave primária interna.';
+COMMENT ON COLUMN livraria_ref.cidades.cid_nome       IS 'Nome da cidade (ex.: São Paulo, Rio de Janeiro).';
+COMMENT ON COLUMN livraria_ref.cidades.cid_nome_norm  IS 'Nome normalizado (maiúsculas, sem acentos) para busca case-insensitive.';
+COMMENT ON COLUMN livraria_ref.cidades.est_id         IS 'FK para estados.';
 
 
--- -----------------------------------------------------------------------------
--- bairros
--- -----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS bairros (
-    bai_id              SERIAL          PRIMARY KEY,
-    bai_uuid            UUID            NOT NULL DEFAULT gen_random_uuid(),
-    bai_nome            VARCHAR(200)    NOT NULL,
-    bai_nome_norm       VARCHAR(200)    NOT NULL,
-    cid_id              INTEGER         NOT NULL,
-    bai_criado_em       TIMESTAMPTZ     NOT NULL DEFAULT NOW(),
+CREATE TABLE IF NOT EXISTS livraria_ref.bairros (
+    bai_id              SERIAL      PRIMARY KEY,
+    bai_nome            VARCHAR(100) NOT NULL,
+    bai_nome_norm       VARCHAR(100) NOT NULL,
+    cid_id              INTEGER     NOT NULL,
 
-    CONSTRAINT uq_bairros_norm_cidade UNIQUE (bai_nome_norm, cid_id),
+    CONSTRAINT uq_bairros_nome_cidade UNIQUE (bai_nome_norm, cid_id),
 
-    CONSTRAINT fk_bairros_cidades
-        FOREIGN KEY (cid_id)
-        REFERENCES cidades (cid_id)
-        ON UPDATE CASCADE
-        ON DELETE CASCADE
+    CONSTRAINT fk_bairros_cidade FOREIGN KEY (cid_id) REFERENCES livraria_ref.cidades(cid_id) ON DELETE RESTRICT
 );
 
-COMMENT ON TABLE bairros IS 'Catálogo normalizado de bairros por cidade (matching via bai_nome_norm).';
-COMMENT ON COLUMN bairros.bai_nome_norm IS 'Versão normalizada de bai_nome (UPPER(TRIM(...))).';
+COMMENT ON TABLE  livraria_ref.bairros                IS 'Bairros vinculados a cidades.';
+COMMENT ON COLUMN livraria_ref.bairros.bai_id         IS 'Chave primária interna.';
+COMMENT ON COLUMN livraria_ref.bairros.bai_nome       IS 'Nome do bairro (ex.: Centro, Copacabana).';
+COMMENT ON COLUMN livraria_ref.bairros.bai_nome_norm  IS 'Nome normalizado (maiúsculas, sem acentos) para busca case-insensitive.';
+COMMENT ON COLUMN livraria_ref.bairros.cid_id         IS 'FK para cidades.';

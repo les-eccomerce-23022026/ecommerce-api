@@ -11,7 +11,10 @@ declare global {
         id: number;
         email: string;
         role: string;
-        isAdminMestre?: boolean;
+        papeis?: string[];
+        lojas?: Array<{ loj_id: number; loj_uuid: string }>;
+        loja_uuid_principal?: string;
+        loj_id_atual?: number;
       };
     }
   }

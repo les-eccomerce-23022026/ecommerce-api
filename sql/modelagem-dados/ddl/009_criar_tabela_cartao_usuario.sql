@@ -1,6 +1,7 @@
 -- =============================================================================
--- DDL 008 — Tabela de cartões de crédito do usuário
+-- DDL 009 — Tabela de cartões do usuário
 -- Sistema: LES – E-Commerce de Livros
+-- Schema: livraria_financeiro
 -- =============================================================================
 
 -- -----------------------------------------------------------------------------
@@ -17,7 +18,7 @@
 --   • crt_validade: mês/ano de validade do cartão.
 --   • CVV nunca é armazenado (RN0024).
 -- -----------------------------------------------------------------------------
-CREATE TABLE IF NOT EXISTS cartoes (
+CREATE TABLE IF NOT EXISTS livraria_financeiro.cartoes (
     crt_id              BIGSERIAL   PRIMARY KEY,
     crt_uuid            UUID        NOT NULL    DEFAULT gen_random_uuid(),
     usu_id              BIGINT      NOT NULL,
@@ -46,36 +47,36 @@ CREATE TABLE IF NOT EXISTS cartoes (
 
     CONSTRAINT fk_cartoes_usuarios
         FOREIGN KEY (usu_id)
-        REFERENCES usuarios (usu_id)
+        REFERENCES livraria_gestao.usuarios (usu_id)
         ON UPDATE CASCADE
         ON DELETE CASCADE,
 
     CONSTRAINT fk_cartoes_bandeiras
         FOREIGN KEY (ban_id)
-        REFERENCES bandeiras_cartao (ban_id)
+        REFERENCES livraria_financeiro.bandeiras_cartao (ban_id)
         ON UPDATE CASCADE
         ON DELETE RESTRICT
 );
 
-COMMENT ON TABLE  cartoes                        IS 'Cartões de crédito cadastrados pelos usuários. Apenas token é armazenado por segurança.';
-COMMENT ON COLUMN cartoes.crt_id                IS 'Chave primária interna. Nunca exposta nas rotas HTTP.';
-COMMENT ON COLUMN cartoes.crt_uuid              IS 'Identificador público (UUID v4). Retornado nas rotas HTTP.';
-COMMENT ON COLUMN cartoes.usu_id                IS 'FK para usuarios.';
-COMMENT ON COLUMN cartoes.ban_id                IS 'FK para bandeiras_cartao — bandeira do cartão.';
-COMMENT ON COLUMN cartoes.crt_token             IS 'Token do cartão retornado pela operadora. Nunca o número real.';
-COMMENT ON COLUMN cartoes.crt_final             IS 'Últimos 4 dígitos do cartão para identificação (ex.: 1234).';
-COMMENT ON COLUMN cartoes.crt_nome_impresso     IS 'Nome como aparece impresso no cartão.';
-COMMENT ON COLUMN cartoes.crt_validade          IS 'Data de validade do cartão (mês/ano).';
-COMMENT ON COLUMN cartoes.crt_principal         IS 'TRUE se este é o cartão principal do usuário.';
-COMMENT ON COLUMN cartoes.crt_criado_em         IS 'Timestamp de criação do registro.';
-COMMENT ON COLUMN cartoes.crt_atualizado_em     IS 'Timestamp da última atualização.';
+COMMENT ON TABLE  livraria_financeiro.cartoes                        IS 'Cartões de crédito cadastrados pelos usuários. Apenas token é armazenado por segurança.';
+COMMENT ON COLUMN livraria_financeiro.cartoes.crt_id                IS 'Chave primária interna. Nunca exposta nas rotas HTTP.';
+COMMENT ON COLUMN livraria_financeiro.cartoes.crt_uuid              IS 'Identificador público (UUID v4). Retornado nas rotas HTTP.';
+COMMENT ON COLUMN livraria_financeiro.cartoes.usu_id                IS 'FK para usuarios.';
+COMMENT ON COLUMN livraria_financeiro.cartoes.ban_id                IS 'FK para bandeiras_cartao — bandeira do cartão.';
+COMMENT ON COLUMN livraria_financeiro.cartoes.crt_token             IS 'Token do cartão retornado pela operadora. Nunca o número real.';
+COMMENT ON COLUMN livraria_financeiro.cartoes.crt_final             IS 'Últimos 4 dígitos do cartão para identificação (ex.: 1234).';
+COMMENT ON COLUMN livraria_financeiro.cartoes.crt_nome_impresso     IS 'Nome como aparece impresso no cartão.';
+COMMENT ON COLUMN livraria_financeiro.cartoes.crt_validade          IS 'Data de validade do cartão (mês/ano).';
+COMMENT ON COLUMN livraria_financeiro.cartoes.crt_principal         IS 'TRUE se este é o cartão principal do usuário.';
+COMMENT ON COLUMN livraria_financeiro.cartoes.crt_criado_em         IS 'Timestamp de criação do registro.';
+COMMENT ON COLUMN livraria_financeiro.cartoes.crt_atualizado_em     IS 'Timestamp da última atualização.';
 
 
 -- -----------------------------------------------------------------------------
 -- Índices de busca frequente
 -- -----------------------------------------------------------------------------
-CREATE INDEX IF NOT EXISTS idx_cartoes_usuario     ON cartoes (usu_id);
-CREATE INDEX IF NOT EXISTS idx_cartoes_bandeira    ON cartoes (ban_id);
+CREATE INDEX IF NOT EXISTS idx_cartoes_usuario     ON livraria_financeiro.cartoes (usu_id);
+CREATE INDEX IF NOT EXISTS idx_cartoes_bandeira    ON livraria_financeiro.cartoes (ban_id);
 
 
 -- -----------------------------------------------------------------------------
@@ -94,8 +95,8 @@ BEGIN
 END;
 $$;
 
-DROP TRIGGER IF EXISTS tg_cartoes_atualizado_em ON cartoes;
+DROP TRIGGER IF EXISTS tg_cartoes_atualizado_em ON livraria_financeiro.cartoes;
 CREATE TRIGGER tg_cartoes_atualizado_em
-    BEFORE UPDATE ON cartoes
+    BEFORE UPDATE ON livraria_financeiro.cartoes
     FOR EACH ROW
     EXECUTE FUNCTION fn_atualizar_timestamp();

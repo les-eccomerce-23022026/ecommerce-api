@@ -1,0 +1,14 @@
+-- Migration: 015_padronizar_nomenclatura_vendas.sql
+-- Descrição: NO-OP - Esta migration foi desativada
+-- Data: 2026-03-26
+--
+-- Justificativa:
+--   - As tabelas de vendas foram criadas com o prefixo ecm_ na migration 010
+--   - Esta migration tentava renomear ecm_venda -> vendas, ecm_item_venda -> itens_venda
+--   - Porém, as migrations 011 e 012 já criaram FKs para ecm_venda
+--   - A renomeação quebraria essas FKs e causaria erros
+--   - A solução correta seria ter criado as tabelas sem prefixo desde a migration 010
+--   - Como o banco de desenvolvimento já está funcionando com os nomes atuais,
+--     esta migration foi desativada para evitar conflitos
+--
+-- Esta migration é mantida apenas para preservar o histórico de versões

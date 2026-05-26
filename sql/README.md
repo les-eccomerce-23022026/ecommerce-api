@@ -111,6 +111,42 @@ Todos os scripts são **idempotentes** (`IF NOT EXISTS`, `ON CONFLICT DO NOTHING
 
 ---
 
+## Glossário de prefixos (trigramas por tabela)
+
+Para evitar colisão de nomes em `JOIN`s e no mapeamento para o domínio, cada tabela de negócio usa um trigrama exclusivo nas colunas próprias (exceto FKs, que repetem o nome da coluna referenciada).
+
+| Prefixo | Tabela | Domínio |
+|---------|--------|---------|
+| `usu_` | `usuarios` | Usuário |
+| `cli_` | `clientes` | Cliente |
+| `crt_` | `cartoes` | Pagamento |
+| `end_` | `enderecos` | Contato / endereço |
+| `est_` | `estados` | Referência (UF) |
+| `etq_` | `estoques` | Operação (estoque/preço por livro) |
+| `hee_` | `historico_entradas_estoque` | Operação |
+| `liv_` | `livros` | Catálogo |
+
+> **Nota:** `est_` fica reservado a **estados**; a tabela **estoques** usa **`etq_`** (consoantes de “estoque”) para não colidir com `est_id` / `est_sigla` de UF.
+
+---
+
+## Snapshots DDL (versionamento da estrutura)
+
+A estrutura vigente do Postgres (schemas `livraria_*` + `public`) é versionada em [`snapshots/`](snapshots/):
+
+- **`schema_canonico.sql`** — estado atual para revisão em PR
+- **`historico/schema_*.sql`** — backups datados para rollback
+
+```bash
+cd backend
+npm run db:snapshot:historico   # antes de DDL/migration
+npm run db:snapshot             # após migration estável
+```
+
+Ver [`snapshots/README.md`](snapshots/README.md) e ADR [`0012-snapshots-ddl-versionados-git.md`](../../documentacao-exigida/adr/0012-snapshots-ddl-versionados-git.md).
+
+---
+
 ## Diagrama ER (PlantUML)
 
 O arquivo `schema_ecm.puml` contém o diagrama entidade-relacionamento completo do banco de dados em formato PlantUML. Para visualizar:

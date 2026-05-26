@@ -1,6 +1,8 @@
 import { ITelefoneUsuario } from '@/shared/types/ITelefoneUsuario';
 import { IRepositorioTelefoneUsuario } from '@/shared/types/IRepositorioTelefoneUsuario';
 import { IConexaoBanco } from '@/shared/infrastructure/database/IConexaoBanco';
+import { IRowTelefoneUsuario } from '@/shared/types/db-rows.types';
+import { ContextoRequisicao } from '@/shared/infrastructure/contexto/ContextoRequisicao';
 
 export class RepositorioTelefoneUsuarioPostgres implements IRepositorioTelefoneUsuario {
   private db: IConexaoBanco;
@@ -9,7 +11,15 @@ export class RepositorioTelefoneUsuarioPostgres implements IRepositorioTelefoneU
     this.db = db;
   }
 
-  private static mapearParaEntidade(row: Record<string, unknown>): ITelefoneUsuario {
+  /**
+   * Obtém o loj_id do contexto de requisição.
+   * Se não houver contexto, retorna undefined (compatibilidade com código legado).
+   */
+  private obterLojId(): number | undefined {
+    return ContextoRequisicao.obterLojId();
+  }
+
+  private static mapearParaEntidade(row: IRowTelefoneUsuario): ITelefoneUsuario {
     return {
       id: Number(row.id),
       uuid: row.uuid as string,
@@ -28,26 +38,30 @@ export class RepositorioTelefoneUsuarioPostgres implements IRepositorioTelefoneU
       INSERT INTO telefones (usu_id, ttp_id, tel_ddd, tel_numero, tel_principal)
       VALUES ($1, $2, $3, $4, $5)
     `;
-    await this.db.executar(query, [
+    const valores: any[] = [
       telefone.idUsuario,
       telefone.idTipoTelefone,
       telefone.ddd,
       telefone.numero,
       telefone.principal,
-    ]);
+    ];
+
+    await this.db.executar(query, valores);
   }
 
   public async buscarPorIdUsuario(idUsuario: number): Promise<ITelefoneUsuario[]> {
     const query = `
-      SELECT tel_id AS "id", tel_uuid AS "uuid", 
-             usu_id AS "idUsuario", ttp_id AS "idTipoTelefone", 
+      SELECT tel_id AS "id", tel_uuid AS "uuid",
+             usu_id AS "idUsuario", ttp_id AS "idTipoTelefone",
              tel_ddd AS "ddd", tel_numero AS "numero", tel_principal AS "principal",
              tel_criado_em AS "criadoEm", tel_atualizado_em AS "atualizadoEm"
-      FROM telefones 
+      FROM telefones
       WHERE usu_id = $1
     `;
-    const rows = await this.db.executar(query, [idUsuario]);
-    return rows.map((row) => RepositorioTelefoneUsuarioPostgres.mapearParaEntidade(row as Record<string, unknown>));
+    const parametros: any[] = [idUsuario];
+
+    const rows = await this.db.executar(query, parametros);
+    return rows.map((row) => RepositorioTelefoneUsuarioPostgres.mapearParaEntidade(row as IRowTelefoneUsuario));
   }
 
   public async atualizar(telefone: ITelefoneUsuario): Promise<void> {
@@ -56,18 +70,22 @@ export class RepositorioTelefoneUsuarioPostgres implements IRepositorioTelefoneU
       SET ttp_id = $1, tel_ddd = $2, tel_numero = $3, tel_principal = $4
       WHERE usu_id = $5 AND tel_uuid = $6
     `;
-    await this.db.executar(query, [
+    const parametros: any[] = [
       telefone.idTipoTelefone,
       telefone.ddd,
       telefone.numero,
       telefone.principal,
       telefone.idUsuario,
       telefone.uuid,
-    ]);
+    ];
+
+    await this.db.executar(query, parametros);
   }
 
   public async deletar(idUsuario: number, uuidTelefone: string): Promise<void> {
-    const query = 'DELETE FROM telefones WHERE usu_id = $1 AND tel_uuid = $2';
-    await this.db.executar(query, [idUsuario, uuidTelefone]);
+    const query = `DELETE FROM telefones WHERE usu_id = $1 AND tel_uuid = $2`;
+    const parametros: any[] = [idUsuario, uuidTelefone];
+
+    await this.db.executar(query, parametros);
   }
 }

@@ -1,9 +1,9 @@
 -- -----------------------------------------------------------------------------
 -- paises
 -- -----------------------------------------------------------------------------
-INSERT INTO paises (pai_nome)
-VALUES ('Brasil')
-ON CONFLICT (pai_nome) DO NOTHING;
+INSERT INTO livraria_ref.paises (pai_sigla, pai_nome)
+VALUES ('BRA', 'Brasil')
+ON CONFLICT (pai_sigla) DO NOTHING;
 
 
 -- -----------------------------------------------------------------------------

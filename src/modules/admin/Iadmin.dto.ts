@@ -1,13 +1,19 @@
 /**
  * DTO para criação de novos administradores.
+ * Suporta CPF (PF), CNPJ (PJ), ou ambos simultaneamente.
+ * - PF: CPF obrigatório, CNPJ opcional
+ * - PJ: CNPJ obrigatório, CPF opcional
+ * - Ambos: CPF e CNPJ podem ser fornecidos simultaneamente
  */
 export interface ICriarAdminDto {
   nome: string;
   email: string;
-  cpf: string;
+  cpf?: string; // Obrigatório se tipoPessoa = PF, opcional se tipoPessoa = PJ
+  cnpj?: string; // Obrigatório se tipoPessoa = PJ, opcional se tipoPessoa = PF
   senha: string;
   confirmacaoSenha: string;
   usarMesmaSenha?: boolean;
+  tipoPessoa?: 'PF' | 'PJ'; // Define qual documento é obrigatório
 }
 
 /**
@@ -17,7 +23,8 @@ export interface IRespostaAdminCriadoDto {
   uuid: string;
   nome: string;
   email: string;
-  cpf: string;
+  cpf?: string;
+  cnpj?: string;
   role: string;
 }
 

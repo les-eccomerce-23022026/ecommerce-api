@@ -4,43 +4,83 @@ services:
     container_name: ecm_postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ecm_livraria
-      POSTGRES_USER: ecm_user
-      POSTGRES_PASSWORD: ecm_senha
+      POSTGRES_DB: ${POSTGRES_DB:-ecm_livraria}
+      POSTGRES_USER: ${POSTGRES_USER:-ecm_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ecm_senha}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-
-  redis:
-    image: redis:7-alpine
-    container_name: ecm_redis
-    restart: unless-stopped
-    command: ["redis-server", "--appendonly", "yes"]
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ecm_user -d ecm_livraria"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    networks:
+      - ecm_network
 
   app:
     build:
       context: .
       target: development
+      dockerfile: Dockerfile
     container_name: ecm_app
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      # host:container — valores em .env (PORTA_HTTP_EXTERNA / PORTA_HTTP)
+      - "${PORTA_HTTP_EXTERNA:-3002}:${PORTA_HTTP:-3000}"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "const p=process.env.PORTA_HTTP||'3000';require('http').get('http://127.0.0.1:'+p+'/api',r=>process.exit(r.statusCode<500?0:1)).on('error',()=>process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
     volumes:
       - .:/app
       - /app/node_modules
     env_file:
       - .env
     depends_on:
-      - postgres
-      - redis
-    command: npm run dev
+      postgres:
+        condition: service_healthy
+    environment:
+      - NODE_ENV=development
+      - DEFAULT_LOJA_ID=1
+      - MULTI_TENANCY_ENABLED=true
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=ecm_user
+      - POSTGRES_PASSWORD=ecm_senha
+      - POSTGRES_DB=ecm_livraria
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+    networks:
+      - ecm_network
+
+networks:
+  ecm_network:
+    driver: bridge
 
 volumes:
   postgres_data:
-  redis_data:
 

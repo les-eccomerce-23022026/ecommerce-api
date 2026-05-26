@@ -14,7 +14,7 @@ export interface IEnderecoUsuario {
   complemento?: string;
   idCidade: number;
   idBairro: number;
-  idCep: number;
+  idCep: string | number;
   principal: boolean;
   criadoEm?: Date;
   atualizadoEm?: Date;

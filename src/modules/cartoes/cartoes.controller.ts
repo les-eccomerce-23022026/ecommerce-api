@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import { listarCamposObrigatoriosCartaoFaltantes } from '@/modules/cartoes/cartoes-controller-validacao.util';
 import { di } from '../../shared/infrastructure/di.container';
 import { RespostaPadrao } from '../../shared/errors/Iresposta-padrao';
 import { ICriarCartaoDto, IAtualizarCartaoDto } from './cartoes.service';
@@ -24,7 +25,7 @@ export class ControladorCartoes {
       // Formatar resposta para o frontend (sem dados sensíveis)
       const cartoesFormatados = cartoes.map(cartao => ({
         uuid: cartao.uuid,
-        final: cartao.final,
+        ultimosDigitosCartao: cartao.ultimosDigitosCartao,
         nomeImpresso: cartao.nomeImpresso,
         bandeira: cartao.bandeira || 'Outra',
         validade: cartao.validade.toISOString().substring(0, 7), // YYYY-MM
@@ -49,16 +50,8 @@ export class ControladorCartoes {
       }
 
       const dados: ICriarCartaoDto = requisicao.body;
-
-      // Validações básicas
-      const { uuidBandeira, token, final, nomeImpresso, validade } = dados;
-      if (!uuidBandeira || !token || !final || !nomeImpresso || !validade) {
-        const faltando = [];
-        if (!uuidBandeira) faltando.push('uuidBandeira');
-        if (!token) faltando.push('token');
-        if (!final) faltando.push('final');
-        if (!nomeImpresso) faltando.push('nomeImpresso');
-        if (!validade) faltando.push('validade');
+      const faltando = listarCamposObrigatoriosCartaoFaltantes(dados);
+      if (faltando.length > 0) {
         return RespostaPadrao.enviarErro(
           resposta,
           400,
@@ -70,7 +63,7 @@ export class ControladorCartoes {
 
       const cartaoFormatado = {
         uuid: cartao.uuid,
-        final: cartao.final,
+        ultimosDigitosCartao: cartao.ultimosDigitosCartao,
         nomeImpresso: cartao.nomeImpresso,
         bandeira: cartao.bandeira || 'Outra',
         validade: cartao.validade.toISOString().substring(0, 7),
@@ -99,7 +92,7 @@ export class ControladorCartoes {
 
       const cartaoFormatado = {
         uuid: cartao.uuid,
-        final: cartao.final,
+        ultimosDigitosCartao: cartao.ultimosDigitosCartao,
         nomeImpresso: cartao.nomeImpresso,
         bandeira: cartao.bandeira || 'Outra',
         validade: cartao.validade.toISOString().substring(0, 7),

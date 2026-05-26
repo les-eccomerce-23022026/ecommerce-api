@@ -3,50 +3,17 @@
 -- Sistema: LES – E-Commerce de Livros
 -- Execute após 001_seeds_tipos_referencia.sql.
 --
--- ATENÇÃO SEGURANÇA:
---   Este script NÃO contém a senha em texto plano.
---   O hash abaixo é o bcrypt (rounds=10) de 'Admin@123' (senha de bootstrap).
---   Após o primeiro deploy, o usuário admin DEVE alterar a senha via
---   PATCH /api/clientes/senha ou equivalente administrativo.
+-- ATENÇÃO: Este script foi DESATIVADO.
+-- O conceito de "Administrador Mestre" foi removido do sistema.
 --
---   Hash gerado com: bcrypt.hashSync('Admin@123', 10)
---   Valor:          $2a$10$C0kM1fJ942MS.BnEkxtZauPsu7PTQn8uR9FgeEdhhN9lXfiQ9F1hW
+-- O sistema agora usa um modelo multi-tenant onde cada administrador
+-- gerencia sua própria loja. Use o script 003_seed_multi_tenant_completo.sql
+-- para criar 3 administradores, 3 lojas, 15 produtos e 9 clientes.
 --
--- O INSERT é idempotente (ON CONFLICT DO NOTHING) e pode ser re-executado
--- em ambientes de desenvolvimento sem efeito colateral.
+-- Para criar administradores, execute:
+-- 1. 001_seeds_tipos_referencia.sql
+-- 2. 003_seed_multi_tenant_completo.sql
 -- =============================================================================
 
-DO $$
-DECLARE
-    v_id_papel_admin  INTEGER;
-    v_uuid_admin      UUID := '00000000-0000-0000-0000-000000000001';
-BEGIN
-    -- Obtém o id interno do papel 'admin' de forma segura
-    SELECT pap_id
-    INTO   v_id_papel_admin
-    FROM   papeis
-    WHERE  pap_descricao = 'admin'
-    LIMIT  1;
-
-    IF v_id_papel_admin IS NULL THEN
-        RAISE EXCEPTION 'Papel "admin" não encontrado. Execute 001_seeds_tipos_referencia.sql antes deste script.';
-    END IF;
-
-        usu_senha_hash,
-        pap_id,
-        usu_ativo,
-        usu_is_admin_mestre
-    )
-    VALUES (
-        v_uuid_admin,
-        'Administrador Mestre',
-        'admin@livraria.com.br',
-        '000.000.000-00',
-        '$2a$10$C0kM1fJ942MS.BnEkxtZauPsu7PTQn8uR9FgeEdhhN9lXfiQ9F1hW',
-        v_id_papel_admin,
-        TRUE,
-        TRUE
-    )
-    ON CONFLICT (usu_email) DO NOTHING;
-END;
-$$;
+-- Este script está desativado. Use 003_seed_multi_tenant_completo.sql
+-- RAISE NOTICE 'Script 002_seed_usuario_admin_inicial.sql desativado. Use 003_seed_multi_tenant_completo.sql em vez disso.';

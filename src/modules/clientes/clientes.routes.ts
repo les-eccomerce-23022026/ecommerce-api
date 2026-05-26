@@ -1,6 +1,6 @@
 import { IRouter } from 'express';
 import { ControladorClientes } from '@/modules/clientes/clientes.controller';
-import { ControladorConsultaClientes } from '@/modules/clientes/consulta-clientes.controller';
+import { ControladorConsultaClientes } from '@/modules/clientes/consultaClientes.controller';
 import { autenticacaoMiddleware } from '@/shared/middlewares/autenticacao.middleware';
 import { adminOnlyMiddleware, clienteOnlyMiddleware } from '@/shared/middlewares/autorizacao.middleware';
 
@@ -10,7 +10,7 @@ import { adminOnlyMiddleware, clienteOnlyMiddleware } from '@/shared/middlewares
 export function registrarRotasClientes(app: IRouter): void {
   // Rota pública de registro
   app.post('/clientes/registro', (requisicao, resposta) =>
-    ControladorClientes.registrarCliente(requisicao, resposta),
+    ControladorClientes.realizarCadastroPublico(requisicao, resposta),
   );
 
   // Rota protegida para obter perfil próprio
@@ -43,12 +43,17 @@ export function registrarRotasClientes(app: IRouter): void {
 
   // Rota de inativação (soft delete) (RF0023)
   app.delete('/clientes/perfil', autenticacaoMiddleware, (req, res) =>
-    ControladorClientes.inativarCliente(req, res),
+    ControladorClientes.suspenderAcessoCliente(req, res),
   );
 
   // Rota de consulta administrativa de clientes (RF0024)
   app.get('/clientes', autenticacaoMiddleware, adminOnlyMiddleware, (requisicao, resposta) =>
     ControladorConsultaClientes.consultarClientes(requisicao, resposta),
+  );
+
+  // Rota de detalhe de cliente por UUID (RF0024)
+  app.get('/clientes/:uuid', autenticacaoMiddleware, adminOnlyMiddleware, (requisicao, resposta) =>
+    ControladorConsultaClientes.obterClientePorUuid(requisicao, resposta),
   );
 }
 
