@@ -12,8 +12,8 @@ declare global {
         email: string;
         role: string;
         papeis?: string[];
-        loj_ids?: number[];
-        loj_id_principal?: number;
+        lojas?: Array<{ loj_id: number; loj_uuid: string }>;
+        loja_uuid_principal?: string;
         loj_id_atual?: number;
       };
     }

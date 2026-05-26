@@ -3,9 +3,15 @@ import { AsyncLocalStorage } from 'async_hooks';
 /**
  * Interface do contexto de requisição.
  * Contém dados que devem estar disponíveis durante toda a execução da requisição.
+ * 
+ * IMPORTANTE: 
+ * - Externamente (API, frontend): usa apenas UUIDs públicos (loj_uuid, usu_uuid)
+ * - Internamente (repositórios): usa loj_id convertido para performance
+ * - IDs internos (BIGSERIAL) NUNCA são expostos na API
  */
 export interface IContextoRequisicao {
   loj_id?: number;
+  loj_uuid?: string;
   usu_id?: number;
   usu_uuid?: string;
 }
@@ -51,8 +57,20 @@ class ContextoRequisicao {
   }
 
   /**
+   * Obtém o loj_uuid do contexto atual.
+   * Retorna undefined se não houver contexto definido.
+   */
+  static obterLojUuid(): string | undefined {
+    const contexto = ContextoRequisicao.obterContexto();
+    return contexto?.loj_uuid;
+  }
+
+  /**
    * Obtém o loj_id do contexto atual.
    * Retorna undefined se não houver contexto definido.
+   * 
+   * NOTA: loj_id é usado internamente pelos repositórios para performance.
+   * Externamente (API/frontend), apenas loj_uuid é exposto.
    */
   static obterLojId(): number | undefined {
     const contexto = ContextoRequisicao.obterContexto();

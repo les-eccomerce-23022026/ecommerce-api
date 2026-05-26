@@ -6,12 +6,15 @@ import { IRepositorioUsuarios } from '@/modules/usuarios/IRepositorioUsuarios';
 import { IUsuario } from '@/modules/usuarios/IUsuario.entity';
 import { IRepositorioRefreshToken } from '@/modules/auth/IRepositorioRefreshToken';
 import type { ICriarRefreshTokenDto } from '@/modules/auth/IRepositorioRefreshToken';
-import { PAPEL_ADMIN, PAPEL_CLIENTE } from '@/shared/types/papeis';
+import { PAPEL_ADMIN, PAPEL_ADMIN_SISTEMA, PAPEL_CLIENTE } from '@/shared/types/papeis';
 import { Logger } from '@/shared/utils/Logger.util';
 
-/** Define o papel exposto no login conforme vínculos ativos (admin tem prioridade quando ambos existem). */
+/** Define o papel exposto no login conforme vínculos ativos (admin_sistema tem prioridade máxima). */
 function resolverPapelLogin(usuario: IUsuario): string {
   const descricoes = usuario.papeis.map((p) => p.descricao);
+  if (descricoes.includes(PAPEL_ADMIN_SISTEMA.descricao)) {
+    return PAPEL_ADMIN_SISTEMA.descricao;
+  }
   if (descricoes.includes(PAPEL_ADMIN.descricao)) {
     return PAPEL_ADMIN.descricao;
   }
@@ -126,29 +129,35 @@ export class ServicoAutenticacao {
     const usuarioAutenticado = match.usuario;
     const papelLogin = resolverPapelLogin(usuarioAutenticado);
 
-    // Buscar lojas do usuário para multi-tenancy
-    let loj_ids: number[] = [];
-    let loj_id_principal: number | undefined;
+    // Buscar lojas do usuário para multi-tenancy (com UUIDs)
+    let lojas: Array<{ loj_id: number; loj_uuid: string }> = [];
+    let loja_uuid_principal: string | undefined;
     
     try {
-      loj_ids = await this.repositorioUsuarios.buscarLojasDoUsuario(usuarioAutenticado.id);
+      lojas = await this.repositorioUsuarios.buscarLojasDoUsuarioComUuids(usuarioAutenticado.id);
       
-      if (loj_ids.length > 0) {
+      if (lojas.length > 0) {
         // A primeira loja do array é a loja principal
-        loj_id_principal = loj_ids[0];
+        loja_uuid_principal = lojas[0].loj_uuid;
       } else {
         // Se o usuário não tem lojas associadas (multi-tenancy não habilitado),
-        // usar loja padrão (1) se configurada
+        // buscar loja padrão (1) se configurada
         const defaultLojaId = process.env.DEFAULT_LOJA_ID ? parseInt(process.env.DEFAULT_LOJA_ID) : 1;
-        loj_ids = [defaultLojaId];
-        loj_id_principal = defaultLojaId;
+        const defaultLojaUuid = await this.repositorioUsuarios.buscarLojaUuidPorId(defaultLojaId);
+        if (defaultLojaUuid) {
+          lojas = [{ loj_id: defaultLojaId, loj_uuid: defaultLojaUuid }];
+          loja_uuid_principal = defaultLojaUuid;
+        }
       }
     } catch (erro) {
       // Se falhar ao buscar lojas, usar loja padrão
       Logger.warn('[auth.service] Falha ao buscar lojas do usuário, usando loja padrão');
       const defaultLojaId = process.env.DEFAULT_LOJA_ID ? parseInt(process.env.DEFAULT_LOJA_ID) : 1;
-      loj_ids = [defaultLojaId];
-      loj_id_principal = defaultLojaId;
+      const defaultLojaUuid = await this.repositorioUsuarios.buscarLojaUuidPorId(defaultLojaId);
+      if (defaultLojaUuid) {
+        lojas = [{ loj_id: defaultLojaId, loj_uuid: defaultLojaUuid }];
+        loja_uuid_principal = defaultLojaUuid;
+      }
     }
 
     const usuarioRetorno: IUsuarioAutenticadoDto = {
@@ -181,7 +190,7 @@ export class ServicoAutenticacao {
       ipAddress,
       userAgent,
       expiraEm: refreshTokenExpiraEm,
-      lojId: loj_id_principal || 1,
+      lojId: lojas.length > 0 ? lojas[0].loj_id : 1,
     };
     await this.repositorioRefreshToken.criar(refreshTokenDto);
 
@@ -192,8 +201,8 @@ export class ServicoAutenticacao {
         email: usuarioAutenticado.email,
         role: papelLogin,
         papeis: usuarioAutenticado.papeis.map((p) => p.descricao),
-        loj_ids: loj_ids,
-        loj_id_principal: loj_id_principal,
+        lojas: lojas,
+        loja_uuid_principal: loja_uuid_principal,
         // IP e fingerprint para proteção contra replay attack
         ip: ipAddress,
         fingerprint: userAgent ? crypto.createHash('sha256').update(userAgent).digest('hex') : undefined,
@@ -265,23 +274,29 @@ export class ServicoAutenticacao {
       throw new Error('Configuração de autenticação incompleta.');
     }
 
-    // Buscar lojas do usuário
-    let loj_ids: number[] = [];
-    let loj_id_principal: number | undefined;
+    // Buscar lojas do usuário (com UUIDs)
+    let lojas: Array<{ loj_id: number; loj_uuid: string }> = [];
+    let loja_uuid_principal: string | undefined;
     
     try {
-      loj_ids = await this.repositorioUsuarios.buscarLojasDoUsuario(usuario.id);
-      if (loj_ids.length > 0) {
-        loj_id_principal = loj_ids[0];
+      lojas = await this.repositorioUsuarios.buscarLojasDoUsuarioComUuids(usuario.id);
+      if (lojas.length > 0) {
+        loja_uuid_principal = lojas[0].loj_uuid;
       } else {
         const defaultLojaId = process.env.DEFAULT_LOJA_ID ? parseInt(process.env.DEFAULT_LOJA_ID) : 1;
-        loj_ids = [defaultLojaId];
-        loj_id_principal = defaultLojaId;
+        const defaultLojaUuid = await this.repositorioUsuarios.buscarLojaUuidPorId(defaultLojaId);
+        if (defaultLojaUuid) {
+          lojas = [{ loj_id: defaultLojaId, loj_uuid: defaultLojaUuid }];
+          loja_uuid_principal = defaultLojaUuid;
+        }
       }
     } catch (erro) {
       const defaultLojaId = process.env.DEFAULT_LOJA_ID ? parseInt(process.env.DEFAULT_LOJA_ID) : 1;
-      loj_ids = [defaultLojaId];
-      loj_id_principal = defaultLojaId;
+      const defaultLojaUuid = await this.repositorioUsuarios.buscarLojaUuidPorId(defaultLojaId);
+      if (defaultLojaUuid) {
+        lojas = [{ loj_id: defaultLojaId, loj_uuid: defaultLojaUuid }];
+        loja_uuid_principal = defaultLojaUuid;
+      }
     }
 
     const papelLogin = resolverPapelLogin(usuario);
@@ -292,8 +307,8 @@ export class ServicoAutenticacao {
         email: usuario.email,
         role: papelLogin,
         papeis: usuario.papeis.map((p: { descricao: string }) => p.descricao),
-        loj_ids: loj_ids,
-        loj_id_principal: loj_id_principal,
+        lojas: lojas,
+        loja_uuid_principal: loja_uuid_principal,
         ip: ipAddress,
         fingerprint: userAgent ? crypto.createHash('sha256').update(userAgent).digest('hex') : undefined,
       },
