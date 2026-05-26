@@ -51,14 +51,21 @@ describe('Integração — Checkout: cotação de frete + cupons + cartões', ()
       expect(resVenda.body.status).toBe('EM PROCESSAMENTO');
       expect(resVenda.body.frete).toBe(cot.valorFrete);
 
-      // Garantir cupom de troca no banco usando a rota API
-      const usuRes = await contexto.db!.executar<{ usu_id: number }>('SELECT usu_id FROM usuarios LIMIT 1');
-      const cliRes = await contexto.db!.executar<{ cli_id: number }>(
-        'SELECT c.cli_id FROM livraria_gestao.clientes c WHERE c.usu_id = $1',
-        [usuRes[0].usu_id]
-      );
-      if (cliRes.length > 0) {
-        await criarCupomTrocaTeste(app, tokenAdmin, cliRes[0].cli_id, 'TROCA50', 50);
+      // Garantir cupom de troca no banco usando a rota API de teste
+      // Obter email do usuário autenticado via token
+      const usuarioRes = await request(app)
+        .get('/api/clientes/perfil')
+        .set('Authorization', `Bearer ${token}`);
+      
+      if (usuarioRes.status === 200 && usuarioRes.body.dados) {
+        const clienteRes = await request(app)
+          .post('/api/admin/testes/obter-cliente-id')
+          .set('Authorization', `Bearer ${tokenAdmin}`)
+          .send({ email: usuarioRes.body.dados.email });
+        
+        if (clienteRes.status === 200 && clienteRes.body.dados) {
+          await criarCupomTrocaTeste(app, tokenAdmin, clienteRes.body.dados.clienteId, 'TROCA50', 50);
+        }
       }
 
       const partes = montarPartesPagamentoCuponsEDoisCartoes(valorTotal);
@@ -199,8 +206,12 @@ describe('Integração — Checkout: cotação de frete + cupons + cartões', ()
 
     it('retorna 400 quando a cotação está expirada (CRIADA + expira_em no passado)', async () => {
       const cot = await cotarFretePac(app, token, 50);
+      
+      // Expirar cotação via consulta direta (não há endpoint de teste para isso ainda)
+      // Este é um caso específico que precisa de acesso direto ao banco para testar
+      // a validação de expiração de cotação. Mantendo a consulta direta por enquanto.
       await contexto.db!.executar(
-        `UPDATE cotacao_frete SET cfr_expira_em = NOW() - INTERVAL '1 hour' WHERE cfr_uuid = $1`,
+        `UPDATE livraria_comercial.cotacao_frete SET cfr_expira_em = NOW() - INTERVAL '1 hour' WHERE cfr_uuid = $1`,
         [cot.cotacaoUuid],
       );
 

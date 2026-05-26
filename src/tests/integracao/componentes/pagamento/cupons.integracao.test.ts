@@ -18,15 +18,14 @@ describe('Integração - Cupom', () => {
     tokenAdmin = await obterTokenAdmin(contexto.app);
 
     // Garante cupons de troca na transação do teste usando a rota API
-    // Buscar cli_id do cliente
-    const clienteRes = await contexto.db!.executar<{ cli_id: number }>(
-      `SELECT c.cli_id FROM livraria_gestao.clientes c
-       JOIN livraria_gestao.usuarios u ON u.usu_id = c.usu_id
-       WHERE u.usu_email = 'clientetest@email.com'`
-    );
+    // Buscar cli_id do cliente via endpoint de teste
+    const clienteRes = await request(contexto.app)
+      .post('/api/admin/testes/obter-cliente-id')
+      .set('Authorization', `Bearer ${tokenAdmin}`)
+      .send({ email: 'clientetest@email.com' });
     
-    if (clienteRes.length > 0) {
-      const cliId = clienteRes[0].cli_id;
+    if (clienteRes.status === 200 && clienteRes.body.dados) {
+      const cliId = clienteRes.body.dados.clienteId;
       await criarCupomTrocaTeste(contexto.app, tokenAdmin, cliId, 'TROCA50', 50);
       await criarCupomTrocaTeste(contexto.app, tokenAdmin, cliId, 'TROCA30', 30);
     }
@@ -153,15 +152,14 @@ describe('Integração - Cupom', () => {
       // 1. Criar cupom de troca com valor 100
       const tokenAdmin = await obterTokenAdmin(contexto.app);
       
-      // Buscar cli_id do cliente para cupom de troca
-      const clienteRes = await contexto.db!.executar<{ cli_id: number }>(
-        `SELECT c.cli_id FROM livraria_gestao.clientes c
-         JOIN livraria_gestao.usuarios u ON u.usu_id = c.usu_id
-         WHERE u.usu_email = 'clientetest@email.com'`
-      );
+      // Buscar cli_id do cliente para cupom de troca via endpoint de teste
+      const clienteRes = await request(contexto.app)
+        .post('/api/admin/testes/obter-cliente-id')
+        .set('Authorization', `Bearer ${tokenAdmin}`)
+        .send({ email: 'clientetest@email.com' });
       
-      if (clienteRes.length > 0) {
-        const cliId = clienteRes[0].cli_id;
+      if (clienteRes.status === 200 && clienteRes.body.dados) {
+        const cliId = clienteRes.body.dados.clienteId;
         
         await request(contexto.app)
           .post('/api/admin/testes/criar-cupom')

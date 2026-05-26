@@ -2,7 +2,6 @@ import request from 'supertest';
 import { configurarTesteIntegracao } from '@/tests/helpers/setup-integracao.util';
 import { obterTokenCliente } from '@/tests/helpers/requisicoes-api.util';
 import { LIVRO_UUID_TESTE } from '@/tests/helpers/pedido-venda.helper';
-import { di } from '@/shared/infrastructure/di.container';
 
 /**
  * Testes de Integração - Notificações
@@ -22,10 +21,14 @@ describe('Integração - Módulo de Notificações', () => {
   beforeAll(async () => {
     token = await obterTokenCliente(contexto.app);
     
-    // Obter UUID do usuário diretamente do repositório
-    const repositorioUsuarios = di.repoUsuarios;
-    const usuario = await repositorioUsuarios.buscarPorEmail('cliente.teste@email.com');
-    usuarioUuid = usuario?.uuid || '';
+    // Obter UUID do usuário via endpoint da API
+    const resPerfil = await request(contexto.app)
+      .get('/api/clientes/perfil')
+      .set('Authorization', `Bearer ${token}`);
+    
+    if (resPerfil.status === 200 && resPerfil.body.dados) {
+      usuarioUuid = resPerfil.body.dados.uuid || '';
+    }
   });
 
   it('deve criar notificação ao despachar entrega', async () => {

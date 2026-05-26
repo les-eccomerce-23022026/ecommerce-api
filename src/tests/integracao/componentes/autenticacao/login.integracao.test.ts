@@ -42,7 +42,7 @@ describe('Integração - Autenticação', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.dados.user.email).toBe('admin@livraria.com.br');
-      expect(res.body.dados.user.role).toBe('admin');
+      expect(res.body.dados.user.role).toBe('admin_sistema');
       expect(res.body.dados.token).toBeDefined();
       expect(typeof res.body.dados.token).toBe('string');
       expect(res.body.dados.token.length).toBeGreaterThan(0);

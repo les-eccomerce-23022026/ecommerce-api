@@ -8,8 +8,8 @@ import {
 import { criarAdminComumObterToken } from '@/tests/helpers/admin-testes.helper';
 
 /**
- * Administrador comum (não mestre): listagens permitidas vs rotas exclusivas do mestre.
- * GET /api/clientes é permitido a qualquer admin; gestão em /api/admin/* exige mestre.
+ * Administrador comum (não sistema): listagens permitidas vs rotas exclusivas do sistema.
+ * GET /api/clientes é permitido a qualquer admin; gestão em /api/admin/* exige admin sistema.
  */
 describe('Integração — Administrador comum (listagens e restrições)', () => {
   const contexto = configurarTesteIntegracao();
@@ -55,13 +55,13 @@ describe('Integração — Administrador comum (listagens e restrições)', () =
   });
 
   describe('GET /api/clientes (consulta administrativa — RF0024)', () => {
-    it('permite listagem com token de administrador mestre', async () => {
-      const tokenMestre = await obterTokenAdmin(contexto.app);
+    it('permite listagem com token de administrador sistema', async () => {
+      const tokenSistema = await obterTokenAdmin(contexto.app);
 
       const res = await request(contexto.app)
         .get('/api/clientes')
         .query({ pagina: 1, limite: 5 })
-        .set('Authorization', `Bearer ${tokenMestre}`);
+        .set('Authorization', `Bearer ${tokenSistema}`);
 
       expect(res.status).toBe(200);
       expect(res.body.sucesso).toBe(true);
@@ -72,8 +72,8 @@ describe('Integração — Administrador comum (listagens e restrições)', () =
     });
 
     it('permite listagem com token de administrador comum (somente leitura)', async () => {
-      const tokenMestre = await obterTokenAdmin(contexto.app);
-      const { token } = await criarAdminComumObterToken(contexto.app, tokenMestre);
+      const tokenSistema = await obterTokenAdmin(contexto.app);
+      const { token } = await criarAdminComumObterToken(contexto.app, tokenSistema);
 
       const res = await request(contexto.app)
         .get('/api/clientes')
@@ -86,12 +86,12 @@ describe('Integração — Administrador comum (listagens e restrições)', () =
     });
 
     it('aceita filtro por nome', async () => {
-      const tokenMestre = await obterTokenAdmin(contexto.app);
+      const tokenSistema = await obterTokenAdmin(contexto.app);
 
       const res = await request(contexto.app)
         .get('/api/clientes')
         .query({ nome: 'Cliente', pagina: 1, limite: 10 })
-        .set('Authorization', `Bearer ${tokenMestre}`);
+        .set('Authorization', `Bearer ${tokenSistema}`);
 
       expect(res.status).toBe(200);
       expect(res.body.sucesso).toBe(true);
@@ -110,22 +110,22 @@ describe('Integração — Administrador comum (listagens e restrições)', () =
     });
   });
 
-  describe('Rotas exclusivas do administrador mestre (/api/admin/*)', () => {
+  describe('Rotas exclusivas do administrador sistema (/api/admin/*)', () => {
     it('bloqueia GET /api/admin/administradores para admin comum', async () => {
-      const tokenMestre = await obterTokenAdmin(contexto.app);
-      const { token } = await criarAdminComumObterToken(contexto.app, tokenMestre);
+      const tokenSistema = await obterTokenAdmin(contexto.app);
+      const { token } = await criarAdminComumObterToken(contexto.app, tokenSistema);
 
       const res = await request(contexto.app)
         .get('/api/admin/administradores')
         .set('Authorization', `Bearer ${token}`);
 
       expect(res.status).toBe(403);
-      expect(res.body.mensagem).toMatch(/Administrador Mestre/i);
+      expect(res.body.mensagem).toMatch(/Administrador do Sistema/i);
     });
 
     it('bloqueia POST /api/admin/registro para admin comum', async () => {
-      const tokenMestre = await obterTokenAdmin(contexto.app);
-      const { token } = await criarAdminComumObterToken(contexto.app, tokenMestre);
+      const tokenSistema = await obterTokenAdmin(contexto.app);
+      const { token } = await criarAdminComumObterToken(contexto.app, tokenSistema);
 
       const res = await request(contexto.app)
         .post('/api/admin/registro')
@@ -139,7 +139,7 @@ describe('Integração — Administrador comum (listagens e restrições)', () =
         });
 
       expect(res.status).toBe(403);
-      expect(res.body.mensagem).toMatch(/Administrador Mestre/i);
+      expect(res.body.mensagem).toMatch(/Administrador do Sistema/i);
     });
   });
 

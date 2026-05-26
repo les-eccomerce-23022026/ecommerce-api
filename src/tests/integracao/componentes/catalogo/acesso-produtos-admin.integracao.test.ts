@@ -5,18 +5,18 @@ import { di } from '@/shared/infrastructure/di.container';
 
 /**
  * Testes de integração para verificação de acesso a produtos por tipo de admin.
- * Verifica se admin mestre tem acesso global e admin comum tem acesso limitado à loja.
- * 
+ * Verifica se admin sistema tem acesso global e admin comum tem acesso limitado à loja.
+ *
  * RN0091: Isolamento de Dados por Loja
- * - Admin mestre vê dados de todas as lojas (acesso global)
+ * - Admin sistema vê dados de todas as lojas (acesso global)
  * - Admin comum vê apenas dados da loja associada
  * - Cliente vê produtos de todas as lojas (catálogo compartilhado)
  */
 describe('Integração - Acesso a Produtos por Tipo de Admin', () => {
   const contexto = configurarTesteIntegracao();
 
-  describe('Acesso de Admin Mestre', () => {
-    it('[RN0091] admin mestre deve conseguir criar livros', async () => {
+  describe('Acesso de Admin Sistema', () => {
+    it('[RN0091] admin sistema deve conseguir criar livros', async () => {
       const tokenMestre = await obterTokenAdmin(contexto.app);
 
       const res = await request(contexto.app)
@@ -46,7 +46,7 @@ describe('Integração - Acesso a Produtos por Tipo de Admin', () => {
       expect(res.body.sucesso).toBe(true);
     });
 
-    it('[RN0091] admin mestre deve conseguir listar todos os administradores', async () => {
+    it('[RN0091] admin sistema deve conseguir listar todos os administradores', async () => {
       const tokenMestre = await obterTokenAdmin(contexto.app);
 
       const res = await request(contexto.app)
@@ -58,15 +58,15 @@ describe('Integração - Acesso a Produtos por Tipo de Admin', () => {
       expect(Array.isArray(res.body.dados)).toBe(true);
     });
 
-    it('[RN0091] admin mestre deve conseguir criar lojas', async () => {
+    it('[RN0091] admin sistema deve conseguir criar lojas', async () => {
       const tokenMestre = await obterTokenAdmin(contexto.app);
 
       const res = await request(contexto.app)
         .post('/api/admin/lojas')
         .set('Authorization', `Bearer ${tokenMestre}`)
         .send({
-          nome: 'Loja Mestre',
-          slug: 'loja-mestre',
+          nome: 'Loja Sistema',
+          slug: 'loja-sistema',
           cnpj: '12.345.678/0001-90',
         });
 
@@ -74,7 +74,7 @@ describe('Integração - Acesso a Produtos por Tipo de Admin', () => {
       expect(res.body.sucesso).toBe(true);
     });
 
-    it('[RN0091] admin mestre deve conseguir associar admin a loja', async () => {
+    it('[RN0091] admin sistema deve conseguir associar admin a loja', async () => {
       const tokenMestre = await obterTokenAdmin(contexto.app);
 
       // Criar loja
@@ -185,7 +185,7 @@ describe('Integração - Acesso a Produtos por Tipo de Admin', () => {
 
       expect(res.status).toBe(403);
       expect(res.body.sucesso).toBe(false);
-      expect(res.body.mensagem).toMatch(/acesso negado|mestre/i);
+      expect(res.body.mensagem).toMatch(/acesso negado|sistema/i);
     });
 
     it('[RN0091] admin comum NÃO deve conseguir associar admin a loja', async () => {

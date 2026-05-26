@@ -32,24 +32,24 @@ describe('Integração — Vendas / fluxo administrativo', () => {
   const contexto = configurarTesteIntegracao();
   let app: Application;
   let tokenCliente: string;
-  let tokenAdminMestre: string;
+  let tokenAdminSistema: string;
   let tokenAdminComum: string;
 
   beforeAll(async () => {
     app = contexto.app;
     tokenCliente = await obterTokenCliente(app);
-    tokenAdminMestre = await obterTokenAdmin(app);
-    const criado = await criarAdminComumObterToken(app, tokenAdminMestre);
+    tokenAdminSistema = await obterTokenAdmin(app);
+    const criado = await criarAdminComumObterToken(app, tokenAdminSistema);
     tokenAdminComum = criado.token;
   });
 
   describe('Cenários felizes', () => {
     describe('GET /api/clientes — consulta administrativa (RF0024)', () => {
-      it('permite ao administrador mestre listar clientes com paginação', async () => {
+      it('permite ao administrador sistema listar clientes com paginação', async () => {
         const res = await logApi(request(app)
           .get('/api/clientes')
           .query({ pagina: 1, limite: 5 })
-          .set('Authorization', `Bearer ${tokenAdminMestre}`));
+          .set('Authorization', `Bearer ${tokenAdminSistema}`));
 
         expect(res.status).toBe(200);
         expect(res.body.sucesso).toBe(true);
@@ -71,7 +71,7 @@ describe('Integração — Vendas / fluxo administrativo', () => {
     });
 
     describe('POST /api/entregas — despacho EM TRÂNSITO (RF0038)', () => {
-      it('administrador mestre agenda entrega e a venda passa a EM TRÂNSITO', async () => {
+      it('administrador sistema agenda entrega e a venda passa a EM TRÂNSITO', async () => {
         const { vendaUuid } = await criarVendaPedido(app, tokenCliente, {
           precoUnitario: 40,
           quantidade: 1,
@@ -80,7 +80,7 @@ describe('Integração — Vendas / fluxo administrativo', () => {
 
         const resEntrega = await logApi(request(app)
           .post('/api/entregas')
-          .set('Authorization', `Bearer ${tokenAdminMestre}`)
+          .set('Authorization', `Bearer ${tokenAdminSistema}`)
           .send(corpoAgendarEntrega(vendaUuid, 8)));
 
         expect(resEntrega.status).toBe(201);
@@ -126,7 +126,7 @@ describe('Integração — Vendas / fluxo administrativo', () => {
 
         const resEntrega = await logApi(request(app)
           .post('/api/entregas')
-          .set('Authorization', `Bearer ${tokenAdminMestre}`)
+          .set('Authorization', `Bearer ${tokenAdminSistema}`)
           .send(corpoAgendarEntrega(vendaUuid)));
 
         expect(resEntrega.status).toBe(201);
@@ -136,7 +136,7 @@ describe('Integração — Vendas / fluxo administrativo', () => {
         const resLista = await logApi(request(app)
           .get('/api/entregas')
           .query({ vendaUuid })
-          .set('Authorization', `Bearer ${tokenAdminMestre}`));
+          .set('Authorization', `Bearer ${tokenAdminSistema}`));
 
         expect(resLista.status).toBe(200);
         expect(Array.isArray(resLista.body)).toBe(true);
@@ -144,7 +144,7 @@ describe('Integração — Vendas / fluxo administrativo', () => {
 
         const resUma = await logApi(request(app)
           .get(`/api/entregas/${entregaUuid}`)
-          .set('Authorization', `Bearer ${tokenAdminMestre}`));
+          .set('Authorization', `Bearer ${tokenAdminSistema}`));
 
         expect(resUma.status).toBe(200);
         expect(resUma.body.vendaUuid).toBe(vendaUuid);
@@ -184,7 +184,7 @@ describe('Integração — Vendas / fluxo administrativo', () => {
       it('retorna 400 quando a venda não existe', async () => {
         const res = await logApi(request(app)
           .post('/api/entregas')
-          .set('Authorization', `Bearer ${tokenAdminMestre}`)
+          .set('Authorization', `Bearer ${tokenAdminSistema}`)
           .send(corpoAgendarEntrega('00000000-0000-0000-0000-00000000beef')));
 
         expect(res.status).toBe(400);
@@ -196,7 +196,7 @@ describe('Integração — Vendas / fluxo administrativo', () => {
       it('retorna 400 sem query vendaUuid', async () => {
         const res = await logApi(request(app)
           .get('/api/entregas')
-          .set('Authorization', `Bearer ${tokenAdminMestre}`));
+          .set('Authorization', `Bearer ${tokenAdminSistema}`));
 
         expect(res.status).toBe(400);
         expect(res.body.erro).toMatch(/obrigatório/i);
@@ -207,7 +207,7 @@ describe('Integração — Vendas / fluxo administrativo', () => {
       it('retorna 404 para UUID de entrega inexistente', async () => {
         const res = await logApi(request(app)
           .get('/api/entregas/00000000-0000-0000-0000-00000000cafe')
-          .set('Authorization', `Bearer ${tokenAdminMestre}`));
+          .set('Authorization', `Bearer ${tokenAdminSistema}`));
 
         expect(res.status).toBe(404);
         expect(res.body.erro).toMatch(/não encontrada/i);

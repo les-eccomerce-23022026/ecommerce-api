@@ -206,17 +206,13 @@ describe('Integração — Vendas / pedido do cliente', () => {
 
   describe('[L2] Baixa de estoque após pagamento aprovado', () => {
     it('[L2] deve baixar estoque após pagamento aprovado', async () => {
-      // 1. Obter estoque inicial do livro
-      const estoqueInicialRes = await contexto.db!.executar<{ etq_quantidade_disponivel: number }>(
-        `SELECT etq_quantidade_disponivel FROM livraria_comercial.estoques 
-         WHERE liv_id = (SELECT liv_id FROM livraria_comercial.livros WHERE liv_uuid = $1)`,
-        [livroUuid]
-      );
+      // 1. Obter estoque inicial do livro via endpoint da API
+      const livroRes = await request(app)
+        .get(`/api/livros/${livroUuid}`)
+        .set('Authorization', `Bearer ${tokenCliente}`);
 
-      expect(estoqueInicialRes).toBeDefined();
-      expect(estoqueInicialRes.length).toBeGreaterThan(0);
-
-      const estoqueInicial = estoqueInicialRes[0].etq_quantidade_disponivel;
+      expect(livroRes.status).toBe(200);
+      const estoqueInicial = livroRes.body.dados.estoqueDisponivel || 0;
       const quantidadeVenda = 2;
 
       // 2. Criar venda
@@ -256,17 +252,13 @@ describe('Integração — Vendas / pedido do cliente', () => {
       expect(resPagamento.body.sucesso).toBe(true);
       expect(resPagamento.body.status).toBe('APROVADA');
 
-      // 5. Validar baixa de estoque
-      const estoqueFinalRes = await contexto.db!.executar<{ etq_quantidade_disponivel: number }>(
-        `SELECT etq_quantidade_disponivel FROM livraria_comercial.estoques 
-         WHERE liv_id = (SELECT liv_id FROM livraria_comercial.livros WHERE liv_uuid = $1)`,
-        [livroUuid]
-      );
+      // 5. Validar baixa de estoque via endpoint da API
+      const livroFinalRes = await request(app)
+        .get(`/api/livros/${livroUuid}`)
+        .set('Authorization', `Bearer ${tokenCliente}`);
 
-      expect(estoqueFinalRes).toBeDefined();
-      expect(estoqueFinalRes.length).toBeGreaterThan(0);
-
-      const estoqueFinal = estoqueFinalRes[0].etq_quantidade_disponivel;
+      expect(livroFinalRes.status).toBe(200);
+      const estoqueFinal = livroFinalRes.body.dados.estoqueDisponivel || 0;
 
       // O estoque deve ter sido baixado pela quantidade vendida
       expect(estoqueFinal).toBe(estoqueInicial - quantidadeVenda);

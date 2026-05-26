@@ -13,10 +13,10 @@ function gerarUuidAleatorio(): string {
 /**
  * Testes de integração para CRUD de produtos com contexto de loja.
  * Verifica isolamento de dados por loj_id e comportamento do middleware contextoLoja.
- * 
+ *
  * RN0091: Isolamento de Dados por Loja
  * - Admin de loja X só vê produtos da loja X
- * - Admin mestre vê produtos de todas as lojas
+ * - Admin sistema vê produtos de todas as lojas
  * - Clientes veem produtos de todas as lojas (catálogo compartilhado)
  */
 describe('Integração - CRUD de Produtos com Multi-tenancy', () => {

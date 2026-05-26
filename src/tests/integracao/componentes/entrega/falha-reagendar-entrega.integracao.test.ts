@@ -40,15 +40,17 @@ describe('Integração - Fluxo de Falha e Reagendamento de Entrega (Sprint 3)', 
 
     expect(resEntrega.status).toBe(201);
 
-    // 3. Validar criação de notificação no banco de dados
-    const notificacoes = await contexto.db!.executar<{ not_uuid: string; not_tipo: string }>(
-      `SELECT not_uuid, not_tipo FROM livraria_comercial.notificacoes 
-       WHERE not_venda_uuid = $1`,
-      [vendaUuid]
-    );
+    // 3. Validar criação de notificação via endpoint da API
+    const resNotificacoes = await request(contexto.app)
+      .get('/api/notificacoes')
+      .set('Authorization', `Bearer ${token}`);
 
-    expect(notificacoes.length).toBeGreaterThan(0);
-    expect(notificacoes[0].not_tipo).toBe('RASTREIO');
+    expect(resNotificacoes.status).toBe(200);
+    expect(resNotificacoes.body.length).toBeGreaterThan(0);
+    
+    const notificacaoVenda = resNotificacoes.body.find((n: any) => n.vendaUuid === vendaUuid);
+    expect(notificacaoVenda).toBeDefined();
+    expect(notificacaoVenda.tipo).toBe('RASTREIO');
   });
 
   it('deve registrar falha na entrega e reagendar com novo endereço (S3-C)', async () => {

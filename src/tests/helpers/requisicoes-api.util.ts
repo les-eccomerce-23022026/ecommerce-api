@@ -2,7 +2,7 @@ import request, { Response } from 'supertest';
 import { Application } from 'express';
 import bcrypt from 'bcryptjs';
 import { di } from '@/shared/infrastructure/di.container';
-import { PAPEL_ADMIN, PAPEL_CLIENTE } from '@/shared/types/papeis';
+import { PAPEL_ADMIN, PAPEL_CLIENTE, PAPEL_ADMIN_SISTEMA } from '@/shared/types/papeis';
 import { ITelefoneDto, IEnderecoDto } from '@/modules/clientes/Iclientes.dto';
 import { validarCpf } from '@/shared/utils/validacao-cpf.util';
 import { gerarCnpjValido } from '@/shared/utils/validacao-cnpj.util';
@@ -236,7 +236,7 @@ export async function obterTokenAdmin(app: Application): Promise<string> {
       cpf: '000.000.000-00',
       senhaHash: senhaHashAdmin,
       role: PAPEL_ADMIN,
-      papeis: [PAPEL_CLIENTE, PAPEL_ADMIN],
+      papeis: [PAPEL_CLIENTE, PAPEL_ADMIN, PAPEL_ADMIN_SISTEMA],
     });
   } else {
     // Atualiza o hash dentro da transação de isolamento para garantir que a senha
@@ -245,9 +245,10 @@ export async function obterTokenAdmin(app: Application): Promise<string> {
     await repositorioUsuarios.atualizarUsuario(adminExistente.uuid, {
       senhaHash: senhaHashAdmin,
     });
-    // Garante que o admin tenha ambos os papéis associados
+    // Garante que o admin tenha todos os papéis associados
     await repositorioUsuarios.associarPapelUsuario(adminExistente.id, PAPEL_CLIENTE.id);
     await repositorioUsuarios.associarPapelUsuario(adminExistente.id, PAPEL_ADMIN.id);
+    await repositorioUsuarios.associarPapelUsuario(adminExistente.id, PAPEL_ADMIN_SISTEMA.id);
   }
 
   const maximoTentativas = 5;

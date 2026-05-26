@@ -29,12 +29,12 @@ function gerarCpfValidoUnico(): string {
 }
 
 /**
- * Cria um administrador não-mestre via API (token do mestre) e retorna token + e-mail.
+ * Cria um administrador não-sistema via API (token do admin sistema) e retorna token + e-mail.
  * CPF é variado para evitar colisão quando vários admins são criados na mesma suíte.
  */
 export async function criarAdminComumObterToken(
   app: Application,
-  tokenMestre: string,
+  tokenSistema: string,
 ): Promise<{ token: string; email: string }> {
   const id = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
   const email = `admin.comum.${id}@test.integracao.local`;
@@ -42,7 +42,7 @@ export async function criarAdminComumObterToken(
 
   const res = await request(app)
     .post('/api/admin/registro')
-    .set('Authorization', `Bearer ${tokenMestre}`)
+    .set('Authorization', `Bearer ${tokenSistema}`)
     .send({
       nome: 'Admin Comum Integração',
       email,

@@ -11,18 +11,17 @@ export const cartaoValido = {
   bandeira: 'Visa',
 };
 
-export async function prepararTabelasPagamentoIntegracao(db: ContextoPagamentosIntegracao['db']): Promise<void> {
-  if (!db) return;
-  await db.executar(
-    `INSERT INTO tipo_pagamento (tpg_descricao) VALUES ('pix') ON CONFLICT (tpg_descricao) DO NOTHING`,
-  );
-  await db.executar(
-    `INSERT INTO status_venda (stv_descricao) VALUES ('AGUARDANDO PAGAMENTO') ON CONFLICT (stv_descricao) DO NOTHING`,
-  );
-  await db.executar(`
-    ALTER TABLE livraria_financeiro.pagamento_pix_simulado
-      ADD COLUMN IF NOT EXISTS pps_segredo_confirmacao VARCHAR(128)
-  `);
+export async function prepararTabelasPagamentoIntegracao(
+  contexto: ContextoPagamentosIntegracao,
+  tokenAdmin: string
+): Promise<void> {
+  const res = await request(contexto.app)
+    .post('/api/admin/testes/preparar-tabelas-pagamento')
+    .set('Authorization', `Bearer ${tokenAdmin}`);
+  
+  if (res.status !== 200) {
+    throw new Error(`Erro ao preparar tabelas de pagamento: ${res.status} - ${JSON.stringify(res.body)}`);
+  }
 }
 
 export async function criarVendaPagamentos(
@@ -44,7 +43,9 @@ export async function criarVendaPagamentos(
       valorFrete,
       valorTotal: total,
     });
-  expect(res.status).toBe(201);
+  if (res.status !== 201) {
+    throw new Error(`Erro ao criar venda: ${res.status} - ${JSON.stringify(res.body)}`);
+  }
   return res.body.id as string;
 }
 
@@ -57,6 +58,8 @@ export async function registrarIntencaoPagamentos(
     .post('/api/pagamentos/intencao-pagamento')
     .set('Authorization', `Bearer ${token}`)
     .send({ valorTotal });
-  expect(res.status).toBe(201);
+  if (res.status !== 201) {
+    throw new Error(`Erro ao registrar intenção: ${res.status} - ${JSON.stringify(res.body)}`);
+  }
   return res.body as { idIntencao: string; segredoConfirmacao: string };
 }

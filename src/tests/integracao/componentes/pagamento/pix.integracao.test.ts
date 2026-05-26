@@ -21,17 +21,12 @@ describe('Integração - Pagamentos (PIX e Seleção)', () => {
   });
 
   beforeEach(async () => {
-    if (contexto.db) {
-      await contexto.db.executar(
-        `INSERT INTO tipo_pagamento (tpg_descricao) VALUES ('pix') ON CONFLICT (tpg_descricao) DO NOTHING`
-      );
-      await contexto.db.executar(
-        `INSERT INTO status_venda (stv_descricao) VALUES ('AGUARDANDO PAGAMENTO') ON CONFLICT (stv_descricao) DO NOTHING`
-      );
-      await contexto.db.executar(`
-        ALTER TABLE livraria_financeiro.pagamento_pix_simulado
-          ADD COLUMN IF NOT EXISTS pps_segredo_confirmacao VARCHAR(128)
-      `);
+    const res = await request(contexto.app)
+      .post('/api/admin/testes/preparar-tabelas-pagamento')
+      .set('Authorization', `Bearer ${tokenAdmin}`);
+    
+    if (res.status !== 200) {
+      throw new Error(`Erro ao preparar tabelas de pagamento: ${res.status} - ${JSON.stringify(res.body)}`);
     }
   });
 

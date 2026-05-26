@@ -4,7 +4,7 @@ import request from 'supertest';
 import { Application } from 'express';
 import { configurarTesteIntegracao } from '@/tests/helpers/setup-integracao.util';
 import { obterTokenAdmin, obterTokenCliente } from '@/tests/helpers/requisicoes-api.util';
-import { payloadPedidoValido } from '@/tests/helpers/pedido-venda.helper';
+import { payloadPedidoValido, LIVRO_UUID_TESTE } from '@/tests/helpers/pedido-venda.helper';
 import { v4 as uuidv4 } from 'uuid';
 
 describe('Integração — Bulk Insert de Livros', () => {
@@ -321,7 +321,7 @@ describe('Integração — Bulk Insert de Livros', () => {
       const resVenda = await request(app)
         .post('/api/vendas')
         .set('Authorization', `Bearer ${tokenCliente}`)
-        .send(payloadPedidoValido({ precoUnitario: 50, quantidade: 1, valorFrete: 10 }));
+        .send(payloadPedidoValido(LIVRO_UUID_TESTE, { precoUnitario: 50, quantidade: 1, valorFrete: 10 }));
 
       expect(resVenda.status).toBe(201);
       const vendaUuid = resVenda.body.id as string;
@@ -342,7 +342,7 @@ describe('Integração — Bulk Insert de Livros', () => {
       const resVenda = await request(app)
         .post('/api/vendas')
         .set('Authorization', `Bearer ${tokenCliente}`)
-        .send(payloadPedidoValido({ precoUnitario: 30, quantidade: 1, valorFrete: 5 }));
+        .send(payloadPedidoValido(LIVRO_UUID_TESTE, { precoUnitario: 30, quantidade: 1, valorFrete: 5 }));
 
       expect(resVenda.status).toBe(201);
       const vendaUuid = resVenda.body.id as string;

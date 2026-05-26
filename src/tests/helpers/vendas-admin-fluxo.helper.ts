@@ -1,6 +1,6 @@
 import request from 'supertest';
 import { Application } from 'express';
-import { payloadPedidoValido } from '@/tests/helpers/pedido-venda.helper';
+import { payloadPedidoValido, LIVRO_UUID_TESTE } from '@/tests/helpers/pedido-venda.helper';
 
 const cartaoCheckout = {
   numero: '4111111111111111',
@@ -20,9 +20,9 @@ export type VendaCriada = {
 export async function criarVendaPedido(
   app: Application,
   tokenCliente: string,
-  opcoes?: Parameters<typeof payloadPedidoValido>[0],
+  opcoes?: Parameters<typeof payloadPedidoValido>[1],
 ): Promise<VendaCriada> {
-  const body = payloadPedidoValido(opcoes);
+  const body = payloadPedidoValido(LIVRO_UUID_TESTE, opcoes);
   const res = await request(app)
     .post('/api/vendas')
     .set('Authorization', `Bearer ${tokenCliente}`)

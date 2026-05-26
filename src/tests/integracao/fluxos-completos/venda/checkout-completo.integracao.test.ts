@@ -126,17 +126,17 @@ describe('Integração - Venda Completa (Sprint 1)', () => {
     const cupomValorOriginal = 200;
     const vendaUuid = await criarVenda(total);
 
-    // 1. Obter cli_id do cliente para criar cupom
-    const clienteRes = await contexto.db!.executar<{ cli_id: number }>(
-      'SELECT c.cli_id FROM livraria_gestao.clientes c WHERE c.usu_id = (SELECT usu_id FROM usuarios WHERE usu_email = $1)',
-      [emailCliente]
-    );
+    // 1. Obter cli_id do cliente para criar cupom via endpoint de teste
+    const clienteRes = await request(contexto.app)
+      .post('/api/admin/testes/obter-cliente-id')
+      .set('Authorization', `Bearer ${tokenAdmin}`)
+      .send({ email: emailCliente });
     
-    if (clienteRes.length === 0) {
+    if (clienteRes.status !== 200 || !clienteRes.body.dados) {
       throw new Error(`Cliente não encontrado para email ${emailCliente}`);
     }
     
-    const cliId = clienteRes[0].cli_id;
+    const cliId = clienteRes.body.dados.clienteId;
     const codigoCupom = 'TROCA-TESTE-123';
 
     // 2. Criar cupom usando a rota API de teste

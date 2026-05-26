@@ -6,10 +6,10 @@ import { di } from '@/shared/infrastructure/di.container';
 /**
  * Testes de integração para multi-tenancy por loja.
  * Verifica o isolamento de dados por loj_id e o comportamento do middleware contextoLoja.
- * 
+ *
  * RN0091: Isolamento de Dados por Loja
  * - Admin de loja X só vê produtos/vendas/clientes da loja X
- * - Admin mestre vê dados de todas as lojas
+ * - Admin sistema vê dados de todas as lojas
  * - Clientes veem produtos de todas as lojas (catálogo compartilhado)
  */
 describe('Integração - Multi-tenancy por Loja', () => {
@@ -51,7 +51,7 @@ describe('Integração - Multi-tenancy por Loja', () => {
       expect(res.body.mensagem).toContain('Campos obrigatórios ausentes');
     });
 
-    it('[RN0091] deve retornar 403 ao criar loja sem ser admin mestre', async () => {
+    it('[RN0091] deve retornar 403 ao criar loja sem ser admin sistema', async () => {
       // Criar admin comum
       const tokenMestre = await obterTokenAdmin(contexto.app);
       const adminRes = await registrarAdmin(contexto.app, tokenMestre, {
@@ -149,7 +149,7 @@ describe('Integração - Multi-tenancy por Loja', () => {
       expect(res.body.mensagem).toContain('Campos obrigatórios ausentes');
     });
 
-    it('[RN0091] deve retornar 403 ao associar admin sem ser admin mestre', async () => {
+    it('[RN0091] deve retornar 403 ao associar admin sem ser admin sistema', async () => {
       const tokenMestre = await obterTokenAdmin(contexto.app);
 
       // Criar admin comum

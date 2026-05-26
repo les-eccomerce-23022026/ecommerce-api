@@ -1,6 +1,6 @@
 import request from 'supertest';
 import { configurarTesteIntegracao } from '@/tests/helpers/setup-integracao.util';
-import { obterTokenCliente } from '@/tests/helpers/requisicoes-api.util';
+import { obterTokenCliente, obterTokenAdmin } from '@/tests/helpers/requisicoes-api.util';
 import {
   cartaoValido,
   prepararTabelasPagamentoIntegracao,
@@ -11,13 +11,15 @@ import {
 describe('Integração - Pagamentos (parcelas e limites)', () => {
   const contexto = configurarTesteIntegracao();
   let token: string;
+  let tokenAdmin: string;
 
   beforeAll(async () => {
     token = await obterTokenCliente(contexto.app);
+    tokenAdmin = await obterTokenAdmin(contexto.app);
   });
 
   beforeEach(async () => {
-    await prepararTabelasPagamentoIntegracao(contexto.db);
+    await prepararTabelasPagamentoIntegracao(contexto, tokenAdmin);
   });
 
   const criarVenda = (total = 60) => criarVendaPagamentos(contexto, token, total);
