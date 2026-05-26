@@ -160,6 +160,18 @@ Usuários criados pelos seeds em `sql/modelagem-dados/dml/` e migrations (`008_s
 | **Administrador Mestre** | `admin@livraria.com.br` | `Admin@123` | `isAdminMestre: true` — gestão de outros admins | `002_seed_usuario_admin_inicial.sql` |
 | **Admin Teste** | `admintest@email.com` | `@asdfJKLÇ123` | Admin comum (sem mestre) | `005_seed_usuarios_teste.sql`, `008_seed_dados_teste_bdd.sql` |
 
+### Multi-Tenancy (após migration 050)
+
+| Nome | E-mail | Senha | Papel | Escopo | Origem |
+|------|--------|-------|-------|--------|--------|
+| **Admin Sistema** | `admin_sistema@livraria.com.br` | `SenhaForte@123` | `admin_sistema` + `admin` | Global (todas lojas) | `050_seed_multi_tenant_completo.sql` |
+| **Admin Tenant (Centro)** | `admin_centro@livraria.com.br` | `SenhaForte@123` | `admin` | Apenas Livraria Centro | `050_seed_multi_tenant_completo.sql` |
+| **Admin Tenant (Norte)** | `admin_norte@livraria.com.br` | `SenhaForte@123` | `admin` | Apenas Livraria Norte | `050_seed_multi_tenant_completo.sql` |
+| **Admin Tenant (Sul)** | `admin_sul@livraria.com.br` | `SenhaForte@123` | `admin` | Apenas Livraria Sul | `050_seed_multi_tenant_completo.sql` |
+| **Cliente** | `maria.silva@email.com` | `SenhaForte@123` | `cliente` | Global (catálogo) | `050_seed_multi_tenant_completo.sql` |
+
+> **Nota:** Para detalhes sobre a arquitetura multi-tenancy, permissões e implementação técnica, consulte [`docs/MULTI-TENANCY-QUICK-REFERENCE.md`](docs/MULTI-TENANCY-QUICK-REFERENCE.md) ou [`docs/MULTI-TENANCY-IMPLEMENTACAO.md`](docs/MULTI-TENANCY-IMPLEMENTACAO.md).
+
 ### Exemplo de login
 
 Com Docker (`PORTA_HTTP_EXTERNA=3002`):
