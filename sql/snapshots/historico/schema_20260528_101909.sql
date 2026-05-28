@@ -1,6 +1,6 @@
--- Gerado em: 2026-05-28 10:20:08
+-- Gerado em: 2026-05-28 10:19:09
 -- Fonte: ecm_postgres / ecm_livraria
--- Comando: npm run db:snapshot
+-- Comando: npm run db:snapshot:historico
 
 --
 -- PostgreSQL database dump
@@ -68,13 +68,6 @@ COMMENT ON SCHEMA livraria_ref IS 'Validacao fluxo snapshot DDL - teste terminal
 --
 
 CREATE SCHEMA public;
-
-
---
--- Name: SCHEMA public; Type: COMMENT; Schema: -; Owner: -
---
-
-COMMENT ON SCHEMA public IS 'standard public schema';
 
 
 --
@@ -637,7 +630,7 @@ CREATE TABLE livraria_comercial.cotacao_frete (
     cfr_criado_em timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     ven_id bigint,
     loj_id bigint NOT NULL,
-    CONSTRAINT cotacao_frete_cfr_estado_check CHECK (((cfr_estado)::text = ANY (ARRAY[('CRIADA'::character varying)::text, ('CONSUMIDA'::character varying)::text, ('EXPIRADA'::character varying)::text, ('CANCELADA'::character varying)::text]))),
+    CONSTRAINT cotacao_frete_cfr_estado_check CHECK (((cfr_estado)::text = ANY ((ARRAY['CRIADA'::character varying, 'CONSUMIDA'::character varying, 'EXPIRADA'::character varying, 'CANCELADA'::character varying])::text[]))),
     CONSTRAINT cotacao_frete_cfr_peso_kg_check CHECK ((cfr_peso_kg > (0)::numeric)),
     CONSTRAINT cotacao_frete_cfr_valor_check CHECK ((cfr_valor >= (0)::numeric))
 );
@@ -712,7 +705,7 @@ CREATE TABLE livraria_comercial.cupom (
     cup_ativo boolean DEFAULT true,
     cup_criado_em timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
     cup_atualizado_em timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT cupom_cup_tipo_check CHECK (((cup_tipo)::text = ANY (ARRAY[('promocional'::character varying)::text, ('troca'::character varying)::text]))),
+    CONSTRAINT cupom_cup_tipo_check CHECK (((cup_tipo)::text = ANY ((ARRAY['promocional'::character varying, 'troca'::character varying])::text[]))),
     CONSTRAINT cupom_cup_valor_desconto_check CHECK ((cup_valor_desconto > (0)::numeric)),
     CONSTRAINT cupom_cup_valor_minimo_check CHECK ((cup_valor_minimo >= (0)::numeric))
 );
@@ -849,7 +842,7 @@ CREATE TABLE livraria_comercial.cupons_troca (
     cpt_status character varying(20) DEFAULT 'DISPONIVEL'::character varying NOT NULL,
     cpt_valido_ate date NOT NULL,
     cpt_criado_em timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT cupons_troca_cpt_status_check CHECK (((cpt_status)::text = ANY (ARRAY[('DISPONIVEL'::character varying)::text, ('UTILIZADO'::character varying)::text, ('EXPIRADO'::character varying)::text]))),
+    CONSTRAINT cupons_troca_cpt_status_check CHECK (((cpt_status)::text = ANY ((ARRAY['DISPONIVEL'::character varying, 'UTILIZADO'::character varying, 'EXPIRADO'::character varying])::text[]))),
     CONSTRAINT cupons_troca_cpt_valor_check CHECK ((cpt_valor > (0)::numeric))
 );
 
@@ -1867,107 +1860,6 @@ ALTER SEQUENCE livraria_comercial.livros_liv_id_seq OWNED BY livraria_comercial.
 
 
 --
--- Name: metricas_recomendacao; Type: TABLE; Schema: livraria_comercial; Owner: -
---
-
-CREATE TABLE livraria_comercial.metricas_recomendacao (
-    id bigint NOT NULL,
-    cliente_uuid uuid NOT NULL,
-    query text NOT NULL,
-    produtos_recomendados jsonb NOT NULL,
-    tempo_resposta_ms integer NOT NULL,
-    precisao numeric(5,4) NOT NULL,
-    recall numeric(5,4) NOT NULL,
-    f1_score numeric(5,4) NOT NULL,
-    relevancia_semantica numeric(5,4) NOT NULL,
-    data_criacao timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
-    loj_id bigint NOT NULL
-);
-
-
---
--- Name: TABLE metricas_recomendacao; Type: COMMENT; Schema: livraria_comercial; Owner: -
---
-
-COMMENT ON TABLE livraria_comercial.metricas_recomendacao IS 'Métricas de avaliação do sistema de recomendação de IA';
-
-
---
--- Name: COLUMN metricas_recomendacao.cliente_uuid; Type: COMMENT; Schema: livraria_comercial; Owner: -
---
-
-COMMENT ON COLUMN livraria_comercial.metricas_recomendacao.cliente_uuid IS 'UUID do cliente que fez a consulta';
-
-
---
--- Name: COLUMN metricas_recomendacao.query; Type: COMMENT; Schema: livraria_comercial; Owner: -
---
-
-COMMENT ON COLUMN livraria_comercial.metricas_recomendacao.query IS 'Query/texto da pergunta do usuário';
-
-
---
--- Name: COLUMN metricas_recomendacao.produtos_recomendados; Type: COMMENT; Schema: livraria_comercial; Owner: -
---
-
-COMMENT ON COLUMN livraria_comercial.metricas_recomendacao.produtos_recomendados IS 'Lista de UUIDs dos produtos recomendados';
-
-
---
--- Name: COLUMN metricas_recomendacao.tempo_resposta_ms; Type: COMMENT; Schema: livraria_comercial; Owner: -
---
-
-COMMENT ON COLUMN livraria_comercial.metricas_recomendacao.tempo_resposta_ms IS 'Tempo de resposta em milissegundos';
-
-
---
--- Name: COLUMN metricas_recomendacao.precisao; Type: COMMENT; Schema: livraria_comercial; Owner: -
---
-
-COMMENT ON COLUMN livraria_comercial.metricas_recomendacao.precisao IS 'Precisão das recomendações (0-1)';
-
-
---
--- Name: COLUMN metricas_recomendacao.recall; Type: COMMENT; Schema: livraria_comercial; Owner: -
---
-
-COMMENT ON COLUMN livraria_comercial.metricas_recomendacao.recall IS 'Recall das recomendações (0-1)';
-
-
---
--- Name: COLUMN metricas_recomendacao.f1_score; Type: COMMENT; Schema: livraria_comercial; Owner: -
---
-
-COMMENT ON COLUMN livraria_comercial.metricas_recomendacao.f1_score IS 'F1-Score das recomendações (0-1)';
-
-
---
--- Name: COLUMN metricas_recomendacao.relevancia_semantica; Type: COMMENT; Schema: livraria_comercial; Owner: -
---
-
-COMMENT ON COLUMN livraria_comercial.metricas_recomendacao.relevancia_semantica IS 'Relevância semântica da resposta (0-1)';
-
-
---
--- Name: metricas_recomendacao_id_seq; Type: SEQUENCE; Schema: livraria_comercial; Owner: -
---
-
-CREATE SEQUENCE livraria_comercial.metricas_recomendacao_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
---
--- Name: metricas_recomendacao_id_seq; Type: SEQUENCE OWNED BY; Schema: livraria_comercial; Owner: -
---
-
-ALTER SEQUENCE livraria_comercial.metricas_recomendacao_id_seq OWNED BY livraria_comercial.metricas_recomendacao.id;
-
-
---
 -- Name: notificacoes; Type: TABLE; Schema: livraria_comercial; Owner: -
 --
 
@@ -2460,7 +2352,7 @@ CREATE TABLE livraria_financeiro.intencao_pagamento (
     inp_recusado_em timestamp with time zone,
     ven_id bigint,
     loj_id bigint NOT NULL,
-    CONSTRAINT intencao_pagamento_inp_estado_check CHECK (((inp_estado)::text = ANY (ARRAY[('CRIADA'::character varying)::text, ('CONFIRMADA'::character varying)::text, ('RECUSADA'::character varying)::text, ('EXPIRADA'::character varying)::text, ('CANCELADA'::character varying)::text]))),
+    CONSTRAINT intencao_pagamento_inp_estado_check CHECK (((inp_estado)::text = ANY ((ARRAY['CRIADA'::character varying, 'CONFIRMADA'::character varying, 'RECUSADA'::character varying, 'EXPIRADA'::character varying, 'CANCELADA'::character varying])::text[]))),
     CONSTRAINT intencao_pagamento_inp_tentativas_confirmacao_check CHECK ((inp_tentativas_confirmacao >= 0)),
     CONSTRAINT intencao_pagamento_inp_valor_check CHECK ((inp_valor > (0)::numeric))
 );
@@ -2857,7 +2749,7 @@ CREATE TABLE livraria_gestao.admin_lojas (
     adl_ativo boolean DEFAULT true,
     adl_criado_em timestamp with time zone DEFAULT now(),
     adl_escopo character varying(20) DEFAULT 'LOJA'::character varying NOT NULL,
-    CONSTRAINT ck_admin_lojas_escopo_valido CHECK (((adl_escopo)::text = ANY (ARRAY[('SISTEMA'::character varying)::text, ('LOJA'::character varying)::text])))
+    CONSTRAINT ck_admin_lojas_escopo_valido CHECK (((adl_escopo)::text = ANY ((ARRAY['SISTEMA'::character varying, 'LOJA'::character varying])::text[])))
 );
 
 
@@ -3083,7 +2975,7 @@ CREATE TABLE livraria_gestao.enderecos (
     end_principal boolean DEFAULT false NOT NULL,
     end_criado_em timestamp with time zone DEFAULT now() NOT NULL,
     end_atualizado_em timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT ck_enderecos_tipo CHECK (((end_tipo)::text = ANY (ARRAY[('cobranca'::character varying)::text, ('entrega'::character varying)::text])))
+    CONSTRAINT ck_enderecos_tipo CHECK (((end_tipo)::text = ANY ((ARRAY['cobranca'::character varying, 'entrega'::character varying])::text[])))
 );
 
 
@@ -3826,7 +3718,7 @@ CREATE TABLE livraria_logistica.rastreamentos (
     ras_transportadora character varying(50) NOT NULL,
     ras_data_criacao timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     ras_data_entrega_prevista timestamp without time zone,
-    CONSTRAINT chk_transportadora CHECK (((ras_transportadora)::text = ANY (ARRAY[('Correios'::character varying)::text, ('Loggi'::character varying)::text])))
+    CONSTRAINT chk_transportadora CHECK (((ras_transportadora)::text = ANY ((ARRAY['Correios'::character varying, 'Loggi'::character varying])::text[])))
 );
 
 
@@ -4502,13 +4394,6 @@ ALTER TABLE ONLY livraria_comercial.livros ALTER COLUMN liv_id SET DEFAULT nextv
 
 
 --
--- Name: metricas_recomendacao id; Type: DEFAULT; Schema: livraria_comercial; Owner: -
---
-
-ALTER TABLE ONLY livraria_comercial.metricas_recomendacao ALTER COLUMN id SET DEFAULT nextval('livraria_comercial.metricas_recomendacao_id_seq'::regclass);
-
-
---
 -- Name: papeis pap_id; Type: DEFAULT; Schema: livraria_comercial; Owner: -
 --
 
@@ -5058,14 +4943,6 @@ ALTER TABLE ONLY livraria_comercial.livros
 
 ALTER TABLE ONLY livraria_comercial.livros
     ADD CONSTRAINT livros_pkey PRIMARY KEY (liv_id);
-
-
---
--- Name: metricas_recomendacao metricas_recomendacao_pkey; Type: CONSTRAINT; Schema: livraria_comercial; Owner: -
---
-
-ALTER TABLE ONLY livraria_comercial.metricas_recomendacao
-    ADD CONSTRAINT metricas_recomendacao_pkey PRIMARY KEY (id);
 
 
 --
@@ -5946,41 +5823,6 @@ CREATE INDEX idx_livros_isbn ON livraria_comercial.livros USING btree (liv_isbn)
 
 
 --
--- Name: idx_metricas_cliente_uuid; Type: INDEX; Schema: livraria_comercial; Owner: -
---
-
-CREATE INDEX idx_metricas_cliente_uuid ON livraria_comercial.metricas_recomendacao USING btree (cliente_uuid);
-
-
---
--- Name: idx_metricas_data_criacao; Type: INDEX; Schema: livraria_comercial; Owner: -
---
-
-CREATE INDEX idx_metricas_data_criacao ON livraria_comercial.metricas_recomendacao USING btree (data_criacao DESC);
-
-
---
--- Name: idx_metricas_loj_id; Type: INDEX; Schema: livraria_comercial; Owner: -
---
-
-CREATE INDEX idx_metricas_loj_id ON livraria_comercial.metricas_recomendacao USING btree (loj_id);
-
-
---
--- Name: idx_metricas_produtos_recomendados; Type: INDEX; Schema: livraria_comercial; Owner: -
---
-
-CREATE INDEX idx_metricas_produtos_recomendados ON livraria_comercial.metricas_recomendacao USING gin (produtos_recomendados);
-
-
---
--- Name: idx_metricas_tempo_resposta; Type: INDEX; Schema: livraria_comercial; Owner: -
---
-
-CREATE INDEX idx_metricas_tempo_resposta ON livraria_comercial.metricas_recomendacao USING btree (tempo_resposta_ms);
-
-
---
 -- Name: idx_notificacoes_criado_em; Type: INDEX; Schema: livraria_comercial; Owner: -
 --
 
@@ -6614,22 +6456,6 @@ ALTER TABLE ONLY livraria_comercial.fornecedores
 
 ALTER TABLE ONLY livraria_comercial.itens_venda
     ADD CONSTRAINT fk_itens_venda_loja FOREIGN KEY (loj_id) REFERENCES livraria_gestao.lojas(loj_id);
-
-
---
--- Name: metricas_recomendacao fk_metricas_cliente; Type: FK CONSTRAINT; Schema: livraria_comercial; Owner: -
---
-
-ALTER TABLE ONLY livraria_comercial.metricas_recomendacao
-    ADD CONSTRAINT fk_metricas_cliente FOREIGN KEY (cliente_uuid) REFERENCES livraria_gestao.usuarios(usu_uuid) ON DELETE CASCADE;
-
-
---
--- Name: metricas_recomendacao fk_metricas_loja; Type: FK CONSTRAINT; Schema: livraria_comercial; Owner: -
---
-
-ALTER TABLE ONLY livraria_comercial.metricas_recomendacao
-    ADD CONSTRAINT fk_metricas_loja FOREIGN KEY (loj_id) REFERENCES livraria_gestao.lojas(loj_id);
 
 
 --

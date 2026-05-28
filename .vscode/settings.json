@@ -1,9 +1,0 @@
-{
-    "chat.tools.terminal.autoApprove": {
-        "gh": true,
-        "docker-compose": true,
-        "docker exec": true
-    },
-    "rest-client.rememberCookies": false,
-    "rest-client.enableVariableSubstitution": true
-}

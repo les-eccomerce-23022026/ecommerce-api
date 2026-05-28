@@ -20,6 +20,7 @@ const variaveisObrigatorias: Record<string, string | undefined> = {
   REDIS_HOST: process.env.REDIS_HOST,
   REDIS_PORT: process.env.REDIS_PORT,
   SEGREDO_HMAC_INTENCAO: process.env.SEGREDO_HMAC_INTENCAO,
+  GEMINI_API_KEY: process.env.GEMINI_API_KEY,
 };
 
 const variaveisFaltando = Object.entries(variaveisObrigatorias)

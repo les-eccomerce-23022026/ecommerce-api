@@ -15,6 +15,7 @@ import { registrarRotasCupom } from '@/modules/cupom/cupom.routes';
 import { criarRotasLogisticaMocks } from '@/modules/logistica-mocks/logisticaMocks.routes';
 import { registrarRotasLojas } from '@/modules/lojas/lojas.routes';
 import rotasUsuarioPapeis from '@/modules/usuarios/usuarioPapeis.routes';
+import { registrarRotasIA } from '@/modules/ia/ia.routes';
 import { ServicoMockCorreios } from '@/modules/logistica-mocks/servicoMockCorreios';
 import { ServicoMockLoggi } from '@/modules/logistica-mocks/servicoMockLoggi';
 import { RepositorioRastreamentoPostgres } from '@/modules/logistica-mocks/repositorios/RepositorioRastreamentoPostgres';
@@ -94,6 +95,7 @@ export function criarAplicacao(): Application {
   registrarRotasCarrinho(apiRouter);
   registrarRotasCupom(apiRouter);
   registrarRotasLojas(apiRouter);
+  registrarRotasIA(apiRouter);
   apiRouter.use('/usuarios/papeis', rotasUsuarioPapeis);
   
   // Rotas mockadas para APIs de logística (Correios e Loggi)
