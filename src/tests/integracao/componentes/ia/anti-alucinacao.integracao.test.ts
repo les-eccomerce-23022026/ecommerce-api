@@ -31,6 +31,7 @@ const mockAtualizarEmbedding = jest.fn().mockResolvedValue({});
 const mockRemoverEmbedding = jest.fn().mockResolvedValue(undefined);
 const mockIndexarCatalogo = jest.fn().mockResolvedValue(0);
 const mockLimparColecao = jest.fn().mockResolvedValue(undefined);
+const mockVerificarConexaoChroma = jest.fn().mockResolvedValue(true);
 
 // Mocks dos módulos externos
 jest.mock('@/modules/ia/infrastructure/config/AdapterLangChainGemini', () => ({
@@ -51,22 +52,28 @@ jest.mock('@/modules/ia/infrastructure/repositories/RepositorioEmbeddingChromaDB
     remover: mockRemoverEmbedding,
     indexarCatalogo: mockIndexarCatalogo,
     limparColecao: mockLimparColecao,
+    verificarConexao: mockVerificarConexaoChroma,
   })),
 }));
 
 import request from 'supertest';
 import { configurarTesteIntegracao } from '@/tests/helpers/setup-integracao.util';
+import { obterTokenClienteParaIa, postIaRecomendar, postIaChat } from '@/tests/helpers/ia-integracao.helper';
 
 describe('[RN-IA-002] Integração - Anti-Alucinação da IA', () => {
   const contexto = configurarTesteIntegracao();
+  let tokenCliente: string;
+
+  beforeEach(async () => {
+    tokenCliente = await obterTokenClienteParaIa(contexto.app);
+  });
 
   describe('Recomendação com Lista Vazia do ChromaDB', () => {
     it('[RN-IA-002] deve retornar lista de produtos vazia quando ChromaDB não tem resultados', async () => {
       // Arrange: ChromaDB não encontra nenhum produto similar
       mockBuscarSimilares.mockResolvedValueOnce([]);
 
-      const resposta = await request(contexto.app)
-        .post('/api/ia/recomendar')
+      const resposta = await postIaRecomendar(contexto.app, tokenCliente)
         .send({ query: 'assunto sem nenhum livro no catálogo' });
 
       expect(resposta.status).toBe(200);
@@ -77,8 +84,7 @@ describe('[RN-IA-002] Integração - Anti-Alucinação da IA', () => {
     it('[RN-IA-002] deve retornar totalValidos zero quando nenhum produto é encontrado', async () => {
       mockBuscarSimilares.mockResolvedValueOnce([]);
 
-      const resposta = await request(contexto.app)
-        .post('/api/ia/recomendar')
+      const resposta = await postIaRecomendar(contexto.app, tokenCliente)
         .send({ query: 'temática com ausência no catálogo' });
 
       expect(resposta.status).toBe(200);
@@ -117,8 +123,7 @@ describe('[RN-IA-002] Integração - Anti-Alucinação da IA', () => {
         },
       ]);
 
-      const resposta = await request(contexto.app)
-        .post('/api/ia/recomendar')
+      const resposta = await postIaRecomendar(contexto.app, tokenCliente)
         .send({ query: 'padrões de projeto e refatoração de software' });
 
       expect(resposta.status).toBe(200);
@@ -150,8 +155,7 @@ describe('[RN-IA-002] Integração - Anti-Alucinação da IA', () => {
         },
       ]);
 
-      const resposta = await request(contexto.app)
-        .post('/api/ia/recomendar')
+      const resposta = await postIaRecomendar(contexto.app, tokenCliente)
         .send({ query: 'boas práticas de codificação' });
 
       expect(resposta.status).toBe(200);
@@ -181,8 +185,7 @@ describe('[RN-IA-002] Integração - Anti-Alucinação da IA', () => {
       mockBuscarSimilares.mockResolvedValueOnce(produtosMockados);
 
       const limiteInformado = 3;
-      const resposta = await request(contexto.app)
-        .post('/api/ia/recomendar')
+      const resposta = await postIaRecomendar(contexto.app, tokenCliente)
         .send({ query: 'qualquer busca', limite: limiteInformado });
 
       expect(resposta.status).toBe(200);
@@ -208,8 +211,7 @@ describe('[RN-IA-002] Integração - Anti-Alucinação da IA', () => {
         },
       ]);
 
-      const resposta = await request(contexto.app)
-        .post('/api/ia/chat')
+      const resposta = await postIaChat(contexto.app, tokenCliente)
         .send({ mensagem: 'Indique um livro de Paulo Coelho disponível' });
 
       expect(resposta.status).toBe(200);
@@ -228,8 +230,7 @@ describe('[RN-IA-002] Integração - Anti-Alucinação da IA', () => {
     it('[RN-IA-002] deve retornar produtosRelacionados vazio quando ChromaDB não encontra similares', async () => {
       mockBuscarSimilares.mockResolvedValueOnce([]);
 
-      const resposta = await request(contexto.app)
-        .post('/api/ia/chat')
+      const resposta = await postIaChat(contexto.app, tokenCliente)
         .send({ mensagem: 'Existe algum livro sobre culinária molecular?' });
 
       expect(resposta.status).toBe(200);
@@ -255,8 +256,7 @@ describe('[RN-IA-002] Integração - Anti-Alucinação da IA', () => {
         }))
       );
 
-      const resposta = await request(contexto.app)
-        .post('/api/ia/recomendar')
+      const resposta = await postIaRecomendar(contexto.app, tokenCliente)
         .send({ query: 'ficção científica clássica' });
 
       expect(resposta.status).toBe(200);
@@ -278,8 +278,7 @@ describe('[RN-IA-002] Integração - Anti-Alucinação da IA', () => {
         },
       ]);
 
-      const resposta = await request(contexto.app)
-        .post('/api/ia/recomendar')
+      const resposta = await postIaRecomendar(contexto.app, tokenCliente)
         .send({ query: 'cyberpunk clássico' });
 
       expect(resposta.status).toBe(200);

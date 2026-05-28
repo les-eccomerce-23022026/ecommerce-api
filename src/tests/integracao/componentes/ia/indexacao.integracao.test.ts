@@ -6,6 +6,13 @@
  * serviços, tratamento de falhas e estrutura de resposta.
  *
  * RN-IA-003: Reindexação exige autenticação de administrador.
+ *
+ * Armadilhas de setup (regressão):
+ * - Autenticação admin/cliente: Authorization Bearer (não Cookie `token=`; API usa les_token).
+ * - Papéis: resolverPapelGestao por descricao — PAPEL_*.id fixo quebra FK usuario_papeis.
+ * - Isolamento: configurarTesteIntegracao(false) + setup na mesma transação da suíte.
+ * - Mock: ServicoIndexacaoProdutos.indexarCatalogo (não RepositorioEmbeddingChromaDB).
+ * - Cliente 403: obterTokenCliente + gerarCpfValidoUnico (não POST /auth/registrar na suíte).
  */
 
 // Funções mock declaradas ANTES dos jest.mock (prefixo 'mock' isenta do hoisting)
@@ -29,6 +36,7 @@ const mockAtualizarEmbedding = jest.fn().mockResolvedValue({});
 const mockRemoverEmbedding = jest.fn().mockResolvedValue(undefined);
 const mockIndexarCatalogo = jest.fn().mockResolvedValue(0);
 const mockLimparColecao = jest.fn().mockResolvedValue(undefined);
+const mockVerificarConexaoChroma = jest.fn().mockResolvedValue(true);
 
 // Mocks dos módulos externos
 jest.mock('@/modules/ia/infrastructure/config/AdapterLangChainGemini', () => ({
@@ -47,21 +55,33 @@ jest.mock('@/modules/ia/infrastructure/repositories/RepositorioEmbeddingChromaDB
     buscarSimilares: mockBuscarSimilares,
     atualizar: mockAtualizarEmbedding,
     remover: mockRemoverEmbedding,
-    indexarCatalogo: mockIndexarCatalogo,
     limparColecao: mockLimparColecao,
+    verificarConexao: mockVerificarConexaoChroma,
+  })),
+}));
+
+jest.mock('@/modules/ia/application/services/ServicoIndexacaoProdutos', () => ({
+  ServicoIndexacaoProdutos: jest.fn().mockImplementation(() => ({
+    indexarCatalogo: mockIndexarCatalogo,
+    indexarProduto: jest.fn().mockResolvedValue(undefined),
+    removerProduto: jest.fn().mockResolvedValue(undefined),
   })),
 }));
 
 import request from 'supertest';
 import { configurarTesteIntegracao } from '@/tests/helpers/setup-integracao.util';
-import { obterTokenAdmin } from '@/tests/helpers/requisicoes-api.util';
+import {
+  cabecalhoBearerAuth,
+  gerarCpfValidoUnico,
+  obterTokenAdmin,
+  obterTokenCliente,
+} from '@/tests/helpers/requisicoes-api.util';
 
 describe('[RF-IA-03] Integração - Reindexação do Catálogo (POST /api/ia/reindexar)', () => {
-  const contexto = configurarTesteIntegracao();
   let tokenAdmin: string;
 
-  beforeAll(async () => {
-    tokenAdmin = await obterTokenAdmin(contexto.app);
+  const contexto = configurarTesteIntegracao(false, async ({ app }) => {
+    tokenAdmin = await obterTokenAdmin(app);
   });
 
   describe('Controle de Acesso', () => {
@@ -83,26 +103,15 @@ describe('[RF-IA-03] Integração - Reindexação do Catálogo (POST /api/ia/rei
     });
 
     it('[RN-IA-003] deve retornar 403 quando usuário autenticado não tem papel de administrador', async () => {
-      // Registrar um cliente comum (sem papel admin)
-      const cadastro = await request(contexto.app)
-        .post('/api/auth/registrar')
-        .send({
-          nome: 'Cliente Comum Reindexar',
-          email: 'cliente.reindexar@teste.com',
-          senha: 'Senha@123',
-          cpf: '111.222.333-96',
-          dataNascimento: '1990-01-01',
-        });
-
-      const login = await request(contexto.app)
-        .post('/api/auth/login')
-        .send({ email: 'cliente.reindexar@teste.com', senha: 'Senha@123' });
-
-      const cookiesCliente = login.headers['set-cookie'] as unknown as string[];
+      const tokenCliente = await obterTokenCliente(
+        contexto.app,
+        'cliente.reindexar@teste.com',
+        gerarCpfValidoUnico(),
+      );
 
       const resposta = await request(contexto.app)
         .post('/api/ia/reindexar')
-        .set('Cookie', cookiesCliente);
+        .set(cabecalhoBearerAuth(tokenCliente));
 
       expect(resposta.status).toBe(403);
       expect(resposta.body.sucesso).toBe(false);
@@ -115,7 +124,7 @@ describe('[RF-IA-03] Integração - Reindexação do Catálogo (POST /api/ia/rei
 
       const resposta = await request(contexto.app)
         .post('/api/ia/reindexar')
-        .set('Cookie', [`token=${tokenAdmin}`]);
+        .set(cabecalhoBearerAuth(tokenAdmin));
 
       expect(resposta.status).toBe(200);
       expect(resposta.body.sucesso).toBe(true);
@@ -126,7 +135,7 @@ describe('[RF-IA-03] Integração - Reindexação do Catálogo (POST /api/ia/rei
 
       const resposta = await request(contexto.app)
         .post('/api/ia/reindexar')
-        .set('Cookie', [`token=${tokenAdmin}`]);
+        .set(cabecalhoBearerAuth(tokenAdmin));
 
       expect(resposta.status).toBe(200);
       expect(resposta.body.dados).toHaveProperty('mensagem');
@@ -141,7 +150,7 @@ describe('[RF-IA-03] Integração - Reindexação do Catálogo (POST /api/ia/rei
 
       const resposta = await request(contexto.app)
         .post('/api/ia/reindexar')
-        .set('Cookie', [`token=${tokenAdmin}`]);
+        .set(cabecalhoBearerAuth(tokenAdmin));
 
       expect(resposta.status).toBe(200);
       expect(resposta.body.dados.produtosIndexados).toBe(totalEsperado);
@@ -150,7 +159,7 @@ describe('[RF-IA-03] Integração - Reindexação do Catálogo (POST /api/ia/rei
     it('[RN-IA-003] deve acionar o serviço de indexação ao receber requisição válida', async () => {
       await request(contexto.app)
         .post('/api/ia/reindexar')
-        .set('Cookie', [`token=${tokenAdmin}`]);
+        .set(cabecalhoBearerAuth(tokenAdmin));
 
       expect(mockIndexarCatalogo).toHaveBeenCalled();
     });
@@ -160,7 +169,7 @@ describe('[RF-IA-03] Integração - Reindexação do Catálogo (POST /api/ia/rei
 
       const resposta = await request(contexto.app)
         .post('/api/ia/reindexar')
-        .set('Cookie', [`token=${tokenAdmin}`]);
+        .set(cabecalhoBearerAuth(tokenAdmin));
 
       expect(resposta.status).toBe(200);
       expect(typeof resposta.body.dados.mensagem).toBe('string');
@@ -176,7 +185,7 @@ describe('[RF-IA-03] Integração - Reindexação do Catálogo (POST /api/ia/rei
 
       const resposta = await request(contexto.app)
         .post('/api/ia/reindexar')
-        .set('Cookie', [`token=${tokenAdmin}`]);
+        .set(cabecalhoBearerAuth(tokenAdmin));
 
       expect(resposta.status).toBe(500);
       expect(resposta.body.sucesso).toBe(false);
@@ -193,7 +202,7 @@ describe('[RF-IA-03] Integração - Reindexação do Catálogo (POST /api/ia/rei
 
       const resposta = await request(contexto.app)
         .post('/api/ia/reindexar')
-        .set('Cookie', [`token=${tokenAdmin}`]);
+        .set(cabecalhoBearerAuth(tokenAdmin));
 
       expect(resposta.status).toBe(500);
       expect(resposta.body.sucesso).toBe(false);

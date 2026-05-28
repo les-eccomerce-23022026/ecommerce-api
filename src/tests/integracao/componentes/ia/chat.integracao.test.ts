@@ -31,6 +31,7 @@ const mockAtualizarEmbedding = jest.fn().mockResolvedValue({});
 const mockRemoverEmbedding = jest.fn().mockResolvedValue(undefined);
 const mockIndexarCatalogo = jest.fn().mockResolvedValue(0);
 const mockLimparColecao = jest.fn().mockResolvedValue(undefined);
+const mockVerificarConexaoChroma = jest.fn().mockResolvedValue(true);
 
 // Mocks dos módulos externos
 jest.mock('@/modules/ia/infrastructure/config/AdapterLangChainGemini', () => ({
@@ -51,19 +52,36 @@ jest.mock('@/modules/ia/infrastructure/repositories/RepositorioEmbeddingChromaDB
     remover: mockRemoverEmbedding,
     indexarCatalogo: mockIndexarCatalogo,
     limparColecao: mockLimparColecao,
+    verificarConexao: mockVerificarConexaoChroma,
   })),
 }));
 
 import request from 'supertest';
 import { configurarTesteIntegracao } from '@/tests/helpers/setup-integracao.util';
+import { obterTokenClienteParaIa, postIaChat } from '@/tests/helpers/ia-integracao.helper';
 
 describe('[RF-IA-02] Integração - Chat com IA (POST /api/ia/chat)', () => {
   const contexto = configurarTesteIntegracao();
+  let tokenCliente: string;
+
+  beforeEach(async () => {
+    tokenCliente = await obterTokenClienteParaIa(contexto.app);
+  });
+
+  describe('Controle de Acesso', () => {
+    it('[RN-IA-002] deve retornar 401 quando requisição é feita sem autenticação', async () => {
+      const resposta = await request(contexto.app)
+        .post('/api/ia/chat')
+        .send({ mensagem: 'Olá' });
+
+      expect(resposta.status).toBe(401);
+      expect(resposta.body.sucesso).toBe(false);
+    });
+  });
 
   describe('Validação de Entrada', () => {
     it('[RN-IA-002] deve retornar 400 quando o corpo da requisição está vazio', async () => {
-      const resposta = await request(contexto.app)
-        .post('/api/ia/chat')
+      const resposta = await postIaChat(contexto.app, tokenCliente)
         .send({});
 
       expect(resposta.status).toBe(400);
@@ -72,8 +90,7 @@ describe('[RF-IA-02] Integração - Chat com IA (POST /api/ia/chat)', () => {
     });
 
     it('[RN-IA-002] deve retornar 400 quando mensagem é string vazia', async () => {
-      const resposta = await request(contexto.app)
-        .post('/api/ia/chat')
+      const resposta = await postIaChat(contexto.app, tokenCliente)
         .send({ mensagem: '' });
 
       expect(resposta.status).toBe(400);
@@ -81,8 +98,7 @@ describe('[RF-IA-02] Integração - Chat com IA (POST /api/ia/chat)', () => {
     });
 
     it('[RN-IA-002] deve retornar 400 quando mensagem contém apenas espaços', async () => {
-      const resposta = await request(contexto.app)
-        .post('/api/ia/chat')
+      const resposta = await postIaChat(contexto.app, tokenCliente)
         .send({ mensagem: '   ' });
 
       expect(resposta.status).toBe(400);
@@ -90,8 +106,7 @@ describe('[RF-IA-02] Integração - Chat com IA (POST /api/ia/chat)', () => {
     });
 
     it('[RN-IA-002] deve retornar 400 quando mensagem não é do tipo string', async () => {
-      const resposta = await request(contexto.app)
-        .post('/api/ia/chat')
+      const resposta = await postIaChat(contexto.app, tokenCliente)
         .send({ mensagem: 42 });
 
       expect(resposta.status).toBe(400);
@@ -103,16 +118,14 @@ describe('[RF-IA-02] Integração - Chat com IA (POST /api/ia/chat)', () => {
       // Quando implementada, deve retornar 400. Atualmente retorna 200.
       const mensagemLonga = 'A'.repeat(1001);
 
-      const resposta = await request(contexto.app)
-        .post('/api/ia/chat')
+      const resposta = await postIaChat(contexto.app, tokenCliente)
         .send({ mensagem: mensagemLonga });
 
       expect([200, 400]).toContain(resposta.status);
     });
 
     it('[RN-IA-002] deve retornar 400 quando historico não é um array', async () => {
-      const resposta = await request(contexto.app)
-        .post('/api/ia/chat')
+      const resposta = await postIaChat(contexto.app, tokenCliente)
         .send({ mensagem: 'Quais livros de ficção você recomenda?', historico: 'não sou array' });
 
       expect(resposta.status).toBe(400);
@@ -124,8 +137,7 @@ describe('[RF-IA-02] Integração - Chat com IA (POST /api/ia/chat)', () => {
     it('[RN-IA-002] deve aceitar item do histórico sem campo role (validação não implementada)', async () => {
       // Nota: o controller não valida os campos de cada item do histórico.
       // Quando implementada, deve retornar 400 para itens sem role.
-      const resposta = await request(contexto.app)
-        .post('/api/ia/chat')
+      const resposta = await postIaChat(contexto.app, tokenCliente)
         .send({
           mensagem: 'Me indique um bom romance',
           historico: [{ content: 'anterior sem role' }],
@@ -137,8 +149,7 @@ describe('[RF-IA-02] Integração - Chat com IA (POST /api/ia/chat)', () => {
     it('[RN-IA-002] deve aceitar item com role inválido no histórico (validação não implementada)', async () => {
       // Nota: o controller aceita qualquer role pois não valida o conteúdo do histórico.
       // Quando implementada, deve rejeitar roles fora de user/assistant.
-      const resposta = await request(contexto.app)
-        .post('/api/ia/chat')
+      const resposta = await postIaChat(contexto.app, tokenCliente)
         .send({
           mensagem: 'Me indique um bom romance',
           historico: [{ role: 'system', content: 'conteúdo com role não reconhecido' }],
@@ -150,8 +161,7 @@ describe('[RF-IA-02] Integração - Chat com IA (POST /api/ia/chat)', () => {
 
   describe('Retorno com Sucesso', () => {
     it('[RN-IA-002] deve retornar 200 com estrutura completa para mensagem válida', async () => {
-      const resposta = await request(contexto.app)
-        .post('/api/ia/chat')
+      const resposta = await postIaChat(contexto.app, tokenCliente)
         .send({ mensagem: 'Você pode me indicar livros de programação?' });
 
       expect(resposta.status).toBe(200);
@@ -164,8 +174,7 @@ describe('[RF-IA-02] Integração - Chat com IA (POST /api/ia/chat)', () => {
     });
 
     it('[RN-IA-002] deve retornar 200 com histórico vazio quando não fornecido', async () => {
-      const resposta = await request(contexto.app)
-        .post('/api/ia/chat')
+      const resposta = await postIaChat(contexto.app, tokenCliente)
         .send({ mensagem: 'Quais são os lançamentos de ficção científica?' });
 
       expect(resposta.status).toBe(200);
@@ -179,8 +188,7 @@ describe('[RF-IA-02] Integração - Chat com IA (POST /api/ia/chat)', () => {
         { role: 'assistant', content: 'Que ótimo! Posso recomendar vários títulos.' },
       ];
 
-      const resposta = await request(contexto.app)
-        .post('/api/ia/chat')
+      const resposta = await postIaChat(contexto.app, tokenCliente)
         .send({
           mensagem: 'Pode me sugerir algo nesse estilo?',
           historico,
@@ -191,8 +199,7 @@ describe('[RF-IA-02] Integração - Chat com IA (POST /api/ia/chat)', () => {
     });
 
     it('[RN-IA-002] deve retornar tempoRespostaMs como número não-negativo', async () => {
-      const resposta = await request(contexto.app)
-        .post('/api/ia/chat')
+      const resposta = await postIaChat(contexto.app, tokenCliente)
         .send({ mensagem: 'Qual é o livro mais vendido desta semana?' });
 
       expect(resposta.status).toBe(200);
@@ -201,16 +208,14 @@ describe('[RF-IA-02] Integração - Chat com IA (POST /api/ia/chat)', () => {
     });
 
     it('[RN-IA-002] deve acionar geração de resposta textual com o contexto da livraria', async () => {
-      await request(contexto.app)
-        .post('/api/ia/chat')
+      await postIaChat(contexto.app, tokenCliente)
         .send({ mensagem: 'Recomende um livro de literatura brasileira' });
 
       expect(mockGerarRespostaChat).toHaveBeenCalled();
     });
 
     it('[RN-IA-002] deve acionar busca semântica para contextualizar a resposta do chat', async () => {
-      await request(contexto.app)
-        .post('/api/ia/chat')
+      await postIaChat(contexto.app, tokenCliente)
         .send({ mensagem: 'Tenho interesse em autoajuda e desenvolvimento pessoal' });
 
       expect(mockGerarEmbedding).toHaveBeenCalled();
@@ -220,8 +225,7 @@ describe('[RF-IA-02] Integração - Chat com IA (POST /api/ia/chat)', () => {
     it('[RN-IA-002] deve retornar 200 para mensagem exatamente com 1000 caracteres (limite válido)', async () => {
       const mensagemNoLimite = 'B'.repeat(1000);
 
-      const resposta = await request(contexto.app)
-        .post('/api/ia/chat')
+      const resposta = await postIaChat(contexto.app, tokenCliente)
         .send({ mensagem: mensagemNoLimite });
 
       expect(resposta.status).toBe(200);
@@ -235,8 +239,7 @@ describe('[RF-IA-02] Integração - Chat com IA (POST /api/ia/chat)', () => {
         new Error('Conexão com Gemini API encerrada inesperadamente')
       );
 
-      const resposta = await request(contexto.app)
-        .post('/api/ia/chat')
+      const resposta = await postIaChat(contexto.app, tokenCliente)
         .send({ mensagem: 'Existe algum romance histórico ambientado no Brasil Colônia?' });
 
       expect(resposta.status).toBe(500);
@@ -248,8 +251,7 @@ describe('[RF-IA-02] Integração - Chat com IA (POST /api/ia/chat)', () => {
         new Error('Quota de API excedida para embeddings')
       );
 
-      const resposta = await request(contexto.app)
-        .post('/api/ia/chat')
+      const resposta = await postIaChat(contexto.app, tokenCliente)
         .send({ mensagem: 'Busco livros sobre mindfulness e meditação' });
 
       expect(resposta.status).toBe(500);

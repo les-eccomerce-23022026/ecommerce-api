@@ -11,6 +11,14 @@ import {
   IReindexarResponseDTO,
 } from '../../application/dtos/IRecomendacaoDTO';
 import { PeriodoMetrica } from '../../domain/repositories/IRepositorioRecomendacao';
+import { ErroIa } from '../middleware/erroIa.middleware';
+import {
+  sanitizarTextoEntrada,
+  validarClienteUuidOpcional,
+  validarHistoricoChat,
+  validarTamanhoMensagemChat,
+  validarTamanhoQuery,
+} from '../validators/validacaoEntradaIA.util';
 
 /** Períodos válidos para filtro de métricas de recomendação */
 const PERIODOS_VALIDOS: ReadonlySet<string> = new Set<PeriodoMetrica>([
@@ -28,10 +36,25 @@ const PERIODOS_VALIDOS: ReadonlySet<string> = new Set<PeriodoMetrica>([
 export class ControladorRecomendacao {
   constructor(private servicoRecomendacao: ServicoRecomendacaoApplication) {}
 
+  private obterStatusHttpErro(erro: unknown, padrao: number): number {
+    if (erro instanceof ErroIa) {
+      return erro.statusCode;
+    }
+    return padrao;
+  }
+
+  private obterMensagemErroApi(erro: unknown, mensagemPadrao: string): string {
+    if (erro instanceof ErroIa) {
+      return erro.message;
+    }
+    return RespostaPadrao.obterMensagemErroCliente(erro, mensagemPadrao);
+  }
+
   /**
    * Endpoint POST /api/ia/recomendar
-   * 
+   *
    * Gera recomendações de produtos baseadas na query do usuário.
+   * Requer autenticação de cliente (middlewares na rota).
    */
   recomendar = async (req: Request, res: Response): Promise<void> => {
     try {
@@ -43,24 +66,46 @@ export class ControladorRecomendacao {
         return;
       }
 
+      const querySanitizada = sanitizarTextoEntrada(dados.query);
+      if (querySanitizada.length === 0) {
+        RespostaPadrao.enviarErro(res, 400, 'Query é obrigatória e não pode ser vazia');
+        return;
+      }
+
+      const erroTamanhoQuery = validarTamanhoQuery(querySanitizada);
+      if (erroTamanhoQuery) {
+        RespostaPadrao.enviarErro(res, 400, erroTamanhoQuery);
+        return;
+      }
+
+      const erroClienteUuid = validarClienteUuidOpcional(dados.clienteUuid);
+      if (erroClienteUuid) {
+        RespostaPadrao.enviarErro(res, 400, erroClienteUuid);
+        return;
+      }
+
       if (dados.limite !== undefined && (typeof dados.limite !== 'number' || dados.limite < 1 || dados.limite > 20)) {
         RespostaPadrao.enviarErro(res, 400, 'Limite deve ser entre 1 e 20');
         return;
       }
 
-      const resultado = await this.servicoRecomendacao.recomendar(dados);
+      const resultado = await this.servicoRecomendacao.recomendar({
+        ...dados,
+        query: querySanitizada,
+      });
       RespostaPadrao.enviarSucesso(res, 200, resultado);
     } catch (erro) {
-      const msg = RespostaPadrao.obterMensagemErro(erro, 'Erro ao gerar recomendações');
+      const msg = this.obterMensagemErroApi(erro, 'Erro ao gerar recomendações');
       Logger.error(`[ControladorRecomendacao.recomendar] Erro: ${msg}`, erro instanceof Error ? erro.stack : String(erro));
-      RespostaPadrao.enviarErro(res, 500, msg);
+      RespostaPadrao.enviarErro(res, this.obterStatusHttpErro(erro, 500), msg);
     }
   };
 
   /**
    * Endpoint POST /api/ia/chat
-   * 
+   *
    * Gera resposta de chat com recomendações integradas.
+   * Requer autenticação de cliente (middlewares na rota).
    */
   chat = async (req: Request, res: Response): Promise<void> => {
     try {
@@ -72,17 +117,44 @@ export class ControladorRecomendacao {
         return;
       }
 
+      const mensagemSanitizada = sanitizarTextoEntrada(dados.mensagem);
+      if (mensagemSanitizada.length === 0) {
+        RespostaPadrao.enviarErro(res, 400, 'Mensagem é obrigatória e não pode ser vazia');
+        return;
+      }
+
+      const erroTamanhoMensagem = validarTamanhoMensagemChat(mensagemSanitizada);
+      if (erroTamanhoMensagem) {
+        RespostaPadrao.enviarErro(res, 400, erroTamanhoMensagem);
+        return;
+      }
+
       if (dados.historico && !Array.isArray(dados.historico)) {
         RespostaPadrao.enviarErro(res, 400, 'Histórico deve ser um array');
         return;
       }
 
-      const resultado = await this.servicoRecomendacao.chat(dados);
+      const erroHistorico = validarHistoricoChat(dados.historico);
+      if (erroHistorico) {
+        RespostaPadrao.enviarErro(res, 400, erroHistorico);
+        return;
+      }
+
+      const erroClienteUuid = validarClienteUuidOpcional(dados.clienteUuid);
+      if (erroClienteUuid) {
+        RespostaPadrao.enviarErro(res, 400, erroClienteUuid);
+        return;
+      }
+
+      const resultado = await this.servicoRecomendacao.chat({
+        ...dados,
+        mensagem: mensagemSanitizada,
+      });
       RespostaPadrao.enviarSucesso(res, 200, resultado);
     } catch (erro) {
-      const msg = RespostaPadrao.obterMensagemErro(erro, 'Erro no chat');
+      const msg = this.obterMensagemErroApi(erro, 'Erro no chat');
       Logger.error(`[ControladorRecomendacao.chat] Erro: ${msg}`, erro instanceof Error ? erro.stack : String(erro));
-      RespostaPadrao.enviarErro(res, 500, msg);
+      RespostaPadrao.enviarErro(res, this.obterStatusHttpErro(erro, 500), msg);
     }
   };
 
@@ -106,9 +178,9 @@ export class ControladorRecomendacao {
 
       RespostaPadrao.enviarSucesso(res, 200, resposta);
     } catch (erro) {
-      const msg = RespostaPadrao.obterMensagemErro(erro, 'Erro ao reindexar catálogo');
+      const msg = this.obterMensagemErroApi(erro, 'Erro ao reindexar catálogo');
       Logger.error(`[ControladorRecomendacao.reindexar] Erro: ${msg}`, erro instanceof Error ? erro.stack : String(erro));
-      RespostaPadrao.enviarErro(res, 500, msg);
+      RespostaPadrao.enviarErro(res, this.obterStatusHttpErro(erro, 500), msg);
     }
   };
 
@@ -155,12 +227,12 @@ export class ControladorRecomendacao {
         metricas: metricasPublicas,
       });
     } catch (erro) {
-      const msg = RespostaPadrao.obterMensagemErro(erro, 'Erro ao buscar métricas de recomendação');
+      const msg = this.obterMensagemErroApi(erro, 'Erro ao buscar métricas de recomendação');
       Logger.error(
         `[ControladorRecomendacao.buscarMetricas] Erro: ${msg}`,
         erro instanceof Error ? erro.stack : String(erro),
       );
-      RespostaPadrao.enviarErro(res, 500, msg);
+      RespostaPadrao.enviarErro(res, this.obterStatusHttpErro(erro, 500), msg);
     }
   };
 
@@ -189,12 +261,12 @@ export class ControladorRecomendacao {
 
       RespostaPadrao.enviarSucesso(res, 200, agregadas);
     } catch (erro) {
-      const msg = RespostaPadrao.obterMensagemErro(erro, 'Erro ao buscar métricas agregadas de recomendação');
+      const msg = this.obterMensagemErroApi(erro, 'Erro ao buscar métricas agregadas de recomendação');
       Logger.error(
         `[ControladorRecomendacao.buscarMetricasAgregadas] Erro: ${msg}`,
         erro instanceof Error ? erro.stack : String(erro),
       );
-      RespostaPadrao.enviarErro(res, 500, msg);
+      RespostaPadrao.enviarErro(res, this.obterStatusHttpErro(erro, 500), msg);
     }
   };
 
@@ -205,20 +277,12 @@ export class ControladorRecomendacao {
    */
   saude = async (_req: Request, res: Response): Promise<void> => {
     try {
-      // Retorna disponibilidade do processo Node.js para o serviço de IA.
-      // Verificação ativa das dependências externas (ChromaDB e Gemini) não está incluída
-      // aqui pois exigiria expor os adapters de infraestrutura neste controller.
-      // Caso necessário, deve ser implementada via método verificarSaude() no
-      // ServicoRecomendacaoApplication, aproveitando o AdapterLangChainGemini.validarConexao()
-      // já disponível, e um heartbeat ao cliente ChromaDB.
-      RespostaPadrao.enviarSucesso(res, 200, {
-        status: 'ok',
-        servico: 'ia-recomendacao',
-        timestamp: new Date().toISOString(),
-      });
+      const resultado = await this.servicoRecomendacao.verificarSaude();
+      const statusCode = resultado.status === 'down' ? 503 : 200;
+      RespostaPadrao.enviarSucesso(res, statusCode, resultado);
     } catch (erro) {
-      const msg = RespostaPadrao.obterMensagemErro(erro, 'Erro ao verificar saúde');
-      Logger.error(`[ControladorRecomendacao.saude] Erro: ${msg}`);
+      const msg = this.obterMensagemErroApi(erro, 'Erro ao verificar saúde');
+      Logger.error(`[ControladorRecomendacao.saude] Erro: ${msg}`, erro instanceof Error ? erro.stack : String(erro));
       RespostaPadrao.enviarErro(res, 500, msg);
     }
   };

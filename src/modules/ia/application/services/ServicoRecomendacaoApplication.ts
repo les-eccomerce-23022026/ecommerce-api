@@ -26,6 +26,21 @@ import { Logger } from '@/shared/utils/Logger.util';
 import { ServicoIndexacaoProdutos } from './ServicoIndexacaoProdutos';
 import { ServicoLivros } from '@/modules/livros/servicoLivros';
 
+export interface ISaudeIaDependencia {
+  ok: boolean;
+  mensagem?: string;
+}
+
+export interface ISaudeIaResultado {
+  status: 'ok' | 'degraded' | 'down';
+  servico: string;
+  timestamp: string;
+  dependencias: {
+    chromadb: ISaudeIaDependencia;
+    gemini: ISaudeIaDependencia;
+  };
+}
+
 /**
  * Serviço de Aplicação para Recomendação
  * 
@@ -150,7 +165,7 @@ export class ServicoRecomendacaoApplication {
     if (!clienteUuid) {
       return null;
     }
-    return this.repositorioRecomendacao.buscarContexto(clienteUuid);
+    return this.repositorioContextoCliente.buscarContexto(clienteUuid);
   }
 
   /**
@@ -259,7 +274,7 @@ export class ServicoRecomendacaoApplication {
    */
   async buscarMetricas(periodo: PeriodoMetrica): Promise<IMetricaRecomendacao[]> {
     try {
-      return await this.repositorioRecomendacao.buscarMetricas(periodo);
+      return await this.repositorioMetricasRecomendacao.buscarMetricas(periodo);
     } catch (erro) {
       const mensagem = erro instanceof Error ? erro.message : String(erro);
       Logger.error(`[ServicoRecomendacaoApplication] Erro ao buscar métricas: ${mensagem}`);
@@ -274,12 +289,47 @@ export class ServicoRecomendacaoApplication {
    */
   async buscarMetricasAgregadas(periodo: PeriodoMetrica): Promise<IMetricasAgregadas> {
     try {
-      return await this.repositorioRecomendacao.buscarMetricasAgregadas(periodo);
+      return await this.repositorioMetricasRecomendacao.buscarMetricasAgregadas(periodo);
     } catch (erro) {
       const mensagem = erro instanceof Error ? erro.message : String(erro);
       Logger.error(`[ServicoRecomendacaoApplication] Erro ao buscar métricas agregadas: ${mensagem}`);
       throw erro;
     }
+  }
+
+  /**
+   * Verifica saúde do módulo de IA e dependências externas (ChromaDB e Gemini).
+   */
+  async verificarSaude(): Promise<ISaudeIaResultado> {
+    const [chromadbOk, geminiOk] = await Promise.all([
+      this.repositorioEmbedding.verificarConexao(),
+      this.adapterLangChain.validarConexao(),
+    ]);
+
+    const dependencias = {
+      chromadb: chromadbOk
+        ? { ok: true }
+        : { ok: false, mensagem: 'Falha ao conectar com ChromaDB' },
+      gemini: geminiOk
+        ? { ok: true }
+        : { ok: false, mensagem: 'Falha ao conectar com Gemini API' },
+    };
+
+    let status: ISaudeIaResultado['status'];
+    if (chromadbOk && geminiOk) {
+      status = 'ok';
+    } else if (!chromadbOk && !geminiOk) {
+      status = 'down';
+    } else {
+      status = 'degraded';
+    }
+
+    return {
+      status,
+      servico: 'ia-recomendacao',
+      timestamp: new Date().toISOString(),
+      dependencias,
+    };
   }
 
   /**

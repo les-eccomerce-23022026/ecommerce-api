@@ -62,4 +62,23 @@ export class RespostaPadrao {
     }
     return mensagemPadrao;
   }
+
+  /**
+   * Mensagem segura para respostas HTTP ao cliente.
+   * Em produção, oculta detalhes internos (TypeError, propriedades undefined, etc.).
+   */
+  public static obterMensagemErroCliente(erro: unknown, mensagemPadrao: string): string {
+    if (process.env.NODE_ENV === 'development' || process.env.NODE_ENV === 'test') {
+      return this.obterMensagemErro(erro, mensagemPadrao);
+    }
+
+    if (erro instanceof Error) {
+      const mensagemInterna = /is not a function|cannot read properties|undefined|typeerror/i;
+      if (mensagemInterna.test(erro.message)) {
+        return mensagemPadrao;
+      }
+    }
+
+    return this.obterMensagemErro(erro, mensagemPadrao);
+  }
 }

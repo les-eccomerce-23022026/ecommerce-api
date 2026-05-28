@@ -45,6 +45,11 @@ export async function iniciarEscopoIsolamentoIntegracao(
     'papeis_comercial',
   );
   await executarSqlOpcional(
+    `INSERT INTO livraria_gestao.papeis (pap_descricao) VALUES ('admin'), ('cliente'), ('admin_sistema')
+     ON CONFLICT (pap_descricao) DO NOTHING`,
+    'papeis_gestao',
+  );
+  await executarSqlOpcional(
     `INSERT INTO livraria_gestao.lojas (loj_uuid, loj_nome, loj_slug, loj_ativo)
      VALUES ('00000000-0000-0000-0000-000000000001', 'Loja Padrão Teste', 'loja-padrao-teste', TRUE)
      ON CONFLICT (loj_slug) DO NOTHING`,

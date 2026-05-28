@@ -288,4 +288,15 @@ export class RepositorioEmbeddingChromaDB implements IRepositorioEmbedding {
     this.colecao = null;
     Logger.info('[RepositorioEmbeddingChromaDB] Coleção limpa');
   }
+
+  async verificarConexao(): Promise<boolean> {
+    try {
+      await this.cliente.heartbeat();
+      return true;
+    } catch (erro) {
+      const mensagem = erro instanceof Error ? erro.message : String(erro);
+      Logger.warn(`[RepositorioEmbeddingChromaDB] Heartbeat falhou: ${mensagem}`);
+      return false;
+    }
+  }
 }

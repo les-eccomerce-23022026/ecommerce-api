@@ -43,4 +43,9 @@ export interface IRepositorioEmbedding {
    * Remove todos os embeddings (para reindexação)
    */
   limparColecao(): Promise<void>;
+
+  /**
+   * Verifica conectividade com o vector store (ChromaDB)
+   */
+  verificarConexao(): Promise<boolean>;
 }

@@ -30,6 +30,7 @@ const mockAtualizarEmbedding = jest.fn().mockResolvedValue({});
 const mockRemoverEmbedding = jest.fn().mockResolvedValue(undefined);
 const mockIndexarCatalogo = jest.fn().mockResolvedValue(0);
 const mockLimparColecao = jest.fn().mockResolvedValue(undefined);
+const mockVerificarConexaoChroma = jest.fn().mockResolvedValue(true);
 
 // Mocks dos módulos externos — devem vir DEPOIS das declarações das funções mock
 jest.mock('@/modules/ia/infrastructure/config/AdapterLangChainGemini', () => ({
@@ -50,19 +51,36 @@ jest.mock('@/modules/ia/infrastructure/repositories/RepositorioEmbeddingChromaDB
     remover: mockRemoverEmbedding,
     indexarCatalogo: mockIndexarCatalogo,
     limparColecao: mockLimparColecao,
+    verificarConexao: mockVerificarConexaoChroma,
   })),
 }));
 
 import request from 'supertest';
 import { configurarTesteIntegracao } from '@/tests/helpers/setup-integracao.util';
+import { obterTokenClienteParaIa, postIaRecomendar } from '@/tests/helpers/ia-integracao.helper';
 
 describe('[RF-IA-01] Integração - Recomendação de Produtos (POST /api/ia/recomendar)', () => {
   const contexto = configurarTesteIntegracao();
+  let tokenCliente: string;
+
+  beforeEach(async () => {
+    tokenCliente = await obterTokenClienteParaIa(contexto.app);
+  });
+
+  describe('Controle de Acesso', () => {
+    it('[RN-IA-001] deve retornar 401 quando requisição é feita sem autenticação', async () => {
+      const resposta = await request(contexto.app)
+        .post('/api/ia/recomendar')
+        .send({ query: 'livros de aventura' });
+
+      expect(resposta.status).toBe(401);
+      expect(resposta.body.sucesso).toBe(false);
+    });
+  });
 
   describe('Validação de Entrada', () => {
     it('[RN-IA-001] deve retornar 400 quando query não é fornecida no corpo', async () => {
-      const resposta = await request(contexto.app)
-        .post('/api/ia/recomendar')
+      const resposta = await postIaRecomendar(contexto.app, tokenCliente)
         .send({});
 
       expect(resposta.status).toBe(400);
@@ -71,8 +89,7 @@ describe('[RF-IA-01] Integração - Recomendação de Produtos (POST /api/ia/rec
     });
 
     it('[RN-IA-001] deve retornar 400 quando query é string vazia', async () => {
-      const resposta = await request(contexto.app)
-        .post('/api/ia/recomendar')
+      const resposta = await postIaRecomendar(contexto.app, tokenCliente)
         .send({ query: '' });
 
       expect(resposta.status).toBe(400);
@@ -80,8 +97,7 @@ describe('[RF-IA-01] Integração - Recomendação de Produtos (POST /api/ia/rec
     });
 
     it('[RN-IA-001] deve retornar 400 quando query contém apenas espaços em branco', async () => {
-      const resposta = await request(contexto.app)
-        .post('/api/ia/recomendar')
+      const resposta = await postIaRecomendar(contexto.app, tokenCliente)
         .send({ query: '   ' });
 
       expect(resposta.status).toBe(400);
@@ -89,8 +105,7 @@ describe('[RF-IA-01] Integração - Recomendação de Produtos (POST /api/ia/rec
     });
 
     it('[RN-IA-001] deve retornar 400 quando query não é do tipo string', async () => {
-      const resposta = await request(contexto.app)
-        .post('/api/ia/recomendar')
+      const resposta = await postIaRecomendar(contexto.app, tokenCliente)
         .send({ query: 12345 });
 
       expect(resposta.status).toBe(400);
@@ -98,8 +113,7 @@ describe('[RF-IA-01] Integração - Recomendação de Produtos (POST /api/ia/rec
     });
 
     it('[RN-IA-001] deve retornar 400 quando limite é zero', async () => {
-      const resposta = await request(contexto.app)
-        .post('/api/ia/recomendar')
+      const resposta = await postIaRecomendar(contexto.app, tokenCliente)
         .send({ query: 'livros de ficção científica', limite: 0 });
 
       expect(resposta.status).toBe(400);
@@ -108,8 +122,7 @@ describe('[RF-IA-01] Integração - Recomendação de Produtos (POST /api/ia/rec
     });
 
     it('[RN-IA-001] deve retornar 400 quando limite é negativo', async () => {
-      const resposta = await request(contexto.app)
-        .post('/api/ia/recomendar')
+      const resposta = await postIaRecomendar(contexto.app, tokenCliente)
         .send({ query: 'livros de fantasia', limite: -5 });
 
       expect(resposta.status).toBe(400);
@@ -117,8 +130,7 @@ describe('[RF-IA-01] Integração - Recomendação de Produtos (POST /api/ia/rec
     });
 
     it('[RN-IA-001] deve retornar 400 quando limite excede 20', async () => {
-      const resposta = await request(contexto.app)
-        .post('/api/ia/recomendar')
+      const resposta = await postIaRecomendar(contexto.app, tokenCliente)
         .send({ query: 'romances clássicos', limite: 21 });
 
       expect(resposta.status).toBe(400);
@@ -127,8 +139,7 @@ describe('[RF-IA-01] Integração - Recomendação de Produtos (POST /api/ia/rec
     });
 
     it('[RN-IA-001] deve retornar 400 quando limite não é número', async () => {
-      const resposta = await request(contexto.app)
-        .post('/api/ia/recomendar')
+      const resposta = await postIaRecomendar(contexto.app, tokenCliente)
         .send({ query: 'literatura brasileira', limite: 'cinco' });
 
       expect(resposta.status).toBe(400);
@@ -138,8 +149,7 @@ describe('[RF-IA-01] Integração - Recomendação de Produtos (POST /api/ia/rec
 
   describe('Retorno com Sucesso', () => {
     it('[RN-IA-001] deve retornar 200 com estrutura completa para query válida', async () => {
-      const resposta = await request(contexto.app)
-        .post('/api/ia/recomendar')
+      const resposta = await postIaRecomendar(contexto.app, tokenCliente)
         .send({ query: 'livros de programação em TypeScript' });
 
       expect(resposta.status).toBe(200);
@@ -156,8 +166,7 @@ describe('[RF-IA-01] Integração - Recomendação de Produtos (POST /api/ia/rec
     it('[RN-IA-001] deve ecoar a query original na resposta', async () => {
       const queryOriginal = 'livros de JavaScript para iniciantes';
 
-      const resposta = await request(contexto.app)
-        .post('/api/ia/recomendar')
+      const resposta = await postIaRecomendar(contexto.app, tokenCliente)
         .send({ query: queryOriginal });
 
       expect(resposta.status).toBe(200);
@@ -165,8 +174,7 @@ describe('[RF-IA-01] Integração - Recomendação de Produtos (POST /api/ia/rec
     });
 
     it('[RN-IA-001] deve retornar contextoUsado como false quando clienteUuid não é fornecido', async () => {
-      const resposta = await request(contexto.app)
-        .post('/api/ia/recomendar')
+      const resposta = await postIaRecomendar(contexto.app, tokenCliente)
         .send({ query: 'romances históricos' });
 
       expect(resposta.status).toBe(200);
@@ -174,8 +182,7 @@ describe('[RF-IA-01] Integração - Recomendação de Produtos (POST /api/ia/rec
     });
 
     it('[RN-IA-001] deve aceitar limite válido igual a 1', async () => {
-      const resposta = await request(contexto.app)
-        .post('/api/ia/recomendar')
+      const resposta = await postIaRecomendar(contexto.app, tokenCliente)
         .send({ query: 'livros de ciências exatas', limite: 1 });
 
       expect(resposta.status).toBe(200);
@@ -183,8 +190,7 @@ describe('[RF-IA-01] Integração - Recomendação de Produtos (POST /api/ia/rec
     });
 
     it('[RN-IA-001] deve aceitar limite válido igual a 20', async () => {
-      const resposta = await request(contexto.app)
-        .post('/api/ia/recomendar')
+      const resposta = await postIaRecomendar(contexto.app, tokenCliente)
         .send({ query: 'obras filosóficas', limite: 20 });
 
       expect(resposta.status).toBe(200);
@@ -192,8 +198,7 @@ describe('[RF-IA-01] Integração - Recomendação de Produtos (POST /api/ia/rec
     });
 
     it('[RN-IA-001] deve retornar tempoRespostaMs como número não-negativo', async () => {
-      const resposta = await request(contexto.app)
-        .post('/api/ia/recomendar')
+      const resposta = await postIaRecomendar(contexto.app, tokenCliente)
         .send({ query: 'aventura e fantasia medieval' });
 
       expect(resposta.status).toBe(200);
@@ -204,16 +209,14 @@ describe('[RF-IA-01] Integração - Recomendação de Produtos (POST /api/ia/rec
     it('[RN-IA-001] deve acionar a geração de embedding com a query informada', async () => {
       const queryInformada = 'livros de filosofia grega clássica';
 
-      await request(contexto.app)
-        .post('/api/ia/recomendar')
+      await postIaRecomendar(contexto.app, tokenCliente)
         .send({ query: queryInformada });
 
       expect(mockGerarEmbedding).toHaveBeenCalledWith(queryInformada);
     });
 
     it('[RN-IA-001] deve consultar o repositório de embeddings ao processar recomendação', async () => {
-      await request(contexto.app)
-        .post('/api/ia/recomendar')
+      await postIaRecomendar(contexto.app, tokenCliente)
         .send({ query: 'literatura brasileira contemporânea' });
 
       expect(mockBuscarSimilares).toHaveBeenCalled();
@@ -250,8 +253,7 @@ describe('[RF-IA-01] Integração - Recomendação de Produtos (POST /api/ia/rec
 
       mockBuscarSimilares.mockResolvedValueOnce(produtosMockChromaDB);
 
-      const resposta = await request(contexto.app)
-        .post('/api/ia/recomendar')
+      const resposta = await postIaRecomendar(contexto.app, tokenCliente)
         .send({ query: 'clean code boas práticas de desenvolvimento' });
 
       expect(resposta.status).toBe(200);
@@ -261,8 +263,7 @@ describe('[RF-IA-01] Integração - Recomendação de Produtos (POST /api/ia/rec
     it('[RN-IA-001] deve retornar contextoUsado false para clienteUuid sem histórico de compras', async () => {
       const uuidClienteSemHistorico = '00000000-0000-0000-0000-000000000099';
 
-      const resposta = await request(contexto.app)
-        .post('/api/ia/recomendar')
+      const resposta = await postIaRecomendar(contexto.app, tokenCliente)
         .send({ query: 'livros de romance', clienteUuid: uuidClienteSemHistorico });
 
       expect(resposta.status).toBe(200);
@@ -271,8 +272,7 @@ describe('[RF-IA-01] Integração - Recomendação de Produtos (POST /api/ia/rec
     });
 
     it('[RN-IA-001] deve retornar totalValidos como número não-negativo', async () => {
-      const resposta = await request(contexto.app)
-        .post('/api/ia/recomendar')
+      const resposta = await postIaRecomendar(contexto.app, tokenCliente)
         .send({ query: 'poesia brasileira moderna' });
 
       expect(resposta.status).toBe(200);
@@ -287,8 +287,7 @@ describe('[RF-IA-01] Integração - Recomendação de Produtos (POST /api/ia/rec
         new Error('Falha na conexão com o serviço de embedding')
       );
 
-      const resposta = await request(contexto.app)
-        .post('/api/ia/recomendar')
+      const resposta = await postIaRecomendar(contexto.app, tokenCliente)
         .send({ query: 'livros de culinária italiana' });
 
       expect(resposta.status).toBe(500);
@@ -300,8 +299,7 @@ describe('[RF-IA-01] Integração - Recomendação de Produtos (POST /api/ia/rec
         new Error('Falha na consulta ao ChromaDB')
       );
 
-      const resposta = await request(contexto.app)
-        .post('/api/ia/recomendar')
+      const resposta = await postIaRecomendar(contexto.app, tokenCliente)
         .send({ query: 'guias de viagem pela Europa' });
 
       expect(resposta.status).toBe(500);

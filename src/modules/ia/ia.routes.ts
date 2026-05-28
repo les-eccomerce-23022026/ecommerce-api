@@ -17,7 +17,7 @@ import { middlewareErroIa } from './infrastructure/middleware/erroIa.middleware'
 import { limiteRequisicaoIA } from './infrastructure/middleware/limiteRequisicaoIA.middleware';
 import { logAuditoriaIA } from './infrastructure/middleware/logAuditoriaIA.middleware';
 import { autenticacaoMiddleware } from '@/shared/middlewares/autenticacao.middleware';
-import { adminOnlyMiddleware } from '@/shared/middlewares/autorizacao.middleware';
+import { adminOnlyMiddleware, clienteOnlyMiddleware } from '@/shared/middlewares/autorizacao.middleware';
 
 /**
  * Rotas do módulo de Recomendação de Produtos
@@ -55,12 +55,13 @@ const servicoIndexacaoProdutos = new ServicoIndexacaoProdutos(
 const servicoRecomendacao = new ServicoRecomendacaoApplication(
   repositorioEmbedding,
   repositorioRecomendacao,
+  repositorioRecomendacao,
   servicoGeracaoEmbedding,
   servicoValidacaoProdutos,
   servicoRecomendacaoRAG,
   adapterLangChain,
   servicoIndexacaoProdutos,
-  servicoLivros
+  servicoLivros,
 );
 const controladorRecomendacao = new ControladorRecomendacao(servicoRecomendacao);
 
@@ -71,9 +72,19 @@ const router = Router();
 router.use(logAuditoriaIA);
 router.use(limiteRequisicaoIA);
 
-// ── Rotas públicas ─────────────────────────────────────────────────────────────
-router.post('/recomendar', controladorRecomendacao.recomendar);
-router.post('/chat', controladorRecomendacao.chat);
+// ── Rotas de clientes autenticados (plano IA 5.1 / 5.2) ───────────────────────
+router.post(
+  '/recomendar',
+  autenticacaoMiddleware,
+  clienteOnlyMiddleware,
+  controladorRecomendacao.recomendar,
+);
+router.post(
+  '/chat',
+  autenticacaoMiddleware,
+  clienteOnlyMiddleware,
+  controladorRecomendacao.chat,
+);
 
 // ── Rotas de métricas ──────────────────────────────────────────────────────────
 // ATENÇÃO: rota estática '/metricas/agregadas' deve preceder '/metricas/:periodo'

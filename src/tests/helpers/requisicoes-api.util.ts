@@ -2,7 +2,9 @@ import request, { Response } from 'supertest';
 import { Application } from 'express';
 import bcrypt from 'bcryptjs';
 import { di } from '@/shared/infrastructure/di.container';
+import { FabricaConexaoBanco } from '@/shared/infrastructure/database/FabricaConexaoBanco';
 import { PAPEL_ADMIN, PAPEL_CLIENTE, PAPEL_ADMIN_SISTEMA } from '@/shared/types/papeis';
+import { IPapelUsuario } from '@/shared/types/Ipapel-usuario';
 import { ITelefoneDto, IEnderecoDto } from '@/modules/clientes/Iclientes.dto';
 import { validarCpf } from '@/shared/utils/validacao-cpf.util';
 import { gerarCnpjValido } from '@/shared/utils/validacao-cnpj.util';
@@ -138,6 +140,33 @@ export async function realizarLogin(
   return request(app).post('/api/auth/login').send({ email, senha });
 }
 
+/** Cabeçalho de autenticação usado pela API (middleware lê Bearer ou cookie les_token). */
+export function cabecalhoBearerAuth(token: string): { Authorization: string } {
+  return { Authorization: `Bearer ${token}` };
+}
+
+/**
+ * Resolve pap_id real em livraria_gestao.papeis (serial do BD de teste).
+ * Não use PAPEL_*.id de @/shared/types/papeis em inserts de teste — IDs fixos (1,2,3)
+ * quebram FK em usuario_papeis quando o serial não coincide com o seed.
+ */
+async function resolverPapelGestao(descricao: string): Promise<IPapelUsuario> {
+  const db = FabricaConexaoBanco.obterConexao();
+  await db.executar(
+    `INSERT INTO livraria_gestao.papeis (pap_descricao) VALUES ($1)
+     ON CONFLICT (pap_descricao) DO NOTHING`,
+    [descricao],
+  );
+  const rows = await db.executar<{ pap_id: number; pap_descricao: string }>(
+    `SELECT pap_id, pap_descricao FROM livraria_gestao.papeis WHERE pap_descricao = $1 LIMIT 1`,
+    [descricao],
+  );
+  if (rows.length === 0) {
+    throw new Error(`Papel "${descricao}" não encontrado em livraria_gestao.papeis`);
+  }
+  return { id: Number(rows[0].pap_id), descricao: rows[0].pap_descricao };
+}
+
 export async function obterTokenCliente(
   app: Application,
   email = 'cliente.teste@email.com',
@@ -154,6 +183,7 @@ export async function obterTokenCliente(
   // Mesma abordagem de obterTokenAdmin: cria/atualiza via repositório diretamente
   // para que o usuário fique visível dentro da transação de isolamento do teste.
   const senhaHash = await bcrypt.hash('SenhaForte@123', 10);
+  const papelCliente = await resolverPapelGestao(PAPEL_CLIENTE.descricao);
   const clienteExistente = await repositorioUsuarios.buscarPorEmail(email);
 
   let usuarioId: number;
@@ -164,8 +194,8 @@ export async function obterTokenCliente(
       email,
       cpf,
       senhaHash,
-      role: PAPEL_CLIENTE,
-      papeis: [PAPEL_CLIENTE],
+      role: papelCliente,
+      papeis: [papelCliente],
     });
     usuarioId = usuario.id;
 
@@ -179,13 +209,13 @@ export async function obterTokenCliente(
     // Garante que a senha é 'SenhaForte@123' e que o papel seja apenas cliente na transação atual
     await repositorioUsuarios.atualizarUsuario(clienteExistente.uuid, {
       senhaHash,
-      idPapel: PAPEL_CLIENTE.id,
+      idPapel: papelCliente.id,
     });
     
     // Remove TODOS os papéis existentes e garante que apenas cliente esteja ativo
     // Isso resolve o problema de usuários com múltiplos papéis (admin + cliente)
     await repositorioUsuarios.removerTodosPapeisUsuario(clienteExistente.id);
-    await repositorioUsuarios.associarPapelUsuario(clienteExistente.id, PAPEL_CLIENTE.id);
+    await repositorioUsuarios.associarPapelUsuario(clienteExistente.id, papelCliente.id);
     
     usuarioId = clienteExistente.id;
 
@@ -226,6 +256,10 @@ export async function obterTokenAdmin(app: Application): Promise<string> {
   const repositorioUsuarios = di.repoUsuarios;
   const adminExistente = await repositorioUsuarios.buscarPorEmail('admin@livraria.com.br');
 
+  const papelCliente = await resolverPapelGestao(PAPEL_CLIENTE.descricao);
+  const papelAdmin = await resolverPapelGestao(PAPEL_ADMIN.descricao);
+  const papelAdminSistema = await resolverPapelGestao(PAPEL_ADMIN_SISTEMA.descricao);
+
   // Gera o hash para a senha conhecida dos testes uma única vez
   const senhaHashAdmin = await bcrypt.hash('Admin@123', 10);
 
@@ -235,8 +269,8 @@ export async function obterTokenAdmin(app: Application): Promise<string> {
       email: 'admin@livraria.com.br',
       cpf: '000.000.000-00',
       senhaHash: senhaHashAdmin,
-      role: PAPEL_ADMIN,
-      papeis: [PAPEL_CLIENTE, PAPEL_ADMIN, PAPEL_ADMIN_SISTEMA],
+      role: papelAdmin,
+      papeis: [papelCliente, papelAdmin, papelAdminSistema],
     });
   } else {
     // Atualiza o hash dentro da transação de isolamento para garantir que a senha
@@ -245,10 +279,10 @@ export async function obterTokenAdmin(app: Application): Promise<string> {
     await repositorioUsuarios.atualizarUsuario(adminExistente.uuid, {
       senhaHash: senhaHashAdmin,
     });
-    // Garante que o admin tenha todos os papéis associados
-    await repositorioUsuarios.associarPapelUsuario(adminExistente.id, PAPEL_CLIENTE.id);
-    await repositorioUsuarios.associarPapelUsuario(adminExistente.id, PAPEL_ADMIN.id);
-    await repositorioUsuarios.associarPapelUsuario(adminExistente.id, PAPEL_ADMIN_SISTEMA.id);
+    // Garante que o admin tenha todos os papéis associados (IDs reais do banco de teste)
+    await repositorioUsuarios.associarPapelUsuario(adminExistente.id, papelCliente.id);
+    await repositorioUsuarios.associarPapelUsuario(adminExistente.id, papelAdmin.id);
+    await repositorioUsuarios.associarPapelUsuario(adminExistente.id, papelAdminSistema.id);
   }
 
   const maximoTentativas = 5;

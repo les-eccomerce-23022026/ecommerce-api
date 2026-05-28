@@ -28,12 +28,13 @@ export class RepositorioRecomendacaoPostgres
         SELECT 
           l.liv_uuid as produto_uuid,
           l.liv_titulo as titulo,
-          c.cat_nome as categoria,
+          COALESCE(c.cat_nome, 'Sem categoria') as categoria,
           v.ven_criado_em as data_compra
         FROM livraria_comercial.vendas v
         JOIN livraria_comercial.itens_venda iv ON v.ven_id = iv.ven_id
-        JOIN livraria_comercial.livros l ON iv.liv_id = l.liv_id
-        JOIN livraria_comercial.categorias c ON l.cat_id = c.cat_id
+        JOIN livraria_comercial.livros l ON iv.liv_uuid = l.liv_uuid
+        LEFT JOIN livraria_comercial.livro_categorias lc ON lc.liv_id = l.liv_id
+        LEFT JOIN livraria_comercial.categorias c ON lc.cat_id = c.cat_id AND c.cat_ativo = TRUE
         JOIN livraria_gestao.usuarios u ON v.usu_id = u.usu_id
         WHERE u.usu_uuid = $1
         ORDER BY v.ven_criado_em DESC
