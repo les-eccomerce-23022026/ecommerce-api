@@ -49,4 +49,10 @@ export interface IRepositorioVendas {
    * Obtém o e-mail do usuário vinculado a uma venda.
    */
   obterEmailUsuarioPorVenda(vendaUuid: string): Promise<string | null>;
+
+  /**
+   * Conta vendas por status e loja.
+   * Retorna um mapa com loj_id como chave e contagem como valor.
+   */
+  contarVendasPorStatusELoja(status: string[]): Promise<Map<number, number>>;
 }

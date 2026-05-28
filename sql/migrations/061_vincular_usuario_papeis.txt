@@ -1,0 +1,6 @@
+BEGIN
+INSERT 0 0
+NOTICE:  Migration 061 executada com sucesso
+NOTICE:  Total de usuários vinculados a papéis: 93
+DO
+COMMIT

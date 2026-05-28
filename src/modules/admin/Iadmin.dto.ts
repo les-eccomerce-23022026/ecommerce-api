@@ -36,4 +36,5 @@ export interface IListaAdminDto {
   nome: string;
   email: string;
   ativo: boolean;
+  trocasPendentes?: number; // Contagem de trocas/devoluções pendentes para admin sistema
 }

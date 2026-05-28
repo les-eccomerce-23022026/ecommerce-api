@@ -1,0 +1,8 @@
+BEGIN
+INSERT 0 1
+INSERT 0 0
+NOTICE:  Migration 060 executada com sucesso
+NOTICE:  Admins de loja vinculados: 11
+NOTICE:  Admins de sistema vinculados: 1
+DO
+COMMIT

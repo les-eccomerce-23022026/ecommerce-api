@@ -1,9 +1,13 @@
 import { RepositorioEstoque, IItemEstoque, IEntradaEstoque } from './repositorioEstoque';
 
 export interface IKpisEstoque {
-  totalItens: number;
-  itensCriticos: number;
+  totalLivros: number;
+  abaixoLimite: number;
   estoqueCriticoLimite: number;
+  valorTotalEstoque: number;
+  valorTotalCusto: number;
+  quantidadeTotalReservada: number;
+  quantidadeTotalDisponivel: number;
 }
 
 export class ServicoEstoque {
@@ -18,15 +22,23 @@ export class ServicoEstoque {
   }
 
   async obterKpis(limiteCritico = 5): Promise<IKpisEstoque> {
-    const [totalItens, itensCriticos] = await Promise.all([
+    const [totalLivros, abaixoLimite, valorTotalEstoque, valorTotalCusto, quantidadeTotalReservada, quantidadeTotalDisponivel] = await Promise.all([
       this.repositorio.contarTotalEstoque(),
       this.repositorio.contarEstoqueCritico(limiteCritico),
+      this.repositorio.calcularValorTotalEstoque(),
+      this.repositorio.calcularValorTotalCusto(),
+      this.repositorio.calcularQuantidadeTotalReservada(),
+      this.repositorio.calcularQuantidadeTotalDisponivel(),
     ]);
 
     return {
-      totalItens,
-      itensCriticos,
+      totalLivros,
+      abaixoLimite,
       estoqueCriticoLimite: limiteCritico,
+      valorTotalEstoque,
+      valorTotalCusto,
+      quantidadeTotalReservada,
+      quantidadeTotalDisponivel,
     };
   }
 

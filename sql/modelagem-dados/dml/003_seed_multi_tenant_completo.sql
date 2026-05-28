@@ -8,7 +8,7 @@
 --
 -- Estrutura:
 -- - 3 Lojas (livraria-sao-paulo, livraria-rio, livraria-belo-horizonte)
--- - 3 Administradores (1 por loja)
+-- - 3 Administradores (1 por loja) com vínculos em admin_lojas
 -- - 15 Livros (5 por loja)
 -- - 9 Clientes (3 por loja)
 -- - Estoques e preços por loja
@@ -82,6 +82,25 @@ BEGIN
         TRUE,
         (SELECT loj_id FROM livraria_gestao.lojas WHERE loj_slug = 'livraria-sao-paulo' LIMIT 1)
     ) ON CONFLICT (usu_email) DO NOTHING;
+
+    -- Vincular admin 1 à loja em admin_lojas
+    INSERT INTO livraria_gestao.admin_lojas (usu_id, loj_id, adl_papel, adl_ativo, adl_escopo)
+    SELECT
+        u.usu_id,
+        u.loj_id,
+        'admin',
+        TRUE,
+        'LOJA'
+    FROM livraria_gestao.usuarios u
+    WHERE u.usu_email = 'carlos.silva@livrariasp.com.br'
+    ON CONFLICT (usu_id, loj_id) DO NOTHING;
+
+    -- Vincular admin 1 ao papel em usuario_papeis
+    INSERT INTO livraria_gestao.usuario_papeis (usu_id, pap_id)
+    SELECT u.usu_id, u.pap_id
+    FROM livraria_gestao.usuarios u
+    WHERE u.usu_email = 'carlos.silva@livrariasp.com.br' AND u.pap_id IS NOT NULL
+    ON CONFLICT (usu_id, pap_id) DO NOTHING;
     
     -- Admin 2: Rio de Janeiro
     INSERT INTO livraria_gestao.usuarios (
@@ -98,6 +117,25 @@ BEGIN
         TRUE,
         (SELECT loj_id FROM livraria_gestao.lojas WHERE loj_slug = 'livraria-rio' LIMIT 1)
     ) ON CONFLICT (usu_email) DO NOTHING;
+
+    -- Vincular admin 2 à loja em admin_lojas
+    INSERT INTO livraria_gestao.admin_lojas (usu_id, loj_id, adl_papel, adl_ativo, adl_escopo)
+    SELECT
+        u.usu_id,
+        u.loj_id,
+        'admin',
+        TRUE,
+        'LOJA'
+    FROM livraria_gestao.usuarios u
+    WHERE u.usu_email = 'ana.oliveira@livrariario.com.br'
+    ON CONFLICT (usu_id, loj_id) DO NOTHING;
+
+    -- Vincular admin 2 ao papel em usuario_papeis
+    INSERT INTO livraria_gestao.usuario_papeis (usu_id, pap_id)
+    SELECT u.usu_id, u.pap_id
+    FROM livraria_gestao.usuarios u
+    WHERE u.usu_email = 'ana.oliveira@livrariario.com.br' AND u.pap_id IS NOT NULL
+    ON CONFLICT (usu_id, pap_id) DO NOTHING;
     
     -- Admin 3: Belo Horizonte
     INSERT INTO livraria_gestao.usuarios (
@@ -114,6 +152,25 @@ BEGIN
         TRUE,
         (SELECT loj_id FROM livraria_gestao.lojas WHERE loj_slug = 'livraria-belo-horizonte' LIMIT 1)
     ) ON CONFLICT (usu_email) DO NOTHING;
+
+    -- Vincular admin 3 à loja em admin_lojas
+    INSERT INTO livraria_gestao.admin_lojas (usu_id, loj_id, adl_papel, adl_ativo, adl_escopo)
+    SELECT
+        u.usu_id,
+        u.loj_id,
+        'admin',
+        TRUE,
+        'LOJA'
+    FROM livraria_gestao.usuarios u
+    WHERE u.usu_email = 'roberto.costa@livrariabh.com.br'
+    ON CONFLICT (usu_id, loj_id) DO NOTHING;
+
+    -- Vincular admin 3 ao papel em usuario_papeis
+    INSERT INTO livraria_gestao.usuario_papeis (usu_id, pap_id)
+    SELECT u.usu_id, u.pap_id
+    FROM livraria_gestao.usuarios u
+    WHERE u.usu_email = 'roberto.costa@livrariabh.com.br' AND u.pap_id IS NOT NULL
+    ON CONFLICT (usu_id, pap_id) DO NOTHING;
     
     -- ========================================================================
     -- 3. CRIAR 15 LIVROS (5 por loja)
@@ -576,6 +633,6 @@ BEGIN
     ON CONFLICT (usu_id) DO NOTHING;
     
     RAISE NOTICE 'Seed multi-tenant completo criado com sucesso!';
-    RAISE NOTICE '3 Lojas, 3 Administradores, 15 Livros, 9 Clientes criados.';
+    RAISE NOTICE '3 Lojas, 3 Administradores (com vínculos em admin_lojas), 15 Livros, 9 Clientes criados.';
 END;
 $$;

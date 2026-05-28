@@ -5,6 +5,8 @@ describe('ServicoAdmin', () => {
   let servicoAdmin: ServicoAdmin;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let mockRepositorioUsuarios: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let mockRepositorioVendas: any;
 
   beforeEach(() => {
     mockRepositorioUsuarios = {
@@ -16,7 +18,10 @@ describe('ServicoAdmin', () => {
       criarUsuario: jest.fn(),
       associarPapelUsuario: jest.fn(),
     };
-    servicoAdmin = new ServicoAdmin(mockRepositorioUsuarios);
+    mockRepositorioVendas = {
+      contarVendasPorStatusELoja: jest.fn(),
+    };
+    servicoAdmin = new ServicoAdmin(mockRepositorioUsuarios, mockRepositorioVendas);
   });
 
   describe('registrarNovoAdministrador', () => {

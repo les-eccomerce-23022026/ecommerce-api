@@ -1,5 +1,6 @@
 import bcrypt from 'bcryptjs';
 import { IRepositorioUsuarios } from '@/modules/usuarios/IRepositorioUsuarios';
+import { IRepositorioVendas } from '@/modules/vendas/repositories/IRepositorioVendas';
 import { ICriarAdminDto, IListaAdminDto, IRespostaAdminCriadoDto } from '@/modules/admin/Iadmin.dto';
 import { verificarForcaSenha } from '@/shared/utils/senha.util';
 import { Logger } from '@/shared/utils/Logger.util';
@@ -10,9 +11,11 @@ import { PAPEL_ADMIN, PAPEL_CLIENTE } from '@/shared/types/papeis';
  */
 export class ServicoAdmin {
   private readonly repositorioUsuarios: IRepositorioUsuarios;
+  private readonly repositorioVendas: IRepositorioVendas;
 
-  constructor(repositorioUsuarios: IRepositorioUsuarios) {
+  constructor(repositorioUsuarios: IRepositorioUsuarios, repositorioVendas: IRepositorioVendas) {
     this.repositorioUsuarios = repositorioUsuarios;
+    this.repositorioVendas = repositorioVendas;
   }
 
   private static validarSenhaCadastroAdministrador(dados: ICriarAdminDto): void {
@@ -29,17 +32,33 @@ export class ServicoAdmin {
   /**
    * Lista todos os administradores cadastrados.
    * Busca via tabela usuario_papeis para incluir usuários com múltiplos papéis.
+   * Para admin_sistema, inclui contagem de trocas pendentes por loja.
    */
   public async listarAdministradores(): Promise<IListaAdminDto[]> {
     Logger.info('[listarAdministradores] Buscando administradores via usuario_papeis');
     const todos = await this.repositorioUsuarios.buscarUsuariosPorPapel(PAPEL_ADMIN.id);
     Logger.info('[listarAdministradores] Administradores encontrados', { quantidade: todos.length });
-    return todos.map((u) => ({
-      uuid: u.uuid,
-      nome: u.nome,
-      email: u.email,
-      ativo: u.ativo,
-    }));
+    
+    // Contar vendas com status de troca pendente por loja
+    const trocasPorLoja = await this.repositorioVendas.contarVendasPorStatusELoja(['EM TROCA', 'TROCA AUTORIZADA']);
+    
+    // Para cada administrador, buscar suas lojas e somar as trocas pendentes
+    const administradoresComTrocas = await Promise.all(
+      todos.map(async (u) => {
+        const lojas = await this.repositorioUsuarios.buscarLojasDoUsuario(u.id);
+        const totalTrocas = lojas.reduce((soma, lojId) => soma + (trocasPorLoja.get(lojId) || 0), 0);
+        
+        return {
+          uuid: u.uuid,
+          nome: u.nome,
+          email: u.email,
+          ativo: u.ativo,
+          trocasPendentes: totalTrocas > 0 ? totalTrocas : undefined,
+        };
+      })
+    );
+    
+    return administradoresComTrocas;
   }
 
   /**

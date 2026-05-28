@@ -13,9 +13,10 @@ DECLARE
     v_id_papel_admin   INTEGER;
     v_id_papel_cliente INTEGER;
     v_id_usuario_cli   BIGINT;
+    v_id_usuario_admin BIGINT;
 BEGIN
-    SELECT pap_id INTO v_id_papel_admin FROM livraria_comercial.papeis WHERE pap_descricao = 'admin';
-    SELECT pap_id INTO v_id_papel_cliente FROM livraria_comercial.papeis WHERE pap_descricao = 'cliente';
+    SELECT pap_id INTO v_id_papel_admin FROM livraria_gestao.papeis WHERE pap_descricao = 'admin';
+    SELECT pap_id INTO v_id_papel_cliente FROM livraria_gestao.papeis WHERE pap_descricao = 'cliente';
 
     -- Atualiza ou Insere Administrador de Teste
     INSERT INTO livraria_gestao.usuarios (usu_nome, usu_email, usu_cpf, usu_senha_hash, pap_id, usu_ativo, loj_id)
@@ -27,7 +28,15 @@ BEGIN
         v_id_papel_admin,
         TRUE,
         1  -- loj_id = 1 (loja padrão)
-    ) ON CONFLICT (usu_email) DO UPDATE SET usu_senha_hash = '$2b$10$GaOa1GtR//oZ7.lI3y.7/uT25D7Px3T.54NuII0z/laURHdAIw59W';
+    ) ON CONFLICT (usu_email) DO UPDATE SET usu_senha_hash = '$2b$10$GaOa1GtR//oZ7.lI3y.7/uT25D7Px3T.54NuII0z/laURHdAIw59W'
+    RETURNING usu_id INTO v_id_usuario_admin;
+
+    -- Associar papel admin na tabela usuario_papeis
+    IF v_id_usuario_admin IS NOT NULL THEN
+        INSERT INTO livraria_gestao.usuario_papeis (usu_id, pap_id, usp_ativo)
+        VALUES (v_id_usuario_admin, v_id_papel_admin, TRUE)
+        ON CONFLICT (usu_id, pap_id) DO UPDATE SET usp_ativo = TRUE;
+    END IF;
 
     -- Atualiza ou Insere Cliente de Teste
     INSERT INTO livraria_gestao.usuarios (usu_nome, usu_email, usu_cpf, usu_senha_hash, pap_id, usu_ativo, loj_id)
@@ -47,7 +56,12 @@ BEGIN
         WHERE usu_email = 'clientetest@email.com' AND pap_id = v_id_papel_cliente;
     END IF;
 
+    -- Associar papel cliente na tabela usuario_papeis
     IF v_id_usuario_cli IS NOT NULL THEN
+        INSERT INTO livraria_gestao.usuario_papeis (usu_id, pap_id, usp_ativo)
+        VALUES (v_id_usuario_cli, v_id_papel_cliente, TRUE)
+        ON CONFLICT (usu_id, pap_id) DO UPDATE SET usp_ativo = TRUE;
+        
         INSERT INTO livraria_gestao.clientes (usu_id, cli_genero, cli_data_nascimento, loj_id)
         VALUES (v_id_usuario_cli, 'Masculino', '1990-01-01', 1)
         ON CONFLICT (usu_id) DO UPDATE SET loj_id = 1;

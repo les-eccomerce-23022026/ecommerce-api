@@ -306,4 +306,23 @@ export class RepositorioVendasPostgres implements IRepositorioVendas {
     const rows = await this.db.executar<{ email: string }>(VENDAS_QUERIES.SELECT_EMAIL_USUARIO_POR_VENDA, [vendaUuid]);
     return rows.length > 0 ? rows[0].email : null;
   }
+
+  public async contarVendasPorStatusELoja(status: string[]): Promise<Map<number, number>> {
+    const query = `
+      SELECT v.loj_id, COUNT(*) as contagem
+      FROM livraria_comercial.vendas v
+      JOIN livraria_comercial.status_venda s ON v.stv_id = s.stv_id
+      WHERE s.stv_descricao = ANY($1::text[])
+      GROUP BY v.loj_id
+    `;
+    
+    const rows = await this.db.executar<{ loj_id: number; contagem: string }>(query, [status]);
+    
+    const mapa = new Map<number, number>();
+    rows.forEach(row => {
+      mapa.set(row.loj_id, parseInt(row.contagem, 10));
+    });
+    
+    return mapa;
+  }
 }

@@ -243,4 +243,85 @@ export class RepositorioEstoque {
         AND loj_id = $3
     `, [quantidade, livroUuid, lojId]);
   }
+
+  async calcularValorTotalEstoque(): Promise<number> {
+    const lojId = this.obterLojId();
+
+    let sql = `
+      SELECT COALESCE(SUM(etq_quantidade_disponivel * etq_preco_venda), 0) AS valor_total
+      FROM estoques e
+      WHERE e.etq_ativo = TRUE
+    `;
+
+    const params: any[] = [];
+
+    if (lojId) {
+      sql += ` AND e.loj_id = $${params.length + 1}`;
+      params.push(lojId);
+    }
+
+    const result = await this.db.executar<{ valor_total: string }>(sql, params);
+    return Number(result[0].valor_total);
+  }
+
+  async calcularValorTotalCusto(): Promise<number> {
+    const lojId = this.obterLojId();
+
+    let sql = `
+      SELECT COALESCE(SUM(etq_quantidade_disponivel * etq_valor_custo_atual), 0) AS valor_total
+      FROM estoques e
+      WHERE e.etq_ativo = TRUE
+        AND e.etq_valor_custo_atual IS NOT NULL
+    `;
+
+    const params: any[] = [];
+
+    if (lojId) {
+      sql += ` AND e.loj_id = $${params.length + 1}`;
+      params.push(lojId);
+    }
+
+    const result = await this.db.executar<{ valor_total: string }>(sql, params);
+    return Number(result[0].valor_total);
+  }
+
+  async calcularQuantidadeTotalReservada(): Promise<number> {
+    const lojId = this.obterLojId();
+
+    let sql = `
+      SELECT COALESCE(SUM(etq_quantidade_reservada), 0) AS total
+      FROM estoques e
+      WHERE e.etq_ativo = TRUE
+    `;
+
+    const params: any[] = [];
+
+    if (lojId) {
+      sql += ` AND e.loj_id = $${params.length + 1}`;
+      params.push(lojId);
+    }
+
+    const result = await this.db.executar<{ total: string }>(sql, params);
+    return Number(result[0].total);
+  }
+
+  async calcularQuantidadeTotalDisponivel(): Promise<number> {
+    const lojId = this.obterLojId();
+
+    let sql = `
+      SELECT COALESCE(SUM(etq_quantidade_disponivel), 0) AS total
+      FROM estoques e
+      WHERE e.etq_ativo = TRUE
+    `;
+
+    const params: any[] = [];
+
+    if (lojId) {
+      sql += ` AND e.loj_id = $${params.length + 1}`;
+      params.push(lojId);
+    }
+
+    const result = await this.db.executar<{ total: string }>(sql, params);
+    return Number(result[0].total);
+  }
 }

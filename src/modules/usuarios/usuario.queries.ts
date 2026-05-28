@@ -49,8 +49,8 @@ export const USUARIO_QUERIES = {
            u.usu_criado_em AS "criadoEm", u.usu_atualizado_em AS "atualizadoEm",
            p.pap_descricao AS "papelDescricao"
     FROM livraria_gestao.usuarios u
-    JOIN livraria_gestao.papeis p ON u.pap_id = p.pap_id
     INNER JOIN livraria_gestao.usuario_papeis up ON u.usu_id = up.usu_id
+    INNER JOIN livraria_gestao.papeis p ON up.pap_id = p.pap_id
     WHERE up.pap_id = $1 AND up.usp_ativo = TRUE
  `,
   DELETE_BY_CPF: 'DELETE FROM livraria_gestao.usuarios WHERE usu_cpf = $1',

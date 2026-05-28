@@ -140,8 +140,17 @@ export class ServicoAutenticacao {
         // A primeira loja do array é a loja principal
         loja_uuid_principal = lojas[0].loj_uuid;
       } else {
+        // Validar: administradores devem ter vínculo com loja
+        if (papelLogin === PAPEL_ADMIN.descricao) {
+          Logger.warn('[auth.service] Administrador sem vínculo com loja', {
+            email: usuarioAutenticado.email,
+            uuid: usuarioAutenticado.uuid
+          });
+          throw new Error('Administrador sem vínculo com loja. Contate o suporte.');
+        }
+        
         // Se o usuário não tem lojas associadas (multi-tenancy não habilitado),
-        // buscar loja padrão (1) se configurada
+        // buscar loja padrão (1) se configurada - apenas para clientes ou não-admin
         const defaultLojaId = process.env.DEFAULT_LOJA_ID ? parseInt(process.env.DEFAULT_LOJA_ID) : 1;
         const defaultLojaUuid = await this.repositorioUsuarios.buscarLojaUuidPorId(defaultLojaId);
         if (defaultLojaUuid) {
@@ -150,6 +159,11 @@ export class ServicoAutenticacao {
         }
       }
     } catch (erro) {
+      // Se o erro for da validação de admin, repassar
+      if (erro instanceof Error && erro.message === 'Administrador sem vínculo com loja. Contate o suporte.') {
+        throw erro;
+      }
+      
       // Se falhar ao buscar lojas, usar loja padrão
       Logger.warn('[auth.service] Falha ao buscar lojas do usuário, usando loja padrão');
       const defaultLojaId = process.env.DEFAULT_LOJA_ID ? parseInt(process.env.DEFAULT_LOJA_ID) : 1;

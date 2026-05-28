@@ -482,7 +482,11 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
   }
 
   public async buscarUsuariosPorPapel(idPapel: number): Promise<IUsuario[]> {
-    const rows = await this.db.executar(USUARIO_QUERIES.SELECT_USUARIOS_POR_PAPEL, [idPapel]);
+    const rows = await this.db.executar(
+      USUARIO_QUERIES.SELECT_USUARIOS_POR_PAPEL, 
+      [idPapel],
+      { searchPath: 'livraria_comercial, livraria_financeiro, livraria_gestao, livraria_logistica, livraria_ref, public' }
+    );
     
     // Buscar papéis para cada usuário
     const usuariosComPapeis = await Promise.all(

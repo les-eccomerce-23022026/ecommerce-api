@@ -31,7 +31,8 @@ export class ControladorEstoque {
 
   obterKpis = async (req: Request, res: Response): Promise<void> => {
     try {
-      const limiteCritico = req.query.limite ? parseInt(req.query.limite as string, 10) : 5;
+      const limiteParam = req.query.limite ? parseInt(req.query.limite as string, 10) : 5;
+      const limiteCritico = isNaN(limiteParam) ? 5 : limiteParam;
       const kpis = await this.servico.obterKpis(limiteCritico);
       RespostaPadrao.enviarSucesso(res, 200, kpis);
     } catch (err: unknown) {
