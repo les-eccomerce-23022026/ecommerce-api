@@ -1,13 +1,18 @@
 import { IRepositorioEmbedding } from '../../domain/repositories/IRepositorioEmbedding';
 import {
-  IRepositorioRecomendacao,
+  IRepositorioContextoCliente,
+  IRepositorioMetricasRecomendacao,
   IMetricaRecomendacao,
   IMetricasAgregadas,
   PeriodoMetrica,
 } from '../../domain/repositories/IRepositorioRecomendacao';
 import { ServicoGeracaoEmbedding } from '../../domain/services/ServicoGeracaoEmbedding';
 import { ServicoValidacaoProdutos } from '../../domain/services/ServicoValidacaoProdutos';
-import { ServicoRecomendacaoRAG } from '../../domain/services/ServicoRecomendacaoRAG';
+import {
+  ServicoRecomendacaoRAG,
+  RecomendacaoResultado,
+  ProdutoRecomendado,
+} from '../../domain/services/ServicoRecomendacaoRAG';
 import { AdapterLangChainGemini } from '../../infrastructure/config/AdapterLangChainGemini';
 import { IContextoRecomendacao } from '../../domain/entities/IContextoRecomendacao.entity';
 import {
@@ -19,6 +24,7 @@ import {
 } from '../dtos/IRecomendacaoDTO';
 import { Logger } from '@/shared/utils/Logger.util';
 import { ServicoIndexacaoProdutos } from './ServicoIndexacaoProdutos';
+import { ServicoLivros } from '@/modules/livros/servicoLivros';
 
 /**
  * Serviço de Aplicação para Recomendação
@@ -28,38 +34,33 @@ import { ServicoIndexacaoProdutos } from './ServicoIndexacaoProdutos';
 export class ServicoRecomendacaoApplication {
   constructor(
     private repositorioEmbedding: IRepositorioEmbedding,
-    private repositorioRecomendacao: IRepositorioRecomendacao,
+    private repositorioContextoCliente: IRepositorioContextoCliente,
+    private repositorioMetricasRecomendacao: IRepositorioMetricasRecomendacao,
     private servicoGeracaoEmbedding: ServicoGeracaoEmbedding,
     private servicoValidacaoProdutos: ServicoValidacaoProdutos,
     private servicoRecomendacaoRAG: ServicoRecomendacaoRAG,
     private adapterLangChain: AdapterLangChainGemini,
-    private servicoIndexacaoProdutos: ServicoIndexacaoProdutos
+    private servicoIndexacaoProdutos: ServicoIndexacaoProdutos,
+    private servicoLivros: ServicoLivros
   ) {}
 
   /**
-   * Gera recomendações baseadas na query do usuário
+   * Gera recomendações baseadas na query do usuário.
+   *
+   * Orquestra: geração de embedding → contexto do cliente → busca RAG →
+   * deduplicação → construção de resposta.
+   *
+   * @param dados Parâmetros da requisição de recomendação.
+   * @returns     DTO com produtos recomendados e métricas de execução.
    */
   async recomendar(dados: IRecomendarRequestDTO): Promise<IRecomendarResponseDTO> {
     const inicio = Date.now();
 
     try {
-      // Gera embedding da query
-      const queryEmbedding = await this.adapterLangChain.gerarEmbedding(dados.query);
+      const queryEmbedding = await this.gerarEmbeddingQuery(dados.query);
+      const contextoCliente = await this.obterContextoCliente(dados.clienteUuid);
+      const produtosExistentes = await this.buscarTodosProdutosExistentes();
 
-      // Busca contexto do cliente se fornecido
-      let contextoCliente: IContextoRecomendacao | null = null;
-      if (dados.clienteUuid) {
-        contextoCliente = await this.repositorioRecomendacao.buscarContexto(
-          dados.clienteUuid
-        );
-      }
-
-      // Busca todos os produtos existentes (para validação anti-alucinação)
-      // TODO: Implementar cache para evitar buscar toda vez
-      const produtosExistentes = new Set<string>();
-      // Por enquanto, vazio - será implementado na Fase 4
-
-      // Gera recomendações
       const resultado = await this.servicoRecomendacaoRAG.gerarRecomendacao(
         dados.query,
         queryEmbedding,
@@ -68,36 +69,15 @@ export class ServicoRecomendacaoApplication {
         dados.limite || 5
       );
 
-      // Mapeia para DTO
-      const produtosDTO: ProdutoRecomendadoDTO[] = resultado.produtos.map((p) => ({
-        uuid: p.uuid,
-        titulo: p.metadados.titulo,
-        autor: p.metadados.autor,
-        categoria: p.metadados.categoria,
-        sinopse: p.metadados.sinopse,
-        isbn: p.metadados.isbn,
-        preco: p.metadados.preco,
-        similaridade: p.similaridade,
-        motivo: p.motivo,
-      }));
-
+      const produtosDTO = this.removerDuplicatasEOrdenar(resultado.produtos, dados.limite || 5);
       const tempoResposta = Date.now() - inicio;
 
       // Salva métricas (será implementado na Fase 4.6)
       // await this.salvarMetricasRecomendacao(...);
 
-      return {
-        query: resultado.query,
-        produtos: produtosDTO,
-        contextoUsado: resultado.contextoUsado,
-        totalEncontrados: resultado.totalEncontrados,
-        totalValidos: resultado.totalValidos,
-        tempoRespostaMs: tempoResposta,
-      };
+      return this.construirResposta(resultado, produtosDTO, tempoResposta);
     } catch (erro) {
-      const mensagem = erro instanceof Error ? erro.message : String(erro);
-      Logger.error(`[ServicoRecomendacaoApplication] Erro ao recomendar: ${mensagem}`);
-      throw erro;
+      return this.tratarErroRecomendacao(erro);
     }
   }
 
@@ -145,6 +125,116 @@ export class ServicoRecomendacaoApplication {
       throw erro;
     }
   }
+
+  // ─── Métodos privados extraídos de recomendar() ──────────────────────────────
+
+  /**
+   * Gera o vetor de embedding da query via adapter LangChain/Gemini.
+   *
+   * @param query Texto da busca inserido pelo usuário.
+   * @returns     Vetor numérico de embedding da query.
+   */
+  private async gerarEmbeddingQuery(query: string): Promise<number[]> {
+    return this.adapterLangChain.gerarEmbedding(query);
+  }
+
+  /**
+   * Obtém o contexto de histórico e preferências do cliente, quando disponível.
+   *
+   * @param clienteUuid Identificador público do cliente (opcional).
+   * @returns           Contexto do cliente ou null se não informado.
+   */
+  private async obterContextoCliente(
+    clienteUuid?: string
+  ): Promise<IContextoRecomendacao | null> {
+    if (!clienteUuid) {
+      return null;
+    }
+    return this.repositorioRecomendacao.buscarContexto(clienteUuid);
+  }
+
+  /**
+   * Remove produtos duplicados mantendo o de maior similaridade por UUID,
+   * ordena por relevância decrescente e limita ao número solicitado.
+   *
+   * O mesmo produto pode aparecer múltiplas vezes nos resultados do ChromaDB
+   * quando possui mais de um chunk indexado — esta etapa consolida essas
+   * ocorrências em um único item.
+   *
+   * @param produtos Lista bruta de produtos (pode conter duplicatas por chunks).
+   * @param limite   Número máximo de produtos a retornar.
+   * @returns        Lista deduplicada, ordenada por similaridade e limitada.
+   */
+  private removerDuplicatasEOrdenar(
+    produtos: ProdutoRecomendado[],
+    limite: number
+  ): ProdutoRecomendadoDTO[] {
+    const produtosUnicos = new Map<string, ProdutoRecomendadoDTO>();
+
+    for (const produto of produtos) {
+      const existente = produtosUnicos.get(produto.uuid);
+      const deveSubstituir = !existente || produto.similaridade > existente.similaridade;
+
+      if (deveSubstituir) {
+        produtosUnicos.set(produto.uuid, {
+          uuid: produto.uuid,
+          titulo: produto.metadados.titulo,
+          autor: produto.metadados.autor,
+          categoria: produto.metadados.categoria,
+          sinopse: produto.metadados.sinopse,
+          isbn: produto.metadados.isbn,
+          preco: produto.metadados.preco,
+          similaridade: produto.similaridade,
+          motivo: produto.motivo,
+        });
+      }
+    }
+
+    return Array.from(produtosUnicos.values())
+      .sort((a, b) => b.similaridade - a.similaridade)
+      .slice(0, limite);
+  }
+
+  /**
+   * Constrói o DTO de resposta consolidando o resultado do domínio RAG,
+   * os produtos já processados e o tempo total de execução.
+   *
+   * @param resultado     Resultado bruto retornado pelo ServicoRecomendacaoRAG.
+   * @param produtosDTO   Produtos deduplicados e ordenados prontos para resposta.
+   * @param tempoResposta Tempo total de execução em milissegundos.
+   * @returns             DTO completo de resposta da recomendação.
+   */
+  private construirResposta(
+    resultado: RecomendacaoResultado,
+    produtosDTO: ProdutoRecomendadoDTO[],
+    tempoResposta: number
+  ): IRecomendarResponseDTO {
+    return {
+      query: resultado.query,
+      produtos: produtosDTO,
+      contextoUsado: resultado.contextoUsado,
+      totalEncontrados: resultado.totalEncontrados,
+      totalValidos: resultado.totalValidos,
+      tempoRespostaMs: tempoResposta,
+    };
+  }
+
+  /**
+   * Registra o erro no log e o repropaga para a camada de infraestrutura.
+   *
+   * Declarado como `never` para que o TypeScript reconheça que este caminho
+   * nunca retorna normalmente, eliminando falsos avisos de "código inacessível".
+   *
+   * @param erro Exceção capturada no bloco catch de recomendar().
+   * @throws     Sempre relança o erro recebido sem modificação.
+   */
+  private tratarErroRecomendacao(erro: unknown): never {
+    const mensagem = erro instanceof Error ? erro.message : String(erro);
+    Logger.error(`[ServicoRecomendacaoApplication] Erro ao recomendar: ${mensagem}`);
+    throw erro;
+  }
+
+  // ─── Métodos privados de suporte ao chat ──────────────────────────────────
 
   /**
    * Constrói contexto de chat a partir dos produtos recomendados
@@ -216,6 +306,24 @@ export class ServicoRecomendacaoApplication {
       const mensagem = erro instanceof Error ? erro.message : String(erro);
       Logger.error(`[ServicoRecomendacaoApplication] Erro ao reindexar: ${mensagem}`);
       throw erro;
+    }
+  }
+
+  /**
+   * Busca todos os produtos existentes no banco de dados
+   * Usado para validação anti-alucinação
+   */
+  private async buscarTodosProdutosExistentes(): Promise<Set<string>> {
+    try {
+      const livros = await this.servicoLivros.listarParaAdmin(10000);
+      const uuids = new Set(livros.map((livro) => livro.uuid));
+      Logger.info(`[ServicoRecomendacaoApplication] ${uuids.size} produtos encontrados no BD para validação`);
+      return uuids;
+    } catch (erro) {
+      const mensagem = erro instanceof Error ? erro.message : String(erro);
+      Logger.error(`[ServicoRecomendacaoApplication] Erro ao buscar produtos existentes: ${mensagem}`);
+      // Retorna set vazio em caso de erro para não quebrar o fluxo
+      return new Set<string>();
     }
   }
 }

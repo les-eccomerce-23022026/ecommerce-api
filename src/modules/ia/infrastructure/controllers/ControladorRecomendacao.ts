@@ -93,12 +93,8 @@ export class ControladorRecomendacao {
    */
   reindexar = async (req: Request, res: Response): Promise<void> => {
     try {
-      // Verifica se é admin (será implementado com middleware de autorização)
-      // if (!usuarioTemPapelAdmin(req.usuario)) {
-      //   RespostaPadrao.enviarErro(res, 403, 'Acesso negado. Esta rota é restrita a administradores.');
-      //   return;
-      // }
-
+      // Autorização garantida pelos middlewares autenticacaoMiddleware + adminOnlyMiddleware
+      // registrados na camada de rotas (ia.routes.ts). Nenhuma verificação adicional é necessária aqui.
       const dados: IReindexarRequestDTO = req.body;
       const resultado = await this.servicoRecomendacao.reindexarCatalogo(dados.forcarReindexacao || false);
 
@@ -209,7 +205,12 @@ export class ControladorRecomendacao {
    */
   saude = async (_req: Request, res: Response): Promise<void> => {
     try {
-      // TODO: Implementar verificação real de conexão com ChromaDB e Gemini
+      // Retorna disponibilidade do processo Node.js para o serviço de IA.
+      // Verificação ativa das dependências externas (ChromaDB e Gemini) não está incluída
+      // aqui pois exigiria expor os adapters de infraestrutura neste controller.
+      // Caso necessário, deve ser implementada via método verificarSaude() no
+      // ServicoRecomendacaoApplication, aproveitando o AdapterLangChainGemini.validarConexao()
+      // já disponível, e um heartbeat ao cliente ChromaDB.
       RespostaPadrao.enviarSucesso(res, 200, {
         status: 'ok',
         servico: 'ia-recomendacao',

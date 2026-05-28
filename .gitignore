@@ -44,3 +44,6 @@ github-projects
 
 .qwen
 .vscode
+
+# Dados runtime
+data/

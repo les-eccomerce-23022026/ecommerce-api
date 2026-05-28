@@ -1,4 +1,3 @@
-import bcrypt from 'bcryptjs';
 import { IRepositorioUsuarios } from '@/modules/usuarios/IRepositorioUsuarios';
 import { IRepositorioPerfilCliente } from '@/shared/types/IRepositorioPerfilCliente';
 import { IRepositorioTelefoneUsuario } from '@/shared/types/IRepositorioTelefoneUsuario';
@@ -12,38 +11,41 @@ import {
   ICartaoDto,
 } from '@/modules/clientes/Iclientes.dto';
 import { IRepositorioCartaoUsuario } from '@/modules/cartoes/IRepositorioCartaoUsuario';
-import { verificarForcaSenha } from '@/shared/utils/senha.util';
 import { IConexaoBanco } from '@/shared/infrastructure/database/IConexaoBanco';
 import { GestaoEnderecoCliente } from '@/modules/clientes/gestaoIdentidadeClienteEndereco.service';
 import { GestaoIdentidadeClienteOperacoes } from '@/modules/clientes/gestaoIdentidadeClienteOperacoes.service';
+import { GestaoSenhaCliente } from '@/modules/clientes/gestaoSenhaCliente.service';
+import { GestaoTelefoneCliente } from '@/modules/clientes/gestaoTelefoneCliente.service';
+import { GestaoCartaoCliente } from '@/modules/clientes/gestaoCartaoCliente.service';
+import { GestaoPerfilCliente } from '@/modules/clientes/gestaoPerfilCliente.service';
 import {
   mascararCpf,
   mascararEmail,
-  converterTelefoneParaDto,
 } from '@/modules/clientes/gestaoIdentidadeClienteTexto.util';
-import { ClientesUtils } from '@/modules/clientes/clientesUtils.service';
 import { ServicoLojas } from '@/modules/lojas/servicoLojas';
+import { UsuarioNaoEncontradoError, OperacaoNaoPermitidaError } from '@/shared/exceptions/Exceptions';
 
 /**
  * Serviço responsável pelo fluxo de cadastro público de clientes.
+ * 
+ * Coordena os serviços especializados para gestão de identidade do cliente:
+ * - GestaoSenhaCliente: gestão de senhas
+ * - GestaoTelefoneCliente: gestão de telefones
+ * - GestaoCartaoCliente: gestão de cartões
+ * - GestaoPerfilCliente: gestão de perfil
+ * - GestaoEnderecoCliente: gestão de endereços
+ * - GestaoIdentidadeClienteOperacoes: operações complexas de cadastro/atualização
  */
 export class GestaoIdentidadeCliente {
   private readonly repositorioUsuarios: IRepositorioUsuarios;
-
-  private readonly repositorioPerfil: IRepositorioPerfilCliente;
-
-  private readonly repositorioTelefone: IRepositorioTelefoneUsuario;
-
   private readonly repositorioEndereco: IRepositorioEnderecoUsuario;
-
-  private readonly repositorioCartoes: IRepositorioCartaoUsuario;
-
   private readonly db: IConexaoBanco;
-
   private readonly endereco: GestaoEnderecoCliente;
-
   private readonly operacoes: GestaoIdentidadeClienteOperacoes;
-
+  private readonly senha: GestaoSenhaCliente;
+  private readonly telefone: GestaoTelefoneCliente;
+  private readonly cartao: GestaoCartaoCliente;
+  private readonly perfil: GestaoPerfilCliente;
   private readonly servicoLojas?: ServicoLojas;
 
   constructor(
@@ -56,13 +58,17 @@ export class GestaoIdentidadeCliente {
     servicoLojas?: ServicoLojas,
   ) {
     this.repositorioUsuarios = repositorioUsuarios;
-    this.repositorioPerfil = repositorioPerfil;
-    this.repositorioTelefone = repositorioTelefone;
     this.repositorioEndereco = repositorioEndereco;
-    this.repositorioCartoes = repositorioCartoes;
     this.db = db;
     this.servicoLojas = servicoLojas;
+    
+    // Inicializa serviços especializados
     this.endereco = new GestaoEnderecoCliente(db, repositorioEndereco);
+    this.senha = new GestaoSenhaCliente(repositorioUsuarios);
+    this.telefone = new GestaoTelefoneCliente(repositorioTelefone);
+    this.cartao = new GestaoCartaoCliente(repositorioCartoes);
+    this.perfil = new GestaoPerfilCliente(repositorioPerfil);
+    
     this.operacoes = new GestaoIdentidadeClienteOperacoes({
       repositorioUsuarios,
       repositorioPerfil,
@@ -75,25 +81,7 @@ export class GestaoIdentidadeCliente {
   }
 
   public async alterarSenha(uuid: string, dados: IAlterarSenhaDto): Promise<void> {
-    const usuario = await this.repositorioUsuarios.buscarPorUuid(uuid);
-    if (!usuario) {
-      throw new Error('Usuário não encontrado.');
-    }
-    const senhaValida = await bcrypt.compare(dados.senhaAtual, usuario.senhaHash);
-    if (!senhaValida) {
-      throw new Error('Senha atual incorreta.');
-    }
-    if (dados.novaSenha !== dados.confirmacaoNovaSenha) {
-      throw new Error('Nova senha e confirmação não conferem.');
-    }
-    if (!verificarForcaSenha(dados.novaSenha)) {
-      throw new Error('Nova senha muito fraca.');
-    }
-    if (dados.novaSenha === dados.senhaAtual) {
-      throw new Error('Nova senha deve ser diferente da senha atual.');
-    }
-    const novaSenhaHash = await bcrypt.hash(dados.novaSenha, 10);
-    await this.repositorioUsuarios.atualizarUsuario(uuid, { senhaHash: novaSenhaHash });
+    return this.senha.alterarSenha(uuid, dados);
   }
 
   public async atualizarCliente(uuid: string, dados: IAtualizarClienteDto) {
@@ -105,17 +93,17 @@ export class GestaoIdentidadeCliente {
     dados: IEnderecoDto & { tipoEndereco?: 'cobranca' | 'entrega' },
   ): Promise<IEnderecoDto> {
     const usuario = await this.repositorioUsuarios.buscarPorUuid(uuid);
-    if (!usuario) throw new Error('Usuário não encontrado.');
+    if (!usuario) throw new UsuarioNaoEncontradoError(uuid);
     return this.endereco.criarEndereco(usuario.id, dados, dados.tipoEndereco || 'entrega', false);
   }
 
   public async removerEndereco(uuidUsuario: string, uuidEndereco: string): Promise<void> {
     const usuario = await this.repositorioUsuarios.buscarPorUuid(uuidUsuario);
-    if (!usuario) throw new Error('Usuário não encontrado.');
+    if (!usuario) throw new UsuarioNaoEncontradoError(uuidUsuario);
     const todosEnderecos = await this.repositorioEndereco.buscarPorIdUsuario(usuario.id);
     const enderecoExistente = todosEnderecos.find((e) => e.uuid === uuidEndereco);
     if (!enderecoExistente) {
-      throw new Error('Endereço não encontrado.');
+      throw new OperacaoNaoPermitidaError('Endereço não encontrado.');
     }
     await this.repositorioEndereco.deletar(usuario.id, uuidEndereco);
   }
@@ -123,10 +111,10 @@ export class GestaoIdentidadeCliente {
   public async suspenderAcessoCliente(uuid: string): Promise<void> {
     const usuario = await this.repositorioUsuarios.buscarPorUuid(uuid);
     if (!usuario) {
-      throw new Error('Usuário não encontrado.');
+      throw new UsuarioNaoEncontradoError(uuid);
     }
     if (!usuario.ativo) {
-      throw new Error('Conta já está inativa.');
+      throw new OperacaoNaoPermitidaError('Conta já está inativa.');
     }
     await this.repositorioUsuarios.atualizarUsuario(uuid, { ativo: false });
   }
@@ -134,13 +122,20 @@ export class GestaoIdentidadeCliente {
   public async obterPerfil(uuid: string): Promise<IPerfilClienteDto> {
     const usuario = await this.repositorioUsuarios.buscarPorUuid(uuid);
     if (!usuario) {
-      throw new Error('Usuário não encontrado.');
+      throw new UsuarioNaoEncontradoError(uuid);
     }
-    const perfil = await this.repositorioPerfil.buscarPorIdUsuario(usuario.id);
-    const telefones = await this.repositorioTelefone.buscarPorIdUsuario(usuario.id);
-    let telefonePrincipal = telefones.find((telefone) => telefone.principal) ?? telefones[0];
-    if (!telefonePrincipal && usuario.telefoneRapido) {
-      telefonePrincipal = {
+    
+    // Usa serviços especializados
+    const perfil = await this.perfil.buscarPerfilPorUsuario(usuario.id);
+    const telefone = await this.telefone.buscarTelefonePrincipal(usuario.id);
+    const enderecosUsuario = await this.repositorioEndereco.buscarPorIdUsuario(usuario.id);
+    const enderecosDto = await this.endereco.converterEnderecosParaDto(enderecosUsuario);
+    const cartoes = await this.cartao.buscarCartoesPorUsuario(usuario.id);
+    
+    // Fallback para telefone rápido se não houver telefone cadastrado
+    let telefoneFinal = telefone;
+    if (!telefoneFinal && usuario.telefoneRapido) {
+      telefoneFinal = {
         id: 0,
         uuid: '',
         idUsuario: usuario.id,
@@ -150,17 +145,7 @@ export class GestaoIdentidadeCliente {
         principal: true,
       };
     }
-    const enderecosUsuario = await this.repositorioEndereco.buscarPorIdUsuario(usuario.id);
-    const enderecosDto = await this.endereco.converterEnderecosParaDto(enderecosUsuario);
-    const cartoesUsuario = await this.repositorioCartoes.buscarPorUsuario(usuario.id);
-    const cartoesDto: ICartaoDto[] = cartoesUsuario.map((c) => ({
-      uuid: c.uuid,
-      ultimosDigitosCartao: c.ultimosDigitosCartao,
-      nomeImpresso: c.nomeImpresso,
-      bandeira: c.bandeira || 'Outra',
-      validade: c.validade.toISOString().substring(0, 7),
-      principal: c.principal,
-    }));
+    
     return {
       uuid: usuario.uuid,
       nome: usuario.nome,
@@ -169,12 +154,10 @@ export class GestaoIdentidadeCliente {
       cpf: usuario.cpf,
       cpfMascarado: usuario.cpf ? mascararCpf(usuario.cpf) : undefined,
       genero: perfil?.genero,
-      dataNascimento: perfil?.dataNascimento
-        ? ClientesUtils.formatarDataSomente(perfil.dataNascimento)
-        : undefined,
-      telefone: telefonePrincipal ? converterTelefoneParaDto(telefonePrincipal) : undefined,
+      dataNascimento: perfil?.dataNascimento,
+      telefone: telefoneFinal,
       enderecos: enderecosDto,
-      cartoes: cartoesDto,
+      cartoes: cartoes,
     };
   }
 
@@ -188,7 +171,7 @@ export class GestaoIdentidadeCliente {
     dados: Partial<IEnderecoDto>,
   ): Promise<IEnderecoDto> {
     const usuario = await this.repositorioUsuarios.buscarPorUuid(uuidUsuario);
-    if (!usuario) throw new Error('Usuário não encontrado.');
+    if (!usuario) throw new UsuarioNaoEncontradoError(uuidUsuario);
     return this.endereco.editarEndereco(usuario, uuidEndereco, dados);
   }
 }

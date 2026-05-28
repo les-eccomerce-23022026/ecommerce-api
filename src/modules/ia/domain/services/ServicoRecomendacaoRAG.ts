@@ -2,6 +2,8 @@ import { IContextoRecomendacao } from '../entities/IContextoRecomendacao.entity'
 import { IRepositorioEmbedding } from '../repositories/IRepositorioEmbedding';
 import { ServicoGeracaoEmbedding } from './ServicoGeracaoEmbedding';
 import { ServicoValidacaoProdutos } from './ServicoValidacaoProdutos';
+import { CONFIGURACAO_RECOMENDACAO } from '../../infrastructure/repositories/RepositorioEmbeddingChromaDB';
+import { MMRReranking, MMROption } from '../../infrastructure/utils/MMRReranking';
 
 /**
  * Serviço de Domínio para Recomendação com RAG
@@ -27,12 +29,14 @@ export class ServicoRecomendacaoRAG {
     queryEmbedding: number[],
     contextoCliente: IContextoRecomendacao | null,
     produtosExistentes: Set<string>,
-    limite: number = 5
+    limite: number = CONFIGURACAO_RECOMENDACAO.quantidadeResultados,
+    usarMMR: boolean = false
   ): Promise<RecomendacaoResultado> {
     // Busca produtos similares no ChromaDB
+    // O repositório aplica CONFIGURACAO_RECOMENDACAO.multiplicadorBusca e CONFIGURACAO_RECOMENDACAO.limiarSimilaridade internamente
     const produtosSimilares = await this.repositorioEmbedding.buscarSimilares(
       queryEmbedding,
-      limite * 2 // Busca mais para filtrar depois
+      limite
     );
 
     // Filtra apenas produtos que existem no BD (anti-alucinação)
@@ -51,13 +55,51 @@ export class ServicoRecomendacaoRAG {
       contextoCliente
     );
 
+    // Aplica MMR reranking se habilitado
+    const produtosFinaisMMR = usarMMR 
+      ? this.aplicarMMR(produtosPersonalizados, produtosSimilares, limite)
+      : produtosPersonalizados;
+
     return {
       query,
-      produtos: produtosPersonalizados,
+      produtos: produtosFinaisMMR,
       contextoUsado: contextoCliente !== null,
       totalEncontrados: produtosSimilares.length,
       totalValidos: produtosValidos.length,
+      rerankingAplicado: usarMMR,
     };
+  }
+
+  /**
+   * Aplica reranking MMR para diversificar resultados
+   */
+  private aplicarMMR(
+    produtos: ProdutoRecomendado[],
+    produtosSimilares: { produtoUuid: string; similaridade: number; metadados: any }[],
+    limite: number
+  ): ProdutoRecomendado[] {
+    // Converte para formato MMROption
+    const mmrOptions: MMROption[] = produtos.map(p => {
+      const similar = produtosSimilares.find(s => s.produtoUuid === p.uuid);
+      return {
+        produtoUuid: p.uuid,
+        similaridade: p.similaridade,
+        metadados: p.metadados,
+        embedding: similar ? undefined : undefined, // Embeddings não disponíveis neste nível
+      };
+    });
+
+    // Aplica MMR com lambda balanceado (0.5)
+    const mmr = new MMRReranking({ lambda: 0.5 });
+    const reranked = mmr.reranking(mmrOptions, limite);
+
+    // Converte de volta para ProdutoRecomendado
+    return reranked.map(r => ({
+      uuid: r.produtoUuid,
+      similaridade: r.similaridade,
+      metadados: r.metadados,
+      motivo: 'mmr_reranking',
+    }));
   }
 
   /**
@@ -94,13 +136,13 @@ export class ServicoRecomendacaoRAG {
       let motivo = 'similaridade_semantica';
 
       if (contextoCliente.preferencias.categorias.includes(metadados?.categoria)) {
-        scorePersonalizado *= 1.2;
+        scorePersonalizado *= CONFIGURACAO_RECOMENDACAO.personalizacao.boostCategoria;
         motivo = 'categoria_preferida';
       }
 
       // Boost para autores preferidos
       if (contextoCliente.preferencias.autores.includes(metadados?.autor)) {
-        scorePersonalizado *= 1.3;
+        scorePersonalizado *= CONFIGURACAO_RECOMENDACAO.personalizacao.boostAutor;
         motivo = 'autor_preferido';
       }
 
@@ -110,7 +152,7 @@ export class ServicoRecomendacaoRAG {
         preco >= contextoCliente.preferencias.faixaPreco.min &&
         preco <= contextoCliente.preferencias.faixaPreco.max
       ) {
-        scorePersonalizado *= 1.1;
+        scorePersonalizado *= CONFIGURACAO_RECOMENDACAO.personalizacao.boostPreco;
         motivo = 'faixa_preco_compativel';
       }
 
@@ -135,6 +177,7 @@ export interface RecomendacaoResultado {
   contextoUsado: boolean;
   totalEncontrados: number;
   totalValidos: number;
+  rerankingAplicado?: boolean;
 }
 
 export interface ProdutoRecomendado {

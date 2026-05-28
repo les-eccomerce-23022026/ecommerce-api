@@ -26,13 +26,12 @@ export class ServicoVendas {
     this.repositorioEntrega = repositorioEntrega ?? null;
   }
 
-  private static validarEntradaBasicaPedido(dados: IVendaInputDto): void {
-    if (!dados.usuarioUuid) throw new Error('Usuário é obrigatório');
-    if (dados.itens.length === 0) throw new Error('Venda deve possuir ao menos um item');
-    if (dados.valorTotal <= 0) throw new Error('Valor total inválido');
-  }
-
-  private async resolverFretePorCotacao(cotacaoUuid: string): Promise<{ valorFrete: number; cfrId: number }> {
+  /**
+   * Valida uma cotação de frete e retorna o objeto cotação verificado.
+   * Garante que a cotação existe, está no estado CRIADA, não expirou
+   * e não está vinculada a outra venda.
+   */
+  private async validarCotacaoFrete(cotacaoUuid: string) {
     if (!this.repositorioCotacaoFrete) {
       throw new Error('Cotação de frete não suportada nesta configuração');
     }
@@ -47,6 +46,14 @@ export class ServicoVendas {
     if (cot.venId != null) {
       throw new Error('Cotação de frete já vinculada a uma venda');
     }
+    return cot;
+  }
+
+  /**
+   * Resolve frete a partir de uma cotação validada, retornando valor e ID interno.
+   */
+  private async resolverFretePorCotacao(cotacaoUuid: string): Promise<{ valorFrete: number; cfrId: number }> {
+    const cot = await this.validarCotacaoFrete(cotacaoUuid);
     return { valorFrete: cot.valor, cfrId: cot.cfrId };
   }
 
@@ -55,7 +62,7 @@ export class ServicoVendas {
    * RF0033, RF0037
    */
   public async registrarPedidoVenda(dados: IVendaInputDto): Promise<IVenda> {
-    ServicoVendas.validarDadosBasicosVenda(dados);
+    ServicoVendas.validarDadosVenda(dados);
     ServicoVendas.validarParcelamento(dados);
     ServicoVendas.validarPagamentosSplit(dados);
     const cotacaoUuid = typeof dados.cotacaoUuid === 'string' ? dados.cotacaoUuid.trim() : '';
@@ -88,7 +95,10 @@ export class ServicoVendas {
     return venda;
   }
 
-  private static validarDadosBasicosVenda(dados: IVendaInputDto): void {
+  /**
+   * Valida os campos obrigatórios comuns a qualquer operação de venda.
+   */
+  private static validarDadosVenda(dados: IVendaInputDto): void {
     if (!dados.usuarioUuid) throw new Error('Usuário é obrigatório');
     if (dados.itens.length === 0) throw new Error('Venda deve possuir ao menos um item');
     if (dados.valorTotal <= 0) throw new Error('Valor total inválido');
@@ -112,37 +122,6 @@ export class ServicoVendas {
         }
       });
     }
-  }
-
-  private static async processarCotacaoFrete(
-    dados: IVendaInputDto,
-    repositorioCotacaoFrete: IRepositorioCotacaoFrete | null
-  ): Promise<{ valorFreteFinal: number; cfrId: number | undefined }> {
-    let valorFreteFinal = Number(dados.valorFrete);
-    let cfrId: number | undefined;
-
-    const cotacaoUuid = typeof dados.cotacaoUuid === 'string' ? dados.cotacaoUuid.trim() : '';
-
-    if (cotacaoUuid) {
-      if (!repositorioCotacaoFrete) {
-        throw new Error('Cotação de frete não suportada nesta configuração');
-      }
-      const cot = await repositorioCotacaoFrete.obterPorUuid(cotacaoUuid);
-      if (!cot) throw new Error('Cotação de frete não encontrada');
-      if (cot.estado !== EstadosCotacaoFrete.CRIADA) {
-        throw new Error('Cotação de frete inválida ou já utilizada');
-      }
-      if (cot.expiraEm.getTime() < Date.now()) {
-        throw new Error('Cotação de frete expirada');
-      }
-      if (cot.venId != null) {
-        throw new Error('Cotação de frete já vinculada a uma venda');
-      }
-      valorFreteFinal = cot.valor;
-      cfrId = cot.cfrId;
-    }
-
-    return { valorFreteFinal, cfrId };
   }
 
   /**

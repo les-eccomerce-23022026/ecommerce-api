@@ -7,6 +7,7 @@ import { ServicoValidacaoProdutos } from './domain/services/ServicoValidacaoProd
 import { ServicoRecomendacaoRAG } from './domain/services/ServicoRecomendacaoRAG';
 import { ServicoRecomendacaoApplication } from './application/services/ServicoRecomendacaoApplication';
 import { ServicoIndexacaoProdutos } from './application/services/ServicoIndexacaoProdutos';
+import { IAdapterEmbedding } from './domain/interfaces/IAdapterEmbedding';
 import { RepositorioRecomendacaoPostgres } from './infrastructure/repositories/RepositorioRecomendacaoPostgres';
 import { ConexaoPostgres } from '@/shared/infrastructure/database/ConexaoPostgres';
 import { ServicoLivros } from '@/modules/livros/servicoLivros';
@@ -15,6 +16,8 @@ import { RepositorioLivrosBulkInsert } from '@/modules/livros/repositorioLivrosB
 import { middlewareErroIa } from './infrastructure/middleware/erroIa.middleware';
 import { limiteRequisicaoIA } from './infrastructure/middleware/limiteRequisicaoIA.middleware';
 import { logAuditoriaIA } from './infrastructure/middleware/logAuditoriaIA.middleware';
+import { autenticacaoMiddleware } from '@/shared/middlewares/autenticacao.middleware';
+import { adminOnlyMiddleware } from '@/shared/middlewares/autorizacao.middleware';
 
 /**
  * Rotas do módulo de Recomendação de Produtos
@@ -25,7 +28,8 @@ import { logAuditoriaIA } from './infrastructure/middleware/logAuditoriaIA.middl
  */
 
 // Inicializa dependências
-const db = ConexaoPostgres.obterInstancia();
+const conexaoPostgres = ConexaoPostgres.obterInstancia();
+const pool = conexaoPostgres['poolProducao']; // Acessa o pool interno
 const repositorioEmbedding = new RepositorioEmbeddingChromaDB();
 const adapterLangChain = new AdapterLangChainGemini();
 const servicoGeracaoEmbedding = new ServicoGeracaoEmbedding();
@@ -35,11 +39,11 @@ const servicoRecomendacaoRAG = new ServicoRecomendacaoRAG(
   servicoGeracaoEmbedding,
   servicoValidacaoProdutos
 );
-const repositorioRecomendacao = new RepositorioRecomendacaoPostgres(db);
+const repositorioRecomendacao = new RepositorioRecomendacaoPostgres(pool);
 
 // Dependências para indexação de produtos
-const repoLivros = new RepositorioLivrosPostgres(db);
-const bulkInsertLivros = new RepositorioLivrosBulkInsert(db);
+const repoLivros = new RepositorioLivrosPostgres(conexaoPostgres);
+const bulkInsertLivros = new RepositorioLivrosBulkInsert(conexaoPostgres);
 const servicoLivros = new ServicoLivros(repoLivros, bulkInsertLivros);
 const servicoIndexacaoProdutos = new ServicoIndexacaoProdutos(
   servicoLivros,
@@ -55,7 +59,8 @@ const servicoRecomendacao = new ServicoRecomendacaoApplication(
   servicoValidacaoProdutos,
   servicoRecomendacaoRAG,
   adapterLangChain,
-  servicoIndexacaoProdutos
+  servicoIndexacaoProdutos,
+  servicoLivros
 );
 const controladorRecomendacao = new ControladorRecomendacao(servicoRecomendacao);
 
@@ -78,8 +83,9 @@ router.get('/metricas/:periodo', controladorRecomendacao.buscarMetricas);
 router.get('/metricas', controladorRecomendacao.buscarMetricas);
 
 // ── Rotas administrativas ──────────────────────────────────────────────────────
-// TODO: adicionar middleware de autorização de administrador
-router.post('/reindexar', controladorRecomendacao.reindexar);
+// Rota protegida: exige autenticação válida (autenticacaoMiddleware) e papel de
+// administrador (adminOnlyMiddleware) para disparar a reindexação do catálogo.
+router.post('/reindexar', autenticacaoMiddleware, adminOnlyMiddleware, controladorRecomendacao.reindexar);
 
 // ── Utilitários ────────────────────────────────────────────────────────────────
 router.get('/saude', controladorRecomendacao.saude);

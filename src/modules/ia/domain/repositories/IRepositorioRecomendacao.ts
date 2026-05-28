@@ -1,16 +1,25 @@
 import { IContextoRecomendacao } from '../entities/IContextoRecomendacao.entity';
 
 /**
- * Interface de Repositório de Recomendação
- * 
- * Define operações para gerenciar recomendações e métricas de avaliação.
+ * Contrato de repositório para busca do contexto personalizado do cliente.
+ *
+ * Segregado conforme ISP: consumidores que apenas precisam do contexto de
+ * recomendação não dependem das operações de métricas.
  */
-export interface IRepositorioRecomendacao {
+export interface IRepositorioContextoCliente {
   /**
    * Busca o contexto de recomendação de um cliente
    */
   buscarContexto(clienteUuid: string): Promise<IContextoRecomendacao | null>;
+}
 
+/**
+ * Contrato de repositório para persistência e consulta de métricas de recomendação.
+ *
+ * Segregado conforme ISP: consumidores que apenas precisam de métricas
+ * não dependem das operações de contexto de clientes.
+ */
+export interface IRepositorioMetricasRecomendacao {
   /**
    * Salva uma métrica de avaliação de recomendação
    */
@@ -26,6 +35,17 @@ export interface IRepositorioRecomendacao {
    */
   buscarMetricasAgregadas(periodo: PeriodoMetrica): Promise<IMetricasAgregadas>;
 }
+
+/**
+ * Interface de Repositório de Recomendação
+ *
+ * Composição de IRepositorioContextoCliente e IRepositorioMetricasRecomendacao.
+ * Mantida para backward compatibility — implementações e consumidores existentes
+ * continuam funcionando sem nenhuma alteração de assinatura.
+ */
+export interface IRepositorioRecomendacao
+  extends IRepositorioContextoCliente,
+    IRepositorioMetricasRecomendacao {}
 
 export interface IMetricaRecomendacao {
   id: number;

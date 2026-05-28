@@ -1,20 +1,24 @@
 import { Pool } from 'pg';
 import {
-  IRepositorioRecomendacao,
-  IContextoRecomendacao,
+  IRepositorioContextoCliente,
+  IRepositorioMetricasRecomendacao,
   IMetricaRecomendacao,
   ICriarMetricaRecomendacaoDto,
   PeriodoMetrica,
   IMetricasAgregadas,
 } from '../../domain/repositories/IRepositorioRecomendacao';
+import { IContextoRecomendacao } from '../../domain/entities/IContextoRecomendacao.entity';
 import { Logger } from '@/shared/utils/Logger.util';
 
 /**
  * Implementação do Repositório de Recomendação usando PostgreSQL
- * 
- * Responsável por gerenciar contexto de clientes e métricas de recomendação.
+ *
+ * Implementa IRepositorioContextoCliente (contexto do cliente) e
+ * IRepositorioMetricasRecomendacao (métricas de avaliação) de forma segregada,
+ * respeitando o Princípio da Segregação de Interfaces (ISP).
  */
-export class RepositorioRecomendacaoPostgres implements IRepositorioRecomendacao {
+export class RepositorioRecomendacaoPostgres
+  implements IRepositorioContextoCliente, IRepositorioMetricasRecomendacao {
   constructor(private pool: Pool) {}
 
   async buscarContexto(clienteUuid: string): Promise<IContextoRecomendacao | null> {

@@ -8,6 +8,31 @@ import { IProdutoEmbedding } from '../../domain/entities/IProdutoEmbedding.entit
 import { Logger } from '@/shared/utils/Logger.util';
 
 /**
+ * Configurações de recomendação e recuperação de contexto (RAG)
+ * Valores podem ser sobrescritos por variáveis de ambiente
+ *
+ * Exportado para uso em serviços de domínio (ex: ServicoRecomendacaoRAG)
+ * que precisam dos parâmetros de personalização e retrieval.
+ */
+export const CONFIGURACAO_RECOMENDACAO = {
+  // Quantidade de documentos a recuperar por busca semântica
+  quantidadeResultados: parseInt(process.env.RAG_TOP_K || '5', 10),
+
+  // Limiar mínimo de similaridade semântica aceito (0-1)
+  limiarSimilaridade: parseFloat(process.env.RAG_SIMILARITY_THRESHOLD || '0.7'),
+
+  // Multiplicador de busca (recupera mais candidatos para filtrar pelo limiar depois)
+  multiplicadorBusca: parseInt(process.env.RAG_SEARCH_MULTIPLIER || '2', 10),
+
+  // Fatores de personalização por perfil do cliente
+  personalizacao: {
+    boostCategoria: parseFloat(process.env.RAG_CATEGORY_BOOST || '1.2'),
+    boostAutor: parseFloat(process.env.RAG_AUTHOR_BOOST || '1.3'),
+    boostPreco: parseFloat(process.env.RAG_PRICE_BOOST || '1.1'),
+  },
+} as const;
+
+/**
  * Implementação do Repositório de Embeddings usando ChromaDB
  * 
  * Responsável por gerenciar embeddings de produtos no ChromaDB para
@@ -16,17 +41,19 @@ import { Logger } from '@/shared/utils/Logger.util';
 export class RepositorioEmbeddingChromaDB implements IRepositorioEmbedding {
   private cliente: ChromaClient;
   private colecao: Collection | null = null;
-  private readonly NOME_COLECAO = 'produtos_livraria';
+  private readonly nomeColecao = 'produtos_livraria';
 
   constructor() {
     // Inicializa cliente ChromaDB com persistência local
+    // Usa modo HTTP para evitar problemas com path de arquivo
+    const chromaPath = process.env.CHROMADB_PATH || 'http://localhost:8000';
     this.cliente = new ChromaClient({
-      path: process.env.CHROMADB_PATH || './chroma_db',
+      path: chromaPath,
     });
   }
 
   /**
-   * Inicializa a coleção do ChromaDB
+   * Inicializa a coleção do ChromaDB com configuração de embedding function
    */
   private async inicializarColecao(): Promise<Collection> {
     if (this.colecao) {
@@ -36,16 +63,34 @@ export class RepositorioEmbeddingChromaDB implements IRepositorioEmbedding {
     try {
       // Tenta obter coleção existente
       this.colecao = await this.cliente.getCollection({
-        name: this.NOME_COLECAO,
+        name: this.nomeColecao,
       });
       Logger.info('[RepositorioEmbeddingChromaDB] Coleção existente carregada');
-    } catch (erro) {
-      // Se não existir, cria nova
-      this.colecao = await this.cliente.createCollection({
-        name: this.NOME_COLECAO,
-        metadata: { descricao: 'Embeddings de produtos da livraria' },
+      Logger.info('[RepositorioEmbeddingChromaDB] Configurações de recomendação ativas:', {
+        quantidadeResultados: CONFIGURACAO_RECOMENDACAO.quantidadeResultados,
+        limiarSimilaridade: CONFIGURACAO_RECOMENDACAO.limiarSimilaridade,
+        multiplicadorBusca: CONFIGURACAO_RECOMENDACAO.multiplicadorBusca,
+        personalizacao: CONFIGURACAO_RECOMENDACAO.personalizacao,
       });
-      Logger.info('[RepositorioEmbeddingChromaDB] Nova coleção criada');
+    } catch (erro) {
+      // Se não existir, cria nova com configuração de embedding function
+      this.colecao = await this.cliente.createCollection({
+        name: this.nomeColecao,
+        metadata: {
+          descricao: 'Embeddings de produtos da livraria',
+          configuracao_rag: 'v1.0',
+        },
+        // Configuração de embedding function do Gemini
+        // NOTA: ChromaDB HTTP mode não suporta embedding function nativa
+        // Embeddings são gerados externamente via AdapterLangChainGemini
+      });
+      Logger.info('[RepositorioEmbeddingChromaDB] Nova coleção criada com metadata configuracao_rag: v1.0');
+      Logger.info('[RepositorioEmbeddingChromaDB] Configurações de recomendação ativas:', {
+        quantidadeResultados: CONFIGURACAO_RECOMENDACAO.quantidadeResultados,
+        limiarSimilaridade: CONFIGURACAO_RECOMENDACAO.limiarSimilaridade,
+        multiplicadorBusca: CONFIGURACAO_RECOMENDACAO.multiplicadorBusca,
+        personalizacao: CONFIGURACAO_RECOMENDACAO.personalizacao,
+      });
     }
 
     return this.colecao;
@@ -55,20 +100,22 @@ export class RepositorioEmbeddingChromaDB implements IRepositorioEmbedding {
     const colecao = await this.inicializarColecao();
     const uuid = uuidv4();
 
+    const metadadosParaSalvar = {
+      produto_uuid: dados.produtoUuid,
+      titulo: dados.metadados.titulo,
+      autor: dados.metadados.autor,
+      categoria: dados.metadados.categoria,
+      sinopse: dados.metadados.sinopse || '',
+      isbn: dados.metadados.isbn,
+      preco: dados.metadados.preco,
+    };
+
+    Logger.debug(`[RepositorioEmbeddingChromaDB] Salvando embedding para produto ${dados.produtoUuid} com metadados:`, metadadosParaSalvar);
+
     await colecao.add({
       ids: [uuid],
       embeddings: [dados.embedding],
-      metadatas: [
-        {
-          produto_uuid: dados.produtoUuid,
-          titulo: dados.metadados.titulo,
-          autor: dados.metadados.autor,
-          categoria: dados.metadados.categoria,
-          sinopse: dados.metadados.sinopse || '',
-          isbn: dados.metadados.isbn,
-          preco: dados.metadados.preco,
-        },
-      ],
+      metadatas: [metadadosParaSalvar],
     });
 
     return {
@@ -121,20 +168,44 @@ export class RepositorioEmbeddingChromaDB implements IRepositorioEmbedding {
   ): Promise<{ produtoUuid: string; similaridade: number; metadados: any }[]> {
     const colecao = await this.inicializarColecao();
 
+    // Aplica multiplicadorBusca para recuperar mais candidatos e filtrar pelo limiarSimilaridade depois
+    const nResultados = limite * CONFIGURACAO_RECOMENDACAO.multiplicadorBusca;
+
+    Logger.debug(
+      `[RepositorioEmbeddingChromaDB] Buscando similares | quantidadeResultados=${limite} | nResults=${nResultados} (×${CONFIGURACAO_RECOMENDACAO.multiplicadorBusca}) | limiarSimilaridade=${CONFIGURACAO_RECOMENDACAO.limiarSimilaridade}`
+    );
+
     const resultados = await colecao.query({
       queryEmbeddings: [queryEmbedding],
-      nResults: limite,
+      nResults: nResultados,
+      include: ['metadatas', 'distances'], // Inclui explicitamente metadados e distâncias (plural correto)
+    });
+
+    Logger.debug(`[RepositorioEmbeddingChromaDB] Resultados brutos da query:`, {
+      ids: resultados.ids,
+      metadatas: resultados.metadatas,
+      distances: resultados.distances,
     });
 
     if (!resultados.ids[0] || resultados.ids[0].length === 0) {
       return [];
     }
 
-    return resultados.ids[0].map((id, index) => {
-      const metadados = resultados.metadados?.[0]?.[index] as any;
+    // Mapeia todos os resultados convertendo distância → similaridade
+    const todosResultados = resultados.ids[0].map((id, index) => {
+      const metadados = resultados.metadatas?.[0]?.[index] as any;
       const distancia = resultados.distances?.[0]?.[index] || 0;
       // Converte distância para similaridade (1 - distância para cosseno)
       const similaridade = 1 - distancia;
+
+      // Valida se metadados existe antes de acessar
+      if (!metadados) {
+        Logger.error(
+          `[RepositorioEmbeddingChromaDB] Metadados não encontrados para ID ${id}. Metadados completos:`,
+          resultados.metadatas
+        );
+        throw new Error(`Metadados não encontrados para embedding ${id}`);
+      }
 
       return {
         produtoUuid: metadados.produto_uuid,
@@ -149,6 +220,17 @@ export class RepositorioEmbeddingChromaDB implements IRepositorioEmbedding {
         },
       };
     });
+
+    // Filtra pelo limiarSimilaridade — elimina resultados com baixa relevância semântica
+    const resultadosFiltrados = todosResultados.filter(
+      (r) => r.similaridade >= CONFIGURACAO_RECOMENDACAO.limiarSimilaridade
+    );
+
+    Logger.debug(
+      `[RepositorioEmbeddingChromaDB] Após filtro por limiarSimilaridade ${CONFIGURACAO_RECOMENDACAO.limiarSimilaridade}: ${todosResultados.length} → ${resultadosFiltrados.length} resultados`
+    );
+
+    return resultadosFiltrados;
   }
 
   async atualizar(uuid: string, dados: Partial<ICriarProdutoEmbeddingDto>): Promise<IProdutoEmbedding> {
@@ -202,7 +284,7 @@ export class RepositorioEmbeddingChromaDB implements IRepositorioEmbedding {
 
   async limparColecao(): Promise<void> {
     const colecao = await this.inicializarColecao();
-    await this.cliente.deleteCollection({ name: this.NOME_COLECAO });
+    await this.cliente.deleteCollection({ name: this.nomeColecao });
     this.colecao = null;
     Logger.info('[RepositorioEmbeddingChromaDB] Coleção limpa');
   }

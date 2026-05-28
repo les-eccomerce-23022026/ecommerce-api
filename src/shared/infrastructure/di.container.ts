@@ -13,6 +13,10 @@ import { RepositorioTelefoneUsuarioPostgres } from '@/shared/infrastructure/data
 import { RepositorioLojasPostgres } from '@/modules/lojas/repositorioLojasPostgres';
 import { ServicoLojas } from '@/modules/lojas/servicoLojas';
 import { RepositorioVendasPostgres } from '@/modules/vendas/repositories/RepositorioVendasPostgres';
+import { GestaoSenhaCliente } from '@/modules/clientes/gestaoSenhaCliente.service';
+import { GestaoTelefoneCliente } from '@/modules/clientes/gestaoTelefoneCliente.service';
+import { GestaoCartaoCliente } from '@/modules/clientes/gestaoCartaoCliente.service';
+import { GestaoPerfilCliente } from '@/modules/clientes/gestaoPerfilCliente.service';
 
 /**
  * Contêiner de Injeção de Dependências Manual.
@@ -37,6 +41,12 @@ class ContainerDI {
 
   // Serviços
   public static readonly servicoLojas = new ServicoLojas(ContainerDI.repoLojas);
+
+  // Serviços especializados de gestão de cliente
+  public static readonly gestaoSenhaCliente = new GestaoSenhaCliente(ContainerDI.repoUsuarios);
+  public static readonly gestaoTelefoneCliente = new GestaoTelefoneCliente(ContainerDI.repoTelefone);
+  public static readonly gestaoCartaoCliente = new GestaoCartaoCliente(ContainerDI.repoCartoes);
+  public static readonly gestaoPerfilCliente = new GestaoPerfilCliente(ContainerDI.repoPerfil);
 
   public static readonly gestaoIdentidadeCliente = new GestaoIdentidadeCliente(
     ContainerDI.repoUsuarios,

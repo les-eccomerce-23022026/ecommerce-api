@@ -1,33 +1,50 @@
 import { ServicoLivros } from '@/modules/livros/servicoLivros';
-import { RepositorioEmbeddingChromaDB } from '../../infrastructure/repositories/RepositorioEmbeddingChromaDB';
-import { AdapterLangChainGemini } from '../../infrastructure/config/AdapterLangChainGemini';
+import { IRepositorioEmbedding } from '../../domain/repositories/IRepositorioEmbedding';
 import { ServicoGeracaoEmbedding } from '../../domain/services/ServicoGeracaoEmbedding';
+import { IAdapterEmbedding } from '../../domain/interfaces/IAdapterEmbedding';
 import { Logger } from '@/shared/utils/Logger.util';
+import type { ILivroCatalogoDto } from '@/modules/livros/ILivroCatalogo.dto';
+
+/**
+ * Interface para serviço de livros (DIP)
+ */
+export interface IServicoLivros {
+  listarParaAdmin(limite: number): Promise<ILivroCatalogoDto[]>;
+  obterPorUuid(uuid: string): Promise<ILivroCatalogoDto | null>;
+}
 
 /**
  * Serviço de Application para Indexação de Produtos
- * 
+ *
  * Responsável por indexar todos os produtos do catálogo no ChromaDB
- * para busca semântica.
+ * para busca semântica. Utiliza chunking automático via ServicoGeracaoEmbedding
+ * para produtos com sinopses longas, armazenando múltiplos embeddings por
+ * produto quando necessário para melhor cobertura semântica no RAG.
  */
 export class ServicoIndexacaoProdutos {
   constructor(
-    private servicoLivros: ServicoLivros,
-    private repositorioEmbedding: RepositorioEmbeddingChromaDB,
-    private adapterLangChain: AdapterLangChainGemini,
+    private servicoLivros: IServicoLivros,
+    private repositorioEmbedding: IRepositorioEmbedding,
+    private adapterEmbedding: IAdapterEmbedding,
     private servicoGeracaoEmbedding: ServicoGeracaoEmbedding
   ) {}
 
   /**
-   * Indexa todos os produtos do catálogo no ChromaDB
+   * Indexa todos os produtos do catálogo no ChromaDB.
+   *
+   * Para cada livro:
+   * - Gera chunks do texto (1 chunk para sinopses curtas, N chunks para longas)
+   * - Gera embedding individual por chunk via Gemini
+   * - Armazena cada embedding com o mesmo produtoUuid no ChromaDB
+   *
+   * @returns Total de produtos indexados com sucesso (independente do nº de chunks)
    */
   async indexarCatalogo(): Promise<number> {
     const inicio = Date.now();
 
     try {
-      Logger.info('[ServicoIndexacaoProdutos] Iniciando indexação do catálogo');
+      Logger.info('[ServicoIndexacaoProdutos] Iniciando indexação do catálogo com chunking');
 
-      // Busca todos os livros do catálogo
       const livros = await this.servicoLivros.listarParaAdmin(1000);
       Logger.info(`[ServicoIndexacaoProdutos] ${livros.length} livros encontrados`);
 
@@ -36,48 +53,31 @@ export class ServicoIndexacaoProdutos {
         return 0;
       }
 
-      // Prepara dados para geração de embeddings
-      const textosParaEmbedding = livros.map((livro) =>
-        this.servicoGeracaoEmbedding.gerarTextoProduto({
-          titulo: livro.titulo,
-          autor: livro.autor,
-          categoria: livro.categoria,
-          sinopse: livro.sinopse,
-          isbn: livro.isbn,
-        })
-      );
-
-      // Gera embeddings em lote
-      Logger.info('[ServicoIndexacaoProdutos] Gerando embeddings...');
-      const embeddings = await this.adapterLangChain.gerarEmbeddingsLote(textosParaEmbedding);
-      Logger.info(`[ServicoIndexacaoProdutos] ${embeddings.length} embeddings gerados`);
-
-      // Salva embeddings no ChromaDB
       let indexados = 0;
-      for (let i = 0; i < livros.length; i++) {
+      let totalChunksGerados = 0;
+
+      for (const livro of livros) {
         try {
-          await this.repositorioEmbedding.criar({
-            produtoUuid: livros[i].uuid,
-            embedding: embeddings[i],
-            metadados: {
-              titulo: livros[i].titulo,
-              autor: livros[i].autor,
-              categoria: livros[i].categoria,
-              sinopse: livros[i].sinopse,
-              isbn: livros[i].isbn,
-              preco: livros[i].preco,
-            },
-          });
+          const chunksGerados = await this.indexarLivro(livro);
+
+          Logger.debug(
+            `[ServicoIndexacaoProdutos] "${livro.titulo}": ${chunksGerados} chunk(s)`
+          );
+
+          totalChunksGerados += chunksGerados;
           indexados++;
         } catch (erro) {
           const mensagem = erro instanceof Error ? erro.message : String(erro);
-          Logger.error(`[ServicoIndexacaoProdutos] Erro ao indexar livro ${livros[i].uuid}: ${mensagem}`);
+          Logger.error(
+            `[ServicoIndexacaoProdutos] Erro ao indexar livro ${livro.uuid}: ${mensagem}`
+          );
         }
       }
 
       const tempoExecucao = Date.now() - inicio;
       Logger.info(
-        `[ServicoIndexacaoProdutos] Indexação concluída: ${indexados}/${livros.length} livros em ${tempoExecucao}ms`
+        `[ServicoIndexacaoProdutos] Indexação concluída: ${indexados}/${livros.length} livros` +
+          ` | ${totalChunksGerados} embeddings gerados | ${tempoExecucao}ms`
       );
 
       return indexados;
@@ -89,7 +89,10 @@ export class ServicoIndexacaoProdutos {
   }
 
   /**
-   * Indexa um único produto (usado após criação/atualização)
+   * Indexa um único produto (usado após criação/atualização).
+   * Aplica chunking automaticamente se a sinopse for longa.
+   *
+   * @param produtoUuid - UUID público do produto a indexar
    */
   async indexarProduto(produtoUuid: string): Promise<void> {
     try {
@@ -98,19 +101,72 @@ export class ServicoIndexacaoProdutos {
         throw new Error(`Livro ${produtoUuid} não encontrado`);
       }
 
-      // Gera texto para embedding
-      const texto = this.servicoGeracaoEmbedding.gerarTextoProduto({
-        titulo: livro.titulo,
-        autor: livro.autor,
-        categoria: livro.categoria,
-        sinopse: livro.sinopse,
-        isbn: livro.isbn,
-      });
+      const chunksGerados = await this.indexarLivro(livro);
 
-      // Gera embedding
-      const embedding = await this.adapterLangChain.gerarEmbedding(texto);
+      Logger.info(
+        `[ServicoIndexacaoProdutos] Livro ${produtoUuid} indexado com sucesso` +
+          ` (${chunksGerados} chunk(s))`
+      );
+    } catch (erro) {
+      const mensagem = erro instanceof Error ? erro.message : String(erro);
+      Logger.error(
+        `[ServicoIndexacaoProdutos] Erro ao indexar produto ${produtoUuid}: ${mensagem}`
+      );
+      throw erro;
+    }
+  }
 
-      // Salva no ChromaDB
+  /**
+   * Remove um produto do índice.
+   *
+   * Nota: remove apenas o primeiro embedding encontrado pelo produtoUuid.
+   * Em produtos com múltiplos chunks, eventuais chunks órfãos serão removidos
+   * em operação de reindexação completa (limparColecao + indexarCatalogo).
+   *
+   * @param produtoUuid - UUID público do produto a remover
+   */
+  async removerProduto(produtoUuid: string): Promise<void> {
+    try {
+      const embedding = await this.repositorioEmbedding.buscarPorProdutoUuid(produtoUuid);
+      if (embedding) {
+        await this.repositorioEmbedding.remover(embedding.uuid);
+        Logger.info(`[ServicoIndexacaoProdutos] Livro ${produtoUuid} removido do índice`);
+      }
+    } catch (erro) {
+      const mensagem = erro instanceof Error ? erro.message : String(erro);
+      Logger.error(
+        `[ServicoIndexacaoProdutos] Erro ao remover produto ${produtoUuid}: ${mensagem}`
+      );
+      throw erro;
+    }
+  }
+
+  /**
+   * Gera e armazena embeddings de um livro no ChromaDB.
+   *
+   * Para sinopses longas, aplica chunking automático (via ServicoGeracaoEmbedding)
+   * e armazena um embedding por chunk, todos associados ao mesmo produtoUuid.
+   * Método privado reutilizado por indexarCatalogo() e indexarProduto().
+   *
+   * @param livro - Dados do livro a indexar
+   * @returns Número de chunks/embeddings gerados para o livro
+   */
+  private async indexarLivro(livro: ILivroCatalogoDto): Promise<number> {
+    const metadados = {
+      titulo: livro.titulo,
+      autor: livro.autor,
+      categoria: livro.categoria,
+      sinopse: livro.sinopse,
+      isbn: livro.isbn,
+    };
+
+    // Obtém chunks — 1 para sinopses curtas, N para longas (chunking automático)
+    const chunks = this.servicoGeracaoEmbedding.gerarChunksDoProduto(metadados);
+
+    // Gera e armazena embedding para cada chunk individualmente
+    for (let indiceChunk = 0; indiceChunk < chunks.length; indiceChunk++) {
+      const embedding = await this.adapterEmbedding.gerarEmbedding(chunks[indiceChunk]);
+
       await this.repositorioEmbedding.criar({
         produtoUuid: livro.uuid,
         embedding,
@@ -123,29 +179,8 @@ export class ServicoIndexacaoProdutos {
           preco: livro.preco,
         },
       });
-
-      Logger.info(`[ServicoIndexacaoProdutos] Livro ${produtoUuid} indexado com sucesso`);
-    } catch (erro) {
-      const mensagem = erro instanceof Error ? erro.message : String(erro);
-      Logger.error(`[ServicoIndexacaoProdutos] Erro ao indexar produto ${produtoUuid}: ${mensagem}`);
-      throw erro;
     }
-  }
 
-  /**
-   * Remove um produto do índice
-   */
-  async removerProduto(produtoUuid: string): Promise<void> {
-    try {
-      const embedding = await this.repositorioEmbedding.buscarPorProdutoUuid(produtoUuid);
-      if (embedding) {
-        await this.repositorioEmbedding.remover(embedding.uuid);
-        Logger.info(`[ServicoIndexacaoProdutos] Livro ${produtoUuid} removido do índice`);
-      }
-    } catch (erro) {
-      const mensagem = erro instanceof Error ? erro.message : String(erro);
-      Logger.error(`[ServicoIndexacaoProdutos] Erro ao remover produto ${produtoUuid}: ${mensagem}`);
-      throw erro;
-    }
+    return chunks.length;
   }
 }
