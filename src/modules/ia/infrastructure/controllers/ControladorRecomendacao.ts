@@ -10,6 +10,15 @@ import {
   IReindexarRequestDTO,
   IReindexarResponseDTO,
 } from '../../application/dtos/IRecomendacaoDTO';
+import { PeriodoMetrica } from '../../domain/repositories/IRepositorioRecomendacao';
+
+/** Períodos válidos para filtro de métricas de recomendação */
+const PERIODOS_VALIDOS: ReadonlySet<string> = new Set<PeriodoMetrica>([
+  'hoje',
+  'semana',
+  'mes',
+  'todos',
+]);
 
 /**
  * Controller de Recomendação de Produtos com IA
@@ -103,6 +112,92 @@ export class ControladorRecomendacao {
     } catch (erro) {
       const msg = RespostaPadrao.obterMensagemErro(erro, 'Erro ao reindexar catálogo');
       Logger.error(`[ControladorRecomendacao.reindexar] Erro: ${msg}`, erro instanceof Error ? erro.stack : String(erro));
+      RespostaPadrao.enviarErro(res, 500, msg);
+    }
+  };
+
+  /**
+   * Endpoint GET /api/ia/metricas
+   * Endpoint GET /api/ia/metricas/:periodo
+   *
+   * Retorna o histórico detalhado de métricas de recomendação registradas no período.
+   * O parâmetro :periodo é opcional; quando ausente, retorna todos os registros.
+   * Valores aceitos: hoje, semana, mes, todos.
+   */
+  buscarMetricas = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const periodoParam = (req.params.periodo ?? 'todos').toLowerCase();
+
+      if (!PERIODOS_VALIDOS.has(periodoParam)) {
+        RespostaPadrao.enviarErro(
+          res,
+          400,
+          `Período inválido. Valores aceitos: ${Array.from(PERIODOS_VALIDOS).join(', ')}`,
+        );
+        return;
+      }
+
+      const periodo = periodoParam as PeriodoMetrica;
+      const metricas = await this.servicoRecomendacao.buscarMetricas(periodo);
+
+      // Omite o id interno para não expor BIGSERIAL conforme regra U4
+      const metricasPublicas = metricas.map((m) => ({
+        clienteUuid: m.clienteUuid,
+        query: m.query,
+        produtosRecomendados: m.produtosRecomendados,
+        tempoRespostaMs: m.tempoRespostaMs,
+        precisao: m.precisao,
+        recall: m.recall,
+        f1Score: m.f1Score,
+        relevanciaSemantica: m.relevanciaSemantica,
+        dataCriacao: m.dataCriacao,
+      }));
+
+      RespostaPadrao.enviarSucesso(res, 200, {
+        periodo,
+        total: metricasPublicas.length,
+        metricas: metricasPublicas,
+      });
+    } catch (erro) {
+      const msg = RespostaPadrao.obterMensagemErro(erro, 'Erro ao buscar métricas de recomendação');
+      Logger.error(
+        `[ControladorRecomendacao.buscarMetricas] Erro: ${msg}`,
+        erro instanceof Error ? erro.stack : String(erro),
+      );
+      RespostaPadrao.enviarErro(res, 500, msg);
+    }
+  };
+
+  /**
+   * Endpoint GET /api/ia/metricas/agregadas
+   *
+   * Retorna médias e totais consolidados das métricas de recomendação.
+   * Aceita query param opcional ?periodo= (hoje, semana, mes, todos).
+   * Quando omitido, consolida todos os registros históricos.
+   */
+  buscarMetricasAgregadas = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const periodoParam = ((req.query.periodo as string) ?? 'todos').toLowerCase();
+
+      if (!PERIODOS_VALIDOS.has(periodoParam)) {
+        RespostaPadrao.enviarErro(
+          res,
+          400,
+          `Período inválido. Valores aceitos: ${Array.from(PERIODOS_VALIDOS).join(', ')}`,
+        );
+        return;
+      }
+
+      const periodo = periodoParam as PeriodoMetrica;
+      const agregadas = await this.servicoRecomendacao.buscarMetricasAgregadas(periodo);
+
+      RespostaPadrao.enviarSucesso(res, 200, agregadas);
+    } catch (erro) {
+      const msg = RespostaPadrao.obterMensagemErro(erro, 'Erro ao buscar métricas agregadas de recomendação');
+      Logger.error(
+        `[ControladorRecomendacao.buscarMetricasAgregadas] Erro: ${msg}`,
+        erro instanceof Error ? erro.stack : String(erro),
+      );
       RespostaPadrao.enviarErro(res, 500, msg);
     }
   };

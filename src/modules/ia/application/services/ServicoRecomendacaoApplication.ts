@@ -1,5 +1,10 @@
 import { IRepositorioEmbedding } from '../../domain/repositories/IRepositorioEmbedding';
-import { IRepositorioRecomendacao } from '../../domain/repositories/IRepositorioRecomendacao';
+import {
+  IRepositorioRecomendacao,
+  IMetricaRecomendacao,
+  IMetricasAgregadas,
+  PeriodoMetrica,
+} from '../../domain/repositories/IRepositorioRecomendacao';
 import { ServicoGeracaoEmbedding } from '../../domain/services/ServicoGeracaoEmbedding';
 import { ServicoValidacaoProdutos } from '../../domain/services/ServicoValidacaoProdutos';
 import { ServicoRecomendacaoRAG } from '../../domain/services/ServicoRecomendacaoRAG';
@@ -155,6 +160,36 @@ export class ServicoRecomendacaoApplication {
     );
 
     return `Livros encontrados:\n${linhas.join('\n')}`;
+  }
+
+  /**
+   * Busca métricas de recomendação registradas no período informado.
+   *
+   * @param periodo Intervalo de tempo desejado: 'hoje', 'semana', 'mes' ou 'todos'
+   */
+  async buscarMetricas(periodo: PeriodoMetrica): Promise<IMetricaRecomendacao[]> {
+    try {
+      return await this.repositorioRecomendacao.buscarMetricas(periodo);
+    } catch (erro) {
+      const mensagem = erro instanceof Error ? erro.message : String(erro);
+      Logger.error(`[ServicoRecomendacaoApplication] Erro ao buscar métricas: ${mensagem}`);
+      throw erro;
+    }
+  }
+
+  /**
+   * Busca métricas agregadas (médias e totais) de recomendação no período informado.
+   *
+   * @param periodo Intervalo de tempo desejado: 'hoje', 'semana', 'mes' ou 'todos'
+   */
+  async buscarMetricasAgregadas(periodo: PeriodoMetrica): Promise<IMetricasAgregadas> {
+    try {
+      return await this.repositorioRecomendacao.buscarMetricasAgregadas(periodo);
+    } catch (erro) {
+      const mensagem = erro instanceof Error ? erro.message : String(erro);
+      Logger.error(`[ServicoRecomendacaoApplication] Erro ao buscar métricas agregadas: ${mensagem}`);
+      throw erro;
+    }
   }
 
   /**
