@@ -325,4 +325,15 @@ export class RepositorioVendasPostgres implements IRepositorioVendas {
     
     return mapa;
   }
+
+  public async obterPrecoVendaPorLivroUuid(livroUuid: string): Promise<number | null> {
+    const rows = await this.db.executar<{ preco: number }>(
+      VENDAS_QUERIES.SELECT_PRECO_VENDA_POR_LIVRO_UUID,
+      [livroUuid],
+    );
+    if (rows.length === 0) {
+      return null;
+    }
+    return Number(rows[0].preco);
+  }
 }

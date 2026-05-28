@@ -13,8 +13,17 @@ export const limiteTentativasLogin = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutos
   max: 5, // Limite de 5 tentativas
   skip: (req: Request) => {
-    // Desabilita em ambiente de teste ou quando usando banco de teste (E2E)
+    if (process.env.FORCAR_RATE_LIMIT_LOGIN_TESTE === 'true') {
+      return false;
+    }
     return process.env.NODE_ENV === 'test' || req.headers['x-use-test-db'] === 'true';
+  },
+  keyGenerator: (req: Request, res: Response) => {
+    const chaveTeste = req.headers['x-test-rate-limit-key'];
+    if (process.env.FORCAR_RATE_LIMIT_LOGIN_TESTE === 'true' && typeof chaveTeste === 'string' && chaveTeste.length > 0) {
+      return chaveTeste;
+    }
+    return ipKeyGenerator(req, res);
   },
   message: {
     sucesso: false,
@@ -22,8 +31,6 @@ export const limiteTentativasLogin = rateLimit({
   },
   standardHeaders: true, // Retorna informações de rate limit nos headers (RateLimit-*)
   legacyHeaders: false, // Desabilita headers legados (X-RateLimit-*)
-  // Usa IP real do cliente com suporte IPv6 correto usando helper do express-rate-limit
-  keyGenerator: ipKeyGenerator,
   // Handler personalizado para log de tentativas bloqueadas
   handler: (req: Request, res: Response, next: NextFunction, options: any) => {
     console.warn(`[Rate Limit] Login bloqueado para IP: ${req.ip}`);

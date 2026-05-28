@@ -55,4 +55,7 @@ export interface IRepositorioVendas {
    * Retorna um mapa com loj_id como chave e contagem como valor.
    */
   contarVendasPorStatusELoja(status: string[]): Promise<Map<number, number>>;
+
+  /** Preço de venda ativo no catálogo para validação de integridade (U5). */
+  obterPrecoVendaPorLivroUuid(livroUuid: string): Promise<number | null>;
 }

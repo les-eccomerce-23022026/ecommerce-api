@@ -8,53 +8,8 @@
  * RN-IA-002: Produtos retornados pela IA devem existir no catálogo.
  */
 
-// Funções mock declaradas ANTES dos jest.mock (prefixo 'mock' isenta do hoisting)
-const mockGerarEmbedding = jest.fn().mockResolvedValue([0.1, 0.2, 0.3, 0.4, 0.5]);
-const mockGerarEmbeddingsLote = jest.fn().mockResolvedValue([[0.1, 0.2, 0.3, 0.4, 0.5]]);
-const mockGerarRespostaChat = jest.fn().mockResolvedValue(
-  'Com base no catálogo da nossa livraria, recomendo os seguintes títulos disponíveis em estoque.'
-);
-const mockValidarConexao = jest.fn().mockResolvedValue(true);
-
-const mockCriarEmbedding = jest.fn().mockResolvedValue({
-  id: 0,
-  uuid: 'embed-uuid-padrao',
-  produtoUuid: 'prod-uuid-padrao',
-  embedding: [0.1, 0.2, 0.3],
-  metadados: {},
-  criadoEm: new Date(),
-  atualizadoEm: new Date(),
-});
-const mockBuscarPorProdutoUuid = jest.fn().mockResolvedValue(null);
-const mockBuscarSimilares = jest.fn().mockResolvedValue([]);
-const mockAtualizarEmbedding = jest.fn().mockResolvedValue({});
-const mockRemoverEmbedding = jest.fn().mockResolvedValue(undefined);
-const mockIndexarCatalogo = jest.fn().mockResolvedValue(0);
-const mockLimparColecao = jest.fn().mockResolvedValue(undefined);
-const mockVerificarConexaoChroma = jest.fn().mockResolvedValue(true);
-
-// Mocks dos módulos externos
-jest.mock('@/modules/ia/infrastructure/config/AdapterLangChainGemini', () => ({
-  AdapterLangChainGemini: jest.fn().mockImplementation(() => ({
-    gerarEmbedding: mockGerarEmbedding,
-    gerarEmbeddingsLote: mockGerarEmbeddingsLote,
-    gerarRespostaChat: mockGerarRespostaChat,
-    validarConexao: mockValidarConexao,
-  })),
-}));
-
-jest.mock('@/modules/ia/infrastructure/repositories/RepositorioEmbeddingChromaDB', () => ({
-  RepositorioEmbeddingChromaDB: jest.fn().mockImplementation(() => ({
-    criar: mockCriarEmbedding,
-    buscarPorProdutoUuid: mockBuscarPorProdutoUuid,
-    buscarSimilares: mockBuscarSimilares,
-    atualizar: mockAtualizarEmbedding,
-    remover: mockRemoverEmbedding,
-    indexarCatalogo: mockIndexarCatalogo,
-    limparColecao: mockLimparColecao,
-    verificarConexao: mockVerificarConexaoChroma,
-  })),
-}));
+import '@/tests/helpers/setupMocksIA.util';
+import { mockBuscarSimilares } from '@/tests/helpers/setupMocksIA.util';
 
 import request from 'supertest';
 import { configurarTesteIntegracao } from '@/tests/helpers/setup-integracao.util';

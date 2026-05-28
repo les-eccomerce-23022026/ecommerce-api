@@ -8,53 +8,12 @@
  * RN-IA-002: Chat deve sempre incluir contexto do catálogo da livraria.
  */
 
-// Funções mock declaradas ANTES dos jest.mock (prefixo 'mock' isenta do hoisting)
-const mockGerarEmbedding = jest.fn().mockResolvedValue([0.1, 0.2, 0.3, 0.4, 0.5]);
-const mockGerarEmbeddingsLote = jest.fn().mockResolvedValue([[0.1, 0.2, 0.3, 0.4, 0.5]]);
-const mockGerarRespostaChat = jest.fn().mockResolvedValue(
-  'Com base nos livros disponíveis em nossa livraria, sugiro...'
-);
-const mockValidarConexao = jest.fn().mockResolvedValue(true);
-
-const mockCriarEmbedding = jest.fn().mockResolvedValue({
-  id: 0,
-  uuid: 'embed-uuid-padrao',
-  produtoUuid: 'prod-uuid-padrao',
-  embedding: [0.1, 0.2, 0.3],
-  metadados: {},
-  criadoEm: new Date(),
-  atualizadoEm: new Date(),
-});
-const mockBuscarPorProdutoUuid = jest.fn().mockResolvedValue(null);
-const mockBuscarSimilares = jest.fn().mockResolvedValue([]);
-const mockAtualizarEmbedding = jest.fn().mockResolvedValue({});
-const mockRemoverEmbedding = jest.fn().mockResolvedValue(undefined);
-const mockIndexarCatalogo = jest.fn().mockResolvedValue(0);
-const mockLimparColecao = jest.fn().mockResolvedValue(undefined);
-const mockVerificarConexaoChroma = jest.fn().mockResolvedValue(true);
-
-// Mocks dos módulos externos
-jest.mock('@/modules/ia/infrastructure/config/AdapterLangChainGemini', () => ({
-  AdapterLangChainGemini: jest.fn().mockImplementation(() => ({
-    gerarEmbedding: mockGerarEmbedding,
-    gerarEmbeddingsLote: mockGerarEmbeddingsLote,
-    gerarRespostaChat: mockGerarRespostaChat,
-    validarConexao: mockValidarConexao,
-  })),
-}));
-
-jest.mock('@/modules/ia/infrastructure/repositories/RepositorioEmbeddingChromaDB', () => ({
-  RepositorioEmbeddingChromaDB: jest.fn().mockImplementation(() => ({
-    criar: mockCriarEmbedding,
-    buscarPorProdutoUuid: mockBuscarPorProdutoUuid,
-    buscarSimilares: mockBuscarSimilares,
-    atualizar: mockAtualizarEmbedding,
-    remover: mockRemoverEmbedding,
-    indexarCatalogo: mockIndexarCatalogo,
-    limparColecao: mockLimparColecao,
-    verificarConexao: mockVerificarConexaoChroma,
-  })),
-}));
+import '@/tests/helpers/setupMocksIA.util';
+import {
+  mockBuscarSimilares,
+  mockGerarEmbedding,
+  mockGerarRespostaChat,
+} from '@/tests/helpers/setupMocksIA.util';
 
 import request from 'supertest';
 import { configurarTesteIntegracao } from '@/tests/helpers/setup-integracao.util';
@@ -113,15 +72,14 @@ describe('[RF-IA-02] Integração - Chat com IA (POST /api/ia/chat)', () => {
       expect(resposta.body.sucesso).toBe(false);
     });
 
-    it('[RN-IA-002] deve aceitar mensagem com 1001 caracteres (limite não implementado no controller)', async () => {
-      // Nota: validação de tamanho máximo ainda não implementada no controller.
-      // Quando implementada, deve retornar 400. Atualmente retorna 200.
+    it('[RN-IA-002] deve retornar 400 quando mensagem excede 1000 caracteres', async () => {
       const mensagemLonga = 'A'.repeat(1001);
 
       const resposta = await postIaChat(contexto.app, tokenCliente)
         .send({ mensagem: mensagemLonga });
 
-      expect([200, 400]).toContain(resposta.status);
+      expect(resposta.status).toBe(400);
+      expect(resposta.body.sucesso).toBe(false);
     });
 
     it('[RN-IA-002] deve retornar 400 quando historico não é um array', async () => {
@@ -143,7 +101,7 @@ describe('[RF-IA-02] Integração - Chat com IA (POST /api/ia/chat)', () => {
           historico: [{ content: 'anterior sem role' }],
         });
 
-      expect([200, 400]).toContain(resposta.status);
+      expect(resposta.status).toBe(200);
     });
 
     it('[RN-IA-002] deve aceitar item com role inválido no histórico (validação não implementada)', async () => {
@@ -155,7 +113,7 @@ describe('[RF-IA-02] Integração - Chat com IA (POST /api/ia/chat)', () => {
           historico: [{ role: 'system', content: 'conteúdo com role não reconhecido' }],
         });
 
-      expect([200, 400]).toContain(resposta.status);
+      expect(resposta.status).toBe(200);
     });
   });
 

@@ -17,6 +17,7 @@ describe('Integração — Vendas / pedido do cliente', () => {
   let app: Application;
   let tokenCliente: string;
   let livroUuid: string;
+  let precoVendaLivro: number;
 
   beforeAll(async () => {
     app = contexto.app;
@@ -24,9 +25,9 @@ describe('Integração — Vendas / pedido do cliente', () => {
   });
 
   beforeEach(async () => {
-    // Criar livro dinamicamente para isolamento do teste (escopo já iniciado no beforeEach)
     const livro = await garantirLivroComEstoqueParaCarrinho(contexto.db!);
     livroUuid = livro.livUuid;
+    precoVendaLivro = livro.precoVenda;
   });
 
   let tokenClienteB: string;
@@ -38,7 +39,7 @@ describe('Integração — Vendas / pedido do cliente', () => {
   describe('POST /api/vendas', () => {
     describe('cenários felizes', () => {
       it('[RF0033][RF0037][RN0038] cria pedido com status EM PROCESSAMENTO e totais coerentes', async () => {
-        const body = payloadPedidoValido(livroUuid, { precoUnitario: 50, quantidade: 1, valorFrete: 10 });
+        const body = payloadPedidoValido(livroUuid, { precoUnitario: precoVendaLivro, quantidade: 1, valorFrete: 10 });
 
         const res = await request(app)
           .post('/api/vendas')
@@ -54,7 +55,7 @@ describe('Integração — Vendas / pedido do cliente', () => {
       });
 
       it('[RF0025] permite consultar o mesmo pedido em GET /vendas/:uuid', async () => {
-        const body = payloadPedidoValido(livroUuid, { precoUnitario: 30, quantidade: 2, valorFrete: 5 });
+        const body = payloadPedidoValido(livroUuid, { precoUnitario: precoVendaLivro, quantidade: 2, valorFrete: 5 });
         const criado = await request(app)
           .post('/api/vendas')
           .set('Authorization', `Bearer ${tokenCliente}`)
@@ -100,7 +101,7 @@ describe('Integração — Vendas / pedido do cliente', () => {
           .post('/api/vendas')
           .set('Authorization', `Bearer ${tokenCliente}`)
           .send({
-            itens: [{ livroUuid, quantidade: 1, precoUnitario: 10 }],
+            itens: [{ livroUuid, quantidade: 1, precoUnitario: precoVendaLivro }],
             valorTotalItens: 10,
             valorFrete: 0,
             valorTotal: 0,
@@ -114,7 +115,7 @@ describe('Integração — Vendas / pedido do cliente', () => {
         const res = await request(app)
           .post('/api/vendas')
           .set('Authorization', `Bearer ${tokenCliente}`)
-          .send(payloadPedidoValido(livroUuid, { precoUnitario: 50, quantidade: 1, valorFrete: 10, parcelas: 2 }));
+          .send(payloadPedidoValido(livroUuid, { precoUnitario: precoVendaLivro, quantidade: 1, valorFrete: 10, parcelas: 2 }));
 
         expect(res.status).toBe(400);
         expect(res.body.erro).toMatch(/RN0069/i);
@@ -125,7 +126,7 @@ describe('Integração — Vendas / pedido do cliente', () => {
           .post('/api/vendas')
           .set('Authorization', `Bearer ${tokenCliente}`)
           .send({
-            ...payloadPedidoValido(livroUuid, { precoUnitario: 50, quantidade: 1, valorFrete: 10 }),
+            ...payloadPedidoValido(livroUuid, { precoUnitario: precoVendaLivro, quantidade: 1, valorFrete: 10 }),
             pagamentos: [
               { tipo: 'cartao', valor: 55 },
               { tipo: 'cartao', valor: 5 }, // Invalida RN0034 (mínimo 10)
@@ -144,7 +145,7 @@ describe('Integração — Vendas / pedido do cliente', () => {
       const criado = await request(app)
         .post('/api/vendas')
         .set('Authorization', `Bearer ${tokenCliente}`)
-        .send(payloadPedidoValido(livroUuid, { precoUnitario: 20, quantidade: 1, valorFrete: 5 }));
+        .send(payloadPedidoValido(livroUuid, { precoUnitario: precoVendaLivro, quantidade: 1, valorFrete: 5 }));
 
       expect(criado.status).toBe(201);
       const vendaUuid = criado.body.id as string;
@@ -182,7 +183,7 @@ describe('Integração — Vendas / pedido do cliente', () => {
       await request(app)
         .post('/api/vendas')
         .set('Authorization', `Bearer ${tokenCliente}`)
-        .send(payloadPedidoValido(livroUuid, { precoUnitario: 40, quantidade: 1, valorFrete: 5 }));
+        .send(payloadPedidoValido(livroUuid, { precoUnitario: precoVendaLivro, quantidade: 1, valorFrete: 5 }));
 
       const res = await request(app)
         .get('/api/minhas-vendas')
@@ -219,7 +220,7 @@ describe('Integração — Vendas / pedido do cliente', () => {
       const resVenda = await request(app)
         .post('/api/vendas')
         .set('Authorization', `Bearer ${tokenCliente}`)
-        .send(payloadPedidoValido(livroUuid, { precoUnitario: 50, quantidade: quantidadeVenda, valorFrete: 10 }));
+        .send(payloadPedidoValido(livroUuid, { precoUnitario: precoVendaLivro, quantidade: quantidadeVenda, valorFrete: 10 }));
 
       expect(resVenda.status).toBe(201);
 

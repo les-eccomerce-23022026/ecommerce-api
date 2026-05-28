@@ -81,17 +81,21 @@ export class ServicoCartoes {
   }
 
   /**
-   * Atualiza um cartão existente.
+   * Atualiza um cartão existente do usuário autenticado.
    */
-  async atualizarCartao(uuid: string, dados: IAtualizarCartaoDto): Promise<ICartaoUsuario | null> {
+  async atualizarCartao(
+    idUsuario: number,
+    uuid: string,
+    dados: IAtualizarCartaoDto,
+  ): Promise<ICartaoUsuario | null> {
     const cartaoExistente = await this.repositorioCartoes.buscarPorUuid(uuid);
-    if (!cartaoExistente) {
+    if (!cartaoExistente || cartaoExistente.idUsuario !== idUsuario) {
       throw new Error('Cartão não encontrado.');
     }
 
     // Se estiver definindo como principal, remove dos outros
     if (dados.principal) {
-      await this.repositorioCartoes.definirComoPrincipal(uuid, cartaoExistente.idUsuario);
+      await this.repositorioCartoes.definirComoPrincipal(uuid, idUsuario);
     }
 
     const payloadRepositorio: IAtualizarCartaoDto & { idBandeira?: number } = { ...dados };
@@ -110,9 +114,14 @@ export class ServicoCartoes {
   }
 
   /**
-   * Remove um cartão.
+   * Remove um cartão do usuário autenticado.
    */
-  async removerCartao(uuid: string): Promise<void> {
+  async removerCartao(idUsuario: number, uuid: string): Promise<void> {
+    const cartaoExistente = await this.repositorioCartoes.buscarPorUuid(uuid);
+    if (!cartaoExistente || cartaoExistente.idUsuario !== idUsuario) {
+      throw new Error('Cartão não encontrado.');
+    }
+
     const removido = await this.repositorioCartoes.excluir(uuid);
     if (!removido) {
       throw new Error('Cartão não encontrado.');

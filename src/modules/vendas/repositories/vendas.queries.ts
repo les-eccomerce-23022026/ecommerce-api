@@ -4,6 +4,14 @@
  */
 
 export const VENDAS_QUERIES = {
+  SELECT_PRECO_VENDA_POR_LIVRO_UUID: `
+    SELECT e.etq_preco_venda::float AS preco
+    FROM livraria_comercial.livros l
+    INNER JOIN livraria_comercial.estoques e ON e.liv_id = l.liv_id
+    WHERE l.liv_uuid = $1 AND l.liv_ativo = TRUE AND e.etq_ativo = TRUE
+    LIMIT 1
+  `,
+
   SELECT_USUARIO_POR_UUID: 'SELECT usu_id FROM livraria_gestao.usuarios WHERE usu_uuid = $1',
   
   SELECT_STATUS_POR_DESCRICAO: 'SELECT stv_id FROM livraria_comercial.status_venda WHERE stv_descricao = $1',

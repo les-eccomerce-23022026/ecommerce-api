@@ -15,58 +15,12 @@
  * - Cliente 403: obterTokenCliente + gerarCpfValidoUnico (não POST /auth/registrar na suíte).
  */
 
-// Funções mock declaradas ANTES dos jest.mock (prefixo 'mock' isenta do hoisting)
-const mockGerarEmbedding = jest.fn().mockResolvedValue([0.1, 0.2, 0.3, 0.4, 0.5]);
-const mockGerarEmbeddingsLote = jest.fn().mockResolvedValue([[0.1, 0.2, 0.3, 0.4, 0.5]]);
-const mockGerarRespostaChat = jest.fn().mockResolvedValue('Resposta de chat simulada.');
-const mockValidarConexao = jest.fn().mockResolvedValue(true);
-
-const mockCriarEmbedding = jest.fn().mockResolvedValue({
-  id: 0,
-  uuid: 'embed-uuid-padrao',
-  produtoUuid: 'prod-uuid-padrao',
-  embedding: [0.1, 0.2, 0.3],
-  metadados: {},
-  criadoEm: new Date(),
-  atualizadoEm: new Date(),
-});
-const mockBuscarPorProdutoUuid = jest.fn().mockResolvedValue(null);
-const mockBuscarSimilares = jest.fn().mockResolvedValue([]);
-const mockAtualizarEmbedding = jest.fn().mockResolvedValue({});
-const mockRemoverEmbedding = jest.fn().mockResolvedValue(undefined);
-const mockIndexarCatalogo = jest.fn().mockResolvedValue(0);
-const mockLimparColecao = jest.fn().mockResolvedValue(undefined);
-const mockVerificarConexaoChroma = jest.fn().mockResolvedValue(true);
-
-// Mocks dos módulos externos
-jest.mock('@/modules/ia/infrastructure/config/AdapterLangChainGemini', () => ({
-  AdapterLangChainGemini: jest.fn().mockImplementation(() => ({
-    gerarEmbedding: mockGerarEmbedding,
-    gerarEmbeddingsLote: mockGerarEmbeddingsLote,
-    gerarRespostaChat: mockGerarRespostaChat,
-    validarConexao: mockValidarConexao,
-  })),
-}));
-
-jest.mock('@/modules/ia/infrastructure/repositories/RepositorioEmbeddingChromaDB', () => ({
-  RepositorioEmbeddingChromaDB: jest.fn().mockImplementation(() => ({
-    criar: mockCriarEmbedding,
-    buscarPorProdutoUuid: mockBuscarPorProdutoUuid,
-    buscarSimilares: mockBuscarSimilares,
-    atualizar: mockAtualizarEmbedding,
-    remover: mockRemoverEmbedding,
-    limparColecao: mockLimparColecao,
-    verificarConexao: mockVerificarConexaoChroma,
-  })),
-}));
-
-jest.mock('@/modules/ia/application/services/ServicoIndexacaoProdutos', () => ({
-  ServicoIndexacaoProdutos: jest.fn().mockImplementation(() => ({
-    indexarCatalogo: mockIndexarCatalogo,
-    indexarProduto: jest.fn().mockResolvedValue(undefined),
-    removerProduto: jest.fn().mockResolvedValue(undefined),
-  })),
-}));
+import '@/tests/helpers/setupMocksIA.util';
+import {
+  mockGerarEmbeddingsLote,
+  mockIndexarCatalogo,
+} from '@/tests/helpers/setupMocksIA.util';
+import { obterNomeCookieAuth } from '@/shared/constants/auth-cookie';
 
 import request from 'supertest';
 import { configurarTesteIntegracao } from '@/tests/helpers/setup-integracao.util';
@@ -96,7 +50,7 @@ describe('[RF-IA-03] Integração - Reindexação do Catálogo (POST /api/ia/rei
     it('[RN-IA-003] deve retornar 401 quando token de autenticação é inválido', async () => {
       const resposta = await request(contexto.app)
         .post('/api/ia/reindexar')
-        .set('Cookie', ['token=token-invalido-qualquer']);
+        .set('Cookie', [`${obterNomeCookieAuth()}=token-invalido-qualquer`]);
 
       expect(resposta.status).toBe(401);
       expect(resposta.body.sucesso).toBe(false);

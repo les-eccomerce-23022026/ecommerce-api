@@ -128,6 +128,7 @@ describe('Integração - Cartões de Crédito', () => {
       if (res.body.dados.length > 0) {
         const cartao = res.body.dados[0];
         expect(cartao).not.toHaveProperty('numero');
+        expect(cartao).not.toHaveProperty('cvv');
         expect(cartao).toHaveProperty('ultimosDigitosCartao');
       }
     });

@@ -65,6 +65,7 @@ export class ServicoVendas {
     ServicoVendas.validarDadosVenda(dados);
     ServicoVendas.validarParcelamento(dados);
     ServicoVendas.validarPagamentosSplit(dados);
+    await this.validarPrecosItensContraCatalogo(dados.itens);
     const cotacaoUuid = typeof dados.cotacaoUuid === 'string' ? dados.cotacaoUuid.trim() : '';
     let valorFreteFinal = Number(dados.valorFrete);
     let cfrId: number | undefined;
@@ -109,6 +110,20 @@ export class ServicoVendas {
     const parcelas = dados.parcelas || 1;
     if (parcelas > 1 && dados.valorTotal < 80) {
       throw new Error('RN0069: Compras abaixo de R$ 80,00 não permitem parcelamento');
+    }
+  }
+
+  private async validarPrecosItensContraCatalogo(
+    itens: IVendaInputDto['itens'],
+  ): Promise<void> {
+    for (const item of itens) {
+      const precoCatalogo = await this.repositorioVendas.obterPrecoVendaPorLivroUuid(item.livroUuid);
+      if (precoCatalogo === null) {
+        throw new Error('Livro não encontrado ou indisponível no catálogo');
+      }
+      if (Math.abs(precoCatalogo - item.precoUnitario) > TOLERANCIA_MOEDA) {
+        throw new Error('Preço do item não confere com o catálogo');
+      }
     }
   }
 

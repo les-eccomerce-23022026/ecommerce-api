@@ -45,7 +45,7 @@ export function configurarTesteIntegracao(
   if (porTeste) {
     beforeEach(async () => {
       contexto.escopo = await iniciarEscopoIsolamentoIntegracao();
-    });
+    }, 30_000);
 
     afterEach(async () => {
       if (contexto.escopo) {

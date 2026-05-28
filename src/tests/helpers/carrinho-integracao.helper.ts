@@ -58,9 +58,12 @@ export async function garantirTabelaCarrinhoItens(db: IConexaoBanco): Promise<vo
  * Garante autor, editora, grupo, livro e estoque mínimos para exercitar o carrinho.
  * Necessário quando o banco de testes não possui seed de catálogo (vendas não exigem `livros`).
  */
+/** Preço de venda padronizado nos testes de integração que usam o livro do carrinho. */
+export const PRECO_VENDA_LIVRO_TESTE_CARRINHO = 50;
+
 export async function garantirLivroComEstoqueParaCarrinho(
   db: IConexaoBanco,
-): Promise<{ livUuid: string; estoque: number }> {
+): Promise<{ livUuid: string; estoque: number; precoVenda: number }> {
   const existentes = await db.executar<{ liv_uuid: string; estoque: string }>(
     `SELECT l.liv_uuid::text AS liv_uuid, e.etq_quantidade_disponivel::text AS estoque
      FROM livros l
@@ -75,13 +78,15 @@ export async function garantirLivroComEstoqueParaCarrinho(
     const livUuid = existentes[0].liv_uuid;
     await db.executar(
       `UPDATE estoques 
-       SET etq_quantidade_disponivel = 1000 
+       SET etq_quantidade_disponivel = 1000,
+           etq_preco_venda = $2
        WHERE liv_id = (SELECT liv_id FROM livros WHERE liv_uuid = $1)`,
-      [livUuid]
+      [livUuid, PRECO_VENDA_LIVRO_TESTE_CARRINHO],
     );
     return {
       livUuid,
       estoque: 1000,
+      precoVenda: PRECO_VENDA_LIVRO_TESTE_CARRINHO,
     };
   }
 
@@ -126,15 +131,16 @@ export async function garantirLivroComEstoqueParaCarrinho(
 
   await db.executar(
     `INSERT INTO estoques (liv_id, etq_quantidade_disponivel, etq_preco_venda, etq_ativo, loj_id)
-     SELECT l.liv_id, 1000, 49.90, TRUE, 1
+     SELECT l.liv_id, 1000, $2, TRUE, 1
      FROM livros l
      WHERE l.liv_isbn = $1::varchar(20)
        AND NOT EXISTS (SELECT 1 FROM estoques e WHERE e.liv_id = l.liv_id)`,
-    [ISBN_LIVRO_TESTE_CARRINHO],
+    [ISBN_LIVRO_TESTE_CARRINHO, PRECO_VENDA_LIVRO_TESTE_CARRINHO],
   );
 
-  const finalRows = await db.executar<{ liv_uuid: string; estoque: string }>(
-    `SELECT l.liv_uuid::text AS liv_uuid, e.etq_quantidade_disponivel::text AS estoque
+  const finalRows = await db.executar<{ liv_uuid: string; estoque: string; preco: string }>(
+    `SELECT l.liv_uuid::text AS liv_uuid, e.etq_quantidade_disponivel::text AS estoque,
+            e.etq_preco_venda::text AS preco
      FROM livros l
      INNER JOIN estoques e ON e.liv_id = l.liv_id
      WHERE l.liv_isbn = $1::varchar(20)`,
@@ -148,5 +154,6 @@ export async function garantirLivroComEstoqueParaCarrinho(
   return {
     livUuid: finalRows[0].liv_uuid,
     estoque: Number(finalRows[0].estoque),
+    precoVenda: Number(finalRows[0].preco),
   };
 }

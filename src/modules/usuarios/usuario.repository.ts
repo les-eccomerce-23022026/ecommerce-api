@@ -7,6 +7,7 @@ import { IConexaoBanco, DbParametro } from '@/shared/infrastructure/database/ICo
 import { Logger } from '@/shared/utils/Logger.util';
 import { ContextoRequisicao } from '@/shared/infrastructure/contexto/ContextoRequisicao';
 import { PAPEL_CLIENTE } from '@/shared/types/papeis';
+import { IPapelUsuario } from '@/shared/types/Ipapel-usuario';
 import { obterTipoBancoAtual, obterTransacaoAtual } from '@/shared/infrastructure/database/ContextoBanco';
 import { limparDocumento } from '@/shared/validators/validadorDocumento';
 
@@ -29,9 +30,27 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
     return ContextoRequisicao.obterLojId();
   }
 
+  /** Resolve pap_id real por descrição (evita FK quando serial do BD ≠ IDs simbólicos em papeis.ts). */
+  private async resolverPapelId(papel: IPapelUsuario): Promise<number> {
+    await this.db.executar(
+      `INSERT INTO livraria_gestao.papeis (pap_descricao) VALUES ($1)
+       ON CONFLICT (pap_descricao) DO NOTHING`,
+      [papel.descricao],
+    );
+    const rows = await this.db.executar<{ pap_id: number }>(
+      `SELECT pap_id FROM livraria_gestao.papeis WHERE pap_descricao = $1 LIMIT 1`,
+      [papel.descricao],
+    );
+    if (rows.length === 0) {
+      throw new Error(`Papel "${papel.descricao}" não encontrado em livraria_gestao.papeis.`);
+    }
+    return Number(rows[0].pap_id);
+  }
+
   public async criarUsuario(dados: IDadosCriarUsuario): Promise<IUsuario> {
     const { nome, email, cpf, cnpj, tipoPessoa, senhaHash, role, papeis } = dados;
-    const idPapel = role?.id ?? PAPEL_CLIENTE.id;
+    const papelPrincipal = role ?? PAPEL_CLIENTE;
+    const idPapel = await this.resolverPapelId(papelPrincipal);
     const lojId = dados.lojId ?? this.obterLojId() ?? 1;
 
     // Normalizar CPF e CNPJ para garantir consistência
@@ -46,9 +65,10 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
 
     // Associa os papéis na tabela muitos-para-muitos
     // Se papeis foi fornecido, usa todos; caso contrário, usa apenas o role principal
-    const papeisParaAssociar = papeis && papeis.length > 0 ? papeis : [role ?? PAPEL_CLIENTE];
+    const papeisParaAssociar = papeis && papeis.length > 0 ? papeis : [papelPrincipal];
     for (const papel of papeisParaAssociar) {
-      await this.associarPapelUsuario(usuarioId, papel.id);
+      const idPapelAssociado = await this.resolverPapelId(papel);
+      await this.associarPapelUsuario(usuarioId, idPapelAssociado);
     }
 
     return this.buscarPorUuid(usuarioCriadoRow.uuid as string) as Promise<IUsuario>;
