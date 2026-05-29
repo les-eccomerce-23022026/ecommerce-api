@@ -1,6 +1,7 @@
 import request from 'supertest';
 import { Application } from 'express';
-import { payloadPedidoValido, LIVRO_UUID_TESTE } from '@/tests/helpers/pedido-venda.helper';
+import { ConexaoPostgres } from '@/shared/infrastructure/database/ConexaoPostgres';
+import { payloadPedidoValido, LIVRO_UUID_TESTE, alinharPrecoVendaLivroTeste } from '@/tests/helpers/pedido-venda.helper';
 
 const cartaoCheckout = {
   numero: '4111111111111111',
@@ -22,6 +23,10 @@ export async function criarVendaPedido(
   tokenCliente: string,
   opcoes?: Parameters<typeof payloadPedidoValido>[1],
 ): Promise<VendaCriada> {
+  const db = ConexaoPostgres.obterInstancia();
+  const preco = opcoes?.precoUnitario ?? 50;
+  await alinharPrecoVendaLivroTeste(db, LIVRO_UUID_TESTE, preco);
+
   const body = payloadPedidoValido(LIVRO_UUID_TESTE, opcoes);
   const res = await request(app)
     .post('/api/vendas')

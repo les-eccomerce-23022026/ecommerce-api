@@ -22,9 +22,5 @@ export default async function globalTeardown(): Promise<void> {
   } catch (erro) {
     // eslint-disable-next-line no-console
     console.warn('Erro no globalTeardown:', erro);
-  } finally {
-    // Força saída do processo após cleanup adequado
-    // Isso resolve o problema dos handles TCP abertos
-    process.exit(0);
   }
 }

@@ -1,6 +1,7 @@
 import request from 'supertest';
+import { ConexaoPostgres } from '@/shared/infrastructure/database/ConexaoPostgres';
 import { configurarTesteIntegracao } from '@/tests/helpers/setup-integracao.util';
-import { LIVRO_UUID_TESTE } from '@/tests/helpers/pedido-venda.helper';
+import { LIVRO_UUID_TESTE, alinharPrecoVendaLivroTeste } from '@/tests/helpers/pedido-venda.helper';
 
 export type ContextoPagamentosIntegracao = ReturnType<typeof configurarTesteIntegracao>;
 
@@ -34,6 +35,10 @@ export async function criarVendaPagamentos(
   if (valorTotalItens <= 0) {
     throw new Error('criarVenda: total deve ser maior que o frete fixo de teste (10)');
   }
+
+  const db = ConexaoPostgres.obterInstancia();
+  await alinharPrecoVendaLivroTeste(db, LIVRO_UUID_TESTE, valorTotalItens);
+
   const res = await request(contexto.app)
     .post('/api/vendas')
     .set('Authorization', `Bearer ${token}`)

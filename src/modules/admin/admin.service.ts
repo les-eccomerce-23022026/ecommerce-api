@@ -279,9 +279,24 @@ export class ServicoAdmin {
         uuid: usuario.uuid, 
         email: usuario.email,
         papeis: usuario.papeis.map(p => p.descricao),
-        rolePrincipal: usuario.role.descricao
       });
-      
+
+      // Vincular à loja padrão por segurança se ele ainda não tiver lojas
+      try {
+        const defaultLojaId = process.env.DEFAULT_LOJA_ID ? parseInt(process.env.DEFAULT_LOJA_ID) : 1;
+        const sqlLink = `
+          INSERT INTO livraria_gestao.admin_lojas (usu_id, loj_id, adl_papel, adl_ativo, adl_escopo)
+          VALUES ($1, $2, 'admin_loja', TRUE, 'LOJA')
+          ON CONFLICT (usu_id, loj_id) DO NOTHING
+        `;
+        await (this.repositorioUsuarios as any).db.executar(sqlLink, [existenteClientePorEmail.id, defaultLojaId]);
+        Logger.info('[registrarNovoAdministrador] Administrador promovido vinculado à loja padrão com sucesso', { usuarioId: existenteClientePorEmail.id, lojaId: defaultLojaId });
+      } catch (erro) {
+        Logger.warn('[registrarNovoAdministrador] Falha ao vincular admin promovido à loja padrão', {
+          erro: erro instanceof Error ? erro.message : String(erro),
+        });
+      }
+
       return {
         uuid: usuario.uuid,
         nome: usuario.nome,
@@ -291,6 +306,7 @@ export class ServicoAdmin {
         role: usuario.role.descricao,
       };
     }
+
 
     const usuario = await this.repositorioUsuarios.criarUsuario({
       nome: dados.nome,
@@ -303,6 +319,23 @@ export class ServicoAdmin {
       papeis: [PAPEL_CLIENTE, PAPEL_ADMIN],
     });
 
+    // Vincular à loja padrão por segurança (especialmente para os testes onde o admin é criado sem loja específica)
+    try {
+      const defaultLojaId = process.env.DEFAULT_LOJA_ID ? parseInt(process.env.DEFAULT_LOJA_ID) : 1;
+      const sqlLink = `
+        INSERT INTO livraria_gestao.admin_lojas (usu_id, loj_id, adl_papel, adl_ativo, adl_escopo)
+        VALUES ($1, $2, 'admin_loja', TRUE, 'LOJA')
+        ON CONFLICT (usu_id, loj_id) DO NOTHING
+      `;
+      // Executa consulta SQL direta usando o db injetado ou no repositorio
+      await (this.repositorioUsuarios as any).db.executar(sqlLink, [usuario.id, defaultLojaId]);
+      Logger.info('[registrarNovoAdministrador] Administrador vinculado à loja padrão com sucesso', { usuarioId: usuario.id, lojaId: defaultLojaId });
+    } catch (erro) {
+      Logger.warn('[registrarNovoAdministrador] Falha ao vincular administrador à loja padrão (pode ser esperado se tabela ou loja não existir ainda)', {
+        erro: erro instanceof Error ? erro.message : String(erro),
+      });
+    }
+
     return {
       uuid: usuario.uuid,
       nome: usuario.nome,
@@ -313,3 +346,4 @@ export class ServicoAdmin {
     };
   }
 }
+

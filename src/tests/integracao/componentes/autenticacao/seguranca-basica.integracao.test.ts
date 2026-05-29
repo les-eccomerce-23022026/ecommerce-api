@@ -93,6 +93,31 @@ describe('Integração - Segurança Básica', () => {
       expect(res.status).toBe(401);
       expect(res.body.sucesso).toBe(false);
     });
+
+    it('[SEGURANÇA] deve retornar 401 ao acessar rota com token expirado', async () => {
+      const jwt = require('jsonwebtoken');
+      const segredo = process.env.JWT_SEGREDO || 'segredo_teste';
+      const tokenExpirado = jwt.sign(
+        {
+          sub: '33d8d733-9774-4516-b043-9c281dc67faa',
+          email: 'usuario.expirado@teste.com',
+          role: 'cliente',
+          papeis: ['cliente'],
+        },
+        segredo,
+        {
+          expiresIn: '-1s',
+        }
+      );
+
+      const res = await request(contexto.app)
+        .get('/api/clientes/perfil')
+        .set('Authorization', `Bearer ${tokenExpirado}`);
+
+      expect(res.status).toBe(401);
+      expect(res.body.sucesso).toBe(false);
+      expect(res.body.mensagem).toMatch(/expirado|inválido/i);
+    });
   });
 
   describe('Proteção de Rotas de Cliente', () => {

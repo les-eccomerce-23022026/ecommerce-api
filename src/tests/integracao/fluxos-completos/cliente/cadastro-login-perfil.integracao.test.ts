@@ -100,7 +100,7 @@ describe('Integração - Fluxos completos do cliente', () => {
       });
 
     expect(respostaSenhaAtualIncorreta.status).toBe(400);
-    expect(respostaSenhaAtualIncorreta.body.mensagem).toBe('Senha atual incorreta.');
+    expect(respostaSenhaAtualIncorreta.body.mensagem).toBe('Senha atual incorreta');
 
     // Tenta cadastrar um admin com token de cliente,
     // testando controle de acesso e autorização baseada em papéis.

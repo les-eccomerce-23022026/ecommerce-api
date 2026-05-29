@@ -8,7 +8,7 @@ import type { IConexaoBanco } from '@/shared/infrastructure/database/IConexaoBan
  * UUID de livro usado para testes de integração.
  * Este UUID deve corresponder a um livro existente no banco de testes.
  */
-export const LIVRO_UUID_TESTE = '00000000-0000-0000-0000-000000000001';
+export const LIVRO_UUID_TESTE = 'a1b2c3d4-e5f6-7890-1234-56789abcdef0';
 
 /** Alinha o preço de venda do livro no catálogo para cenários que usam valor fixo nos testes. */
 export async function alinharPrecoVendaLivroTeste(
