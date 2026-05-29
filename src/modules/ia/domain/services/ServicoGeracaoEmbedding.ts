@@ -1,12 +1,17 @@
 import { ServicoChunkingTextos } from './ServicoChunkingTextos';
 
 /** Metadados de produto usados para gerar texto de embedding */
-type MetadadosProduto = {
+export type MetadadosProdutoEmbedding = {
   titulo: string;
   autor: string;
   categoria: string;
   sinopse?: string;
   isbn: string;
+  preco?: number;
+  numeroPaginas?: number;
+  anoPublicacao?: number;
+  idioma?: string;
+  tags?: string[];
 };
 
 /**
@@ -35,13 +40,29 @@ export class ServicoGeracaoEmbedding {
    * Retorna texto único — sem chunking. Use gerarChunksDoProduto para
    * sinopses longas.
    */
-  gerarTextoProduto(metadados: MetadadosProduto): string {
+  gerarTextoProduto(metadados: MetadadosProdutoEmbedding): string {
     const partes = [
       `Título: ${metadados.titulo}`,
       `Autor: ${metadados.autor}`,
       `Categoria: ${metadados.categoria}`,
       `ISBN: ${metadados.isbn}`,
     ];
+
+    if (metadados.preco !== undefined) {
+      partes.push(`Preço: R$ ${metadados.preco.toFixed(2)}`);
+    }
+    if (metadados.numeroPaginas !== undefined) {
+      partes.push(`Páginas: ${metadados.numeroPaginas}`);
+    }
+    if (metadados.anoPublicacao !== undefined) {
+      partes.push(`Ano: ${metadados.anoPublicacao}`);
+    }
+    if (metadados.idioma) {
+      partes.push(`Idioma: ${metadados.idioma}`);
+    }
+    if (metadados.tags && metadados.tags.length > 0) {
+      partes.push(`Tags: ${metadados.tags.join(', ')}`);
+    }
 
     if (metadados.sinopse) {
       partes.push(`Sinopse: ${metadados.sinopse}`);
@@ -63,7 +84,7 @@ export class ServicoGeracaoEmbedding {
    * @param metadados - Metadados do produto a ser representado
    * @returns Array de chunks prontos para geração de embeddings
    */
-  gerarChunksDoProduto(metadados: MetadadosProduto): string[] {
+  gerarChunksDoProduto(metadados: MetadadosProdutoEmbedding): string[] {
     const textoCabecalho = [
       `Título: ${metadados.titulo}`,
       `Autor: ${metadados.autor}`,
@@ -100,7 +121,7 @@ export class ServicoGeracaoEmbedding {
    * @param metadados - Metadados do produto a verificar
    * @returns true se o texto exceder o tamanho máximo de chunk
    */
-  precisaChunking(metadados: MetadadosProduto): boolean {
+  precisaChunking(metadados: MetadadosProdutoEmbedding): boolean {
     const texto = this.gerarTextoProduto(metadados);
     return this._servicoChunking.precisaChunking(texto);
   }

@@ -13,4 +13,11 @@ export interface ILivroCatalogoDto {
   sinopse?: string;
   status: 'Ativo' | 'Inativo';
   estrelas?: number;
+  /** Campos opcionais para indexação RAG / filtros */
+  categoria?: string;
+  categorias?: string[];
+  numeroPaginas?: number;
+  anoPublicacao?: number;
+  idioma?: string;
+  tags?: string[];
 }

@@ -1,7 +1,10 @@
 import { GoogleGenerativeAIEmbeddings } from '@langchain/google-genai';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenerativeAI, SchemaType } from '@google/generative-ai';
 import { Logger } from '@/shared/utils/Logger.util';
 import { IAdapterEmbedding } from '../../domain/interfaces/IAdapterEmbedding';
+import { IntencaoRecomendacao } from '../../domain/entities/IntencaoRecomendacao.entity';
+import type { ContextoInterpretacaoIntencao } from '../../domain/entities/IntencaoRecomendacao.entity';
+import type { MensagemChatDTO } from '../../application/dtos/IRecomendacaoDTO';
 
 /**
  * Modelos de embedding disponíveis no Google Generative AI
@@ -164,38 +167,195 @@ export class AdapterLangChainGemini implements IAdapterEmbedding {
   }
 
   /**
-   * Gera resposta de chat com contexto
-   * NOTA: Funcionalidade temporariamente desabilitada devido a limitações da API key
-   * TODO: Reimplementar quando tivermos acesso a modelos de chat adequados
+   * Interpreta intenção da mensagem com saída JSON estruturada (Gemini Flash Lite).
+   */
+  async interpretarIntencao(
+    mensagem: string,
+    historico: MensagemChatDTO[] | undefined,
+    contexto: ContextoInterpretacaoIntencao
+  ): Promise<IntencaoRecomendacao> {
+    const genAI = this.inicializarGenAI();
+    const modeloChat = process.env.GEMINI_CHAT_MODEL || 'gemini-2.5-flash-lite';
+
+    const model = genAI.getGenerativeModel({
+      model: modeloChat,
+      generationConfig: {
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: SchemaType.OBJECT,
+          properties: {
+            tipo: { type: SchemaType.STRING },
+            generos: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } },
+            precoMax: { type: SchemaType.NUMBER, nullable: true },
+            precoMin: { type: SchemaType.NUMBER, nullable: true },
+            paginasMax: { type: SchemaType.NUMBER, nullable: true },
+            publicoAlvo: { type: SchemaType.STRING, nullable: true },
+            quantidadeLivros: { type: SchemaType.NUMBER },
+            comparar: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING }, nullable: true },
+            precisaEsclarecer: { type: SchemaType.BOOLEAN },
+            perguntasEsclarecimento: {
+              type: SchemaType.ARRAY,
+              items: { type: SchemaType.STRING },
+              nullable: true,
+            },
+            queryBusca: { type: SchemaType.STRING },
+            confianca: { type: SchemaType.NUMBER },
+          },
+          required: [
+            'tipo',
+            'generos',
+            'quantidadeLivros',
+            'precisaEsclarecer',
+            'queryBusca',
+            'confianca',
+          ],
+        },
+      },
+    });
+
+    const historicoTexto =
+      historico
+        ?.map((m) => `${m.papel}: ${m.conteudo}`)
+        .join('\n') ?? '';
+
+    const prompt = [
+      'Você extrai intenção de busca de livros em uma livraria online.',
+      'Responda apenas JSON válido conforme o schema.',
+      'Use precisaEsclarecer=true apenas quando a mensagem for vaga (ex.: "um presente", "me indica algo") SEM gênero ou tema literário claro.',
+      'Se o usuário citar gênero ou tema (terror, mistério, romance, fantasia, ficção científica), use precisaEsclarecer=false e preencha generos.',
+      'queryBusca deve ser texto otimizado para busca semântica (sem cumprimentos).',
+      'generos: minúsculas, sem acento quando possível (terror, misterio, romance, fantasia, ficcao_cientifica, romance_historico).',
+      `Perfil do cliente: ${JSON.stringify(contexto.perfil ?? {})}`,
+      `Histórico de compras (resumo): ${contexto.resumoCompras ?? 'nenhum'}`,
+      historicoTexto ? `Histórico do chat:\n${historicoTexto}` : '',
+      `Mensagem atual: ${mensagem}`,
+    ]
+      .filter(Boolean)
+      .join('\n');
+
+    const resultado = await model.generateContent(prompt);
+    const texto = resultado.response.text();
+    const parsed = JSON.parse(texto) as IntencaoRecomendacao;
+
+    return {
+      ...parsed,
+      quantidadeLivros: Math.min(Math.max(parsed.quantidadeLivros || 1, 1), 5),
+      generos: parsed.generos ?? [],
+    };
+  }
+
+  /**
+   * Gera resposta de chat com Gemini Flash Lite, restrita ao catálogo fornecido.
    */
   async gerarRespostaChat(
     pergunta: string,
     contexto: string,
-    historicoConversa?: { papel: 'user' | 'model'; conteudo: string }[]
+    historicoConversa?: { papel: 'user' | 'model'; conteudo: string }[],
+    opcoes?: {
+      modoEsclarecimento?: boolean;
+      perguntasFollowUp?: string[];
+      perfil?: { idadeAnos?: number; estado?: string; nome?: string };
+    }
   ): Promise<string> {
-    // Por enquanto, retorna uma resposta baseada no contexto sem usar IA
     try {
-      Logger.warn('[AdapterLangChainGemini] Chat desabilitado temporariamente, usando resposta base');
-      
-      // Extrai informações dos livros do contexto
-      const livrosEncontrados = this.extrairLivrosDoContexto(contexto);
-      
-      if (livrosEncontrados.length === 0) {
-        return 'Não encontrei livros correspondentes à sua solicitação no momento.';
+      if (opcoes?.modoEsclarecimento) {
+        const perguntas = opcoes.perguntasFollowUp ?? [];
+        if (perguntas.length > 0) {
+          return `Para te ajudar melhor, preciso de mais alguns detalhes:\n\n${perguntas.map((p, i) => `${i + 1}. ${p}`).join('\n')}`;
+        }
+        return 'Para te ajudar melhor, pode me contar um pouco mais sobre o que você procura?';
       }
-      
-      const resposta = `Com base no que você está procurando, recomendo os seguintes livros:\n\n${
-        livrosEncontrados.slice(0, 3).map((livro, i) => 
-          `${i + 1}. "${livro.titulo}" de ${livro.autor} - R$ ${livro.preco.toFixed(2)}`
-        ).join('\n')
-      }\n\nEssas recomendações são baseadas em análise semântica do seu pedido.`;
-      
-      return resposta;
+
+      const genAI = this.inicializarGenAI();
+      const modeloChat = process.env.GEMINI_CHAT_MODEL || 'gemini-2.5-flash-lite';
+      const model = genAI.getGenerativeModel({ model: modeloChat });
+
+      const tomPerfil = this.montarInstrucaoTomPerfil(opcoes?.perfil);
+
+      const systemInstruction = [
+        'Você é o assistente de recomendação de uma livraria brasileira.',
+        'Use APENAS os livros listados no contexto — nunca invente títulos, autores ou preços.',
+        'Se o contexto não tiver livros, diga honestamente que não encontrou correspondências.',
+        'Responda em português do Brasil, de forma acolhedora e objetiva.',
+        tomPerfil,
+      ]
+        .filter(Boolean)
+        .join(' ');
+
+      const contents: { role: 'user' | 'model'; parts: { text: string }[] }[] = [];
+
+      if (historicoConversa) {
+        for (const msg of historicoConversa) {
+          contents.push({
+            role: msg.papel,
+            parts: [{ text: msg.conteudo }],
+          });
+        }
+      }
+
+      contents.push({
+        role: 'user',
+        parts: [
+          {
+            text: `Contexto do catálogo (única fonte de verdade):\n${contexto}\n\nPergunta do cliente: ${pergunta}`,
+          },
+        ],
+      });
+
+      const resultado = await model.generateContent({
+        systemInstruction,
+        contents,
+      });
+
+      const texto = resultado.response.text();
+      if (!texto || texto.trim().length === 0) {
+        return this.respostaChatFallback(contexto);
+      }
+      return texto.trim();
     } catch (erro) {
       const mensagem = erro instanceof Error ? erro.message : String(erro);
       Logger.error(`[AdapterLangChainGemini] Erro ao gerar resposta de chat: ${mensagem}`);
-      throw new Error(`Falha ao gerar resposta de chat: ${mensagem}`);
+      return this.respostaChatFallback(contexto);
     }
+  }
+
+  private montarInstrucaoTomPerfil(perfil?: {
+    idadeAnos?: number;
+    estado?: string;
+    nome?: string;
+  }): string {
+    if (!perfil) {
+      return '';
+    }
+    const partes: string[] = [];
+    if (perfil.nome) {
+      partes.push(`Chame o cliente pelo primeiro nome (${perfil.nome.split(' ')[0]}) quando natural.`);
+    }
+    if (perfil.idadeAnos !== undefined && perfil.idadeAnos >= 55) {
+      partes.push('Use tom respeitoso e um pouco mais contextual para leitores maduros.');
+    } else if (perfil.idadeAnos !== undefined && perfil.idadeAnos < 25) {
+      partes.push('Use tom direto e leve para leitores jovens.');
+    }
+    if (perfil.estado) {
+      partes.push(
+        `O cliente está em ${perfil.estado}; pode mencionar envio regional apenas se relevante.`
+      );
+    }
+    return partes.join(' ');
+  }
+
+  private respostaChatFallback(contexto: string): string {
+    const livrosEncontrados = this.extrairLivrosDoContexto(contexto);
+    if (livrosEncontrados.length === 0) {
+      return 'Não encontrei livros correspondentes à sua solicitação no momento.';
+    }
+    return `Com base no catálogo, sugiro:\n\n${livrosEncontrados
+      .slice(0, 3)
+      .map(
+        (livro, i) =>
+          `${i + 1}. "${livro.titulo}" de ${livro.autor} - R$ ${livro.preco.toFixed(2)}`
+      )
+      .join('\n')}`;
   }
 
   /**

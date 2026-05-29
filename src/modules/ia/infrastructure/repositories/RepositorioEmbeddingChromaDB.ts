@@ -19,7 +19,7 @@ export const CONFIGURACAO_RECOMENDACAO = {
   quantidadeResultados: parseInt(process.env.RAG_TOP_K || '5', 10),
 
   // Limiar mínimo de similaridade semântica aceito (0-1)
-  limiarSimilaridade: parseFloat(process.env.RAG_SIMILARITY_THRESHOLD || '0.7'),
+  limiarSimilaridade: parseFloat(process.env.RAG_SIMILARITY_THRESHOLD || '0.6'),
 
   // Multiplicador de busca (recupera mais candidatos para filtrar pelo limiar depois)
   multiplicadorBusca: parseInt(process.env.RAG_SEARCH_MULTIPLIER || '2', 10),
@@ -108,6 +108,10 @@ export class RepositorioEmbeddingChromaDB implements IRepositorioEmbedding {
       sinopse: dados.metadados.sinopse || '',
       isbn: dados.metadados.isbn,
       preco: dados.metadados.preco,
+      numero_paginas: dados.metadados.numeroPaginas ?? 0,
+      ano_publicacao: dados.metadados.anoPublicacao ?? 0,
+      idioma: dados.metadados.idioma ?? 'português',
+      tags: dados.metadados.tags ?? '',
     };
 
     Logger.debug(`[RepositorioEmbeddingChromaDB] Salvando embedding para produto ${dados.produtoUuid} com metadados:`, metadadosParaSalvar);
@@ -156,6 +160,10 @@ export class RepositorioEmbeddingChromaDB implements IRepositorioEmbedding {
         sinopse: metadados.sinopse,
         isbn: metadados.isbn,
         preco: metadados.preco,
+        numeroPaginas: metadados.numero_paginas,
+        anoPublicacao: metadados.ano_publicacao,
+        idioma: metadados.idioma,
+        tags: metadados.tags,
       },
       criadoEm: new Date(),
       atualizadoEm: new Date(),
@@ -217,6 +225,10 @@ export class RepositorioEmbeddingChromaDB implements IRepositorioEmbedding {
           sinopse: metadados.sinopse,
           isbn: metadados.isbn,
           preco: metadados.preco,
+          numeroPaginas: metadados.numero_paginas,
+          anoPublicacao: metadados.ano_publicacao,
+          idioma: metadados.idioma,
+          tags: metadados.tags,
         },
       };
     });

@@ -45,20 +45,17 @@ export class ServicoRecomendacaoRAG {
       produtosExistentes
     );
 
-    // Limita ao número solicitado
-    const produtosFinais = produtosValidos.slice(0, limite);
-
-    // Personaliza baseado no contexto do cliente
+    // Personaliza baseado no contexto do cliente (antes do slice para MMR ter mais candidatos)
     const produtosPersonalizados = this.personalizarRecomendacao(
-      produtosFinais,
+      produtosValidos,
       produtosSimilares,
       contextoCliente
     );
 
-    // Aplica MMR reranking se habilitado
-    const produtosFinaisMMR = usarMMR 
+    // Aplica MMR reranking se habilitado (quantidade > 1)
+    const produtosFinaisMMR = usarMMR
       ? this.aplicarMMR(produtosPersonalizados, produtosSimilares, limite)
-      : produtosPersonalizados;
+      : produtosPersonalizados.slice(0, limite);
 
     return {
       query,

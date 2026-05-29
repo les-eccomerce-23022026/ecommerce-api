@@ -78,7 +78,8 @@ export class ControladorRecomendacao {
         return;
       }
 
-      const erroClienteUuid = validarClienteUuidOpcional(dados.clienteUuid);
+      const clienteUuid = req.usuario?.uuid ?? dados.clienteUuid;
+      const erroClienteUuid = validarClienteUuidOpcional(clienteUuid);
       if (erroClienteUuid) {
         RespostaPadrao.enviarErro(res, 400, erroClienteUuid);
         return;
@@ -92,6 +93,7 @@ export class ControladorRecomendacao {
       const resultado = await this.servicoRecomendacao.recomendar({
         ...dados,
         query: querySanitizada,
+        clienteUuid,
       });
       RespostaPadrao.enviarSucesso(res, 200, resultado);
     } catch (erro) {
@@ -140,7 +142,8 @@ export class ControladorRecomendacao {
         return;
       }
 
-      const erroClienteUuid = validarClienteUuidOpcional(dados.clienteUuid);
+      const clienteUuid = req.usuario?.uuid ?? dados.clienteUuid;
+      const erroClienteUuid = validarClienteUuidOpcional(clienteUuid);
       if (erroClienteUuid) {
         RespostaPadrao.enviarErro(res, 400, erroClienteUuid);
         return;
@@ -149,6 +152,7 @@ export class ControladorRecomendacao {
       const resultado = await this.servicoRecomendacao.chat({
         ...dados,
         mensagem: mensagemSanitizada,
+        clienteUuid,
       });
       RespostaPadrao.enviarSucesso(res, 200, resultado);
     } catch (erro) {

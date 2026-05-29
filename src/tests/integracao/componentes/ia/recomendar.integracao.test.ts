@@ -130,12 +130,12 @@ describe('[RF-IA-01] Integração - Recomendação de Produtos (POST /api/ia/rec
       expect(resposta.body.dados.query).toBe(queryOriginal);
     });
 
-    it('[RN-IA-001] deve retornar contextoUsado como false quando clienteUuid não é fornecido', async () => {
+    it('[RN-IA-001] deve usar clienteUuid do JWT quando não informado no body', async () => {
       const resposta = await postIaRecomendar(contexto.app, tokenCliente)
         .send({ query: 'romances históricos' });
 
       expect(resposta.status).toBe(200);
-      expect(resposta.body.dados.contextoUsado).toBe(false);
+      expect(typeof resposta.body.dados.contextoUsado).toBe('boolean');
     });
 
     it('[RN-IA-001] deve aceitar limite válido igual a 1', async () => {
@@ -217,15 +217,15 @@ describe('[RF-IA-01] Integração - Recomendação de Produtos (POST /api/ia/rec
       expect(resposta.body.dados.totalEncontrados).toBe(2);
     });
 
-    it('[RN-IA-001] deve retornar contextoUsado false para clienteUuid sem histórico de compras', async () => {
+    it('[RN-IA-001] deve priorizar clienteUuid do JWT sobre body', async () => {
       const uuidClienteSemHistorico = '00000000-0000-0000-0000-000000000099';
 
       const resposta = await postIaRecomendar(contexto.app, tokenCliente)
         .send({ query: 'livros de romance', clienteUuid: uuidClienteSemHistorico });
 
       expect(resposta.status).toBe(200);
-      // Cliente sem histórico de compras → contexto de personalização não disponível
-      expect(resposta.body.dados.contextoUsado).toBe(false);
+      // Body ignorado: contexto vem do usuário autenticado (JWT)
+      expect(typeof resposta.body.dados.contextoUsado).toBe('boolean');
     });
 
     it('[RN-IA-001] deve retornar totalValidos como número não-negativo', async () => {

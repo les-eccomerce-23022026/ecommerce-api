@@ -152,12 +152,21 @@ export class ServicoIndexacaoProdutos {
    * @returns Número de chunks/embeddings gerados para o livro
    */
   private async indexarLivro(livro: ILivroCatalogoDto): Promise<number> {
+    const categoriaPrincipal =
+      livro.categoria ?? livro.categorias?.[0] ?? 'Sem categoria';
+    const tags = livro.tags ?? livro.categorias?.map((c) => c.toLowerCase().replace(/\s+/g, '_'));
+
     const metadados = {
       titulo: livro.titulo,
       autor: livro.autor,
-      categoria: livro.categoria,
+      categoria: categoriaPrincipal,
       sinopse: livro.sinopse,
       isbn: livro.isbn,
+      preco: livro.preco,
+      numeroPaginas: livro.numeroPaginas,
+      anoPublicacao: livro.anoPublicacao,
+      idioma: livro.idioma ?? 'português',
+      tags,
     };
 
     // Obtém chunks — 1 para sinopses curtas, N para longas (chunking automático)
@@ -171,12 +180,16 @@ export class ServicoIndexacaoProdutos {
         produtoUuid: livro.uuid,
         embedding,
         metadados: {
-          titulo: livro.titulo,
-          autor: livro.autor,
-          categoria: livro.categoria,
-          sinopse: livro.sinopse,
-          isbn: livro.isbn,
-          preco: livro.preco,
+          titulo: metadados.titulo,
+          autor: metadados.autor,
+          categoria: metadados.categoria,
+          sinopse: metadados.sinopse,
+          isbn: metadados.isbn,
+          preco: metadados.preco,
+          numeroPaginas: metadados.numeroPaginas,
+          anoPublicacao: metadados.anoPublicacao,
+          idioma: metadados.idioma,
+          tags: metadados.tags?.join(','),
         },
       });
     }

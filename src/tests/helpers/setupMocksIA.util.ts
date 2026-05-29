@@ -8,6 +8,14 @@ export const mockGerarEmbeddingsLote = jest.fn().mockResolvedValue([[0.1, 0.2, 0
 export const mockGerarRespostaChat = jest.fn().mockResolvedValue(
   'Resposta simulada do catálogo da livraria.',
 );
+export const mockInterpretarIntencao = jest.fn().mockResolvedValue({
+  tipo: 'recomendacao',
+  generos: [],
+  quantidadeLivros: 1,
+  precisaEsclarecer: false,
+  queryBusca: 'consulta simulada',
+  confianca: 0.9,
+});
 export const mockValidarConexaoGemini = jest.fn().mockResolvedValue(true);
 
 export const mockCriarEmbedding = jest.fn().mockResolvedValue({
@@ -34,11 +42,24 @@ jest.mock('@/modules/ia/infrastructure/config/AdapterLangChainGemini', () => ({
     gerarEmbedding: mockGerarEmbedding,
     gerarEmbeddingsLote: mockGerarEmbeddingsLote,
     gerarRespostaChat: mockGerarRespostaChat,
+    interpretarIntencao: mockInterpretarIntencao,
     validarConexao: mockValidarConexaoGemini,
   })),
 }));
 
+export const mockConfiguracaoRecomendacao = {
+  quantidadeResultados: 5,
+  limiarSimilaridade: 0.6,
+  multiplicadorBusca: 2,
+  personalizacao: {
+    boostCategoria: 1.2,
+    boostAutor: 1.3,
+    boostPreco: 1.1,
+  },
+};
+
 jest.mock('@/modules/ia/infrastructure/repositories/RepositorioEmbeddingChromaDB', () => ({
+  CONFIGURACAO_RECOMENDACAO: mockConfiguracaoRecomendacao,
   RepositorioEmbeddingChromaDB: jest.fn().mockImplementation(() => ({
     criar: mockCriarEmbedding,
     buscarPorProdutoUuid: mockBuscarPorProdutoUuid,
@@ -65,6 +86,14 @@ export function reiniciarMocksIa(): void {
   mockGerarEmbedding.mockResolvedValue([0.1, 0.2, 0.3, 0.4, 0.5]);
   mockGerarEmbeddingsLote.mockResolvedValue([[0.1, 0.2, 0.3, 0.4, 0.5]]);
   mockGerarRespostaChat.mockResolvedValue('Resposta simulada do catálogo da livraria.');
+  mockInterpretarIntencao.mockResolvedValue({
+    tipo: 'recomendacao',
+    generos: [],
+    quantidadeLivros: 1,
+    precisaEsclarecer: false,
+    queryBusca: 'consulta simulada',
+    confianca: 0.9,
+  });
   mockValidarConexaoGemini.mockResolvedValue(true);
   mockBuscarSimilares.mockResolvedValue([]);
   mockIndexarCatalogo.mockResolvedValue(0);

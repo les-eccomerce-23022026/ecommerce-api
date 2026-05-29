@@ -35,17 +35,24 @@ export interface IChatRequestDTO {
   historico?: MensagemChatDTO[];
 }
 
+export type TipoRespostaChat = 'recomendacao' | 'esclarecimento';
+
 export interface IChatResponseDTO {
   resposta: string;
   produtosRecomendados: ProdutoRecomendadoDTO[];
   contextoUsado: boolean;
   tempoRespostaMs: number;
+  tipoResposta: TipoRespostaChat;
+  perguntasFollowUp?: string[];
+  intencaoResumida?: string;
 }
 
+/** Aceita papel (API) ou remetente (frontend legado) */
 export interface MensagemChatDTO {
-  papel: 'user' | 'assistant';
+  papel?: 'user' | 'assistant';
+  remetente?: 'usuario' | 'assistente';
   conteudo: string;
-  timestamp: Date;
+  timestamp?: Date;
 }
 
 export interface IReindexarRequestDTO {

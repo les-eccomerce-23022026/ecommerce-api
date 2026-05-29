@@ -48,12 +48,12 @@ describe('[RN-IA-004] Integração - Segurança dos Endpoints de IA', () => {
       expect(resposta.body.sucesso).toBe(true);
     });
 
-    it('[RN-IA-004] deve retornar 400 para clienteUuid com formato inválido (tentativa de injeção)', async () => {
+    it('[RN-IA-004] deve ignorar clienteUuid inválido no body quando JWT válido', async () => {
       const resposta = await postIaRecomendar(contexto.app, tokenCliente)
         .send({ query: 'livros de romance', clienteUuid: "'; DROP TABLE usuarios; --" });
 
-      expect(resposta.status).toBe(400);
-      expect(resposta.body.sucesso).toBe(false);
+      expect(resposta.status).toBe(200);
+      expect(resposta.body.sucesso).toBe(true);
     });
 
     it('[RN-IA-004] deve processar mensagem de chat com texto de injeção SQL sem erro interno', async () => {
@@ -169,12 +169,12 @@ describe('[RN-IA-004] Integração - Segurança dos Endpoints de IA', () => {
       expect(resposta.body.sucesso).toBe(true);
     });
 
-    it('[RN-IA-004] deve retornar 400 para clienteUuid com formato claramente inválido', async () => {
+    it('[RN-IA-004] deve ignorar clienteUuid malformado no body quando JWT válido', async () => {
       const resposta = await postIaRecomendar(contexto.app, tokenCliente)
         .send({ query: 'livros de aventura', clienteUuid: 'NAO-E-UM-UUID' });
 
-      expect(resposta.status).toBe(400);
-      expect(resposta.body.sucesso).toBe(false);
+      expect(resposta.status).toBe(200);
+      expect(resposta.body.sucesso).toBe(true);
     });
   });
 });

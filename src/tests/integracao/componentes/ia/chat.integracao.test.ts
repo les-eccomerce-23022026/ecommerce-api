@@ -127,6 +127,7 @@ describe('[RF-IA-02] Integração - Chat com IA (POST /api/ia/chat)', () => {
       expect(resposta.body.dados).toHaveProperty('resposta');
       expect(resposta.body.dados).toHaveProperty('produtosRecomendados');
       expect(resposta.body.dados).toHaveProperty('tempoRespostaMs');
+      expect(resposta.body.dados).toHaveProperty('tipoResposta');
       expect(typeof resposta.body.dados.resposta).toBe('string');
       expect(resposta.body.dados.resposta.length).toBeGreaterThan(0);
     });

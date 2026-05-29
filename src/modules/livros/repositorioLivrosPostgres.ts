@@ -18,9 +18,16 @@ type RowLivro = {
   etq_preco_venda: number;
   etq_quantidade_disponivel: number;
   liv_ativo: boolean;
+  liv_numero_paginas?: number | null;
+  liv_ano?: number | null;
+  categorias_agregadas?: string | null;
 };
 
 function mapRow(r: RowLivro): ILivroCatalogoDto {
+  const categoriasLista =
+    r.categorias_agregadas?.split('|').map((c) => c.trim()).filter(Boolean) ?? [];
+  const categoriaPrincipal = categoriasLista[0];
+
   return {
     uuid: r.liv_uuid,
     titulo: r.liv_titulo,
@@ -33,6 +40,12 @@ function mapRow(r: RowLivro): ILivroCatalogoDto {
     sinopse: r.liv_sinopse ?? undefined,
     status: r.liv_ativo ? 'Ativo' : 'Inativo',
     estrelas: 5,
+    categoria: categoriaPrincipal,
+    categorias: categoriasLista.length > 0 ? categoriasLista : undefined,
+    numeroPaginas: r.liv_numero_paginas ?? undefined,
+    anoPublicacao: r.liv_ano ?? undefined,
+    idioma: 'português',
+    tags: categoriasLista.map((c) => c.toLowerCase().replace(/\s+/g, '_')),
   };
 }
 
@@ -184,7 +197,15 @@ export class RepositorioLivrosPostgres {
         a.aut_nome,
         e.etq_preco_venda,
         e.etq_quantidade_disponivel,
-        l.liv_ativo
+        l.liv_ativo,
+        l.liv_numero_paginas,
+        l.liv_ano,
+        (
+          SELECT string_agg(DISTINCT c.cat_nome, '|' ORDER BY c.cat_nome)
+          FROM livraria_comercial.livro_categorias lc
+          INNER JOIN livraria_comercial.categorias c ON lc.cat_id = c.cat_id AND c.cat_ativo = TRUE
+          WHERE lc.liv_id = l.liv_id
+        ) AS categorias_agregadas
       FROM livraria_comercial.livros l
       INNER JOIN livraria_comercial.autores a ON l.aut_id = a.aut_id
       INNER JOIN livraria_comercial.estoques e ON e.liv_id = l.liv_id

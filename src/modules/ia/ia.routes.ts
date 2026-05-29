@@ -6,6 +6,7 @@ import { ServicoGeracaoEmbedding } from './domain/services/ServicoGeracaoEmbeddi
 import { ServicoValidacaoProdutos } from './domain/services/ServicoValidacaoProdutos';
 import { ServicoRecomendacaoRAG } from './domain/services/ServicoRecomendacaoRAG';
 import { ServicoRecomendacaoApplication } from './application/services/ServicoRecomendacaoApplication';
+import { ServicoInterpretacaoIntencao } from './application/services/ServicoInterpretacaoIntencao';
 import { ServicoIndexacaoProdutos } from './application/services/ServicoIndexacaoProdutos';
 import { IAdapterEmbedding } from './domain/interfaces/IAdapterEmbedding';
 import { RepositorioRecomendacaoPostgres } from './infrastructure/repositories/RepositorioRecomendacaoPostgres';
@@ -52,6 +53,8 @@ const servicoIndexacaoProdutos = new ServicoIndexacaoProdutos(
   servicoGeracaoEmbedding
 );
 
+const servicoInterpretacaoIntencao = new ServicoInterpretacaoIntencao(adapterLangChain);
+
 const servicoRecomendacao = new ServicoRecomendacaoApplication(
   repositorioEmbedding,
   repositorioRecomendacao,
@@ -62,6 +65,7 @@ const servicoRecomendacao = new ServicoRecomendacaoApplication(
   adapterLangChain,
   servicoIndexacaoProdutos,
   servicoLivros,
+  servicoInterpretacaoIntencao,
 );
 const controladorRecomendacao = new ControladorRecomendacao(servicoRecomendacao);
 

@@ -18,21 +18,54 @@ import { Logger } from '@/shared/utils/Logger.util';
  * respeitando o Princípio da Segregação de Interfaces (ISP).
  */
 export class RepositorioRecomendacaoPostgres
-  implements IRepositorioContextoCliente, IRepositorioMetricasRecomendacao {
+  implements IRepositorioContextoCliente, IRepositorioMetricasRecomendacao
+{
   constructor(private pool: Pool) {}
 
   async buscarContexto(clienteUuid: string): Promise<IContextoRecomendacao | null> {
     try {
-      // Busca histórico de compras do cliente
+      const queryPerfil = `
+        SELECT
+          u.usu_nome AS nome,
+          u.usu_genero AS genero,
+          u.usu_data_nascimento AS data_nascimento,
+          est.est_sigla AS estado,
+          cid.cid_nome AS cidade
+        FROM livraria_gestao.usuarios u
+        LEFT JOIN LATERAL (
+          SELECT e.cid_id
+          FROM livraria_gestao.enderecos e
+          WHERE e.usu_id = u.usu_id
+          ORDER BY e.end_principal DESC, e.end_criado_em DESC
+          LIMIT 1
+        ) end_principal ON TRUE
+        LEFT JOIN livraria_ref.cidades cid ON cid.cid_id = end_principal.cid_id
+        LEFT JOIN livraria_ref.estados est ON est.est_id = cid.est_id
+        WHERE u.usu_uuid = $1
+        LIMIT 1
+      `;
+
+      const resultadoPerfil = await this.pool.query(queryPerfil, [clienteUuid]);
+
+      if (resultadoPerfil.rows.length === 0) {
+        return null;
+      }
+
+      const rowPerfil = resultadoPerfil.rows[0];
+      const idadeAnos = this.calcularIdadeAnos(rowPerfil.data_nascimento);
+
       const queryHistorico = `
-        SELECT 
-          l.liv_uuid as produto_uuid,
-          l.liv_titulo as titulo,
-          COALESCE(c.cat_nome, 'Sem categoria') as categoria,
-          v.ven_criado_em as data_compra
+        SELECT
+          l.liv_uuid AS produto_uuid,
+          l.liv_titulo AS titulo,
+          COALESCE(c.cat_nome, 'Sem categoria') AS categoria,
+          a.aut_nome AS autor,
+          iv.itv_preco_unitario AS preco,
+          v.ven_criado_em AS data_compra
         FROM livraria_comercial.vendas v
         JOIN livraria_comercial.itens_venda iv ON v.ven_id = iv.ven_id
         JOIN livraria_comercial.livros l ON iv.liv_uuid = l.liv_uuid
+        JOIN livraria_comercial.autores a ON l.aut_id = a.aut_id
         LEFT JOIN livraria_comercial.livro_categorias lc ON lc.liv_id = l.liv_id
         LEFT JOIN livraria_comercial.categorias c ON lc.cat_id = c.cat_id AND c.cat_ativo = TRUE
         JOIN livraria_gestao.usuarios u ON v.usu_id = u.usu_id
@@ -43,10 +76,6 @@ export class RepositorioRecomendacaoPostgres
 
       const resultadoHistorico = await this.pool.query(queryHistorico, [clienteUuid]);
 
-      if (resultadoHistorico.rows.length === 0) {
-        return null;
-      }
-
       const historicoCompras = resultadoHistorico.rows.map((row) => ({
         produtoUuid: row.produto_uuid,
         titulo: row.titulo,
@@ -54,19 +83,24 @@ export class RepositorioRecomendacaoPostgres
         dataCompra: row.data_compra,
       }));
 
-      // Calcula preferências baseado no histórico
       const categoriasContagem = new Map<string, number>();
       const autoresContagem = new Map<string, number>();
       let precoMin = Infinity;
       let precoMax = 0;
 
-      for (const item of historicoCompras) {
+      for (const item of resultadoHistorico.rows) {
         categoriasContagem.set(
           item.categoria,
           (categoriasContagem.get(item.categoria) || 0) + 1
         );
-        // TODO: Adicionar contagem de autores quando disponível
-        // TODO: Calcular faixa de preço baseado nos produtos comprados
+        if (item.autor) {
+          autoresContagem.set(item.autor, (autoresContagem.get(item.autor) || 0) + 1);
+        }
+        const preco = Number(item.preco);
+        if (!Number.isNaN(preco) && preco > 0) {
+          precoMin = Math.min(precoMin, preco);
+          precoMax = Math.max(precoMax, preco);
+        }
       }
 
       const categorias = Array.from(categoriasContagem.entries())
@@ -79,7 +113,6 @@ export class RepositorioRecomendacaoPostgres
         .slice(0, 5)
         .map((entry) => entry[0]);
 
-      // Valores padrão para faixa de preço
       const faixaPreco = {
         min: precoMin === Infinity ? 0 : precoMin,
         max: precoMax === 0 ? 1000 : precoMax,
@@ -87,6 +120,13 @@ export class RepositorioRecomendacaoPostgres
 
       return {
         clienteUuid,
+        perfil: {
+          nome: rowPerfil.nome ?? undefined,
+          idadeAnos,
+          genero: rowPerfil.genero ?? undefined,
+          estado: rowPerfil.estado ?? undefined,
+          cidade: rowPerfil.cidade ?? undefined,
+        },
         historicoCompras,
         preferencias: {
           categorias,
@@ -99,6 +139,23 @@ export class RepositorioRecomendacaoPostgres
       Logger.error(`[RepositorioRecomendacaoPostgres] Erro ao buscar contexto: ${mensagem}`);
       throw erro;
     }
+  }
+
+  private calcularIdadeAnos(dataNascimento: Date | string | null): number | undefined {
+    if (!dataNascimento) {
+      return undefined;
+    }
+    const nascimento = new Date(dataNascimento);
+    if (Number.isNaN(nascimento.getTime())) {
+      return undefined;
+    }
+    const hoje = new Date();
+    let idade = hoje.getFullYear() - nascimento.getFullYear();
+    const mesDiff = hoje.getMonth() - nascimento.getMonth();
+    if (mesDiff < 0 || (mesDiff === 0 && hoje.getDate() < nascimento.getDate())) {
+      idade -= 1;
+    }
+    return idade >= 0 ? idade : undefined;
   }
 
   async salvarMetrica(metrica: ICriarMetricaRecomendacaoDto): Promise<void> {
@@ -219,29 +276,30 @@ export class RepositorioRecomendacaoPostgres
   /**
    * Constrói condição SQL baseada no período
    */
-  private buildCondicaoPeriodo(periodo: PeriodoMetrica): { condicao: string; params: any[] } {
+  private buildCondicaoPeriodo(periodo: PeriodoMetrica): { condicao: string; params: unknown[] } {
     const agora = new Date();
     let condicao = '1=1';
-    const params: any[] = [];
+    const params: unknown[] = [];
 
-    switch (periodo) {
-      case 'hoje':
+    const mapaPeriodo: Record<PeriodoMetrica, () => void> = {
+      hoje: () => {
         condicao = 'data_criacao >= $1';
         params.push(new Date(agora.setHours(0, 0, 0, 0)));
-        break;
-      case 'semana':
+      },
+      semana: () => {
         condicao = 'data_criacao >= $1';
         params.push(new Date(agora.setDate(agora.getDate() - 7)));
-        break;
-      case 'mes':
+      },
+      mes: () => {
         condicao = 'data_criacao >= $1';
         params.push(new Date(agora.setMonth(agora.getMonth() - 1)));
-        break;
-      case 'todos':
-      default:
-        // Sem filtro
-        break;
-    }
+      },
+      todos: () => {
+        /* sem filtro */
+      },
+    };
+
+    mapaPeriodo[periodo]();
 
     return { condicao, params };
   }

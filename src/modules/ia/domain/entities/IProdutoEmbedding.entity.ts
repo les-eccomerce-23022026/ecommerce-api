@@ -17,6 +17,10 @@ export interface IProdutoEmbedding {
     sinopse?: string;
     isbn: string;
     preco: number;
+    numeroPaginas?: number;
+    anoPublicacao?: number;
+    idioma?: string;
+    tags?: string;
   };
   criadoEm: Date;
   atualizadoEm: Date;
@@ -32,5 +36,9 @@ export interface ICriarProdutoEmbeddingDto {
     sinopse?: string;
     isbn: string;
     preco: number;
+    numeroPaginas?: number;
+    anoPublicacao?: number;
+    idioma?: string;
+    tags?: string;
   };
 }

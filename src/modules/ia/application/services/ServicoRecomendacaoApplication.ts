@@ -13,18 +13,22 @@ import {
   RecomendacaoResultado,
   ProdutoRecomendado,
 } from '../../domain/services/ServicoRecomendacaoRAG';
+import { ServicoFiltroCatalogo } from '../../domain/services/ServicoFiltroCatalogo';
 import { AdapterLangChainGemini } from '../../infrastructure/config/AdapterLangChainGemini';
 import { IContextoRecomendacao } from '../../domain/entities/IContextoRecomendacao.entity';
+import { IntencaoRecomendacao } from '../../domain/entities/IntencaoRecomendacao.entity';
 import {
   IRecomendarRequestDTO,
   IRecomendarResponseDTO,
   IChatRequestDTO,
   IChatResponseDTO,
   ProdutoRecomendadoDTO,
+  MensagemChatDTO,
 } from '../dtos/IRecomendacaoDTO';
 import { Logger } from '@/shared/utils/Logger.util';
 import { ServicoIndexacaoProdutos } from './ServicoIndexacaoProdutos';
 import { ServicoLivros } from '@/modules/livros/servicoLivros';
+import { ServicoInterpretacaoIntencao } from './ServicoInterpretacaoIntencao';
 
 export interface ISaudeIaDependencia {
   ok: boolean;
@@ -41,12 +45,20 @@ export interface ISaudeIaResultado {
   };
 }
 
+export interface OpcoesRecomendacaoInterna {
+  queryTexto?: string;
+  intencao?: IntencaoRecomendacao;
+  limite?: number;
+}
+
 /**
  * Serviço de Aplicação para Recomendação
- * 
- * Orquestra os serviços de domínio e infraestrutura para gerar recomendações.
+ *
+ * Orquestra interpretação de intenção, RAG, filtros estruturados e chat Gemini.
  */
 export class ServicoRecomendacaoApplication {
+  private readonly servicoFiltroCatalogo = new ServicoFiltroCatalogo();
+
   constructor(
     private repositorioEmbedding: IRepositorioEmbedding,
     private repositorioContextoCliente: IRepositorioContextoCliente,
@@ -56,39 +68,26 @@ export class ServicoRecomendacaoApplication {
     private servicoRecomendacaoRAG: ServicoRecomendacaoRAG,
     private adapterLangChain: AdapterLangChainGemini,
     private servicoIndexacaoProdutos: ServicoIndexacaoProdutos,
-    private servicoLivros: ServicoLivros
+    private servicoLivros: ServicoLivros,
+    private servicoInterpretacaoIntencao: ServicoInterpretacaoIntencao
   ) {}
 
-  /**
-   * Gera recomendações baseadas na query do usuário.
-   *
-   * Orquestra: geração de embedding → contexto do cliente → busca RAG →
-   * deduplicação → construção de resposta.
-   *
-   * @param dados Parâmetros da requisição de recomendação.
-   * @returns     DTO com produtos recomendados e métricas de execução.
-   */
   async recomendar(dados: IRecomendarRequestDTO): Promise<IRecomendarResponseDTO> {
     const inicio = Date.now();
 
     try {
-      const queryEmbedding = await this.gerarEmbeddingQuery(dados.query);
       const contextoCliente = await this.obterContextoCliente(dados.clienteUuid);
-      const produtosExistentes = await this.buscarTodosProdutosExistentes();
-
-      const resultado = await this.servicoRecomendacaoRAG.gerarRecomendacao(
+      const resultado = await this.executarPipelineRecomendacao(
         dados.query,
-        queryEmbedding,
         contextoCliente,
-        produtosExistentes,
-        dados.limite || 5
+        { limite: dados.limite || 5 }
       );
 
-      const produtosDTO = this.removerDuplicatasEOrdenar(resultado.produtos, dados.limite || 5);
+      const produtosDTO = this.removerDuplicatasEOrdenar(
+        resultado.produtos,
+        dados.limite || 5
+      );
       const tempoResposta = Date.now() - inicio;
-
-      // Salva métricas (será implementado na Fase 4.6)
-      // await this.salvarMetricasRecomendacao(...);
 
       return this.construirResposta(resultado, produtosDTO, tempoResposta);
     } catch (erro) {
@@ -96,43 +95,87 @@ export class ServicoRecomendacaoApplication {
     }
   }
 
-  /**
-   * Gera resposta de chat com recomendações
-   */
   async chat(dados: IChatRequestDTO): Promise<IChatResponseDTO> {
     const inicio = Date.now();
 
     try {
-      // Primeiro, gera recomendações
-      const recomendacao = await this.recomendar({
-        query: dados.mensagem,
-        clienteUuid: dados.clienteUuid,
-        limite: 5,
-      });
+      const historicoNormalizado = this.normalizarHistorico(dados.historico);
+      const contextoCliente = await this.obterContextoCliente(dados.clienteUuid);
 
-      // Constrói contexto para o chat
-      const contextoChat = this.construirContextoChat(recomendacao.produtos);
+      const intencao = await this.servicoInterpretacaoIntencao.interpretar(
+        dados.mensagem,
+        historicoNormalizado,
+        {
+          perfil: contextoCliente?.perfil,
+          resumoCompras: this.resumirCompras(contextoCliente),
+        }
+      );
 
-      // Converte histórico para formato do Gemini
-      const historicoGemini = dados.historico?.map((msg) => ({
-        papel: msg.papel === 'assistant' ? 'model' : 'user',
-        conteudo: msg.conteudo,
-      }));
+      const intencaoResumida = this.resumirIntencao(intencao);
 
-      // Gera resposta usando Gemini
+      if (intencao.precisaEsclarecer) {
+        const respostaEsclarecimento = await this.adapterLangChain.gerarRespostaChat(
+          dados.mensagem,
+          'Nenhum livro — modo esclarecimento.',
+          this.converterHistoricoGemini(historicoNormalizado),
+          {
+            modoEsclarecimento: true,
+            perguntasFollowUp: intencao.perguntasEsclarecimento,
+            perfil: contextoCliente?.perfil,
+          }
+        );
+
+        return {
+          resposta: respostaEsclarecimento,
+          produtosRecomendados: [],
+          contextoUsado: contextoCliente !== null,
+          tempoRespostaMs: Date.now() - inicio,
+          tipoResposta: 'esclarecimento',
+          perguntasFollowUp: intencao.perguntasEsclarecimento,
+          intencaoResumida,
+        };
+      }
+
+      const limite = intencao.quantidadeLivros || 5;
+      let produtosBrutos: ProdutoRecomendado[] = [];
+
+      if (intencao.tipo === 'comparativo' && intencao.comparar && intencao.comparar.length >= 2) {
+        produtosBrutos = await this.recomendarComparativo(
+          intencao,
+          contextoCliente,
+          limite
+        );
+      } else {
+        const queryEnriquecida = this.montarQueryEnriquecida(
+          intencao.queryBusca || dados.mensagem,
+          intencao,
+          contextoCliente
+        );
+        const resultado = await this.executarPipelineRecomendacao(
+          queryEnriquecida,
+          contextoCliente,
+          { intencao, limite }
+        );
+        produtosBrutos = resultado.produtos;
+      }
+
+      const produtosDTO = this.removerDuplicatasEOrdenar(produtosBrutos, limite);
+      const contextoChat = this.construirContextoChat(produtosDTO);
+
       const resposta = await this.adapterLangChain.gerarRespostaChat(
         dados.mensagem,
         contextoChat,
-        historicoGemini
+        this.converterHistoricoGemini(historicoNormalizado),
+        { perfil: contextoCliente?.perfil }
       );
-
-      const tempoResposta = Date.now() - inicio;
 
       return {
         resposta,
-        produtosRecomendados: recomendacao.produtos,
-        contextoUsado: recomendacao.contextoUsado,
-        tempoRespostaMs: tempoResposta,
+        produtosRecomendados: produtosDTO,
+        contextoUsado: contextoCliente !== null,
+        tempoRespostaMs: Date.now() - inicio,
+        tipoResposta: 'recomendacao',
+        intencaoResumida,
       };
     } catch (erro) {
       const mensagem = erro instanceof Error ? erro.message : String(erro);
@@ -141,24 +184,150 @@ export class ServicoRecomendacaoApplication {
     }
   }
 
-  // ─── Métodos privados extraídos de recomendar() ──────────────────────────────
+  private async executarPipelineRecomendacao(
+    query: string,
+    contextoCliente: IContextoRecomendacao | null,
+    opcoes: OpcoesRecomendacaoInterna
+  ): Promise<RecomendacaoResultado> {
+    const queryEmbedding = await this.gerarEmbeddingQuery(query);
+    const produtosExistentes = await this.buscarTodosProdutosExistentes();
+    const limite = opcoes.limite ?? opcoes.intencao?.quantidadeLivros ?? 5;
+    const usarMMR = limite > 1;
 
-  /**
-   * Gera o vetor de embedding da query via adapter LangChain/Gemini.
-   *
-   * @param query Texto da busca inserido pelo usuário.
-   * @returns     Vetor numérico de embedding da query.
-   */
+    const resultadoRag = await this.servicoRecomendacaoRAG.gerarRecomendacao(
+      query,
+      queryEmbedding,
+      contextoCliente,
+      produtosExistentes,
+      Math.max(limite * 2, 10),
+      usarMMR
+    );
+
+    const filtros = opcoes.intencao
+      ? this.servicoFiltroCatalogo.filtrosDeIntencao(opcoes.intencao)
+      : {};
+    const { produtos: produtosFiltrados } = this.servicoFiltroCatalogo.aplicar(
+      resultadoRag.produtos,
+      filtros
+    );
+
+    return {
+      ...resultadoRag,
+      produtos: produtosFiltrados.slice(0, limite),
+      query: opcoes.queryTexto ?? query,
+    };
+  }
+
+  private async recomendarComparativo(
+    intencao: IntencaoRecomendacao,
+    contextoCliente: IContextoRecomendacao | null,
+    limite: number
+  ): Promise<ProdutoRecomendado[]> {
+    const titulos = intencao.comparar ?? [];
+    const porUuid = new Map<string, ProdutoRecomendado>();
+
+    for (const titulo of titulos.slice(0, 3)) {
+      const query = `${titulo} ${intencao.generos.join(' ')}`;
+      const resultado = await this.executarPipelineRecomendacao(query, contextoCliente, {
+        intencao: { ...intencao, quantidadeLivros: 1 },
+        limite: 2,
+      });
+
+      for (const produto of resultado.produtos) {
+        if (!porUuid.has(produto.uuid)) {
+          porUuid.set(produto.uuid, produto);
+        }
+      }
+    }
+
+    return Array.from(porUuid.values()).slice(0, limite);
+  }
+
+  private montarQueryEnriquecida(
+    queryBase: string,
+    intencao: IntencaoRecomendacao,
+    contexto: IContextoRecomendacao | null
+  ): string {
+    const partes = [queryBase];
+
+    if (intencao.generos.length > 0) {
+      partes.push(`Gêneros: ${intencao.generos.join(', ')}`);
+    }
+    if (intencao.publicoAlvo) {
+      partes.push(`Público: ${intencao.publicoAlvo}`);
+    }
+    if (intencao.precoMax !== undefined) {
+      partes.push(`Preço até R$ ${intencao.precoMax}`);
+    }
+    if (contexto?.preferencias.categorias.length) {
+      partes.push(`Preferências: ${contexto.preferencias.categorias.join(', ')}`);
+    }
+    if (contexto?.perfil?.estado) {
+      partes.push(`Região: ${contexto.perfil.estado}`);
+    }
+
+    return partes.join('. ');
+  }
+
+  private normalizarHistorico(historico?: MensagemChatDTO[]): MensagemChatDTO[] | undefined {
+    if (!historico) {
+      return undefined;
+    }
+
+    return historico.map((msg) => ({
+      conteudo: msg.conteudo,
+      papel: this.normalizarPapelMensagem(msg),
+      timestamp: msg.timestamp,
+    }));
+  }
+
+  private normalizarPapelMensagem(msg: MensagemChatDTO): 'user' | 'assistant' {
+    if (msg.papel === 'user' || msg.papel === 'assistant') {
+      return msg.papel;
+    }
+    if (msg.remetente === 'usuario') {
+      return 'user';
+    }
+    if (msg.remetente === 'assistente') {
+      return 'assistant';
+    }
+    return 'user';
+  }
+
+  private converterHistoricoGemini(
+    historico?: MensagemChatDTO[]
+  ): { papel: 'user' | 'model'; conteudo: string }[] | undefined {
+    return historico?.map((msg) => ({
+      papel: msg.papel === 'assistant' ? 'model' : 'user',
+      conteudo: msg.conteudo,
+    }));
+  }
+
+  private resumirCompras(contexto: IContextoRecomendacao | null): string | undefined {
+    if (!contexto || contexto.historicoCompras.length === 0) {
+      return undefined;
+    }
+    return contexto.historicoCompras
+      .slice(0, 5)
+      .map((c) => `${c.titulo} (${c.categoria})`)
+      .join('; ');
+  }
+
+  private resumirIntencao(intencao: IntencaoRecomendacao): string {
+    const partes = [intencao.tipo];
+    if (intencao.generos.length) {
+      partes.push(intencao.generos.join(', '));
+    }
+    if (intencao.precoMax) {
+      partes.push(`até R$${intencao.precoMax}`);
+    }
+    return partes.join(' · ');
+  }
+
   private async gerarEmbeddingQuery(query: string): Promise<number[]> {
     return this.adapterLangChain.gerarEmbedding(query);
   }
 
-  /**
-   * Obtém o contexto de histórico e preferências do cliente, quando disponível.
-   *
-   * @param clienteUuid Identificador público do cliente (opcional).
-   * @returns           Contexto do cliente ou null se não informado.
-   */
   private async obterContextoCliente(
     clienteUuid?: string
   ): Promise<IContextoRecomendacao | null> {
@@ -168,18 +337,6 @@ export class ServicoRecomendacaoApplication {
     return this.repositorioContextoCliente.buscarContexto(clienteUuid);
   }
 
-  /**
-   * Remove produtos duplicados mantendo o de maior similaridade por UUID,
-   * ordena por relevância decrescente e limita ao número solicitado.
-   *
-   * O mesmo produto pode aparecer múltiplas vezes nos resultados do ChromaDB
-   * quando possui mais de um chunk indexado — esta etapa consolida essas
-   * ocorrências em um único item.
-   *
-   * @param produtos Lista bruta de produtos (pode conter duplicatas por chunks).
-   * @param limite   Número máximo de produtos a retornar.
-   * @returns        Lista deduplicada, ordenada por similaridade e limitada.
-   */
   private removerDuplicatasEOrdenar(
     produtos: ProdutoRecomendado[],
     limite: number
@@ -210,15 +367,6 @@ export class ServicoRecomendacaoApplication {
       .slice(0, limite);
   }
 
-  /**
-   * Constrói o DTO de resposta consolidando o resultado do domínio RAG,
-   * os produtos já processados e o tempo total de execução.
-   *
-   * @param resultado     Resultado bruto retornado pelo ServicoRecomendacaoRAG.
-   * @param produtosDTO   Produtos deduplicados e ordenados prontos para resposta.
-   * @param tempoResposta Tempo total de execução em milissegundos.
-   * @returns             DTO completo de resposta da recomendação.
-   */
   private construirResposta(
     resultado: RecomendacaoResultado,
     produtosDTO: ProdutoRecomendadoDTO[],
@@ -234,26 +382,12 @@ export class ServicoRecomendacaoApplication {
     };
   }
 
-  /**
-   * Registra o erro no log e o repropaga para a camada de infraestrutura.
-   *
-   * Declarado como `never` para que o TypeScript reconheça que este caminho
-   * nunca retorna normalmente, eliminando falsos avisos de "código inacessível".
-   *
-   * @param erro Exceção capturada no bloco catch de recomendar().
-   * @throws     Sempre relança o erro recebido sem modificação.
-   */
   private tratarErroRecomendacao(erro: unknown): never {
     const mensagem = erro instanceof Error ? erro.message : String(erro);
     Logger.error(`[ServicoRecomendacaoApplication] Erro ao recomendar: ${mensagem}`);
     throw erro;
   }
 
-  // ─── Métodos privados de suporte ao chat ──────────────────────────────────
-
-  /**
-   * Constrói contexto de chat a partir dos produtos recomendados
-   */
   private construirContextoChat(produtos: ProdutoRecomendadoDTO[]): string {
     if (produtos.length === 0) {
       return 'Nenhum produto encontrado.';
@@ -267,11 +401,6 @@ export class ServicoRecomendacaoApplication {
     return `Livros encontrados:\n${linhas.join('\n')}`;
   }
 
-  /**
-   * Busca métricas de recomendação registradas no período informado.
-   *
-   * @param periodo Intervalo de tempo desejado: 'hoje', 'semana', 'mes' ou 'todos'
-   */
   async buscarMetricas(periodo: PeriodoMetrica): Promise<IMetricaRecomendacao[]> {
     try {
       return await this.repositorioMetricasRecomendacao.buscarMetricas(periodo);
@@ -282,24 +411,18 @@ export class ServicoRecomendacaoApplication {
     }
   }
 
-  /**
-   * Busca métricas agregadas (médias e totais) de recomendação no período informado.
-   *
-   * @param periodo Intervalo de tempo desejado: 'hoje', 'semana', 'mes' ou 'todos'
-   */
   async buscarMetricasAgregadas(periodo: PeriodoMetrica): Promise<IMetricasAgregadas> {
     try {
       return await this.repositorioMetricasRecomendacao.buscarMetricasAgregadas(periodo);
     } catch (erro) {
       const mensagem = erro instanceof Error ? erro.message : String(erro);
-      Logger.error(`[ServicoRecomendacaoApplication] Erro ao buscar métricas agregadas: ${mensagem}`);
+      Logger.error(
+        `[ServicoRecomendacaoApplication] Erro ao buscar métricas agregadas: ${mensagem}`
+      );
       throw erro;
     }
   }
 
-  /**
-   * Verifica saúde do módulo de IA e dependências externas (ChromaDB e Gemini).
-   */
   async verificarSaude(): Promise<ISaudeIaResultado> {
     const [chromadbOk, geminiOk] = await Promise.all([
       this.repositorioEmbedding.verificarConexao(),
@@ -332,10 +455,9 @@ export class ServicoRecomendacaoApplication {
     };
   }
 
-  /**
-   * Reindexa todos os produtos no ChromaDB
-   */
-  async reindexarCatalogo(forcar: boolean = false): Promise<{ produtosIndexados: number; tempoExecucaoMs: number }> {
+  async reindexarCatalogo(
+    forcar: boolean = false
+  ): Promise<{ produtosIndexados: number; tempoExecucaoMs: number }> {
     const inicio = Date.now();
 
     try {
@@ -346,7 +468,9 @@ export class ServicoRecomendacaoApplication {
       const quantidade = await this.servicoIndexacaoProdutos.indexarCatalogo();
       const tempoExecucao = Date.now() - inicio;
 
-      Logger.info(`[ServicoRecomendacaoApplication] Catálogo reindexado: ${quantidade} produtos em ${tempoExecucao}ms`);
+      Logger.info(
+        `[ServicoRecomendacaoApplication] Catálogo reindexado: ${quantidade} produtos em ${tempoExecucao}ms`
+      );
 
       return {
         produtosIndexados: quantidade,
@@ -359,20 +483,19 @@ export class ServicoRecomendacaoApplication {
     }
   }
 
-  /**
-   * Busca todos os produtos existentes no banco de dados
-   * Usado para validação anti-alucinação
-   */
   private async buscarTodosProdutosExistentes(): Promise<Set<string>> {
     try {
       const livros = await this.servicoLivros.listarParaAdmin(10000);
       const uuids = new Set(livros.map((livro) => livro.uuid));
-      Logger.info(`[ServicoRecomendacaoApplication] ${uuids.size} produtos encontrados no BD para validação`);
+      Logger.info(
+        `[ServicoRecomendacaoApplication] ${uuids.size} produtos encontrados no BD para validação`
+      );
       return uuids;
     } catch (erro) {
       const mensagem = erro instanceof Error ? erro.message : String(erro);
-      Logger.error(`[ServicoRecomendacaoApplication] Erro ao buscar produtos existentes: ${mensagem}`);
-      // Retorna set vazio em caso de erro para não quebrar o fluxo
+      Logger.error(
+        `[ServicoRecomendacaoApplication] Erro ao buscar produtos existentes: ${mensagem}`
+      );
       return new Set<string>();
     }
   }

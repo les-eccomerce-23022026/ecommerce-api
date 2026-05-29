@@ -4,8 +4,17 @@
  * Representa o contexto usado para gerar recomendações personalizadas,
  * incluindo histórico de compras e preferências do cliente.
  */
+export interface IPerfilClienteRecomendacao {
+  idadeAnos?: number;
+  genero?: string;
+  estado?: string;
+  cidade?: string;
+  nome?: string;
+}
+
 export interface IContextoRecomendacao {
   clienteUuid: string;
+  perfil?: IPerfilClienteRecomendacao;
   historicoCompras: {
     produtoUuid: string;
     titulo: string;
