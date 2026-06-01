@@ -18,6 +18,27 @@ export const mockInterpretarIntencao = jest.fn().mockResolvedValue({
 });
 export const mockValidarConexaoGemini = jest.fn().mockResolvedValue(true);
 
+// ── Mocks do RepositorioRecomendacaoPostgres ────────────────────────────────
+// IRepositorioContextoCliente
+export const mockBuscarContexto = jest.fn().mockResolvedValue(null);
+// IRepositorioTendencias (pos_venda e tendencias)
+export const mockBuscarPedidosRecentes = jest.fn().mockResolvedValue([]);
+export const mockBuscarTendenciasPorCategoria = jest.fn().mockResolvedValue([]);
+export const mockBuscarTendenciasPorFaixaEtaria = jest.fn().mockResolvedValue([]);
+// IRepositorioMetricasRecomendacao
+export const mockSalvarMetrica = jest.fn().mockResolvedValue(undefined);
+export const mockBuscarMetricasRepositorio = jest.fn().mockResolvedValue([]);
+export const mockBuscarMetricasAgregadasRepositorio = jest.fn().mockResolvedValue({
+  periodo: 'todos',
+  totalRecomendacoes: 0,
+  tempoRespostaMedio: 0,
+  precisaoMedia: 0,
+  recallMedio: 0,
+  f1ScoreMedio: 0,
+  relevanciaSemanticaMedia: 0,
+  taxaErro: 0,
+});
+
 export const mockCriarEmbedding = jest.fn().mockResolvedValue({
   id: 0,
   uuid: 'embed-uuid-padrao',
@@ -72,6 +93,18 @@ jest.mock('@/modules/ia/infrastructure/repositories/RepositorioEmbeddingChromaDB
   })),
 }));
 
+jest.mock('@/modules/ia/infrastructure/repositories/RepositorioRecomendacaoPostgres', () => ({
+  RepositorioRecomendacaoPostgres: jest.fn().mockImplementation(() => ({
+    buscarContexto: mockBuscarContexto,
+    buscarPedidosRecentes: mockBuscarPedidosRecentes,
+    buscarTendenciasPorCategoria: mockBuscarTendenciasPorCategoria,
+    buscarTendenciasPorFaixaEtaria: mockBuscarTendenciasPorFaixaEtaria,
+    salvarMetrica: mockSalvarMetrica,
+    buscarMetricas: mockBuscarMetricasRepositorio,
+    buscarMetricasAgregadas: mockBuscarMetricasAgregadasRepositorio,
+  })),
+}));
+
 jest.mock('@/modules/ia/application/services/ServicoIndexacaoProdutos', () => ({
   ServicoIndexacaoProdutos: jest.fn().mockImplementation(() => ({
     indexarCatalogo: mockIndexarCatalogo,
@@ -80,7 +113,7 @@ jest.mock('@/modules/ia/application/services/ServicoIndexacaoProdutos', () => ({
   })),
 }));
 
-/** Reinicia contadores dos mocks entre testes (opcional). */
+/** Reinicia contadores e implementações dos mocks entre testes (opcional). */
 export function reiniciarMocksIa(): void {
   jest.clearAllMocks();
   mockGerarEmbedding.mockResolvedValue([0.1, 0.2, 0.3, 0.4, 0.5]);
@@ -98,4 +131,11 @@ export function reiniciarMocksIa(): void {
   mockBuscarSimilares.mockResolvedValue([]);
   mockIndexarCatalogo.mockResolvedValue(0);
   mockVerificarConexaoChroma.mockResolvedValue(true);
+  // RepositorioRecomendacaoPostgres
+  mockBuscarContexto.mockResolvedValue(null);
+  mockBuscarPedidosRecentes.mockResolvedValue([]);
+  mockBuscarTendenciasPorCategoria.mockResolvedValue([]);
+  mockBuscarTendenciasPorFaixaEtaria.mockResolvedValue([]);
+  mockSalvarMetrica.mockResolvedValue(undefined);
+  mockBuscarMetricasRepositorio.mockResolvedValue([]);
 }

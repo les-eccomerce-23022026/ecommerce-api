@@ -8,6 +8,10 @@ import {
   corpoAgendarEntrega,
   criarVendaPedido,
 } from '@/tests/helpers/vendas-admin-fluxo.helper';
+import { 
+  gerarPayloadPedido,
+  validarConsistenciaPrecos
+} from '@/tests/helpers/precos-catalogo.helper';
 
 async function logApi(reqPromise: Promise<import('supertest').Response>) {
   const res = await reqPromise;
@@ -41,6 +45,11 @@ describe('Integração — Vendas / fluxo administrativo', () => {
     tokenAdminSistema = await obterTokenAdmin(app);
     const criado = await criarAdminComumObterToken(app, tokenAdminSistema);
     tokenAdminComum = criado.token;
+  });
+
+  beforeEach(async () => {
+    // Validar consistência de preços antes de cada teste
+    await validarConsistenciaPrecos(contexto.db!);
   });
 
   describe('Cenários felizes', () => {

@@ -14,7 +14,7 @@ export const LIVRO_UUID_TESTE = 'a1b2c3d4-e5f6-7890-1234-56789abcdef0';
 export async function alinharPrecoVendaLivroTeste(
   db: IConexaoBanco,
   livroUuid: string,
-  precoVenda = 50,
+  precoVenda = 79.90,
 ): Promise<void> {
   await db.executar(
     `UPDATE livraria_comercial.estoques e
@@ -37,7 +37,7 @@ export async function obterPrecoVendaLivroTeste(
     [livroUuid],
   );
   if (!rows.length) {
-    return 50;
+    return 79.90;
   }
   return Number(rows[0].preco);
 }
@@ -49,7 +49,7 @@ export function payloadPedidoValido(livroUuid: string, opcoes?: {
   [key: string]: unknown;
 }): Record<string, unknown> {
   const { precoUnitario, quantidade, valorFrete, ...extras } = opcoes || {};
-  const preco = precoUnitario ?? 50;
+  const preco = precoUnitario ?? 79.90;
   const qtd = quantidade ?? 1;
   const frete = valorFrete ?? 10;
   const totalItens = preco * qtd;

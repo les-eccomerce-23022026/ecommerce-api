@@ -1,7 +1,12 @@
 import request from 'supertest';
 import { configurarTesteIntegracao } from '@/tests/helpers/setup-integracao.util';
 import { obterTokenCliente, obterTokenAdmin, mudarStatusVendaTeste } from '@/tests/helpers/requisicoes-api.util';
-import { LIVRO_UUID_TESTE } from '@/tests/helpers/pedido-venda.helper';
+import { 
+  LIVRO_UUID_TESTE, 
+  gerarPayloadPedido,
+  obterPrecoCatalogo,
+  validarConsistenciaPrecos
+} from '@/tests/helpers/precos-catalogo.helper';
 
 describe('Integração - Troca e Devolução (Sprint 2)', () => {
   const contexto = configurarTesteIntegracao();
@@ -13,17 +18,22 @@ describe('Integração - Troca e Devolução (Sprint 2)', () => {
     tokenAdmin = await obterTokenAdmin(contexto.app);
   });
 
+  beforeEach(async () => {
+    // Validar consistência de preços antes de cada teste
+    await validarConsistenciaPrecos(contexto.db!);
+  });
+
   async function criarPedidoEntregue() {
-    // 1. Criar Venda
+    // 1. Criar Venda com preço dinâmico do catálogo
+    const payload = await gerarPayloadPedido(contexto.db!, LIVRO_UUID_TESTE, {
+      quantidade: 1,
+      valorFrete: 10
+    });
+    
     const resVenda = await request(contexto.app)
       .post('/api/vendas')
       .set('Authorization', `Bearer ${tokenCliente}`)
-      .send({
-        itens: [{ livroUuid: LIVRO_UUID_TESTE, quantidade: 1, precoUnitario: 100 }],
-        valorTotalItens: 100,
-        valorFrete: 10,
-        valorTotal: 110,
-      });
+      .send(payload);
     const vendaUuid = resVenda.body.id as string;
 
     // 2. Mudar para ENTREGUE e registrar data de entrega (necessário para o prazo de 7 dias — RN0043)
@@ -85,7 +95,10 @@ describe('Integração - Troca e Devolução (Sprint 2)', () => {
 
     expect(resConfirmar.status).toBe(200);
     expect(resConfirmar.body.pedido.status).toBe('CONCLUÍDA');
-    expect(resConfirmar.body.cupomGerado.valor).toBe(100); // Valor do item
+    
+    // Obter preço dinâmico do catálogo para validação
+    const precoItem = await obterPrecoCatalogo(contexto.db!, LIVRO_UUID_TESTE);
+    expect(resConfirmar.body.cupomGerado.valor).toBe(precoItem); // Valor do item
     expect(resConfirmar.body.cupomGerado.codigo).toMatch(/^TROCA-/);
 
     // 4. Verificar se cupom existe no banco
@@ -95,7 +108,7 @@ describe('Integração - Troca e Devolução (Sprint 2)', () => {
     
     const cupom = resCupom.body.cuponsDisponiveis.find((c: { codigo: string }) => c.codigo === resConfirmar.body.cupomGerado.codigo);
     expect(cupom).toBeDefined();
-    expect(cupom.valor).toBe(100);
+    expect(cupom.valor).toBe(precoItem);
   });
 
   it('S2-C: Troca rejeitada', async () => {
