@@ -68,7 +68,9 @@ export function criarAplicacao(): Application {
   // Configura os middlewares globais ANTES das rotas.
   app.use(express.json());
   app.use(contextoLojaMiddleware);
-  // app.use(middlewareTrocaBanco);
+  if (process.env.NODE_ENV === 'test' || process.env.ENABLE_TEST_DB_SWITCH === 'true') {
+    app.use(middlewareTrocaBanco);
+  }
 
   // Instanciar serviços mock de logística
   const repoRastreamento = new RepositorioRastreamentoPostgres(db);

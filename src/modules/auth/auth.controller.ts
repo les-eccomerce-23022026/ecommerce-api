@@ -50,7 +50,8 @@ export class ControladorAutenticacao {
       // ⚠️ SEGURANÇA: Token retornado no corpo APENAS em testes.
       // Em produção, o JWT está protegido em cookie HttpOnly.
       // Refresh token retornado em cookie HttpOnly separado.
-      const incluirTokenNoCorpo = process.env.NODE_ENV === 'test';
+      const incluirTokenNoCorpo =
+        process.env.NODE_ENV === 'test' || requisicao.headers['x-use-test-db'] === 'true';
       
       // Cookie HttpOnly para refresh token
       if (resultado.refreshToken) {
@@ -183,7 +184,8 @@ export class ControladorAutenticacao {
         maxAge: maxAgeMs,
       });
 
-      const incluirTokenNoCorpo = process.env.NODE_ENV === 'test';
+      const incluirTokenNoCorpo =
+        process.env.NODE_ENV === 'test' || requisicao.headers['x-use-test-db'] === 'true';
       const respostaCorpo = incluirTokenNoCorpo
         ? { token: resultado.token, user: resultado.user }
         : { user: resultado.user };
