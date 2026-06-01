@@ -35,16 +35,44 @@ export interface IChatRequestDTO {
   historico?: MensagemChatDTO[];
 }
 
-export type TipoRespostaChat = 'recomendacao' | 'esclarecimento';
+/**
+ * Tipo de resposta do assistente de chat.
+ *
+ * - recomendacao  : sugestão de livros do catálogo via RAG
+ * - esclarecimento: assistente pediu mais informações ao cliente
+ * - comparativo   : comparação entre dois ou mais livros
+ * - pos_venda     : resposta sobre pedidos, entregas ou trocas (sem inventar dados)
+ * - tendencias    : ranking de mais vendidos por categoria ou faixa etária
+ * - informacao    : políticas da loja, frete ou horários (apenas dados conhecidos)
+ */
+export type TipoRespostaChat =
+  | 'recomendacao'
+  | 'esclarecimento'
+  | 'comparativo'
+  | 'pos_venda'
+  | 'tendencias'
+  | 'informacao';
 
 export interface IChatResponseDTO {
   resposta: string;
+  /**
+   * Lista de produtos recomendados.
+   * Sempre vazia para `pos_venda` puro (sem pedido de livro relacionado).
+   */
   produtosRecomendados: ProdutoRecomendadoDTO[];
   contextoUsado: boolean;
   tempoRespostaMs: number;
   tipoResposta: TipoRespostaChat;
+  /** Turno atual da conversa (1 = primeira pergunta do cliente). */
+  numeroTurno: number;
   perguntasFollowUp?: string[];
   intencaoResumida?: string;
+}
+
+/** Produto citado em mensagem anterior do assistente (continuidade multi-turno) */
+export interface ProdutoMencionadoChatDTO {
+  uuid: string;
+  titulo: string;
 }
 
 /** Aceita papel (API) ou remetente (frontend legado) */
@@ -53,6 +81,8 @@ export interface MensagemChatDTO {
   remetente?: 'usuario' | 'assistente';
   conteudo: string;
   timestamp?: Date;
+  /** Livros exibidos na resposta do assistente — usado para não repetir sugestões */
+  produtosMencionados?: ProdutoMencionadoChatDTO[];
 }
 
 export interface IReindexarRequestDTO {

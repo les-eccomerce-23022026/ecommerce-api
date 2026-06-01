@@ -1,4 +1,9 @@
 import { IContextoRecomendacao } from '../entities/IContextoRecomendacao.entity';
+import {
+  IPedidoRecenteContexto,
+  ITendenciaCategoriaContexto,
+  ITendenciaFaixaEtariaContexto,
+} from '../entities/IContextoRecomendacao.entity';
 
 /**
  * Contrato de repositório para busca do contexto personalizado do cliente.
@@ -37,15 +42,48 @@ export interface IRepositorioMetricasRecomendacao {
 }
 
 /**
+ * Contrato de repositório para dados de tendências e pós-venda do assistente.
+ *
+ * Segregado conforme ISP: consumidores que precisam de tendências e pedidos
+ * não dependem das operações de recomendação ou métricas.
+ */
+export interface IRepositorioTendencias {
+  /**
+   * Retorna os últimos pedidos realizados pelo cliente (máx. 10),
+   * usados no modo pós-venda para responder dúvidas de status e entrega.
+   */
+  buscarPedidosRecentes(clienteUuid: string): Promise<IPedidoRecenteContexto[]>;
+
+  /**
+   * Retorna os livros mais vendidos por categoria (vendas APROVADA/ENTREGUE).
+   * @param categorias - Filtro opcional de categorias; sem filtro retorna top 5 categorias gerais.
+   */
+  buscarTendenciasPorCategoria(categorias?: string[]): Promise<ITendenciaCategoriaContexto[]>;
+
+  /**
+   * Retorna os livros mais vendidos por faixa etária dos compradores.
+   * Faixas: 0-12 / 13-17 / 18-24 / 25-39 / 40-54 / 55+
+   */
+  buscarTendenciasPorFaixaEtaria(): Promise<ITendenciaFaixaEtariaContexto[]>;
+}
+
+/**
  * Interface de Repositório de Recomendação
  *
- * Composição de IRepositorioContextoCliente e IRepositorioMetricasRecomendacao.
- * Mantida para backward compatibility — implementações e consumidores existentes
- * continuam funcionando sem nenhuma alteração de assinatura.
+ * Composição completa para backward compatibility — implementações e consumidores
+ * existentes continuam funcionando sem nenhuma alteração de assinatura.
  */
 export interface IRepositorioRecomendacao
   extends IRepositorioContextoCliente,
-    IRepositorioMetricasRecomendacao {}
+    IRepositorioMetricasRecomendacao,
+    IRepositorioTendencias {}
+
+/** Re-exporta tipos de entidade para uso fora do módulo de domínio */
+export type {
+  IPedidoRecenteContexto,
+  ITendenciaCategoriaContexto,
+  ITendenciaFaixaEtariaContexto,
+};
 
 export interface IMetricaRecomendacao {
   id: number;
