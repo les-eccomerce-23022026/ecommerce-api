@@ -57,8 +57,9 @@ const servicoInterpretacaoIntencao = new ServicoInterpretacaoIntencao(adapterLan
 
 const servicoRecomendacao = new ServicoRecomendacaoApplication(
   repositorioEmbedding,
-  repositorioRecomendacao,
-  repositorioRecomendacao,
+  repositorioRecomendacao, // IRepositorioContextoCliente
+  repositorioRecomendacao, // IRepositorioMetricasRecomendacao
+  repositorioRecomendacao, // IRepositorioTendencias (pedidos + rankings)
   servicoGeracaoEmbedding,
   servicoValidacaoProdutos,
   servicoRecomendacaoRAG,

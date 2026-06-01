@@ -66,7 +66,13 @@ export class ServicoInterpretacaoIntencao {
       generos,
       precoMax: precoMatch ? Number(precoMatch[1]) : undefined,
       paginasMax: paginasMatch ? Number(paginasMatch[1]) : undefined,
-      quantidadeLivros: quantidadeMatch ? Math.min(Number(quantidadeMatch[1]), 5) : 1,
+      quantidadeLivros: quantidadeMatch
+        ? Math.min(Number(quantidadeMatch[1]), 5)
+        : texto.includes('mais vendidos') || texto.includes('vendidos') || texto.includes('popular')
+          ? 4
+          : generos.length > 0
+            ? 4
+            : 1,
       precisaEsclarecer: ambiguo,
       perguntasEsclarecimento: ambiguo
         ? ['Para quem é o presente e qual a faixa etária do destinatário?']

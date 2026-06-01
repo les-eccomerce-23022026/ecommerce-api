@@ -34,27 +34,46 @@ export class ServicoRecomendacaoRAG {
   ): Promise<RecomendacaoResultado> {
     // Busca produtos similares no ChromaDB
     // O repositório aplica CONFIGURACAO_RECOMENDACAO.multiplicadorBusca e CONFIGURACAO_RECOMENDACAO.limiarSimilaridade internamente
+    const limiteBusca = Math.max(limite * 4, 30);
     const produtosSimilares = await this.repositorioEmbedding.buscarSimilares(
       queryEmbedding,
-      limite
+      limiteBusca
     );
 
-    // Filtra apenas produtos que existem no BD (anti-alucinação)
-    const produtosValidos = this.servicoValidacaoProdutos.filtrarProdutosExistentes(
-      produtosSimilares.map((p) => p.produtoUuid),
-      produtosExistentes
+    // Um livro pode ter vários chunks no Chroma — mantém o melhor score por produtoUuid
+    const melhorPorProduto = new Map<
+      string,
+      { produtoUuid: string; similaridade: number; metadados: Record<string, unknown> }
+    >();
+    for (const candidato of produtosSimilares) {
+      if (!candidato.produtoUuid) {
+        continue;
+      }
+      const atual = melhorPorProduto.get(candidato.produtoUuid);
+      if (!atual || candidato.similaridade > atual.similaridade) {
+        melhorPorProduto.set(candidato.produtoUuid, candidato);
+      }
+    }
+
+    const candidatosUnicos = Array.from(melhorPorProduto.values()).sort(
+      (a, b) => b.similaridade - a.similaridade
     );
+
+    // Filtra apenas produtos que existem no BD (anti-alucinação), ignorando embeddings órfãos
+    const produtosValidos = candidatosUnicos
+      .filter((p) => produtosExistentes.has(p.produtoUuid))
+      .map((p) => p.produtoUuid);
 
     // Personaliza baseado no contexto do cliente (antes do slice para MMR ter mais candidatos)
     const produtosPersonalizados = this.personalizarRecomendacao(
       produtosValidos,
-      produtosSimilares,
+      candidatosUnicos,
       contextoCliente
     );
 
     // Aplica MMR reranking se habilitado (quantidade > 1)
     const produtosFinaisMMR = usarMMR
-      ? this.aplicarMMR(produtosPersonalizados, produtosSimilares, limite)
+      ? this.aplicarMMR(produtosPersonalizados, candidatosUnicos, limite)
       : produtosPersonalizados.slice(0, limite);
 
     return {
