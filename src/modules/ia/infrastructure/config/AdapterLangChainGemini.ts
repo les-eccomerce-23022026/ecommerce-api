@@ -168,6 +168,15 @@ export class AdapterLangChainGemini implements IAdapterEmbedding {
 
   /**
    * Interpreta intenção da mensagem com saída JSON estruturada (Gemini Flash Lite).
+   *
+   * Classifica a mensagem em um dos tipos:
+   * - recomendacao  : pedido de indicação de livros
+   * - esclarecimento: mensagem vaga que precisa de mais detalhes
+   * - comparativo   : comparação entre livros
+   * - conversa      : bate-papo sem intenção de compra
+   * - pos_venda     : dúvidas sobre pedido, entrega, status ou troca
+   * - tendencias    : mais vendidos por categoria, faixa etária ou ranking geral
+   * - informacao    : políticas da loja, frete, horário de atendimento
    */
   async interpretarIntencao(
     mensagem: string,
@@ -215,16 +224,35 @@ export class AdapterLangChainGemini implements IAdapterEmbedding {
 
     const historicoTexto =
       historico
-        ?.map((m) => `${m.papel}: ${m.conteudo}`)
+        ?.map((m) => {
+          const papel =
+            m.papel ??
+            (m.remetente === 'assistente' ? 'assistant' : 'user');
+          return `${papel}: ${m.conteudo}`;
+        })
         .join('\n') ?? '';
 
     const prompt = [
-      'Você extrai intenção de busca de livros em uma livraria online.',
+      'Você classifica intenções em um assistente de livraria online (pré-venda e pós-venda).',
       'Responda apenas JSON válido conforme o schema.',
-      'Use precisaEsclarecer=true apenas quando a mensagem for vaga (ex.: "um presente", "me indica algo") SEM gênero ou tema literário claro.',
-      'Se o usuário citar gênero ou tema (terror, mistério, romance, fantasia, ficção científica), use precisaEsclarecer=false e preencha generos.',
-      'queryBusca deve ser texto otimizado para busca semântica (sem cumprimentos).',
-      'generos: minúsculas, sem acento quando possível (terror, misterio, romance, fantasia, ficcao_cientifica, romance_historico).',
+      '',
+      'CLASSIFICAÇÃO DO CAMPO "tipo":',
+      '- "recomendacao"   : cliente pede indicação, sugestão ou ajuda para escolher livros.',
+      '- "esclarecimento" : mensagem vaga sem gênero/tema claro (ex.: "um presente", "me indica algo").',
+      '- "comparativo"    : cliente quer comparar dois ou mais livros específicos.',
+      '- "conversa"       : bate-papo sem intenção clara de compra ou pós-venda.',
+      '- "pos_venda"      : dúvidas sobre pedido, status de entrega, prazo de troca ou como cancelar.',
+      '- "tendencias"     : perguntas sobre mais vendidos, livros populares, ranking por categoria ou faixa etária.',
+      '- "informacao"     : perguntas sobre políticas da loja, frete, prazo de entrega estimado ou horário de atendimento.',
+      '',
+      'REGRAS ADICIONAIS:',
+      'Use precisaEsclarecer=true APENAS quando o tipo for "recomendacao" ou "esclarecimento" e a mensagem for vaga SEM gênero ou tema literário claro.',
+      'Para tipos pos_venda, tendencias e informacao: sempre use precisaEsclarecer=false.',
+      'Se o usuário citar gênero/tema (terror, mistério, romance, fantasia, ficção científica), use precisaEsclarecer=false e preencha generos.',
+      'Com histórico de chat: trate a mensagem atual como continuação — mantenha gêneros e critérios já citados; refinamentos ("mais barato", "mais curto", "outro") são tipo recomendacao.',
+      'queryBusca deve ser texto otimizado para busca semântica (sem cumprimentos), incorporando contexto do histórico quando relevante.',
+      'Para tipo "tendencias" ou pedidos de "mais vendidos"/ranking: use quantidadeLivros entre 4 e 5.',
+      'generos: minúsculas, sem acento (terror, misterio, romance, fantasia, ficcao_cientifica, romance_historico).',
       `Perfil do cliente: ${JSON.stringify(contexto.perfil ?? {})}`,
       `Histórico de compras (resumo): ${contexto.resumoCompras ?? 'nenhum'}`,
       historicoTexto ? `Histórico do chat:\n${historicoTexto}` : '',
@@ -237,15 +265,30 @@ export class AdapterLangChainGemini implements IAdapterEmbedding {
     const texto = resultado.response.text();
     const parsed = JSON.parse(texto) as IntencaoRecomendacao;
 
+    const quantidadePadrao = parsed.tipo === 'tendencias' ? 5 : 1;
+    const quantidadeMinima = parsed.tipo === 'tendencias' ? 4 : 1;
+
     return {
       ...parsed,
-      quantidadeLivros: Math.min(Math.max(parsed.quantidadeLivros || 1, 1), 5),
+      quantidadeLivros: Math.min(
+        Math.max(parsed.quantidadeLivros || quantidadePadrao, quantidadeMinima),
+        5
+      ),
       generos: parsed.generos ?? [],
     };
   }
 
   /**
-   * Gera resposta de chat com Gemini Flash Lite, restrita ao catálogo fornecido.
+   * Gera resposta de chat com Gemini Flash Lite.
+   *
+   * O assistente atua como especialista em pré-venda (recomendações de livros) e
+   * pós-venda (pedidos, status, entregas, trocas). Usa APENAS os dados do contexto
+   * fornecido — nunca inventa informações.
+   *
+   * @param pergunta         Mensagem atual do cliente
+   * @param contexto         Texto com os dados de referência (catálogo, pedidos ou tendências)
+   * @param historicoConversa Histórico da conversa para manter continuidade
+   * @param opcoes           Opções adicionais de personalização do modo de resposta
    */
   async gerarRespostaChat(
     pergunta: string,
@@ -255,6 +298,8 @@ export class AdapterLangChainGemini implements IAdapterEmbedding {
       modoEsclarecimento?: boolean;
       perguntasFollowUp?: string[];
       perfil?: { idadeAnos?: number; estado?: string; nome?: string };
+      /** Ativa modo pós-venda: contexto contém pedidos, não catálogo */
+      modoPosvenda?: boolean;
     }
   ): Promise<string> {
     try {
@@ -272,11 +317,23 @@ export class AdapterLangChainGemini implements IAdapterEmbedding {
 
       const tomPerfil = this.montarInstrucaoTomPerfil(opcoes?.perfil);
 
+      const regrasPosvenda = opcoes?.modoPosvenda
+        ? [
+            'MODO PÓS-VENDA ativo: responda APENAS com base nos pedidos listados no contexto.',
+            'Nunca invente status de pedido, datas de entrega ou números de rastreamento.',
+            'Se o pedido não estiver na lista, informe que não encontrou e oriente o cliente a acessar "Meus Pedidos" ou contactar o suporte humano.',
+          ].join(' ')
+        : null;
+
       const systemInstruction = [
-        'Você é o assistente de recomendação de uma livraria brasileira.',
-        'Use APENAS os livros listados no contexto — nunca invente títulos, autores ou preços.',
-        'Se o contexto não tiver livros, diga honestamente que não encontrou correspondências.',
+        'Você é o assistente de uma livraria brasileira, especialista em recomendação de livros (pré-venda) e atendimento pós-venda (pedidos, entregas, trocas).',
+        'Use APENAS os dados fornecidos no contexto — nunca invente títulos, autores, preços, status de pedido ou rankings.',
+        'Se o contexto não tiver a informação solicitada, diga honestamente e oriente o cliente para "Meus Pedidos" ou para o suporte humano quando necessário.',
         'Responda em português do Brasil, de forma acolhedora e objetiva.',
+        'Formate a resposta em tópicos curtos: use linhas iniciadas com "• " (não escreva parágrafos longos).',
+        'Estruture com 3 a 5 tópicos quando possível (ex.: saudação, destaques, preços, próximo passo).',
+        'Cada tópico deve ter no máximo uma frase objetiva.',
+        regrasPosvenda,
         tomPerfil,
       ]
         .filter(Boolean)
@@ -293,11 +350,15 @@ export class AdapterLangChainGemini implements IAdapterEmbedding {
         }
       }
 
+      const rotuloContexto = opcoes?.modoPosvenda
+        ? 'Contexto de pedidos (única fonte de verdade)'
+        : 'Contexto (única fonte de verdade)';
+
       contents.push({
         role: 'user',
         parts: [
           {
-            text: `Contexto do catálogo (única fonte de verdade):\n${contexto}\n\nPergunta do cliente: ${pergunta}`,
+            text: `${rotuloContexto}:\n${contexto}\n\nPergunta do cliente: ${pergunta}`,
           },
         ],
       });

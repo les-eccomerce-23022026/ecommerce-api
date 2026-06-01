@@ -2,12 +2,19 @@ import { Pool } from 'pg';
 import {
   IRepositorioContextoCliente,
   IRepositorioMetricasRecomendacao,
+  IRepositorioTendencias,
   IMetricaRecomendacao,
   ICriarMetricaRecomendacaoDto,
   PeriodoMetrica,
   IMetricasAgregadas,
 } from '../../domain/repositories/IRepositorioRecomendacao';
 import { IContextoRecomendacao } from '../../domain/entities/IContextoRecomendacao.entity';
+import {
+  IPedidoRecenteContexto,
+  ITendenciaCategoriaContexto,
+  ITendenciaFaixaEtariaContexto,
+} from '../../domain/entities/IContextoRecomendacao.entity';
+import { STATUS_VENDAS } from '@/modules/vendas/constants/statusVendas.constant';
 import { Logger } from '@/shared/utils/Logger.util';
 
 /**
@@ -17,8 +24,32 @@ import { Logger } from '@/shared/utils/Logger.util';
  * IRepositorioMetricasRecomendacao (métricas de avaliação) de forma segregada,
  * respeitando o Princípio da Segregação de Interfaces (ISP).
  */
+/**
+ * Status de venda que indicam transações concluídas para fins de tendências.
+ * Usados nas queries de ranking para excluir pedidos cancelados ou em aberto.
+ */
+const STATUS_VENDAS_CONCLUIDOS = [STATUS_VENDAS.APROVADA, STATUS_VENDAS.ENTREGUE] as const;
+
+/**
+ * Número máximo de títulos retornados por agrupamento (categoria ou faixa etária).
+ */
+const LIMITE_TITULOS_POR_GRUPO = 3;
+
+/**
+ * Número máximo de pedidos recentes retornados no modo pós-venda.
+ */
+const LIMITE_PEDIDOS_RECENTES = 10;
+
+/**
+ * Número máximo de categorias no ranking geral (sem filtro de categoria).
+ */
+const LIMITE_CATEGORIAS_GERAIS = 5;
+
 export class RepositorioRecomendacaoPostgres
-  implements IRepositorioContextoCliente, IRepositorioMetricasRecomendacao
+  implements
+    IRepositorioContextoCliente,
+    IRepositorioMetricasRecomendacao,
+    IRepositorioTendencias
 {
   constructor(private pool: Pool) {}
 
@@ -272,6 +303,184 @@ export class RepositorioRecomendacaoPostgres
       throw erro;
     }
   }
+
+  // ── IRepositorioTendencias ─────────────────────────────────────────────────
+
+  /**
+   * Retorna os últimos pedidos do cliente para suporte pós-venda.
+   * Inclui status descritivo, total da venda e quantidade de itens.
+   */
+  async buscarPedidosRecentes(clienteUuid: string): Promise<IPedidoRecenteContexto[]> {
+    try {
+      const query = `
+        SELECT
+          v.ven_uuid                AS uuid,
+          sv.stv_descricao          AS status,
+          v.ven_total_venda         AS total,
+          v.ven_criado_em           AS criado_em,
+          COUNT(iv.itv_id)::INT     AS qtd_itens
+        FROM livraria_comercial.vendas v
+        JOIN livraria_comercial.status_venda sv ON sv.stv_id = v.stv_id
+        JOIN livraria_gestao.usuarios u ON u.usu_id = v.usu_id
+        LEFT JOIN livraria_comercial.itens_venda iv ON iv.ven_id = v.ven_id
+        WHERE u.usu_uuid = $1
+        GROUP BY v.ven_uuid, v.ven_id, sv.stv_descricao, v.ven_total_venda, v.ven_criado_em
+        ORDER BY v.ven_criado_em DESC
+        LIMIT $2
+      `;
+
+      const resultado = await this.pool.query(query, [clienteUuid, LIMITE_PEDIDOS_RECENTES]);
+
+      return resultado.rows.map((row) => ({
+        uuid: row.uuid as string,
+        status: row.status as string,
+        total: Number(row.total),
+        criadoEm: new Date(row.criado_em as string),
+        qtdItens: Number(row.qtd_itens),
+      }));
+    } catch (erro) {
+      const mensagem = erro instanceof Error ? erro.message : String(erro);
+      Logger.error(`[RepositorioRecomendacaoPostgres] Erro ao buscar pedidos recentes: ${mensagem}`);
+      return [];
+    }
+  }
+
+  /**
+   * Retorna os livros mais vendidos agrupados por categoria.
+   * Considera apenas vendas com status APROVADA ou ENTREGUE.
+   *
+   * @param categorias Filtro opcional; sem filtro retorna top 5 categorias gerais.
+   */
+  async buscarTendenciasPorCategoria(categorias?: string[]): Promise<ITendenciaCategoriaContexto[]> {
+    try {
+      const temFiltro = categorias && categorias.length > 0;
+
+      /*
+       * A window function SUM(COUNT(...)) OVER (PARTITION BY categoria) calcula
+       * o volume total de vendas por categoria após o GROUP BY, permitindo
+       * ordenar as categorias do mais vendido para o menos vendido sem CTE.
+       */
+      const query = `
+        SELECT
+          c.cat_nome                                              AS categoria,
+          l.liv_titulo                                            AS titulo,
+          COUNT(iv.itv_id)                                       AS contagem,
+          SUM(COUNT(iv.itv_id)) OVER (PARTITION BY c.cat_nome)  AS volume_categoria
+        FROM livraria_comercial.itens_venda iv
+        JOIN livraria_comercial.livros l ON l.liv_uuid = iv.liv_uuid
+        JOIN livraria_comercial.livro_categorias lc ON lc.liv_id = l.liv_id
+        JOIN livraria_comercial.categorias c ON c.cat_id = lc.cat_id AND c.cat_ativo = TRUE
+        JOIN livraria_comercial.vendas v ON v.ven_id = iv.ven_id
+        JOIN livraria_comercial.status_venda sv ON sv.stv_id = v.stv_id
+        WHERE sv.stv_descricao = ANY($1::text[])
+          ${temFiltro ? 'AND c.cat_nome = ANY($2::text[])' : ''}
+        GROUP BY c.cat_nome, l.liv_titulo
+        ORDER BY volume_categoria DESC, contagem DESC
+      `;
+
+      const params: unknown[] = temFiltro
+        ? [STATUS_VENDAS_CONCLUIDOS, categorias]
+        : [STATUS_VENDAS_CONCLUIDOS];
+
+      const resultado = await this.pool.query(query, params);
+
+      return this.agruparTitulosPorGrupo<ITendenciaCategoriaContexto>(
+        resultado.rows,
+        'categoria',
+        LIMITE_CATEGORIAS_GERAIS
+      );
+    } catch (erro) {
+      const mensagem = erro instanceof Error ? erro.message : String(erro);
+      Logger.error(`[RepositorioRecomendacaoPostgres] Erro ao buscar tendências por categoria: ${mensagem}`);
+      return [];
+    }
+  }
+
+  /**
+   * Retorna os livros mais vendidos agrupados por faixa etária dos compradores.
+   * Faixas calculadas a partir de usu_data_nascimento.
+   * Considera apenas vendas APROVADA ou ENTREGUE.
+   */
+  async buscarTendenciasPorFaixaEtaria(): Promise<ITendenciaFaixaEtariaContexto[]> {
+    try {
+      const query = `
+        SELECT
+          CASE
+            WHEN EXTRACT(YEAR FROM AGE(NOW(), u.usu_data_nascimento))::INT BETWEEN 0  AND 12 THEN '0-12'
+            WHEN EXTRACT(YEAR FROM AGE(NOW(), u.usu_data_nascimento))::INT BETWEEN 13 AND 17 THEN '13-17'
+            WHEN EXTRACT(YEAR FROM AGE(NOW(), u.usu_data_nascimento))::INT BETWEEN 18 AND 24 THEN '18-24'
+            WHEN EXTRACT(YEAR FROM AGE(NOW(), u.usu_data_nascimento))::INT BETWEEN 25 AND 39 THEN '25-39'
+            WHEN EXTRACT(YEAR FROM AGE(NOW(), u.usu_data_nascimento))::INT BETWEEN 40 AND 54 THEN '40-54'
+            ELSE '55+'
+          END                    AS faixa_etaria,
+          l.liv_titulo           AS titulo,
+          COUNT(iv.itv_id)       AS contagem
+        FROM livraria_comercial.itens_venda iv
+        JOIN livraria_comercial.livros l ON l.liv_uuid = iv.liv_uuid
+        JOIN livraria_comercial.vendas v ON v.ven_id = iv.ven_id
+        JOIN livraria_gestao.usuarios u ON u.usu_id = v.usu_id
+        JOIN livraria_comercial.status_venda sv ON sv.stv_id = v.stv_id
+        WHERE sv.stv_descricao = ANY($1::text[])
+          AND u.usu_data_nascimento IS NOT NULL
+        GROUP BY faixa_etaria, l.liv_titulo
+        ORDER BY faixa_etaria, contagem DESC
+      `;
+
+      const resultado = await this.pool.query(query, [STATUS_VENDAS_CONCLUIDOS]);
+
+      return this.agruparTitulosPorGrupo<ITendenciaFaixaEtariaContexto>(
+        resultado.rows,
+        'faixa_etaria',
+        Infinity
+      );
+    } catch (erro) {
+      const mensagem = erro instanceof Error ? erro.message : String(erro);
+      Logger.error(`[RepositorioRecomendacaoPostgres] Erro ao buscar tendências por faixa etária: ${mensagem}`);
+      return [];
+    }
+  }
+
+  /**
+   * Agrupa linhas de resultado em grupos com lista de títulos (top N por grupo).
+   *
+   * @param rows       Linhas do resultado SQL com campos `grupoKey` e `titulo`
+   * @param grupoKey   Nome da coluna que identifica o grupo
+   * @param limiteGrupos Máximo de grupos distintos retornados
+   */
+  private agruparTitulosPorGrupo<T extends { titulosTop: string[] }>(
+    rows: Record<string, unknown>[],
+    grupoKey: string,
+    limiteGrupos: number
+  ): T[] {
+    const mapa = new Map<string, string[]>();
+
+    for (const row of rows) {
+      const chave = String(row[grupoKey]);
+      if (!mapa.has(chave)) {
+        if (mapa.size >= limiteGrupos) {
+          continue;
+        }
+        mapa.set(chave, []);
+      }
+      const titulos = mapa.get(chave)!;
+      if (titulos.length < LIMITE_TITULOS_POR_GRUPO) {
+        titulos.push(String(row['titulo']));
+      }
+    }
+
+    return Array.from(mapa.entries()).map(([chave, titulos]) => {
+      const obj: Record<string, unknown> = { titulosTop: titulos };
+      // Mapeia a chave para o campo correto de acordo com o tipo de grupo
+      if (grupoKey === 'faixa_etaria') {
+        obj['faixa'] = chave;
+      } else {
+        obj['categoria'] = chave;
+      }
+      return obj as unknown as T;
+    });
+  }
+
+  // ── IRepositorioMetricasRecomendacao — helpers ─────────────────────────────
 
   /**
    * Constrói condição SQL baseada no período
