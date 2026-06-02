@@ -2,20 +2,50 @@ import type { ILivroCatalogoDto } from '@/modules/livros/ILivroCatalogo.dto';
 import type { ICategoriaMenuDto, IListagemCatalogoLivros, OrdenacaoCatalogo } from '@/modules/livros/ICatalogoLivros.dto';
 import { RepositorioLivrosPostgres } from '@/modules/livros/repositorioLivrosPostgres';
 import { RepositorioLivrosBulkInsert } from '@/modules/livros/repositorioLivrosBulkInsert';
+import { CacheDisco } from '@/shared/infrastructure/cache/CacheDisco';
+import { GeradorChaveCache } from '@/shared/infrastructure/cache/geradorChaveCache';
+import { ContextoRequisicao } from '@/shared/infrastructure/contexto/ContextoRequisicao';
 
 export class ServicoLivros {
   constructor(
     private readonly repo: RepositorioLivrosPostgres,
     private readonly bulkInsert: RepositorioLivrosBulkInsert,
+    private readonly cache: CacheDisco = new CacheDisco(),
   ) {}
 
-  listarCatalogo(opcoes: {
+  async listarCatalogo(opcoes: {
     pagina: number;
     itensPorPagina: number;
     categoriaSlug?: string;
     ordenacao: OrdenacaoCatalogo;
   }): Promise<IListagemCatalogoLivros> {
-    return this.repo.listarCatalogo(opcoes);
+    const lojaUuid = ContextoRequisicao.obterLojUuid();
+    const chave = GeradorChaveCache.gerarChaveCatalogo({
+      ...opcoes,
+      lojaUuid,
+    });
+
+    // TTL de 30 segundos (configurável via variável de ambiente se necessário)
+    const ttlMs = Number(process.env.CACHE_TTL_MS) || 30000;
+
+    // Tentar obter do cache
+    const cacheado = await this.cache.obter<IListagemCatalogoLivros>(chave);
+    if (cacheado) {
+      return cacheado;
+    }
+
+    // Se não há cache ou expirou, buscar do banco
+    const resultado = await this.repo.listarCatalogo(opcoes);
+
+    // Salvar no cache
+    try {
+      await this.cache.definir(chave, resultado, ttlMs);
+    } catch (erro) {
+      // Se falhar ao salvar no cache, não interromper o fluxo
+      console.error('[ServicoLivros.listarCatalogo] Erro ao salvar cache:', erro);
+    }
+
+    return resultado;
   }
 
   listarCategoriasMenu(): Promise<ICategoriaMenuDto[]> {
@@ -97,6 +127,13 @@ export class ServicoLivros {
       precoVenda: dados.precoVenda,
       valorCusto: dados.valorCusto,
     });
+
+    // Invalidar cache do catálogo
+    try {
+      await this.cache.invalidar('catalogo:*');
+    } catch (erro) {
+      console.error('[ServicoLivros.criarLivro] Erro ao invalidar cache:', erro);
+    }
 
     // Retornar o livro criado
     return this.repo.obterPorUuid(dados.uuid).then((livro) => {
@@ -189,6 +226,13 @@ export class ServicoLivros {
     // Criar livros em lote com transação
     await this.bulkInsert.criarLivrosEmLoteComTransacao(dadosPreparados);
 
+    // Invalidar cache do catálogo
+    try {
+      await this.cache.invalidar('catalogo:*');
+    } catch (erro) {
+      console.error('[ServicoLivros.criarLivrosEmLote] Erro ao invalidar cache:', erro);
+    }
+
     // Retornar os livros criados
     const livrosCriados = await Promise.all(
       dadosLivros.map((livro) => this.repo.obterPorUuid(livro.uuid)),
@@ -215,6 +259,14 @@ export class ServicoLivros {
     }
 
     await this.repo.inativarLivro(uuid);
+
+    // Invalidar cache do catálogo
+    try {
+      await this.cache.invalidar('catalogo:*');
+    } catch (erro) {
+      console.error('[ServicoLivros.inativarLivro] Erro ao invalidar cache:', erro);
+    }
+
     return this.repo.obterPorUuid(uuid).then((l) => {
       if (!l) throw new Error('Erro ao recuperar livro após inativação');
       return l;
@@ -231,6 +283,14 @@ export class ServicoLivros {
     }
 
     await this.repo.ativarLivro(uuid);
+
+    // Invalidar cache do catálogo
+    try {
+      await this.cache.invalidar('catalogo:*');
+    } catch (erro) {
+      console.error('[ServicoLivros.ativarLivro] Erro ao invalidar cache:', erro);
+    }
+
     return this.repo.obterPorUuid(uuid).then((l) => {
       if (!l) throw new Error('Erro ao recuperar livro após ativação');
       return l;
@@ -270,6 +330,15 @@ export class ServicoLivros {
       throw new Error('Ano deve estar entre 1900 e 2100.');
     }
 
-    return this.repo.atualizarLivroParcial(uuid, dados);
+    const resultado = await this.repo.atualizarLivroParcial(uuid, dados);
+
+    // Invalidar cache do catálogo
+    try {
+      await this.cache.invalidar('catalogo:*');
+    } catch (erro) {
+      console.error('[ServicoLivros.atualizarLivroParcial] Erro ao invalidar cache:', erro);
+    }
+
+    return resultado;
   }
 }
