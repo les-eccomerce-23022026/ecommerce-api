@@ -65,8 +65,16 @@ async function validarCupomTrocaSeNecessario(
   const codigo = forma.getDetalhes();
   if (!codigo) throw new Error('Código do cupom de troca é obrigatório');
   const cupom = await repositorioPagamentos.obterCupomTrocaPorCodigo(codigo);
-  if (!cupom || !cupom.ativo || cupom.valorAtual < valor) {
-    throw new Error('Cupom de troca inválido ou saldo insuficiente');
+  if (!cupom) {
+    throw new Error('Cupom de troca não encontrado');
+  }
+  if (!cupom.ativo) {
+    throw new Error('Cupom de troca está inativo');
+  }
+  if (cupom.valorAtual < valor) {
+    throw new Error(
+      `Saldo insuficiente no cupom de troca. Saldo disponível: R$ ${cupom.valorAtual.toFixed(2)}, Valor solicitado: R$ ${valor.toFixed(2)}`
+    );
   }
 }
 
@@ -134,7 +142,9 @@ export async function definirMetodoLiquidacaoServico(
     status: StatusPagamento.PENDENTE,
     criadoEm: new Date(),
   };
-  const salvo = await repositorioPagamentos.cadastrar(pagamento);
+  const salvo = await repositorioPagamentos.cadastrar(pagamento, {
+    idempotencyKey: dados.idempotencyKey
+  });
   if (formaPagamento.isPix()) {
     return gerarCobrancaPix(repositorioPagamentos, repositorioVendas, salvo, dados.valor, dados.vendaUuid);
   }

@@ -6,7 +6,9 @@ export { IPagamento } from '../entities/IPagamento';
  * Interface do repositório de pagamentos.
  */
 export interface IRepositorioPagamentos {
-  cadastrar(pagamento: IPagamento, opcoes?: { inpIdIntencao?: number }): Promise<IPagamento>;
+  cadastrar(pagamento: IPagamento, opcoes?: { inpIdIntencao?: number; idempotencyKey?: string }): Promise<IPagamento>;
+  cadastrarEmLote(pagamentos: IPagamento[], opcoes?: { inpIdIntencao?: number }): Promise<IPagamento[]>;
+  obterPorIdempotencyKey(idempotencyKey: string): Promise<IPagamento | null>;
   obterVenIdPorVendaUuid(vendaUuid: string): Promise<number | null>;
   obterPagIdInternoPorUuid(pagUuid: string): Promise<number | null>;
   obterPorUuid(uuid: string): Promise<IPagamento | null>;

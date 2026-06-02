@@ -41,7 +41,16 @@ export class RepositorioPagamentosPostgres implements IRepositorioPagamentos {
     return rows[0]?.pag_id ?? null;
   }
 
-  public async cadastrar(dados: IPagamento, opcoes?: { inpIdIntencao?: number }): Promise<IPagamento> {
+  public async cadastrar(dados: IPagamento, opcoes?: { inpIdIntencao?: number; idempotencyKey?: string }): Promise<IPagamento> {
+    // Verificar idempotência se key fornecida
+    if (opcoes?.idempotencyKey) {
+      const existente = await this.obterPorIdempotencyKey(opcoes.idempotencyKey);
+      if (existente) {
+        Logger.info(`Pagamento idempotente retornado: ${opcoes.idempotencyKey}`);
+        return existente;
+      }
+    }
+
     // Obter ID interno da venda
     const vendaQuery = 'SELECT ven_id FROM livraria_comercial.vendas WHERE ven_uuid = $1';
     const vendaRes = await this.db.executar<{ ven_id: number }>(vendaQuery, [dados.vendaUuid]);
@@ -61,16 +70,17 @@ export class RepositorioPagamentosPostgres implements IRepositorioPagamentos {
     const stpId = statusRes[0].stp_id;
 
     const inpId = opcoes?.inpIdIntencao;
+    const idempotencyKey = opcoes?.idempotencyKey;
     const loj_id = this.obterLojId() ?? 1;
 
     // Inserir pagamento
     const pagamentoQuery = `
-      INSERT INTO pagamento (ven_id, tpg_id, stp_id, pag_valor, pag_detalhes_cupom, pag_processado_em, inp_id, loj_id)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      INSERT INTO pagamento (ven_id, tpg_id, stp_id, pag_valor, pag_detalhes_cupom, pag_processado_em, inp_id, loj_id, pag_idempotency_key)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
       RETURNING pag_id, pag_uuid, pag_criado_em
     `;
     const pagamentoValues: DbParametro[] = [
-      venId, tpgId, stpId, dados.valor, dados.formaPagamento.getDetalhes(), dados.processadoEm || null, inpId ?? null, loj_id
+      venId, tpgId, stpId, dados.valor, dados.formaPagamento.getDetalhes(), dados.processadoEm || null, inpId ?? null, loj_id, idempotencyKey ?? null
     ];
 
     const pagamentoRows = await this.db.executar<{
@@ -91,6 +101,134 @@ export class RepositorioPagamentosPostgres implements IRepositorioPagamentos {
     }
 
     return { ...dados, id: row.pag_uuid, criadoEm: new Date(row.pag_criado_em) };
+  }
+
+  public async obterPorIdempotencyKey(idempotencyKey: string): Promise<IPagamento | null> {
+    const loj_id = this.obterLojId();
+    
+    let query = `
+      SELECT p.pag_uuid, p.pag_valor, p.pag_detalhes_cupom, p.pag_criado_em, p.pag_processado_em,
+             s.stp_descricao, t.tpg_descricao, c.cpp_numero_tokenizado, c.cpp_nome_titular, c.cpp_validade, c.cpp_bandeira
+      FROM livraria_financeiro.pagamento p
+      JOIN livraria_financeiro.status_pagamento s ON p.stp_id = s.stp_id
+      JOIN livraria_financeiro.tipo_pagamento t ON p.tpg_id = t.tpg_id
+      LEFT JOIN livraria_financeiro.cartao_pagamento c ON p.pag_id = c.pag_id
+      WHERE p.pag_idempotency_key = $1
+    `;
+
+    const params: DbParametro[] = [idempotencyKey];
+
+    if (loj_id) {
+      query += ' AND p.loj_id = $2';
+      params.push(loj_id);
+    }
+
+    const rows = await this.db.executar(query, params);
+    if (rows.length === 0) return null;
+
+    const row = rows[0];
+    const cartao = row.cpp_numero_tokenizado ? new CartaoCredito(
+      row.cpp_numero_tokenizado,
+      row.cpp_nome_titular,
+      row.cpp_validade,
+      row.cpp_bandeira
+    ) : undefined;
+
+    return {
+      id: row.pag_uuid,
+      vendaUuid: '', // Precisaria join com vendas
+      valor: Number(row.pag_valor),
+      formaPagamento: new FormaPagamento(row.tpg_descricao as TipoPagamento, row.pag_detalhes_cupom),
+      cartao,
+      status: row.stp_descricao as StatusPagamento,
+      criadoEm: new Date(row.pag_criado_em),
+      processadoEm: row.pag_processado_em ? new Date(row.pag_processado_em) : undefined
+    };
+  }
+
+  public async cadastrarEmLote(pagamentos: IPagamento[], opcoes?: { inpIdIntencao?: number }): Promise<IPagamento[]> {
+    if (pagamentos.length === 0) return [];
+
+    // Obter ven_id da primeira venda (todas devem ser da mesma venda)
+    const venId = await this.obterVenIdPorVendaUuid(pagamentos[0].vendaUuid);
+    if (venId === null) throw new Error('Venda não encontrada');
+
+    // Obter IDs de tipos e status em lote
+    const tipos = await this.db.executar<{ tpg_id: number; tpg_descricao: string }>(
+      'SELECT tpg_id, tpg_descricao FROM tipo_pagamento'
+    );
+    const status = await this.db.executar<{ stp_id: number; stp_descricao: string }>(
+      'SELECT stp_id, stp_descricao FROM status_pagamento'
+    );
+
+    const tipoMap = new Map(tipos.map(t => [t.tpg_descricao, t.tpg_id]));
+    const statusMap = new Map(status.map(s => [s.stp_descricao, s.stp_id]));
+
+    const inpId = opcoes?.inpIdIntencao;
+    const loj_id = this.obterLojId() ?? 1;
+
+    // Inserir pagamentos em lote
+    const pagamentoQuery = `
+      INSERT INTO pagamento (ven_id, tpg_id, stp_id, pag_valor, pag_detalhes_cupom, pag_processado_em, inp_id, loj_id)
+      VALUES ${pagamentos.map((_, i) => `($${i * 8 + 1}, $${i * 8 + 2}, $${i * 8 + 3}, $${i * 8 + 4}, $${i * 8 + 5}, $${i * 8 + 6}, $${i * 8 + 7}, $${i * 8 + 8})`).join(', ')}
+      RETURNING pag_id, pag_uuid, pag_criado_em
+    `;
+
+    const pagamentoValues: DbParametro[] = [];
+    pagamentos.forEach(pag => {
+      const tpgId = tipoMap.get(pag.formaPagamento.getTipo());
+      const stpId = statusMap.get(pag.status);
+      if (!tpgId) throw new Error(`Tipo de pagamento não encontrado: ${pag.formaPagamento.getTipo()}`);
+      if (!stpId) throw new Error(`Status de pagamento não encontrado: ${pag.status}`);
+
+      pagamentoValues.push(
+        venId,
+        tpgId,
+        stpId,
+        pag.valor,
+        pag.formaPagamento.getDetalhes(),
+        pag.processadoEm || null,
+        inpId ?? null,
+        loj_id
+      );
+    });
+
+    const pagamentoRows = await this.db.executar<{
+      pag_id: number; pag_uuid: string; pag_criado_em: string;
+    }>(pagamentoQuery, pagamentoValues);
+
+    // Inserir cartões em lote (se existirem)
+    const cartoesParaInserir = pagamentos
+      .map((pag, i) => ({ pag, pagId: pagamentoRows[i].pag_id }))
+      .filter(({ pag }) => pag.cartao);
+
+    if (cartoesParaInserir.length > 0) {
+      const cartaoQuery = `
+        INSERT INTO cartao_pagamento (pag_id, cpp_numero_tokenizado, cpp_nome_titular, cpp_validade, cpp_bandeira, loj_id)
+        VALUES ${cartoesParaInserir.map((_, i) => `($${i * 6 + 1}, $${i * 6 + 2}, $${i * 6 + 3}, $${i * 6 + 4}, $${i * 6 + 5}, $${i * 6 + 6})`).join(', ')}
+      `;
+
+      const cartaoValues: DbParametro[] = [];
+      cartoesParaInserir.forEach(({ pag, pagId }) => {
+        cartaoValues.push(
+          pagId,
+          pag.cartao!.getNumeroTokenizado(),
+          pag.cartao!.getNomeTitular(),
+          pag.cartao!.getValidade(),
+          pag.cartao!.getBandeira(),
+          loj_id
+        );
+      });
+
+      await this.db.executar(cartaoQuery, cartaoValues);
+    }
+
+    // Retornar pagamentos com UUIDs gerados
+    return pagamentos.map((pag, i) => ({
+      ...pag,
+      id: pagamentoRows[i].pag_uuid,
+      criadoEm: new Date(pagamentoRows[i].pag_criado_em)
+    }));
   }
 
   public async obterPorUuid(uuid: string): Promise<IPagamento | null> {
