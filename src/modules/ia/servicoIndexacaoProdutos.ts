@@ -1,7 +1,7 @@
 import { ServicoLivros } from '@/modules/livros/servicoLivros';
-import { IRepositorioEmbedding } from '../../domain/repositories/IRepositorioEmbedding';
-import { ServicoGeracaoEmbedding } from '../../domain/services/ServicoGeracaoEmbedding';
-import { IAdapterEmbedding } from '../../domain/interfaces/IAdapterEmbedding';
+import { IRepositorioEmbedding } from './IRepositorioEmbedding';
+import { ServicoGeracaoEmbedding } from './servicoGeracaoEmbedding';
+import { IAdapterEmbedding } from './IAdapterEmbedding';
 import { Logger } from '@/shared/utils/Logger.util';
 import type { ILivroCatalogoDto } from '@/modules/livros/ILivroCatalogo.dto';
 

@@ -1,5 +1,5 @@
 import { ajustarPrecisaEsclarecer } from './ajustarIntencaoRecomendacao';
-import { IntencaoRecomendacao } from '../entities/IntencaoRecomendacao.entity';
+import { IntencaoRecomendacao } from './IntencaoRecomendacao.entity';
 
 const intencaoBase: IntencaoRecomendacao = {
   tipo: 'esclarecimento',

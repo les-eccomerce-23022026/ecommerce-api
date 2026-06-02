@@ -1,4 +1,4 @@
-import { ServicoChunkingTextos } from './ServicoChunkingTextos';
+import { ServicoChunkingTextos } from './servicoChunkingTextos';
 
 /** Metadados de produto usados para gerar texto de embedding */
 export type MetadadosProdutoEmbedding = {

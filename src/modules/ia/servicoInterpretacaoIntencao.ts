@@ -1,10 +1,10 @@
-import { AdapterLangChainGemini } from '../../infrastructure/config/AdapterLangChainGemini';
+import { AdapterLangChainGemini } from './adapterLangChainGemini';
 import {
   IntencaoRecomendacao,
   ContextoInterpretacaoIntencao,
-} from '../../domain/entities/IntencaoRecomendacao.entity';
-import { ajustarPrecisaEsclarecer } from '../../domain/services/ajustarIntencaoRecomendacao';
-import { MensagemChatDTO } from '../dtos/IRecomendacaoDTO';
+} from './IntencaoRecomendacao.entity';
+import { ajustarPrecisaEsclarecer } from './ajustarIntencaoRecomendacao';
+import { MensagemChatDTO } from './IRecomendacao.dto';
 import { Logger } from '@/shared/utils/Logger.util';
 
 /**
@@ -28,11 +28,72 @@ export class ServicoInterpretacaoIntencao {
     }
   }
 
+  /**
+   * Extrai preço máximo da mensagem usando early returns
+   * Prioridade: match explícito > termos de linguagem natural
+   */
+  private extrairPrecoMaximo(texto: string, precoMatch: RegExpMatchArray | null): number | undefined {
+    if (precoMatch) {
+      return Number(precoMatch[1]);
+    }
+
+    if (texto.includes('baratos') || texto.includes('barato') || texto.includes('economico') || texto.includes('econômico')) {
+      return 50;
+    }
+
+    if (texto.includes('caros') || texto.includes('caro')) {
+      return 1000;
+    }
+
+    return undefined;
+  }
+
+  /**
+   * Verifica se a solicitação de presente é ambígua usando early returns
+   */
+  private verificarAmbiguidadePresente(texto: string): boolean {
+    if (!texto.includes('presente')) {
+      return false;
+    }
+
+    if (texto.match(/\d+\s*anos?/)) {
+      return false;
+    }
+
+    if (texto.includes('filho') || texto.includes('mãe') || texto.includes('pai')) {
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
+   * Determina quantidade de livros usando early returns
+   * Prioridade: match explícito > termos populares > gêneros > padrão
+   */
+  private determinarQuantidadeLivros(texto: string, quantidadeMatch: RegExpMatchArray | null, quantidadeGeneros: number): number {
+    if (quantidadeMatch) {
+      return Math.min(Number(quantidadeMatch[1]), 5);
+    }
+
+    if (texto.includes('mais vendidos') || texto.includes('vendidos') || texto.includes('popular')) {
+      return 4;
+    }
+
+    if (quantidadeGeneros > 0) {
+      return 4;
+    }
+
+    return 1;
+  }
+
   private intencaoHeuristica(mensagem: string): IntencaoRecomendacao {
     const texto = mensagem.toLowerCase();
     const precoMatch = texto.match(/(?:até|max|máximo)\s*r?\$?\s*(\d+)/);
     const paginasMatch = texto.match(/(\d+)\s*p[aá]ginas?/);
     const quantidadeMatch = texto.match(/(\d+)\s+livros?/);
+
+    const precoMax = this.extrairPrecoMaximo(texto, precoMatch);
 
     const generos: string[] = [];
     const mapaGeneros: Record<string, string> = {
@@ -54,25 +115,15 @@ export class ServicoInterpretacaoIntencao {
       }
     }
 
-    const ambiguo =
-      texto.includes('presente') &&
-      !texto.match(/\d+\s*anos?/) &&
-      !texto.includes('filho') &&
-      !texto.includes('mãe') &&
-      !texto.includes('pai');
+    const ambiguo = this.verificarAmbiguidadePresente(texto);
+    const quantidadeLivros = this.determinarQuantidadeLivros(texto, quantidadeMatch, generos.length);
 
     return {
       tipo: ambiguo ? 'esclarecimento' : 'recomendacao',
       generos,
-      precoMax: precoMatch ? Number(precoMatch[1]) : undefined,
+      precoMax,
       paginasMax: paginasMatch ? Number(paginasMatch[1]) : undefined,
-      quantidadeLivros: quantidadeMatch
-        ? Math.min(Number(quantidadeMatch[1]), 5)
-        : texto.includes('mais vendidos') || texto.includes('vendidos') || texto.includes('popular')
-          ? 4
-          : generos.length > 0
-            ? 4
-            : 1,
+      quantidadeLivros,
       precisaEsclarecer: ambiguo,
       perguntasEsclarecimento: ambiguo
         ? ['Para quem é o presente e qual a faixa etária do destinatário?']

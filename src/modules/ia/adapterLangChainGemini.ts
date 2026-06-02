@@ -1,10 +1,66 @@
 import { GoogleGenerativeAIEmbeddings } from '@langchain/google-genai';
 import { GoogleGenerativeAI, SchemaType } from '@google/generative-ai';
+import { ChatGroq } from '@langchain/groq';
+import { Embeddings, EmbeddingsParams } from '@langchain/core/embeddings';
 import { Logger } from '@/shared/utils/Logger.util';
-import { IAdapterEmbedding } from '../../domain/interfaces/IAdapterEmbedding';
-import { IntencaoRecomendacao } from '../../domain/entities/IntencaoRecomendacao.entity';
-import type { ContextoInterpretacaoIntencao } from '../../domain/entities/IntencaoRecomendacao.entity';
-import type { MensagemChatDTO } from '../../application/dtos/IRecomendacaoDTO';
+import { IAdapterEmbedding } from './IAdapterEmbedding';
+import { IntencaoRecomendacao } from './IntencaoRecomendacao.entity';
+import type { ContextoInterpretacaoIntencao } from './IntencaoRecomendacao.entity';
+import type { MensagemChatDTO } from './IRecomendacao.dto';
+
+/**
+ * Implementação personalizada de embeddings usando API do Groq
+ * Modelo: nomic-ai/nomic-embed-text-v1 (dimensão 768)
+ */
+class GroqEmbeddingsCustom extends Embeddings {
+  private apiKey: string;
+  private modelName: string = 'nomic-ai/nomic-embed-text-v1';
+
+  constructor(fields: { apiKey: string; modelName?: string }) {
+    super({});
+    this.apiKey = fields.apiKey;
+    if (fields.modelName) {
+      this.modelName = fields.modelName;
+    }
+  }
+
+  async embedDocuments(texts: string[]): Promise<number[][]> {
+    const results: number[][] = [];
+    for (const text of texts) {
+      const embedding = await this.embedQuery(text);
+      results.push(embedding);
+    }
+    return results;
+  }
+
+  async embedQuery(text: string): Promise<number[]> {
+    try {
+      const response = await fetch('https://api.groq.com/openai/v1/embeddings', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: this.modelName,
+          input: text,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(`Groq API error: ${response.status} - ${error}`);
+      }
+
+      const data = await response.json();
+      return data.data[0].embedding;
+    } catch (error) {
+      const mensagem = error instanceof Error ? error.message : String(error);
+      Logger.error(`[GroqEmbeddingsCustom] Erro ao gerar embedding: ${mensagem}`);
+      throw error;
+    }
+  }
+}
 
 /**
  * Modelos de embedding disponíveis no Google Generative AI
@@ -31,49 +87,44 @@ const MODELS_FALLBACK = [
 ] as const;
 
 /**
- * Adapter LangChain com Gemini Flash Lite
+ * Adapter LangChain com Gemini Flash Lite e Groq como fallback
  * 
  * Responsável por integrar LangChain com a API do Gemini para:
- * - Geração de embeddings
+ * - Geração de embeddings (com fallback para Groq)
  * - Geração de respostas de chat
  */
 export class AdapterLangChainGemini implements IAdapterEmbedding {
-  private embeddings: GoogleGenerativeAIEmbeddings | null = null;
+  private embeddings: GoogleGenerativeAIEmbeddings | GroqEmbeddingsCustom | null = null;
   private genAI: GoogleGenerativeAI | null = null;
   private modeloAtual: string | null = null;
+  private provedorAtual: 'gemini' | 'groq' | null = null;
 
   constructor() {
     // Valida variável de ambiente obrigatória (regra U3)
-    if (!process.env.GEMINI_API_KEY) {
-      throw new Error('GEMINI_API_KEY não está definida nas variáveis de ambiente');
+    if (!process.env.GEMINI_API_KEY && !process.env.GROQ_API_KEY) {
+      throw new Error('GEMINI_API_KEY ou GROQ_API_KEY não está definida nas variáveis de ambiente');
     }
   }
 
   /**
    * Inicializa o cliente de embeddings com sistema de fallback
-   * Tenta o modelo configurado, se falhar, tenta os modelos de fallback
+   * Tenta Gemini primeiro, se falhar, tenta Groq
    */
-  private async inicializarEmbeddings(): Promise<GoogleGenerativeAIEmbeddings> {
+  private async inicializarEmbeddings(): Promise<GoogleGenerativeAIEmbeddings | GroqEmbeddingsCustom> {
     if (this.embeddings) {
       return this.embeddings;
     }
 
-    // Modelo configurado ou padrão (gemini-embedding-001)
-    const modeloConfigurado = process.env.GEMINI_EMBEDDING_MODEL || 'gemini-embedding-001';
-    
-    // Lista de modelos para tentar (configurado + fallbacks)
-    const modelosParaTentar = [modeloConfigurado, ...MODELS_FALLBACK];
-    const modelosUnicos = Array.from(new Set(modelosParaTentar)); // Remove duplicatas
-
-    Logger.info(`[AdapterLangChainGemini] Tentando inicializar embeddings. Modelos para tentar: ${modelosUnicos.join(', ')}`);
-
-    for (const modelo of modelosUnicos) {
+    // Tenta Gemini primeiro
+    if (process.env.GEMINI_API_KEY) {
       try {
-        Logger.info(`[AdapterLangChainGemini] Tentando modelo: ${modelo}`);
+        Logger.info('[AdapterLangChainGemini] Tentando inicializar embeddings com Gemini...');
+        
+        const modeloConfigurado = process.env.GEMINI_EMBEDDING_MODEL || 'gemini-embedding-001';
         
         this.embeddings = new GoogleGenerativeAIEmbeddings({
           apiKey: process.env.GEMINI_API_KEY,
-          modelName: modelo,
+          modelName: modeloConfigurado,
         });
 
         // Testa se o modelo funciona gerando um embedding de teste
@@ -83,19 +134,49 @@ export class AdapterLangChainGemini implements IAdapterEmbedding {
           throw new Error('Embedding de teste retornou array vazio');
         }
 
-        this.modeloAtual = modelo;
-        Logger.info(`[AdapterLangChainGemini] Embeddings inicializados com sucesso usando modelo ${modelo} (dimensão: ${teste.length})`);
+        this.modeloAtual = modeloConfigurado;
+        this.provedorAtual = 'gemini';
+        Logger.info(`[AdapterLangChainGemini] Embeddings inicializados com sucesso usando Gemini ${modeloConfigurado} (dimensão: ${teste.length})`);
         return this.embeddings;
 
       } catch (erro) {
         const mensagem = erro instanceof Error ? erro.message : String(erro);
-        Logger.warn(`[AdapterLangChainGemini] Falha ao usar modelo ${modelo}: ${mensagem}`);
-        this.embeddings = null; // Limpa para tentar próximo modelo
+        Logger.warn(`[AdapterLangChainGemini] Falha ao usar Gemini: ${mensagem}`);
+        this.embeddings = null; // Limpa para tentar Groq
       }
     }
 
-    // Se todos os modelos falharem
-    throw new Error('Não foi possível inicializar embeddings com nenhum dos modelos disponíveis. Verifique a API Key e a conexão com a Google.');
+    // Fallback para Groq
+    if (process.env.GROQ_API_KEY) {
+      try {
+        Logger.info('[AdapterLangChainGemini] Tentando inicializar embeddings com Groq como fallback...');
+        
+        this.embeddings = new GroqEmbeddingsCustom({
+          apiKey: process.env.GROQ_API_KEY,
+          modelName: 'nomic-ai/nomic-embed-text-v1',
+        });
+
+        // Testa se o modelo funciona gerando um embedding de teste
+        const teste = await this.embeddings.embedQuery('teste');
+        
+        if (!Array.isArray(teste) || teste.length === 0) {
+          throw new Error('Embedding de teste retornou array vazio');
+        }
+
+        this.modeloAtual = 'nomic-ai/nomic-embed-text-v1';
+        this.provedorAtual = 'groq';
+        Logger.info(`[AdapterLangChainGemini] Embeddings inicializados com sucesso usando Groq (dimensão: ${teste.length})`);
+        return this.embeddings;
+
+      } catch (erro) {
+        const mensagem = erro instanceof Error ? erro.message : String(erro);
+        Logger.error(`[AdapterLangChainGemini] Falha ao usar Groq: ${mensagem}`);
+        this.embeddings = null;
+      }
+    }
+
+    // Se todos falharem
+    throw new Error('Não foi possível inicializar embeddings com Gemini nem Groq. Verifique as API Keys e a conexão.');
   }
 
   /**
@@ -184,7 +265,7 @@ export class AdapterLangChainGemini implements IAdapterEmbedding {
     contexto: ContextoInterpretacaoIntencao
   ): Promise<IntencaoRecomendacao> {
     const genAI = this.inicializarGenAI();
-    const modeloChat = process.env.GEMINI_CHAT_MODEL || 'gemini-2.5-flash-lite';
+    const modeloChat = process.env.GEMINI_CHAT_MODEL || 'gemini-2.5-flash';
 
     const model = genAI.getGenerativeModel({
       model: modeloChat,
@@ -312,7 +393,7 @@ export class AdapterLangChainGemini implements IAdapterEmbedding {
       }
 
       const genAI = this.inicializarGenAI();
-      const modeloChat = process.env.GEMINI_CHAT_MODEL || 'gemini-2.5-flash-lite';
+      const modeloChat = process.env.GEMINI_CHAT_MODEL || 'gemini-2.5-flash';
       const model = genAI.getGenerativeModel({ model: modeloChat });
 
       const tomPerfil = this.montarInstrucaoTomPerfil(opcoes?.perfil);
@@ -442,13 +523,23 @@ export class AdapterLangChainGemini implements IAdapterEmbedding {
 
   /**
    * Valida se a API key está configurada corretamente
+   * Adiciona timeout de 10 segundos para evitar travamento
    */
   async validarConexao(): Promise<boolean> {
     try {
-      await this.gerarEmbedding('teste');
+      const timeoutPromise = new Promise<boolean>((_, reject) => {
+        setTimeout(() => reject(new Error('Timeout na validação de conexão')), 10000);
+      });
+      
+      await Promise.race([
+        this.gerarEmbedding('teste'),
+        timeoutPromise
+      ]);
+      
       return true;
     } catch (erro) {
-      Logger.error('[AdapterLangChainGemini] Falha na validação de conexão');
+      const mensagem = erro instanceof Error ? erro.message : String(erro);
+      Logger.error(`[AdapterLangChainGemini] Falha na validação de conexão: ${mensagem}`);
       return false;
     }
   }

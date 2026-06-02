@@ -7,13 +7,13 @@ import {
   ICriarMetricaRecomendacaoDto,
   PeriodoMetrica,
   IMetricasAgregadas,
-} from '../../domain/repositories/IRepositorioRecomendacao';
-import { IContextoRecomendacao } from '../../domain/entities/IContextoRecomendacao.entity';
+} from './IRepositorioRecomendacao';
+import { IContextoRecomendacao } from './IContextoRecomendacao.entity';
 import {
   IPedidoRecenteContexto,
   ITendenciaCategoriaContexto,
   ITendenciaFaixaEtariaContexto,
-} from '../../domain/entities/IContextoRecomendacao.entity';
+} from './IContextoRecomendacao.entity';
 import { STATUS_VENDAS } from '@/modules/vendas/constants/statusVendas.constant';
 import { Logger } from '@/shared/utils/Logger.util';
 

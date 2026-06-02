@@ -9,9 +9,22 @@ const REGEX_UUID =
 
 /**
  * Remove tags HTML de entradas de texto para mitigar XSS refletido na resposta.
+ * Também escapa caracteres especiais para prevenir XSS em metadados.
  */
 export function sanitizarTextoEntrada(texto: string): string {
-  return texto.replace(REGEX_TAGS_HTML, '').trim();
+  // Remove tags HTML
+  const semTags = texto.replace(REGEX_TAGS_HTML, '');
+  
+  // Escapa caracteres especiais HTML para prevenir XSS em metadados
+  const escapado = semTags
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;')
+    .replace(/\//g, '&#x2F;');
+  
+  return escapado.trim();
 }
 
 /**

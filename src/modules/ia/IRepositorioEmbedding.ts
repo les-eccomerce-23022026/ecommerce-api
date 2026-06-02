@@ -1,4 +1,4 @@
-import { IProdutoEmbedding, ICriarProdutoEmbeddingDto } from '../entities/IProdutoEmbedding.entity';
+import { IProdutoEmbedding, ICriarProdutoEmbeddingDto } from './IProdutoEmbedding.entity';
 
 /**
  * Interface de Repositório de Embeddings

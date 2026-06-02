@@ -1,5 +1,5 @@
-import { MensagemChatDTO } from '../../application/dtos/IRecomendacaoDTO';
-import { IntencaoRecomendacao } from '../entities/IntencaoRecomendacao.entity';
+import { MensagemChatDTO } from './IRecomendacao.dto';
+import { IntencaoRecomendacao } from './IntencaoRecomendacao.entity';
 
 export interface ProdutoMencionadoHistorico {
   uuid: string;

@@ -1,4 +1,4 @@
-import { IntencaoRecomendacao } from '../entities/IntencaoRecomendacao.entity';
+import { IntencaoRecomendacao } from './IntencaoRecomendacao.entity';
 
 /**
  * Evita bloquear o RAG quando o usuário já indicou gênero/tema (ex.: "livros de terror").

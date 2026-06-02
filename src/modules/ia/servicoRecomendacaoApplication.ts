@@ -1,4 +1,4 @@
-import { IRepositorioEmbedding } from '../../domain/repositories/IRepositorioEmbedding';
+import { IRepositorioEmbedding } from './IRepositorioEmbedding';
 import {
   IRepositorioContextoCliente,
   IRepositorioMetricasRecomendacao,
@@ -9,21 +9,21 @@ import {
   IPedidoRecenteContexto,
   ITendenciaCategoriaContexto,
   ITendenciaFaixaEtariaContexto,
-} from '../../domain/repositories/IRepositorioRecomendacao';
-import { ServicoGeracaoEmbedding } from '../../domain/services/ServicoGeracaoEmbedding';
-import { ServicoValidacaoProdutos } from '../../domain/services/ServicoValidacaoProdutos';
+} from './IRepositorioRecomendacao';
+import { ServicoGeracaoEmbedding } from './servicoGeracaoEmbedding';
+import { ServicoValidacaoProdutos } from './servicoValidacaoProdutos';
 import {
   ServicoRecomendacaoRAG,
   RecomendacaoResultado,
   ProdutoRecomendado,
-} from '../../domain/services/ServicoRecomendacaoRAG';
-import { ServicoFiltroCatalogo } from '../../domain/services/ServicoFiltroCatalogo';
-import { AdapterLangChainGemini } from '../../infrastructure/config/AdapterLangChainGemini';
-import { IContextoRecomendacao } from '../../domain/entities/IContextoRecomendacao.entity';
+} from './servicoRecomendacaoRAG';
+import { ServicoFiltroCatalogo } from './servicoFiltroCatalogo';
+import { AdapterLangChainGemini } from './adapterLangChainGemini';
+import { IContextoRecomendacao } from './IContextoRecomendacao.entity';
 import {
   IntencaoRecomendacao,
   TipoIntencaoRecomendacao,
-} from '../../domain/entities/IntencaoRecomendacao.entity';
+} from './IntencaoRecomendacao.entity';
 import {
   IRecomendarRequestDTO,
   IRecomendarResponseDTO,
@@ -31,16 +31,16 @@ import {
   IChatResponseDTO,
   ProdutoRecomendadoDTO,
   MensagemChatDTO,
-} from '../dtos/IRecomendacaoDTO';
+} from './IRecomendacao.dto';
 import { STATUS_VENDAS } from '@/modules/vendas/constants/statusVendas.constant';
 import { Logger } from '@/shared/utils/Logger.util';
-import { ServicoIndexacaoProdutos } from './ServicoIndexacaoProdutos';
+import { ServicoIndexacaoProdutos } from './servicoIndexacaoProdutos';
 import { ServicoLivros } from '@/modules/livros/servicoLivros';
-import { ServicoInterpretacaoIntencao } from './ServicoInterpretacaoIntencao';
+import { ServicoInterpretacaoIntencao } from './servicoInterpretacaoIntencao';
 import {
   ServicoContextoConversa,
   ContextoTurnoConversa,
-} from '../../domain/services/ServicoContextoConversa';
+} from './servicoContextoConversa';
 
 /**
  * Políticas fixas da loja enviadas ao assistente nos modos pós-venda e informação.
@@ -108,17 +108,27 @@ export class ServicoRecomendacaoApplication {
     private servicoInterpretacaoIntencao: ServicoInterpretacaoIntencao
   ) {}
 
+  /**
+   * Endpoint: recomendar — fluxo simples de recomendação sem chat.
+   * 
+   * Fluxo: Contexto cliente → Pipeline RAG → Remover duplicatas → Retornar resposta.
+   * Útil para integrações diretas sem conversação.
+   */
   async recomendar(dados: IRecomendarRequestDTO): Promise<IRecomendarResponseDTO> {
     const inicio = Date.now();
 
     try {
+      // 1. Busca contexto personalizado do cliente (histórico, preferências)
       const contextoCliente = await this.obterContextoCliente(dados.clienteUuid);
+      
+      // 2. Executa pipeline RAG: gera embedding, busca produtos, aplica filtros
       const resultado = await this.executarPipelineRecomendacao(
         dados.query,
         contextoCliente,
         { limite: dados.limite || 5 }
       );
 
+      // 3. Remove duplicatas e ordena por similaridade (maior primeiro)
       const produtosDTO = this.removerDuplicatasEOrdenar(
         resultado.produtos,
         dados.limite || 5
@@ -131,24 +141,46 @@ export class ServicoRecomendacaoApplication {
     }
   }
 
+  /**
+   * Endpoint: chat — fluxo conversacional com interpretação de intenção.
+   * 
+   * Fluxo completo:
+   * 1. Normaliza e limita histórico para não sobrecarregar a LLM
+   * 2. Busca contexto personalizado do cliente
+   * 3. Analisa contexto da conversa (turno atual, produtos mencionados)
+   * 4. Interpreta intenção via Gemini (recomendação, pós-venda, tendências, etc.)
+   * 5. Despacha para handler específico baseado na intenção
+   * 
+   * O despacho usa tabela de despacho (Record) ao invés de switch/case (regra U2).
+   */
   async chat(dados: IChatRequestDTO): Promise<IChatResponseDTO> {
     const inicio = Date.now();
 
     try {
+      // 1. Normaliza histórico para formato consistente (papel: 'user' | 'assistant')
       const historicoNormalizado = this.normalizarHistorico(dados.historico);
+      
+      // 2. Limita histórico a últimos 3 turnos para economizar tokens e manter contexto relevante
       const historicoParaLlm = this.servicoContextoConversa.limitarHistoricoPorTurnos(
         historicoNormalizado
       );
+      
+      // 3. Busca contexto personalizado do cliente (histórico de compras, preferências)
       const contextoCliente = await this.obterContextoCliente(dados.clienteUuid);
+      
+      // 4. Analisa contexto do turno atual: é continuação? quais produtos já foram mostrados?
       const contextoTurno = this.servicoContextoConversa.analisar(
         historicoParaLlm,
         dados.mensagem
       );
+      
+      // 5. Converte histórico para formato Gemini (papel: 'user' | 'model')
       const historicoGemini = this.converterHistoricoGemini(
         historicoParaLlm,
         dados.mensagem
       );
 
+      // 6. Interpreta intenção via Gemini: o que o usuário quer? (recomendação, pós-venda, etc.)
       const intencao = await this.servicoInterpretacaoIntencao.interpretar(
         dados.mensagem,
         historicoParaLlm,
@@ -158,6 +190,7 @@ export class ServicoRecomendacaoApplication {
         }
       );
 
+      // 7. Resume intenção para logs e debugging
       const intencaoResumida = this.resumirIntencao(intencao);
 
       // Esclarecimento tem prioridade máxima — resposta imediata sem RAG
@@ -174,6 +207,7 @@ export class ServicoRecomendacaoApplication {
       }
 
       // Despacho por tipo de intenção — sem switch/case (regra U2)
+      // Cada intenção tem seu handler especializado que entende o contexto específico
       const despachoChat: Record<TipoIntencaoRecomendacao, () => Promise<IChatResponseDTO>> = {
         pos_venda: () =>
           this.processarChatPosvenda(
@@ -205,6 +239,7 @@ export class ServicoRecomendacaoApplication {
           ),
       };
 
+      // Executa o handler correspondente ao tipo de intenção
       return despachoChat[intencao.tipo]();
     } catch (erro) {
       const mensagem = erro instanceof Error ? erro.message : String(erro);
@@ -529,16 +564,37 @@ export class ServicoRecomendacaoApplication {
     );
   }
 
+  /**
+   * Pipeline RAG: gera recomendações usando busca semântica + filtros estruturados.
+   * 
+   * Fluxo:
+   * 1. Gera embedding da query do usuário
+   * 2. Busca todos os produtos existentes no BD (para validação anti-alucinação)
+   * 3. Executa RAG: busca vetorial + MMR (diversificação) se limite > 1
+   * 4. Aplica filtros estruturados (preço, páginas, gênero, etc.)
+   * 5. Remove produtos já mostrados (excluirUuids) para evitar repetição
+   * 6. Retorna resultados limitados
+   * 
+   * MMR (Maximal Marginal Relevance): diversifica resultados para não mostrar
+   * apenas produtos muito similares entre si.
+   */
   private async executarPipelineRecomendacao(
     query: string,
     contextoCliente: IContextoRecomendacao | null,
     opcoes: OpcoesRecomendacaoInterna
   ): Promise<RecomendacaoResultado> {
+    // 1. Converte query em vetor numérico para busca semântica
     const queryEmbedding = await this.gerarEmbeddingQuery(query);
+    
+    // 2. Busca todos os produtos existentes para validar resultados (anti-alucinação)
     const produtosExistentes = await this.buscarTodosProdutosExistentes();
+    
+    // 3. Determina limite e se deve usar MMR (diversificação)
     const limite = opcoes.limite ?? opcoes.intencao?.quantidadeLivros ?? 5;
-    const usarMMR = limite > 1;
+    const usarMMR = limite > 1; // MMR só faz sentido para múltiplos resultados
 
+    // 4. Executa RAG: busca vetorial + MMR se aplicável
+    //    Busca 2x o limite para ter margem após filtros e MMR
     const resultadoRag = await this.servicoRecomendacaoRAG.gerarRecomendacao(
       query,
       queryEmbedding,
@@ -548,14 +604,18 @@ export class ServicoRecomendacaoApplication {
       usarMMR
     );
 
+    // 5. Extrai filtros da intenção (preço, páginas, gênero, etc.)
     const filtros = opcoes.intencao
       ? this.servicoFiltroCatalogo.filtrosDeIntencao(opcoes.intencao)
       : {};
+    
+    // 6. Aplica filtros estruturados sobre resultados do RAG
     let { produtos: produtosFiltrados } = this.servicoFiltroCatalogo.aplicar(
       resultadoRag.produtos,
       filtros
     );
 
+    // 7. Remove produtos já mostrados em turnos anteriores (evita repetição)
     if (opcoes.excluirUuids && opcoes.excluirUuids.length > 0) {
       const excluir = new Set(opcoes.excluirUuids);
       const semRepeticao = produtosFiltrados.filter((p) => !excluir.has(p.uuid));
@@ -564,6 +624,7 @@ export class ServicoRecomendacaoApplication {
       }
     }
 
+    // 8. Retorna resultados limitados ao solicitado
     return {
       ...resultadoRag,
       produtos: produtosFiltrados.slice(0, limite),
@@ -571,6 +632,16 @@ export class ServicoRecomendacaoApplication {
     };
   }
 
+  /**
+   * Busca produtos para o chat com enriquecimento de contexto.
+   * 
+   * Fluxo:
+   * 1. Monta query enriquecida com gêneros, preço, preferências do cliente
+   * 2. Enriquece query com contexto da conversa (produtos mencionados anteriormente)
+   * 3. Em continuações, busca mais produtos para ter margem de seleção
+   * 4. Executa pipeline RAG excluindo produtos já mostrados
+   * 5. Remove duplicatas e ordena por similaridade
+   */
   private async buscarProdutosChat(
     dados: IChatRequestDTO,
     intencao: IntencaoRecomendacao,
@@ -579,18 +650,24 @@ export class ServicoRecomendacaoApplication {
     limite: number,
     intencaoBusca?: IntencaoRecomendacao
   ): Promise<ProdutoRecomendadoDTO[]> {
+    // 1. Monta query base com filtros da intenção + contexto do cliente
     const queryBase = this.montarQueryEnriquecida(
       intencao.queryBusca || dados.mensagem,
       intencao,
       contextoCliente
     );
+    
+    // 2. Enriquece query com contexto da conversa (ex: "o livro de terror que mencionei")
     const queryEnriquecida = this.servicoContextoConversa.enriquecerQueryBusca(
       queryBase,
       contextoTurno,
       dados.mensagem
     );
+    
+    // 3. Em continuações, busca +3 produtos para ter margem de seleção
     const limiteBusca = contextoTurno.ehContinuacao ? limite + 3 : limite;
 
+    // 4. Executa pipeline RAG excluindo produtos já mostrados (evita repetição)
     const resultado = await this.executarPipelineRecomendacao(
       queryEnriquecida,
       contextoCliente,
@@ -645,6 +722,20 @@ export class ServicoRecomendacaoApplication {
     return Array.from(porUuid.values()).slice(0, limite);
   }
 
+  /**
+   * Monta query enriquecida com filtros estruturados para busca semântica.
+   * 
+   * Adiciona informações contextuais à query base:
+   * - Gêneros solicitados
+   * - Gêneros relacionados (para evitar filter bubbles)
+   * - Público-alvo
+   * - Preço máximo
+   * - Preferências do cliente
+   * - Região geográfica
+   * 
+   * Isso ajuda a busca vetorial a encontrar produtos mais alinhados à intenção
+   * e evita filter bubbles incluindo categorias relacionadas.
+   */
   private montarQueryEnriquecida(
     queryBase: string,
     intencao: IntencaoRecomendacao,
@@ -652,8 +743,15 @@ export class ServicoRecomendacaoApplication {
   ): string {
     const partes = [queryBase];
 
+    // Adiciona filtros da intenção (explicitamente mencionados pelo usuário)
     if (intencao.generos.length > 0) {
       partes.push(`Gêneros: ${intencao.generos.join(', ')}`);
+      
+      // Adiciona gêneros relacionados para evitar filter bubbles
+      const generosRelacionados = this.obterGenerosRelacionados(intencao.generos);
+      if (generosRelacionados.length > 0) {
+        partes.push(`Gêneros relacionados: ${generosRelacionados.join(', ')}`);
+      }
     }
     if (intencao.publicoAlvo) {
       partes.push(`Público: ${intencao.publicoAlvo}`);
@@ -661,6 +759,8 @@ export class ServicoRecomendacaoApplication {
     if (intencao.precoMax !== undefined) {
       partes.push(`Preço até R$ ${intencao.precoMax}`);
     }
+    
+    // Adiciona contexto personalizado do cliente (preferências implícitas)
     if (contexto?.preferencias.categorias.length) {
       partes.push(`Preferências: ${contexto.preferencias.categorias.join(', ')}`);
     }
@@ -671,6 +771,43 @@ export class ServicoRecomendacaoApplication {
     return partes.join('. ');
   }
 
+  /**
+   * Obtém gêneros relacionados para evitar filter bubbles
+   * 
+   * Mapeia gêneros principais para gêneros relacionados, permitindo exploração
+   * de categorias similares e evitando que o usuário fique preso em uma bolha.
+   */
+  private obterGenerosRelacionados(generos: string[]): string[] {
+    const mapaRelacoes: Record<string, string[]> = {
+      'ficcao_cientifica': ['distopia', 'fantasia cientifica', 'space opera', 'cyberpunk'],
+      'terror': ['suspense', 'misterio', 'horror', 'thriller'],
+      'romance': ['romance historico', 'contemporaneo', 'drama'],
+      'fantasia': ['fantasia urbana', 'alta fantasia', 'fantasia epica'],
+      'misterio': ['thriller', 'suspense', 'crime', 'noir'],
+      'suspense': ['thriller', 'misterio', 'crime'],
+      'distopia': ['ficcao_cientifica', 'pos-apocaliptico'],
+      'humor': ['satiro', 'comedia', 'ficcao humoristica'],
+    };
+
+    const relacionados = new Set<string>();
+    
+    for (const genero of generos) {
+      const generoNormalizado = genero.toLowerCase().replace(/ç/g, 'c').replace(/ã/g, 'a').replace(/õ/g, 'o');
+      if (mapaRelacoes[generoNormalizado]) {
+        mapaRelacoes[generoNormalizado].forEach(rel => relacionados.add(rel));
+      }
+    }
+
+    // Retorna até 3 gêneros relacionados para não poluir demais a query
+    return Array.from(relacionados).slice(0, 3);
+  }
+
+  /**
+   * Normaliza o histórico de chat para formato consistente.
+   * 
+   * Garante que todas as mensagens tenham o campo 'papel' no formato padrão
+   * ('user' | 'assistant'), independentemente de como foram originalmente armazenadas.
+   */
   private normalizarHistorico(historico?: MensagemChatDTO[]): MensagemChatDTO[] | undefined {
     if (!historico) {
       return undefined;
@@ -684,6 +821,11 @@ export class ServicoRecomendacaoApplication {
     }));
   }
 
+  /**
+   * Normaliza o papel da mensagem para o formato padrão.
+   * 
+   * Converte diferentes formatos ('remetente', 'papel') para o padrão 'user' | 'assistant'.
+   */
   private normalizarPapelMensagem(msg: MensagemChatDTO): 'user' | 'assistant' {
     if (msg.papel === 'user' || msg.papel === 'assistant') {
       return msg.papel;
@@ -694,9 +836,17 @@ export class ServicoRecomendacaoApplication {
     if (msg.remetente === 'assistente') {
       return 'assistant';
     }
-    return 'user';
+    return 'user'; // Default para usuário em caso de dúvida
   }
 
+  /**
+   * Converte histórico de chat para o formato esperado pelo Gemini.
+   * 
+   * Fluxo:
+   * 1. Remove a mensagem atual do histórico (para não duplicar)
+   * 2. Converte 'assistant' para 'model' (nomenclatura do Gemini)
+   * 3. Retorna apenas conteúdo e papel (sem metadados extras)
+   */
   private converterHistoricoGemini(
     historico?: MensagemChatDTO[],
     mensagemAtual?: string
@@ -706,6 +856,7 @@ export class ServicoRecomendacaoApplication {
     }
 
     const mensagemAtualNorm = mensagemAtual?.trim();
+    // Remove a mensagem atual do histórico para evitar duplicação
     const filtrado = historico.filter((msg) => {
       if (!mensagemAtualNorm) {
         return true;
@@ -718,22 +869,34 @@ export class ServicoRecomendacaoApplication {
       return undefined;
     }
 
+    // Converte para formato Gemini: 'assistant' → 'model'
     return filtrado.map((msg) => ({
       papel: this.normalizarPapelMensagem(msg) === 'assistant' ? 'model' : 'user',
       conteudo: msg.conteudo,
     }));
   }
 
+  /**
+   * Resume o histórico de compras do cliente para contexto da IA.
+   * 
+   * Retorna até 5 compras recentes no formato "Título (Categoria)".
+   * Isso ajuda a IA a entender as preferências do cliente.
+   */
   private resumirCompras(contexto: IContextoRecomendacao | null): string | undefined {
     if (!contexto || contexto.historicoCompras.length === 0) {
       return undefined;
     }
     return contexto.historicoCompras
-      .slice(0, 5)
+      .slice(0, 5) // Limita a 5 compras para não sobrecarregar a LLM
       .map((c) => `${c.titulo} (${c.categoria})`)
       .join('; ');
   }
 
+  /**
+   * Resume a intenção do usuário para logs e debugging.
+   * 
+   * Formato: "tipo · gêneros · preço" (ex: "recomendacao · terror, suspense · até R$50").
+   */
   private resumirIntencao(intencao: IntencaoRecomendacao): string {
     const partes = [intencao.tipo];
     if (intencao.generos.length) {
@@ -749,23 +912,42 @@ export class ServicoRecomendacaoApplication {
     return this.adapterLangChain.gerarEmbedding(query);
   }
 
+  /**
+   * Busca contexto personalizado do cliente para recomendações.
+   * 
+   * Retorna null se não houver clienteUuid (usuário anônimo).
+   * O contexto inclui: perfil, histórico de compras, preferências.
+   */
   private async obterContextoCliente(
     clienteUuid?: string
   ): Promise<IContextoRecomendacao | null> {
     if (!clienteUuid) {
-      return null;
+      return null; // Usuário anônimo sem contexto personalizado
     }
     return this.repositorioContextoCliente.buscarContexto(clienteUuid);
   }
 
+  /**
+   * Remove duplicatas e ordena produtos por similaridade.
+   * 
+   * Lógica:
+   * - Se o mesmo UUID aparece múltiplas vezes, mantém apenas a versão com maior similaridade
+   * - Ordena todos os produtos únicos por similaridade (maior primeiro)
+   * - Retorna apenas os N primeiros conforme o limite
+   * 
+   * Isso é importante porque o RAG pode retornar o mesmo produto em diferentes chunks,
+   * e queremos exibir apenas a melhor versão de cada produto.
+   */
   private removerDuplicatasEOrdenar(
     produtos: ProdutoRecomendado[],
     limite: number
   ): ProdutoRecomendadoDTO[] {
+    // Usa Map para deduplicação por UUID mantendo a versão com maior similaridade
     const produtosUnicos = new Map<string, ProdutoRecomendadoDTO>();
 
     for (const produto of produtos) {
       const existente = produtosUnicos.get(produto.uuid);
+      // Substitui se não existe ou se a nova versão tem similaridade maior
       const deveSubstituir = !existente || produto.similaridade > existente.similaridade;
 
       if (deveSubstituir) {
@@ -783,6 +965,7 @@ export class ServicoRecomendacaoApplication {
       }
     }
 
+    // Ordena por similaridade (maior primeiro) e retorna os N primeiros
     return Array.from(produtosUnicos.values())
       .sort((a, b) => b.similaridade - a.similaridade)
       .slice(0, limite);

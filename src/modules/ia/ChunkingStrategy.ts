@@ -14,7 +14,7 @@ export interface Chunk {
 export interface ChunkingConfig {
   tamanhoMaximo: number;      // Tamanho máximo do chunk em caracteres
   sobreposicao: number;       // Sobreposição entre chunks em caracteres
-  separador?: string;         // Separador para chunking (ex: '.', '\n')
+  separador?: string | string[];         // Separador para chunking (ex: '.', '\n')
 }
 
 /**

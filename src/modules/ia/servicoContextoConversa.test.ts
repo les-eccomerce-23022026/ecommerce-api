@@ -1,5 +1,5 @@
-import { ServicoContextoConversa } from './ServicoContextoConversa';
-import type { MensagemChatDTO } from '../../application/dtos/IRecomendacaoDTO';
+import { ServicoContextoConversa } from './servicoContextoConversa';
+import type { MensagemChatDTO } from './IRecomendacao.dto';
 
 describe('ServicoContextoConversa.limitarHistoricoPorTurnos', () => {
   const servico = new ServicoContextoConversa();

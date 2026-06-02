@@ -1,9 +1,9 @@
-import { IContextoRecomendacao } from '../entities/IContextoRecomendacao.entity';
+import { IContextoRecomendacao } from './IContextoRecomendacao.entity';
 import {
   IPedidoRecenteContexto,
   ITendenciaCategoriaContexto,
   ITendenciaFaixaEtariaContexto,
-} from '../entities/IContextoRecomendacao.entity';
+} from './IContextoRecomendacao.entity';
 
 /**
  * Contrato de repositório para busca do contexto personalizado do cliente.

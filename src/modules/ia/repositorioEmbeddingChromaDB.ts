@@ -3,8 +3,8 @@ import { v4 as uuidv4 } from 'uuid';
 import {
   IRepositorioEmbedding,
   ICriarProdutoEmbeddingDto,
-} from '../../domain/repositories/IRepositorioEmbedding';
-import { IProdutoEmbedding } from '../../domain/entities/IProdutoEmbedding.entity';
+} from './IRepositorioEmbedding';
+import { IProdutoEmbedding } from './IProdutoEmbedding.entity';
 import { Logger } from '@/shared/utils/Logger.util';
 
 /**
@@ -215,6 +215,11 @@ export class RepositorioEmbeddingChromaDB implements IRepositorioEmbedding {
         throw new Error(`Metadados não encontrados para embedding ${id}`);
       }
 
+      // Log para debug dos primeiros 3 resultados
+      if (index < 3) {
+        Logger.debug(`[RepositorioEmbeddingChromaDB] Resultado ${index}: ID=${id}, produto_uuid=${metadados.produto_uuid}, titulo=${metadados.titulo}`);
+      }
+
       return {
         produtoUuid: metadados.produto_uuid,
         similaridade,
@@ -303,11 +308,21 @@ export class RepositorioEmbeddingChromaDB implements IRepositorioEmbedding {
 
   async verificarConexao(): Promise<boolean> {
     try {
-      await this.cliente.heartbeat();
+      // Tenta listar coleções como verificação simples de conexão
+      // O heartbeat foi descontinuado na API v2 do ChromaDB
+      const timeoutPromise = new Promise<boolean>((_, reject) => {
+        setTimeout(() => reject(new Error('Timeout na verificação de conexão')), 5000);
+      });
+      
+      await Promise.race([
+        this.cliente.listCollections(),
+        timeoutPromise
+      ]);
+      
       return true;
     } catch (erro) {
       const mensagem = erro instanceof Error ? erro.message : String(erro);
-      Logger.warn(`[RepositorioEmbeddingChromaDB] Heartbeat falhou: ${mensagem}`);
+      Logger.warn(`[RepositorioEmbeddingChromaDB] Verificação de conexão falhou: ${mensagem}`);
       return false;
     }
   }

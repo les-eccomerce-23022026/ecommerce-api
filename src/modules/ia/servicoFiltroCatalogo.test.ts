@@ -1,5 +1,5 @@
-import { ServicoFiltroCatalogo } from './ServicoFiltroCatalogo';
-import { ProdutoRecomendado } from './ServicoRecomendacaoRAG';
+import { ServicoFiltroCatalogo } from './servicoFiltroCatalogo';
+import { ProdutoRecomendado } from './servicoRecomendacaoRAG';
 
 function produto(parcial: Partial<ProdutoRecomendado['metadados']>): ProdutoRecomendado {
   return {

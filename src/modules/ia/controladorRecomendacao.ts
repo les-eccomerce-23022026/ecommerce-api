@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { ServicoRecomendacaoApplication } from '../../application/services/ServicoRecomendacaoApplication';
+import { ServicoRecomendacaoApplication } from './servicoRecomendacaoApplication';
 import { RespostaPadrao } from '@/shared/errors/Iresposta-padrao';
 import { Logger } from '@/shared/utils/Logger.util';
 import {
@@ -9,16 +9,17 @@ import {
   IChatResponseDTO,
   IReindexarRequestDTO,
   IReindexarResponseDTO,
-} from '../../application/dtos/IRecomendacaoDTO';
-import { PeriodoMetrica } from '../../domain/repositories/IRepositorioRecomendacao';
-import { ErroIa } from '../middleware/erroIa.middleware';
+} from './IRecomendacao.dto';
+import { PeriodoMetrica } from './IRepositorioRecomendacao';
+import { ErroIa } from './erroIa.middleware';
 import {
   sanitizarTextoEntrada,
   validarClienteUuidOpcional,
   validarHistoricoChat,
   validarTamanhoMensagemChat,
   validarTamanhoQuery,
-} from '../validators/validacaoEntradaIA.util';
+} from './validacaoEntradaIA.util';
+import { ServicoValidacaoSegurancaIA } from './servicoValidacaoSegurancaIA';
 
 /** Períodos válidos para filtro de métricas de recomendação */
 const PERIODOS_VALIDOS: ReadonlySet<string> = new Set<PeriodoMetrica>([
@@ -34,6 +35,8 @@ const PERIODOS_VALIDOS: ReadonlySet<string> = new Set<PeriodoMetrica>([
  * Expõe endpoints para recomendação de produtos usando RAG com ChromaDB e Gemini.
  */
 export class ControladorRecomendacao {
+  private readonly servicoValidacaoSeguranca = new ServicoValidacaoSegurancaIA();
+
   constructor(private servicoRecomendacao: ServicoRecomendacaoApplication) {}
 
   private obterStatusHttpErro(erro: unknown, padrao: number): number {
@@ -75,6 +78,14 @@ export class ControladorRecomendacao {
       const erroTamanhoQuery = validarTamanhoQuery(querySanitizada);
       if (erroTamanhoQuery) {
         RespostaPadrao.enviarErro(res, 400, erroTamanhoQuery);
+        return;
+      }
+
+      // Validação de segurança contra injeção de prompt e solicitações impossíveis
+      const resultadoSeguranca = this.servicoValidacaoSeguranca.validarEntrada(querySanitizada);
+      if (!resultadoSeguranca.seguro) {
+        const mensagemRejeicao = ServicoValidacaoSegurancaIA.gerarMensagemRejeicao(resultadoSeguranca);
+        RespostaPadrao.enviarErro(res, 400, mensagemRejeicao);
         return;
       }
 
@@ -128,6 +139,14 @@ export class ControladorRecomendacao {
       const erroTamanhoMensagem = validarTamanhoMensagemChat(mensagemSanitizada);
       if (erroTamanhoMensagem) {
         RespostaPadrao.enviarErro(res, 400, erroTamanhoMensagem);
+        return;
+      }
+
+      // Validação de segurança contra injeção de prompt e solicitações impossíveis
+      const resultadoSeguranca = this.servicoValidacaoSeguranca.validarEntrada(mensagemSanitizada);
+      if (!resultadoSeguranca.seguro) {
+        const mensagemRejeicao = ServicoValidacaoSegurancaIA.gerarMensagemRejeicao(resultadoSeguranca);
+        RespostaPadrao.enviarErro(res, 400, mensagemRejeicao);
         return;
       }
 
