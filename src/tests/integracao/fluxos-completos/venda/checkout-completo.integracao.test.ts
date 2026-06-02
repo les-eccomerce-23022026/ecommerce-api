@@ -230,7 +230,6 @@ describe('Integração - Venda Completa (Sprint 1)', () => {
         ultimosDigitosCartao: '4242',
         nomeImpresso: 'Checkout Test User',
         validade: '2026-12-01',
-        cvv: '123',
         principal: false,
       });
 

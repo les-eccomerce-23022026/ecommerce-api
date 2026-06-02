@@ -79,7 +79,6 @@ describe('Integração - Segurança IDOR (Cliente)', () => {
         ultimosDigitosCartao: '1111',
         nomeImpresso: 'Cliente A',
         validade: '2026-12-01',
-        cvv: '123',
         principal: false,
       });
 

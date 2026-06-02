@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { ConexaoPostgres } from '@/shared/infrastructure/database/ConexaoPostgres';
 import { autenticacaoMiddleware } from '@/shared/middlewares/autenticacao.middleware';
+import { contextoLojaMiddleware } from '@/shared/middlewares/contextoLoja.middleware';
 import { adminOnlyMiddleware } from '@/shared/middlewares/autorizacao.middleware';
 import { ControladorVendas } from '@/modules/vendas/controllers/ControladorVendas';
 import { ServicoVendas } from '@/modules/vendas/services/ServicoVendas';
@@ -31,15 +32,10 @@ export function registrarRotasVendas(router: Router): void {
   router.post('/vendas/:uuid/troca', autenticacaoMiddleware, controller.solicitarTroca);
 
   // Trocas (Admin)
-  router.get('/admin/pedidos/trocas', autenticacaoMiddleware, adminOnlyMiddleware, controller.listarTrocasPendentes);
-  router.patch('/admin/pedidos/:uuid/autorizar-troca', autenticacaoMiddleware, adminOnlyMiddleware, controller.autorizarTroca);
-  router.patch('/admin/pedidos/:uuid/rejeitar-troca', autenticacaoMiddleware, adminOnlyMiddleware, controller.rejeitarTroca);
-  router.patch('/admin/pedidos/:uuid/confirmar-recebimento', autenticacaoMiddleware, adminOnlyMiddleware, controller.confirmarRecebimentoTroca);
-
-  // Admin - Pedidos (Listar e Gerenciar Status)
-  router.get('/admin/pedidos', autenticacaoMiddleware, adminOnlyMiddleware, controller.listarPedidosAdmin);
-  router.patch('/admin/pedidos/:uuid/despachar', autenticacaoMiddleware, adminOnlyMiddleware, controller.despacharPedido);
-  router.patch('/admin/pedidos/:uuid/entrega', autenticacaoMiddleware, adminOnlyMiddleware, controller.confirmarEntrega);
+  router.get('/admin/pedidos/trocas', autenticacaoMiddleware, contextoLojaMiddleware, adminOnlyMiddleware, controller.listarTrocasPendentes);
+  router.patch('/admin/pedidos/:uuid/autorizar-troca', autenticacaoMiddleware, contextoLojaMiddleware, adminOnlyMiddleware, controller.autorizarTroca);
+  router.patch('/admin/pedidos/:uuid/rejeitar-troca', autenticacaoMiddleware, contextoLojaMiddleware, adminOnlyMiddleware, controller.rejeitarTroca);
+  router.patch('/admin/pedidos/:uuid/confirmar-recebimento', autenticacaoMiddleware, contextoLojaMiddleware, adminOnlyMiddleware, controller.confirmarRecebimentoTroca);
 
   // Atualizar endereço de entrega (para redespacho após falha)
   router.put('/vendas/:uuid/endereco-entrega', autenticacaoMiddleware, controller.atualizarEnderecoEntrega);

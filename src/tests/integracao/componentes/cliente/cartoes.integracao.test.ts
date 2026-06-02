@@ -35,7 +35,6 @@ describe('Integração - Cartões de Crédito', () => {
           ultimosDigitosCartao: '1111',
           nomeImpresso: 'Cliente Teste',
           validade: '2026-12-01',
-          cvv: '123',
           principal: false,
         });
 
@@ -56,7 +55,6 @@ describe('Integração - Cartões de Crédito', () => {
           ultimosDigitosCartao: '4444',
           nomeImpresso: 'Cliente Principal',
           validade: '2027-06-01',
-          cvv: '456',
           principal: true,
         });
 
@@ -82,7 +80,6 @@ describe('Integração - Cartões de Crédito', () => {
         ultimosDigitosCartao: '1111',
         nomeImpresso: 'Cliente Teste',
         validade: '2026-12-01',
-        cvv: '123',
       });
 
       expect(res.status).toBe(401);
@@ -101,7 +98,6 @@ describe('Integração - Cartões de Crédito', () => {
           ultimosDigitosCartao: '1111',
           nomeImpresso: 'Cliente Listagem',
           validade: '2026-12-01',
-          cvv: '123',
         });
 
       const res = await request(contexto.app)
@@ -146,7 +142,6 @@ describe('Integração - Cartões de Crédito', () => {
           ultimosDigitosCartao: '1111',
           nomeImpresso: 'Cliente Atualizar',
           validade: '2026-12-01',
-          cvv: '123',
         });
 
       const cartaoUuid = criarRes.body.dados.uuid;
@@ -187,7 +182,6 @@ describe('Integração - Cartões de Crédito', () => {
           ultimosDigitosCartao: '1111',
           nomeImpresso: 'Cliente Remover',
           validade: '2026-12-01',
-          cvv: '123',
         });
 
       const cartaoUuid = criarRes.body.dados.uuid;
@@ -223,7 +217,6 @@ describe('Integração - Cartões de Crédito', () => {
           ultimosDigitosCartao: '1111',
           nomeImpresso: 'Cliente Principal',
           validade: '2026-12-01',
-          cvv: '123',
           principal: false,
         });
 
@@ -251,7 +244,6 @@ describe('Integração - Cartões de Crédito', () => {
           ultimosDigitosCartao: '4242',
           nomeImpresso: 'Cliente Visa',
           validade: '2026-12-01',
-          cvv: '123',
           principal: false,
         });
 
@@ -276,7 +268,6 @@ describe('Integração - Cartões de Crédito', () => {
             ultimosDigitosCartao: '5555',
             nomeImpresso: 'Cliente Master',
             validade: '2027-06-01',
-            cvv: '456',
             principal: false,
           });
 
@@ -299,7 +290,6 @@ describe('Integração - Cartões de Crédito', () => {
           ultimosDigitosCartao: '9999',
           nomeImpresso: 'Cliente Invalido',
           validade: '2026-12-01',
-          cvv: '123',
           principal: false,
         });
 

@@ -3,6 +3,11 @@ import { ICartaoDto } from '@/modules/clientes/Iclientes.dto';
 import { DadosInvalidosError } from '@/shared/exceptions/Exceptions';
 
 /**
+ * Constantes de validação de negócio
+ */
+const LIMITE_MAXIMO_CARTOES_POR_CLIENTE = 5;
+
+/**
  * Serviço responsável pela gestão de cartões de clientes.
  * 
  * Responsabilidades:
@@ -30,6 +35,14 @@ export class GestaoCartaoCliente {
     principal: boolean = false
   ): Promise<ICartaoDto> {
     this.validarDadosCartao(dados);
+
+    // Validar limite de cartões por cliente
+    const cartoesExistentes = await this.repositorioCartoes.buscarPorUsuario(idUsuario);
+    if (cartoesExistentes.length >= LIMITE_MAXIMO_CARTOES_POR_CLIENTE) {
+      throw new DadosInvalidosError(
+        `Limite máximo de ${LIMITE_MAXIMO_CARTOES_POR_CLIENTE} cartões por cliente atingido.`
+      );
+    }
 
     if (principal) {
       await this.removerPrincipalDeTodosCartoes(idUsuario);

@@ -7,6 +7,11 @@ import { IRowIdSimples } from '@/shared/types/db-rows.types';
 import { GestaoEnderecoLeituras } from '@/modules/clientes/gestaoIdentidadeClienteEndereco.leituras';
 import { mapearEnderecoUsuarioParaDto } from '@/modules/clientes/gestaoIdentidadeClienteEndereco.dto.mapper';
 
+/**
+ * Constantes de validação de negócio
+ */
+const LIMITE_MAXIMO_ENDERECOS_POR_CLIENTE = 5;
+
 type RefEnderecoUsuario = { current: IEnderecoUsuario };
 
 /**
@@ -149,8 +154,10 @@ export class GestaoEnderecoCliente {
     const idCep = await this.obterOuCriarCep(enderecoDto.cep, idCidade, idBairro);
     const idPais = GestaoEnderecoCliente.obterOuCriarPais(enderecoDto.pais || 'Brasil');
     const enderecosAtuais = await this.repositorioEndereco.buscarPorIdUsuario(idUsuario);
-    if (enderecosAtuais.length >= 5) {
-      throw new Error('Limite de 5 endereços atingido. Você só pode atualizar os endereços existentes.');
+    if (enderecosAtuais.length >= LIMITE_MAXIMO_ENDERECOS_POR_CLIENTE) {
+      throw new Error(
+        `Limite máximo de ${LIMITE_MAXIMO_ENDERECOS_POR_CLIENTE} endereços por cliente atingido.`
+      );
     }
     const endereco: IEnderecoUsuario = {
       idUsuario,

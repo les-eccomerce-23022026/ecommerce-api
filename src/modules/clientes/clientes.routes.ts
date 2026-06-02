@@ -55,5 +55,10 @@ export function registrarRotasClientes(app: IRouter): void {
   app.get('/clientes/:uuid', autenticacaoMiddleware, adminOnlyMiddleware, (requisicao, resposta) =>
     ControladorConsultaClientes.obterClientePorUuid(requisicao, resposta),
   );
+
+  // Rota para listar cupons do cliente (RF0046 - cupom de troca)
+  app.get('/clientes/perfil/cupons', autenticacaoMiddleware, clienteOnlyMiddleware, (req, res) =>
+    ControladorClientes.listarCupons(req, res),
+  );
 }
 
