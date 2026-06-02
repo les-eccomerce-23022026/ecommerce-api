@@ -1,4 +1,4 @@
--- Gerado em: 2026-06-01 13:37:03
+-- Gerado em: 2026-06-01 13:36:14
 -- Fonte: ecm_postgres / ecm_livraria
 -- Comando: npm run db:snapshot
 
@@ -2889,144 +2889,6 @@ ALTER SEQUENCE livraria_gestao.admin_lojas_adl_id_seq OWNED BY livraria_gestao.a
 
 
 --
--- Name: auditoria; Type: TABLE; Schema: livraria_gestao; Owner: -
---
-
-CREATE TABLE livraria_gestao.auditoria (
-    aud_id bigint NOT NULL,
-    aud_uuid uuid DEFAULT gen_random_uuid() NOT NULL,
-    aud_tipo_acao character varying(50) NOT NULL,
-    aud_entidade character varying(50) NOT NULL,
-    aud_entidade_id character varying(255) NOT NULL,
-    aud_usuario_id bigint,
-    aud_usuario_uuid character varying(255),
-    aud_dados_anteriores jsonb,
-    aud_dados_novos jsonb,
-    aud_ip character varying(45),
-    aud_user_agent character varying(500),
-    aud_loj_id bigint,
-    aud_criado_em timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
-);
-
-
---
--- Name: TABLE auditoria; Type: COMMENT; Schema: livraria_gestao; Owner: -
---
-
-COMMENT ON TABLE livraria_gestao.auditoria IS 'Tabela de auditoria para rastrear ações críticas no sistema';
-
-
---
--- Name: COLUMN auditoria.aud_id; Type: COMMENT; Schema: livraria_gestao; Owner: -
---
-
-COMMENT ON COLUMN livraria_gestao.auditoria.aud_id IS 'Chave primária interna';
-
-
---
--- Name: COLUMN auditoria.aud_uuid; Type: COMMENT; Schema: livraria_gestao; Owner: -
---
-
-COMMENT ON COLUMN livraria_gestao.auditoria.aud_uuid IS 'Identificador público UUID';
-
-
---
--- Name: COLUMN auditoria.aud_tipo_acao; Type: COMMENT; Schema: livraria_gestao; Owner: -
---
-
-COMMENT ON COLUMN livraria_gestao.auditoria.aud_tipo_acao IS 'Tipo de ação (ex: CRIAR, ATUALIZAR, DELETAR, APROVAR, REJEITAR)';
-
-
---
--- Name: COLUMN auditoria.aud_entidade; Type: COMMENT; Schema: livraria_gestao; Owner: -
---
-
-COMMENT ON COLUMN livraria_gestao.auditoria.aud_entidade IS 'Entidade afetada (ex: venda, pagamento, troca, usuario)';
-
-
---
--- Name: COLUMN auditoria.aud_entidade_id; Type: COMMENT; Schema: livraria_gestao; Owner: -
---
-
-COMMENT ON COLUMN livraria_gestao.auditoria.aud_entidade_id IS 'ID da entidade afetada';
-
-
---
--- Name: COLUMN auditoria.aud_usuario_id; Type: COMMENT; Schema: livraria_gestao; Owner: -
---
-
-COMMENT ON COLUMN livraria_gestao.auditoria.aud_usuario_id IS 'ID interno do usuário que realizou a ação';
-
-
---
--- Name: COLUMN auditoria.aud_usuario_uuid; Type: COMMENT; Schema: livraria_gestao; Owner: -
---
-
-COMMENT ON COLUMN livraria_gestao.auditoria.aud_usuario_uuid IS 'UUID do usuário que realizou a ação';
-
-
---
--- Name: COLUMN auditoria.aud_dados_anteriores; Type: COMMENT; Schema: livraria_gestao; Owner: -
---
-
-COMMENT ON COLUMN livraria_gestao.auditoria.aud_dados_anteriores IS 'Dados antes da ação (JSON)';
-
-
---
--- Name: COLUMN auditoria.aud_dados_novos; Type: COMMENT; Schema: livraria_gestao; Owner: -
---
-
-COMMENT ON COLUMN livraria_gestao.auditoria.aud_dados_novos IS 'Dados após a ação (JSON)';
-
-
---
--- Name: COLUMN auditoria.aud_ip; Type: COMMENT; Schema: livraria_gestao; Owner: -
---
-
-COMMENT ON COLUMN livraria_gestao.auditoria.aud_ip IS 'Endereço IP da requisição';
-
-
---
--- Name: COLUMN auditoria.aud_user_agent; Type: COMMENT; Schema: livraria_gestao; Owner: -
---
-
-COMMENT ON COLUMN livraria_gestao.auditoria.aud_user_agent IS 'User agent da requisição';
-
-
---
--- Name: COLUMN auditoria.aud_loj_id; Type: COMMENT; Schema: livraria_gestao; Owner: -
---
-
-COMMENT ON COLUMN livraria_gestao.auditoria.aud_loj_id IS 'ID da loja (multi-tenancy)';
-
-
---
--- Name: COLUMN auditoria.aud_criado_em; Type: COMMENT; Schema: livraria_gestao; Owner: -
---
-
-COMMENT ON COLUMN livraria_gestao.auditoria.aud_criado_em IS 'Timestamp da ação';
-
-
---
--- Name: auditoria_aud_id_seq; Type: SEQUENCE; Schema: livraria_gestao; Owner: -
---
-
-CREATE SEQUENCE livraria_gestao.auditoria_aud_id_seq
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
---
--- Name: auditoria_aud_id_seq; Type: SEQUENCE OWNED BY; Schema: livraria_gestao; Owner: -
---
-
-ALTER SEQUENCE livraria_gestao.auditoria_aud_id_seq OWNED BY livraria_gestao.auditoria.aud_id;
-
-
---
 -- Name: clientes; Type: TABLE; Schema: livraria_gestao; Owner: -
 --
 
@@ -4746,13 +4608,6 @@ ALTER TABLE ONLY livraria_gestao.admin_lojas ALTER COLUMN adl_id SET DEFAULT nex
 
 
 --
--- Name: auditoria aud_id; Type: DEFAULT; Schema: livraria_gestao; Owner: -
---
-
-ALTER TABLE ONLY livraria_gestao.auditoria ALTER COLUMN aud_id SET DEFAULT nextval('livraria_gestao.auditoria_aud_id_seq'::regclass);
-
-
---
 -- Name: clientes cli_id; Type: DEFAULT; Schema: livraria_gestao; Owner: -
 --
 
@@ -5462,14 +5317,6 @@ ALTER TABLE ONLY livraria_gestao.admin_lojas
 
 
 --
--- Name: auditoria auditoria_pkey; Type: CONSTRAINT; Schema: livraria_gestao; Owner: -
---
-
-ALTER TABLE ONLY livraria_gestao.auditoria
-    ADD CONSTRAINT auditoria_pkey PRIMARY KEY (aud_id);
-
-
---
 -- Name: clientes clientes_pkey; Type: CONSTRAINT; Schema: livraria_gestao; Owner: -
 --
 
@@ -5547,14 +5394,6 @@ ALTER TABLE ONLY livraria_gestao.telefones
 
 ALTER TABLE ONLY livraria_gestao.admin_lojas
     ADD CONSTRAINT uq_admin_loja UNIQUE (usu_id, loj_id);
-
-
---
--- Name: auditoria uq_auditoria_uuid; Type: CONSTRAINT; Schema: livraria_gestao; Owner: -
---
-
-ALTER TABLE ONLY livraria_gestao.auditoria
-    ADD CONSTRAINT uq_auditoria_uuid UNIQUE (aud_uuid);
 
 
 --
@@ -6322,48 +6161,6 @@ CREATE INDEX idx_pagamento_venda ON livraria_financeiro.pagamento USING btree (v
 --
 
 CREATE INDEX idx_admin_lojas_escopo ON livraria_gestao.admin_lojas USING btree (adl_escopo);
-
-
---
--- Name: idx_auditoria_criado_em; Type: INDEX; Schema: livraria_gestao; Owner: -
---
-
-CREATE INDEX idx_auditoria_criado_em ON livraria_gestao.auditoria USING btree (aud_criado_em);
-
-
---
--- Name: idx_auditoria_entidade; Type: INDEX; Schema: livraria_gestao; Owner: -
---
-
-CREATE INDEX idx_auditoria_entidade ON livraria_gestao.auditoria USING btree (aud_entidade);
-
-
---
--- Name: idx_auditoria_entidade_id; Type: INDEX; Schema: livraria_gestao; Owner: -
---
-
-CREATE INDEX idx_auditoria_entidade_id ON livraria_gestao.auditoria USING btree (aud_entidade_id);
-
-
---
--- Name: idx_auditoria_loja; Type: INDEX; Schema: livraria_gestao; Owner: -
---
-
-CREATE INDEX idx_auditoria_loja ON livraria_gestao.auditoria USING btree (aud_loj_id);
-
-
---
--- Name: idx_auditoria_tipo_acao; Type: INDEX; Schema: livraria_gestao; Owner: -
---
-
-CREATE INDEX idx_auditoria_tipo_acao ON livraria_gestao.auditoria USING btree (aud_tipo_acao);
-
-
---
--- Name: idx_auditoria_usuario; Type: INDEX; Schema: livraria_gestao; Owner: -
---
-
-CREATE INDEX idx_auditoria_usuario ON livraria_gestao.auditoria USING btree (aud_usuario_id);
 
 
 --
