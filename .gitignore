@@ -28,6 +28,7 @@ Thumbs.db
 *.tsbuildinfo
 tmp
 .cache
+cache/
 AGENTS.md
 exports
 .github

@@ -7,7 +7,7 @@ export function mapStatusVendaParaPedidoFrontend(status: string): string {
   const key = status.trim().toUpperCase();
   const map: Record<string, string> = {
     'EM PROCESSAMENTO': 'Em Processamento',
-    APROVADA: 'Preparando',
+    APROVADA: 'Em Processamento',
     REPROVADA: 'Cancelado',
     'EM TRÂNSITO': 'Em Trânsito',
     ENTREGUE: 'Entregue',

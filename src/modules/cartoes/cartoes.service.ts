@@ -7,7 +7,6 @@ export interface ICriarCartaoDto {
   ultimosDigitosCartao: string;
   nomeImpresso: string;
   validade: Date;
-  cvv?: string; // Adicionado para validação
   principal?: boolean;
 }
 
@@ -17,7 +16,6 @@ export interface IAtualizarCartaoDto {
   ultimosDigitosCartao?: string;
   nomeImpresso?: string;
   validade?: Date;
-  cvv?: string; // Adicionado para validação
   principal?: boolean;
 }
 
@@ -29,14 +27,6 @@ export class ServicoCartoes {
 
   constructor(repositorioCartoes: IRepositorioCartaoUsuario) {
     this.repositorioCartoes = repositorioCartoes;
-  }
-
-  private static validarCvvOpcional(cvv: string | undefined): void {
-    if (!cvv) return;
-    const cvvLimpo = cvv.replace(/\D/g, '');
-    if (cvvLimpo.length !== 3) {
-      throw new Error('O CVV deve conter exatamente 3 dígitos numéricos.');
-    }
   }
 
   private static validarMesValidadeCartao(validade: Date | undefined): void {
@@ -51,7 +41,6 @@ export class ServicoCartoes {
    * Cadastra um novo cartão para um usuário.
    */
   async cadastrarCartao(idUsuario: number, dados: ICriarCartaoDto): Promise<ICartaoUsuario> {
-    ServicoCartoes.validarCvvOpcional(dados.cvv);
     ServicoCartoes.validarMesValidadeCartao(dados.validade);
 
     // Buscar ID interno da bandeira pelo UUID público

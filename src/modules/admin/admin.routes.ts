@@ -18,6 +18,7 @@ import { RepositorioEstoque } from '@/modules/estoque/repositorioEstoque';
 import { ServicoEstoque } from '@/modules/estoque/servicoEstoque';
 import { ControladorEstoque } from '@/modules/estoque/controladorEstoque';
 import { autenticacaoMiddleware } from '@/shared/middlewares/autenticacao.middleware';
+import { contextoLojaMiddleware } from '@/shared/middlewares/contextoLoja.middleware';
 import {
   adminOnlyMiddleware,
   adminSistemaOnlyMiddleware
@@ -57,6 +58,7 @@ export function registrarRotasAdmin(app: IRouter): void {
   app.get(
     '/admin/pedidos',
     autenticacaoMiddleware,
+    contextoLojaMiddleware,
     adminOnlyMiddleware,
     controladorPainel.listarPedidosAdmin,
   );
@@ -64,6 +66,7 @@ export function registrarRotasAdmin(app: IRouter): void {
   app.patch(
     '/admin/pedidos/:uuid/despachar',
     autenticacaoMiddleware,
+    contextoLojaMiddleware,
     adminOnlyMiddleware,
     controladorPainel.despacharPedido,
   );
@@ -71,6 +74,7 @@ export function registrarRotasAdmin(app: IRouter): void {
   app.patch(
     '/admin/pedidos/:uuid/entrega',
     autenticacaoMiddleware,
+    contextoLojaMiddleware,
     adminOnlyMiddleware,
     controladorPainel.confirmarEntregaPedido,
   );
@@ -78,6 +82,7 @@ export function registrarRotasAdmin(app: IRouter): void {
   app.put(
     '/admin/pedidos/:uuid/falha-entrega',
     autenticacaoMiddleware,
+    contextoLojaMiddleware,
     adminOnlyMiddleware,
     controladorPainel.marcarFalhaEntrega,
   );
@@ -85,6 +90,7 @@ export function registrarRotasAdmin(app: IRouter): void {
   app.put(
     '/admin/pedidos/:uuid/redespachar',
     autenticacaoMiddleware,
+    contextoLojaMiddleware,
     adminOnlyMiddleware,
     controladorPainel.redespacharPedido,
   );
@@ -92,6 +98,7 @@ export function registrarRotasAdmin(app: IRouter): void {
   app.post(
     '/admin/pedidos/:uuid/solicitar-reconfirmacao-endereco',
     autenticacaoMiddleware,
+    contextoLojaMiddleware,
     adminOnlyMiddleware,
     controladorPainel.solicitarReconfirmacaoEndereco,
   );
