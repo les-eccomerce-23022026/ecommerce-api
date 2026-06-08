@@ -145,32 +145,49 @@ A API sobe em `http://localhost:${PORTA_HTTP:-3000}` (prefixo `/api`). Variávei
 
 ## 3. Credenciais de login (desenvolvimento e BDD)
 
-Usuários criados pelos seeds em `sql/modelagem-dados/dml/` e migrations (`008_seed_dados_teste_bdd.sql`, `025`–`038`). Após `./scripts/setup-db.sh`, use `POST /api/auth/login` com `{ "email", "senha" }`.
+Usuários criados pelos seeds em `sql/modelagem-dados/dml/` e migrations. Após `./scripts/setup-db.sh`, use `POST /api/auth/login` com `{ "email", "senha" }`.
 
-### Clientes
+### Clientes (3 cadastrados)
 
 | Nome | E-mail | Senha | Origem | Dados extras (após setup) |
 |------|--------|-------|--------|---------------------------|
-| **Cliente Teste** | `clientetest@email.com` | `@asdfJKLÇ123` | `005_seed_usuarios_teste.sql`, `008_seed_dados_teste_bdd.sql` | Endereço principal, cartões salvos (`025`, `026`), massa de checkout BDD (`035`, `038`) |
+| **Cliente Teste** | `clientetest@email.com` | `123456` | `005_seed_usuarios_teste.sql` | Endereço principal, cartões salvos (`090`), cupom de troca (`TROCA-TESTE-BDD-7`) |
+| **Maria Silva** | `cliente1@livraria.com.br` | `123456` | `095_seed_desenvolvimento_minimo_corrigido.sql` | Endereço, telefone, cartão Visa |
+| **João Santos** | `cliente2@livraria.com.br` | `123456` | `095_seed_desenvolvimento_minimo_corrigido.sql` | Endereço, telefone, cartão Mastercard |
 
-### Administradores
-
-| Nome | E-mail | Senha | Perfil | Origem |
-|------|--------|-------|--------|--------|
-| **Administrador Mestre** | `admin@livraria.com.br` | `Admin@123` | `isAdminMestre: true` — gestão de outros admins | `002_seed_usuario_admin_inicial.sql` |
-| **Admin Teste** | `admintest@email.com` | `@asdfJKLÇ123` | Admin comum (sem mestre) | `005_seed_usuarios_teste.sql`, `008_seed_dados_teste_bdd.sql` |
-
-### Multi-Tenancy (após migration 050)
+### Administradores de Loja (2 cadastrados)
 
 | Nome | E-mail | Senha | Papel | Escopo | Origem |
 |------|--------|-------|-------|--------|--------|
-| **Admin Sistema** | `admin_sistema@livraria.com.br` | `SenhaForte@123` | `admin_sistema` + `admin` | Global (todas lojas) | `050_seed_multi_tenant_completo.sql` |
-| **Admin Tenant (Centro)** | `admin_centro@livraria.com.br` | `SenhaForte@123` | `admin` | Apenas Livraria Centro | `050_seed_multi_tenant_completo.sql` |
-| **Admin Tenant (Norte)** | `admin_norte@livraria.com.br` | `SenhaForte@123` | `admin` | Apenas Livraria Norte | `050_seed_multi_tenant_completo.sql` |
-| **Admin Tenant (Sul)** | `admin_sul@livraria.com.br` | `SenhaForte@123` | `admin` | Apenas Livraria Sul | `050_seed_multi_tenant_completo.sql` |
-| **Cliente** | `maria.silva@email.com` | `SenhaForte@123` | `cliente` | Global (catálogo) | `050_seed_multi_tenant_completo.sql` |
+| **Admin Teste** | `admintest@email.com` | `123456` | `admin` | LOJA (loja atribuída) | `005_seed_usuarios_teste.sql` |
+| **Admin Livraria** | `admin_loja@livraria.com.br` | `123456` | `admin` | LOJA (livraria-padrao) | `095_seed_desenvolvimento_minimo_corrigido.sql` |
 
-> **Nota:** Para detalhes sobre a arquitetura multi-tenancy, permissões e implementação técnica, consulte [`docs/MULTI-TENANCY-QUICK-REFERENCE.md`](docs/MULTI-TENANCY-QUICK-REFERENCE.md) ou [`docs/MULTI-TENANCY-IMPLEMENTACAO.md`](docs/MULTI-TENANCY-IMPLEMENTACAO.md).
+### Administrador de Sistema (0 cadastrados)
+
+Atualmente não há nenhum usuário com papel `admin_sistema` no banco de desenvolvimento. Para criar um, execute a migration `083_seed_admin_teste_fixo.sql` se necessário.
+
+### Seed de Vendas Históricas (Análise de Vendas)
+
+Para demonstração do gráfico de análise de vendas por categoria, execute a migration `070_seed_vendas_historicas_13_meses.sql`:
+
+```bash
+docker exec ecm_postgres psql -U ecm_user -d ecm_livraria < sql/migrations/070_seed_vendas_historicas_13_meses.sql
+```
+
+**Dados populados:**
+- **Período**: 13 meses (maio 2025 a maio 2026)
+- **Total de vendas**: ~325 vendas
+- **Total de itens**: ~621 itens de venda
+- **Categorias**: 7 categorias distribuídas (Clássicos, Distopia, Fantasia, Ficção Científica, Literatura Brasileira, Negócios, Tecnologia)
+- **Clientes**: 2 clientes fixos (usu_id 92 e 94)
+- **Loja**: Loja Padrão (UUID: 82c0a24c-4cf4-4b12-823a-f1a8b9a086c3, loj_id: 32)
+- **Status**: 80% ENTREGUE, 15% APROVADA, 5% EM_PROCESSAMENTO
+
+**Login para análise de vendas:**
+- **Email**: admin_loja@livraria.com.br
+- **Senha**: 123456
+- **Papel**: admin (PAPEL_ADMIN)
+- **Escopo**: LOJA (livraria-padrao)
 
 ### Exemplo de login
 
@@ -180,19 +197,19 @@ Com Docker (`PORTA_HTTP_EXTERNA=3002`):
 # Cliente
 curl -s -X POST http://localhost:3002/api/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"email":"clientetest@email.com","senha":"@asdfJKLÇ123"}'
+  -d '{"email":"clientetest@email.com","senha":"123456"}'
 
-# Administrador (comum ou mestre)
+# Administrador de Loja
 curl -s -X POST http://localhost:3002/api/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"email":"admintest@email.com","senha":"@asdfJKLÇ123"}'
+  -d '{"email":"admintest@email.com","senha":"123456"}'
 ```
 
 Sem Docker, troque `3002` por `3000` (ou o valor de `PORTA_HTTP` no `.env`).
 
 ### Cypress e CI
 
-Os testes E2E usam por padrão `clientetest@email.com` e `admintest@email.com` (senha `@asdfJKLÇ123`). Sobrescreva com `CYPRESS_CLIENTE_EMAIL`, `CYPRESS_CLIENTE_SENHA`, `CYPRESS_ADMIN_EMAIL`, `CYPRESS_ADMIN_SENHA`.
+Os testes E2E usam por padrão `clientetest@email.com` e `admintest@email.com` (senha `123456`). Sobrescreva com `CYPRESS_CLIENTE_EMAIL`, `CYPRESS_CLIENTE_SENHA`, `CYPRESS_ADMIN_EMAIL`, `CYPRESS_ADMIN_SENHA`.
 
 ### Bootstrap (somente `NODE_ENV=test`)
 

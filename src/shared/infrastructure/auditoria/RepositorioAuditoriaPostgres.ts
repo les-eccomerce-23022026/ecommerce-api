@@ -23,7 +23,9 @@ export class RepositorioAuditoriaPostgres implements IRepositorioAuditoria {
    * Obtém informações do usuário do contexto de requisição.
    */
   private obterUsuarioContexto(): { id?: number; uuid?: string } {
-    return ContextoRequisicao.obterUsuario() || {};
+    const usuId = ContextoRequisicao.obterUsuId();
+    const usuUuid = ContextoRequisicao.obterUsuUuid();
+    return usuId ? { id: usuId, uuid: usuUuid } : {};
   }
 
   public async registrar(registro: IAuditoriaRegistro): Promise<void> {

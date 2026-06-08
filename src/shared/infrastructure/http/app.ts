@@ -67,10 +67,12 @@ export function criarAplicacao(): Application {
   );
   // Configura os middlewares globais ANTES das rotas.
   app.use(express.json());
-  app.use(contextoLojaMiddleware);
+  // middlewareTrocaBanco deve vir antes de contextoLojaMiddleware para garantir que
+  // o contexto de banco de teste seja aplicado antes de consultar a tabela de lojas
   if (process.env.NODE_ENV === 'test' || process.env.ENABLE_TEST_DB_SWITCH === 'true') {
     app.use(middlewareTrocaBanco);
   }
+  app.use(contextoLojaMiddleware);
 
   // Instanciar serviços mock de logística
   const repoRastreamento = new RepositorioRastreamentoPostgres(db);
@@ -91,8 +93,8 @@ export function criarAplicacao(): Application {
   registrarRotasAutenticacao(apiRouter);
   registrarRotasClientes(apiRouter);
   registrarRotasCartoes(apiRouter);
-  registrarRotasAdmin(apiRouter);
   registrarRotasVendas(apiRouter);
+  registrarRotasAdmin(apiRouter);
   registrarRotasLivros(apiRouter);
   registrarRotasCarrinho(apiRouter);
   registrarRotasCupom(apiRouter);

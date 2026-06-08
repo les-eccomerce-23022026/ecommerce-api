@@ -75,8 +75,13 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
   }
 
   public async buscarPorEmail(email: string): Promise<IUsuario | undefined> {
+    const emailNormalizado = email.trim().toLowerCase();
     const query = `${USUARIO_QUERIES.SELECT_BASE} WHERE u.usu_email = $1 LIMIT 1`;
-    const rows = await this.db.executar(query, [email]);
+    const rows = await this.db.executar(
+      query, 
+      [emailNormalizado],
+      { searchPath: 'livraria_comercial, livraria_financeiro, livraria_gestao, livraria_logistica, livraria_ref, public' }
+    );
 
     if (rows.length === 0) return undefined;
     
@@ -85,28 +90,58 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
     const usuarioId = Number(usuarioRow.id) as number;
     const papeisRows = await this.db.executar(
       USUARIO_QUERIES.SELECT_PAPEIS_USUARIO, 
-      [usuarioId]
+      [usuarioId],
+      { searchPath: 'livraria_comercial, livraria_financeiro, livraria_gestao, livraria_logistica, livraria_ref, public' }
     );
     
     return UsuarioMapper.mapearParaEntidade(usuarioRow, papeisRows as LinhaResultadoUsuario[]);
   }
 
   public async buscarPorEmailPapel(email: string, idPapel: number): Promise<IUsuario | undefined> {
+    const emailNormalizado = email.trim().toLowerCase();
     const query = `${USUARIO_QUERIES.SELECT_BASE} WHERE u.usu_email = $1 AND u.pap_id = $2`;
-    const rows = await this.db.executar(query, [email, idPapel]);
+    const rows = await this.db.executar(
+      query, 
+      [emailNormalizado, idPapel],
+      { searchPath: 'livraria_comercial, livraria_financeiro, livraria_gestao, livraria_logistica, livraria_ref, public' }
+    );
 
     if (rows.length === 0) return undefined;
     
     const usuarioRow = rows[0] as LinhaResultadoUsuario;
     const usuarioId = Number(usuarioRow.id) as number;
-    const papeisRows = await this.db.executar(USUARIO_QUERIES.SELECT_PAPEIS_USUARIO, [usuarioId]);
+    const papeisRows = await this.db.executar(
+      USUARIO_QUERIES.SELECT_PAPEIS_USUARIO, 
+      [usuarioId],
+      { searchPath: 'livraria_comercial, livraria_financeiro, livraria_gestao, livraria_logistica, livraria_ref, public' }
+    );
     
     return UsuarioMapper.mapearParaEntidade(usuarioRow, papeisRows as LinhaResultadoUsuario[]);
   }
 
   public async buscarTodosPorEmail(email: string): Promise<IUsuario[]> {
+    // Normalizar email: trim e lowercase para evitar problemas de encoding
+    const emailNormalizado = email.trim().toLowerCase();
+    
     const query = `${USUARIO_QUERIES.SELECT_BASE} WHERE u.usu_email = $1`;
-    const rows = await this.db.executar(query, [email]);
+    
+    Logger.debug('[buscarTodosPorEmail] Iniciando busca por email', { 
+      emailOriginal: email,
+      emailNormalizado,
+      query: query.trim().substring(0, 200) 
+    });
+    
+    const rows = await this.db.executar(
+      query, 
+      [emailNormalizado],
+      { searchPath: 'livraria_comercial, livraria_financeiro, livraria_gestao, livraria_logistica, livraria_ref, public' }
+    );
+    
+    Logger.debug('[buscarTodosPorEmail] Resultado da query base', { 
+      email: emailNormalizado, 
+      quantidadeRows: rows.length,
+      rows: rows.map(r => ({ id: (r as any).id, email: (r as any).email, ativo: (r as any).ativo }))
+    });
     
     // Buscar papéis para cada usuário
     const usuariosComPapeis = await Promise.all(
@@ -114,15 +149,31 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
         const usuarioRow = row as LinhaResultadoUsuario;
         const usuarioId = Number(usuarioRow.id) as number;
         
+        Logger.debug('[buscarTodosPorEmail] Buscando papéis do usuário', { 
+          usuarioId,
+          email: emailNormalizado 
+        });
+        
         const papeisRows = await this.db.executar(
           USUARIO_QUERIES.SELECT_PAPEIS_USUARIO, 
           [usuarioId],
           { searchPath: 'livraria_comercial, livraria_financeiro, livraria_gestao, livraria_logistica, livraria_ref, public' }
         );
         
+        Logger.debug('[buscarTodosPorEmail] Papéis encontrados', { 
+          usuarioId,
+          quantidadePapeis: papeisRows.length,
+          papeis: papeisRows.map(p => ({ id: (p as any).id, descricao: (p as any).descricao }))
+        });
+        
         return UsuarioMapper.mapearParaEntidade(usuarioRow, papeisRows as LinhaResultadoUsuario[]);
       })
     );
+    
+    Logger.debug('[buscarTodosPorEmail] Finalizado', { 
+      email: emailNormalizado, 
+      quantidadeUsuarios: usuariosComPapeis.length 
+    });
     
     return usuariosComPapeis;
   }

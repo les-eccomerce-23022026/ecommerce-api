@@ -176,8 +176,8 @@ export class RepositorioEstoque {
           etq_quantidade_disponivel = etq_quantidade_disponivel + $1,
           etq_valor_custo_atual = $2,
           etq_atualizado_em = CURRENT_TIMESTAMP
-        WHERE liv_id = $3 AND etq_ativo = TRUE
-      `, [dados.quantidade, dados.custoUnitario, livId]);
+        WHERE liv_id = $3 AND loj_id = $4 AND etq_ativo = TRUE
+      `, [dados.quantidade, dados.custoUnitario, livId, lojId]);
 
       await this.db.executar(`
         COMMIT;

@@ -7,6 +7,7 @@ import type {
 import { montarPartesSqlCatalogo } from '@/modules/livros/repositorioLivrosCatalogoSql';
 import type { IConexaoBanco, DbParametro } from '../../shared/infrastructure/database/IConexaoBanco';
 import { ContextoRequisicao } from '@/shared/infrastructure/contexto/ContextoRequisicao';
+import { MENSAGENS_ERRO } from '@/shared/constants/mensagens-erro.constants';
 
 type RowLivro = {
   liv_uuid: string;
@@ -284,7 +285,7 @@ export class RepositorioLivrosPostgres {
   }): Promise<ILivroCatalogoDto> {
     const livId = await this.obterLivIdPorUuid(livUuid);
     if (!livId) {
-      throw new Error('Livro não encontrado.');
+      throw new Error(MENSAGENS_ERRO.LIVRO_NAO_ENCONTRADO);
     }
 
     // Construir SET dinâmico com parâmetros independentes por tabela (livros vs estoques)

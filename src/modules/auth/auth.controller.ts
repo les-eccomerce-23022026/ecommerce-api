@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { di } from '@/shared/infrastructure/di.container';
 import { RespostaPadrao } from '@/shared/errors/Iresposta-padrao';
 import { obterNomeCookieAuth } from '@/shared/constants/auth-cookie';
+import { MENSAGENS_ERRO } from '@/shared/constants/mensagens-erro.constants';
 import { Logger } from '@/shared/utils/Logger.util';
 
 const { servicoAutenticacao, repoRefreshTokens } = di;
@@ -47,11 +48,27 @@ export class ControladorAutenticacao {
         maxAge: maxAgeMs,            // Sincroniza com expiração do JWT
       });
 
-      // ⚠️ SEGURANÇA: Token retornado no corpo APENAS em testes.
+      // Definir cookie x-loja-uuid para contexto de multi-tenancy
+      // Busca loja_uuid_principal do token JWT decodificado
+      const tokenDecodificado = JSON.parse(Buffer.from(resultado.token.split('.')[1], 'base64').toString());
+      const lojaUuidPrincipal = tokenDecodificado.loja_uuid_principal;
+      if (lojaUuidPrincipal) {
+        resposta.cookie('x-loja-uuid', lojaUuidPrincipal, {
+          httpOnly: false,           // Precisa ser acessível via JavaScript no cliente
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'strict',
+          path: '/',
+          maxAge: 365 * 24 * 60 * 60 * 1000, // 1 ano
+        });
+      }
+
+      // ⚠️ SEGURANÇA: Token retornado no corpo em desenvolvimento e testes.
       // Em produção, o JWT está protegido em cookie HttpOnly.
       // Refresh token retornado em cookie HttpOnly separado.
       const incluirTokenNoCorpo =
-        process.env.NODE_ENV === 'test' || requisicao.headers['x-use-test-db'] === 'true';
+        process.env.NODE_ENV === 'test' || 
+        process.env.NODE_ENV === 'development' ||
+        requisicao.headers['x-use-test-db'] === 'true';
       
       // Cookie HttpOnly para refresh token
       if (resultado.refreshToken) {
@@ -111,7 +128,7 @@ export class ControladorAutenticacao {
       const usuarioBD = await di.repoUsuarios.buscarPorUuid(usuario.uuid);
       
       if (!usuarioBD) {
-        return RespostaPadrao.enviarErro(resposta, 401, 'Usuário não encontrado.');
+        return RespostaPadrao.enviarErro(resposta, 401, MENSAGENS_ERRO.USUARIO_NAO_ENCONTRADO);
       }
 
       return RespostaPadrao.enviarSucesso(resposta, 200, {
@@ -136,8 +153,30 @@ export class ControladorAutenticacao {
    */
   public static async encerrarSessao(requisicao: Request, resposta: Response): Promise<Response> {
     const nomeCookie = obterNomeCookieAuth();
-    resposta.clearCookie(nomeCookie, { path: '/' });
-    resposta.clearCookie(`${nomeCookie}_refresh`, { path: '/' });
+    
+    // Limpar cookie de auth com as mesmas opções usadas ao definir
+    resposta.clearCookie(nomeCookie, { 
+      path: '/',
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict' as const,
+    });
+    
+    // Limpar cookie de refresh token com as mesmas opções usadas ao definir
+    resposta.clearCookie(`${nomeCookie}_refresh`, { 
+      path: '/',
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict' as const,
+    });
+    
+    // Limpar cookie de loja uuid
+    resposta.clearCookie('x-loja-uuid', { 
+      path: '/',
+      httpOnly: false,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict' as const,
+    });
     
     // Revogar refresh tokens se usuário estiver autenticado
     if (requisicao.usuario?.id) {

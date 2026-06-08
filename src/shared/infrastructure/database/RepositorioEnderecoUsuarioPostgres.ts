@@ -32,7 +32,7 @@ export class RepositorioEnderecoUsuarioPostgres implements IRepositorioEnderecoU
       complemento: (row.complemento as string | null | undefined) || undefined,
       idCidade: Number(row.idCidade),
       idBairro: Number(row.idBairro),
-      idCep: Number(row.idCep),
+      idCep: row.idCep ? String(row.idCep).trim() : '',
       idPais: Number(row.idPais),
       principal: row.principal as boolean,
       criadoEm: row.criadoEm ? new Date(row.criadoEm as string) : undefined,

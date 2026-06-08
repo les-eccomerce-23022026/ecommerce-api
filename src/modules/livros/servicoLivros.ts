@@ -5,6 +5,7 @@ import { RepositorioLivrosBulkInsert } from '@/modules/livros/repositorioLivrosB
 import { CacheDisco } from '@/shared/infrastructure/cache/CacheDisco';
 import { GeradorChaveCache } from '@/shared/infrastructure/cache/geradorChaveCache';
 import { ContextoRequisicao } from '@/shared/infrastructure/contexto/ContextoRequisicao';
+import { MENSAGENS_ERRO } from '@/shared/constants/mensagens-erro.constants';
 
 export class ServicoLivros {
   constructor(
@@ -252,7 +253,7 @@ export class ServicoLivros {
   async inativarLivro(uuid: string, motivo: string, categoriaInativacao?: string): Promise<ILivroCatalogoDto> {
     const livro = await this.repo.obterPorUuid(uuid);
     if (!livro) {
-      throw new Error('Livro não encontrado.');
+      throw new Error(MENSAGENS_ERRO.LIVRO_NAO_ENCONTRADO);
     }
     if (!livro.status || livro.status === 'Inativo') {
       throw new Error('Livro já está inativo.');
@@ -276,7 +277,7 @@ export class ServicoLivros {
   async ativarLivro(uuid: string, motivo: string, categoriaAtivacao?: string): Promise<ILivroCatalogoDto> {
     const livro = await this.repo.obterPorUuid(uuid);
     if (!livro) {
-      throw new Error('Livro não encontrado.');
+      throw new Error(MENSAGENS_ERRO.LIVRO_NAO_ENCONTRADO);
     }
     if (livro.status === 'Ativo') {
       throw new Error('Livro já está ativo.');

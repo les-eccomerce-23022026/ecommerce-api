@@ -155,7 +155,41 @@ As seeds são responsáveis por criar dados iniciais para desenvolvimento e test
 
 ---
 
-### 8. 005_seed_usuarios_teste.sql
+### 8. 008_seed_pagamentos_teste.sql
+**Descrição:** Cria pagamentos para vendas existentes, múltiplos cartões por cliente e cenários adicionais de troca
+**Dependências:** `003_seed_multi_tenant_completo.sql`, `004_seed_cartoes_clientes.sql`, `005_seed_vendas_teste.sql`
+**Entidades criadas:**
+- **Pagamentos para 4 vendas existentes:**
+  - Venda ENTREGUE (Fernanda): Pagamento APROVADO
+  - Venda EM PROCESSAMENTO (Lucas): Pagamento PENDENTE
+  - Venda CANCELADA (Marcos): Pagamento RECUSADO
+  - Venda EM TRÂNSITO (Fernanda): Pagamento APROVADO
+- **Registros em cartao_pagamento:** Vincula pagamentos aos cartões do 004
+- **Múltiplos cartões por cliente:** Adiciona 2-3 cartões por cliente (extensão do 004)
+  - Fernanda: 3 cartões (Visa, Mastercard, Elo)
+  - Lucas: 3 cartões (Mastercard, Visa, Elo)
+  - Juliana: 3 cartões (Elo, Visa, Mastercard)
+- **Venda adicional com múltiplos pagamentos:** Juliana (cartão + cupom promocional)
+- **Cenários adicionais de troca:**
+  - Devolução de pedido completo (Carla)
+  - Admin negando troca (Juliana)
+
+**Observações:**
+- ✅ **IDEMPOTENTE:** Pode ser executado múltiplas vezes (usa ON CONFLICT e idempotency_key)
+- ✅ **PAPEIS DE AUTENTICAÇÃO:** Considera papéis (admin vs cliente) nos cenários
+- ✅ **DADOS REALISTAS:** Valores consistentes com vendas, datas realistas
+- ✅ **NÃO QUEBRA ENTREGAS:** Usa ON CONFLICT DO NOTHING/UPDATE para não duplicar dados
+- ✅ **TESTES REPETÍVEIS:** Idempotency_key garante reexecução segura
+
+**Cobertura de Cenários da Entrega 7 (Venda Completa):**
+- Cenário 2: ✅ Combinações de pagamento (cartão + cupom)
+- Cenário 5: ✅ Admin confirma pagamento (status PENDENTE → APROVADO)
+- Cenário 6: ✅ Admin aceita/nega troca (TROCA REJEITADA)
+- Cenário 8: ✅ Devolução de pedido completo
+
+---
+
+### 9. 005_seed_usuarios_teste.sql
 **Descrição:** Cria usuários de teste básicos (1 admin + 1 cliente)
 **Dependências:** `001_seeds_tipos_referencia.sql`, lojas devem existir
 **Entidades criadas:**
@@ -325,10 +359,11 @@ Para ambiente de desenvolvimento completo:
 5. `006_seed_trocas_teste.sql`
 6. **Migration `068_adicionar_loj_id_cupons.sql`** (obrigatório para cupons por loja)
 7. `007_seed_cupons_promocionais.sql`
-8. `005_seed_usuarios_teste.sql` (opcional, para testes automatizados)
-9. `065_seed_demo_30_clientes_100_livros.sql` (opcional, para mais dados)
-10. `067_seed_dados_referencia_e2e.sql` (para testes E2E)
-11. `063_seed_admin_mestre_livraria.sql` (opcional, para admin de sistema)
+8. `008_seed_pagamentos_teste.sql` (NOVO - pagamentos, múltiplos cartões, cenários de troca)
+9. `005_seed_usuarios_teste.sql` (opcional, para testes automatizados)
+10. `065_seed_demo_30_clientes_100_livros.sql` (opcional, para mais dados)
+11. `067_seed_dados_referencia_e2e.sql` (para testes E2E)
+12. `063_seed_admin_mestre_livraria.sql` (opcional, para admin de sistema)
 
 Para ambiente de produção:
 
