@@ -1,0 +1,7 @@
+BEGIN
+ERROR:  duplicate key value violates unique constraint "lojas_loj_uuid_key"
+DETAIL:  Key (loj_uuid)=(82c0a24c-4cf4-4b12-823a-f1a8b9a086c3) already exists.
+ERROR:  current transaction is aborted, commands ignored until end of transaction block
+ERROR:  current transaction is aborted, commands ignored until end of transaction block
+ERROR:  current transaction is aborted, commands ignored until end of transaction block
+ROLLBACK

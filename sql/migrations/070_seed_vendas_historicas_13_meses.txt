@@ -1,0 +1,9 @@
+BEGIN
+NOTICE:  Usando loj_id=32 (UUID: 82c0a24c-4cf4-4b12-823a-f1a8b9a086c3) para seed de vendas históricas
+DO
+INSERT 0 325
+INSERT 0 680
+UPDATE 325
+NOTICE:  Seed concluído: 325 vendas e 680 itens gerados (loj_id=32, UUID=82c0a24c-4cf4-4b12-823a-f1a8b9a086c3)
+DO
+COMMIT

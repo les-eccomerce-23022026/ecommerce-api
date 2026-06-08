@@ -1,0 +1,7 @@
+CREATE INDEX
+CREATE INDEX
+NOTICE:  relation "idx_livro_categorias_livro" already exists, skipping
+CREATE INDEX
+ERROR:  cannot use subquery in index predicate
+LINE 3:   WHERE stv_id IN (
+                       ^
