@@ -1,6 +1,8 @@
 import request from 'supertest';
 import { configurarTesteIntegracao } from '@/tests/helpers/setup-integracao.util';
 import { obterTokenAdmin, registrarCliente, realizarLogin, gerarCpfValidoUnico } from '@/tests/helpers/requisicoes-api.util';
+import { servicoContextoLoja } from '@/shared/services/ServicoContextoLoja';
+import { limparCacheAutorizacaoLoja } from '@/shared/middlewares/autorizacaoLoja.middleware';
 
 /**
  * Testes de integração para segurança básica.
@@ -12,9 +14,19 @@ import { obterTokenAdmin, registrarCliente, realizarLogin, gerarCpfValidoUnico }
  * - Tentativa de acesso com token expirado
  * - SQL injection (usar parâmetros nas queries - já implementado em repositórios)
  * - XSS em campos de texto (validação de entrada)
+ *
+ * MITIGAÇÃO DE CACHE: Este teste cria lojas, o que afeta o cache global
+ * de ServicoContextoLoja. Para evitar problemas em testes paralelos,
+ * o cache é limpo antes de cada teste.
  */
 describe('Integração - Segurança Básica', () => {
   const contexto = configurarTesteIntegracao();
+
+  beforeEach(() => {
+    // Limpar caches globais para evitar interferência entre testes
+    servicoContextoLoja.limparCache();
+    limparCacheAutorizacaoLoja();
+  });
 
   describe('Proteção de Rotas Administrativas', () => {
     it('[SEGURANÇA] deve retornar 401 ao acessar rota admin sem token', async () => {

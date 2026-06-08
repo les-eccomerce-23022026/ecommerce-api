@@ -41,6 +41,8 @@ describe('Integração - Módulo de Notificações', () => {
         valorTotalItens: 50.0,
         valorFrete: 10.0,
         valorTotal: 60.0,
+        enderecoEntregaUuid: 'b52cf444-aa8d-4ed4-9d3e-9941f889cc6b',
+        cartaoUuid: '5c6e0e8a-0211-4bce-abf5-80e144f84ce3',
       });
 
     expect(resVenda.status).toBe(201);

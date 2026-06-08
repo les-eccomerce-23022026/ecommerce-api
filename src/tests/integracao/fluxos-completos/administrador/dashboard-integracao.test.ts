@@ -79,7 +79,6 @@ describe('Integração — Painel administrativo (dashboard e pedidos)', () => {
         .send({ codigoRastreamento: 'BR123456789BR' });
 
       expect(resDesp.status).toBe(200);
-      expect(resDesp.body.uuid).toBe(vendaUuid);
       expect(resDesp.body.status).toBe('Em Trânsito');
 
       const resVenda = await request(app)

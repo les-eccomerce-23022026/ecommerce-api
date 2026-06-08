@@ -6,6 +6,14 @@ describe('Integração - RepositorioVendasPostgres - Correção N+1 Queries', ()
   const contexto = configurarTesteIntegracao();
   let repositorio: RepositorioVendasPostgres;
 
+  // Helper para obter pap_id do papel 'cliente'
+  async function obterPapelClienteId(): Promise<number> {
+    const papelRes = await contexto.db!.executar<{ pap_id: number }>(
+      `SELECT pap_id FROM livraria_gestao.papeis WHERE pap_descricao = 'cliente' LIMIT 1`
+    );
+    return papelRes[0].pap_id;
+  }
+
   beforeEach(() => {
     repositorio = new RepositorioVendasPostgres(contexto.db!);
   });
@@ -30,12 +38,14 @@ describe('Integração - RepositorioVendasPostgres - Correção N+1 Queries', ()
       await contexto.db!.executar(`DELETE FROM livraria_comercial.vendas WHERE usu_id IN (SELECT usu_id FROM livraria_gestao.usuarios WHERE usu_cpf = '12345678901')`);
       await contexto.db!.executar(`DELETE FROM livraria_gestao.usuarios WHERE usu_cpf = '12345678901'`);
       
+      const papelId = await obterPapelClienteId();
+      
       // Setup: Criar usuário
       const usuarioRes = await contexto.db!.executar<{ usu_uuid: string }>(
         `INSERT INTO livraria_gestao.usuarios (usu_nome, usu_email, usu_cpf, usu_senha_hash, pap_id, usu_ativo, loj_id)
          VALUES ($1, $2, $3, $4, $5, TRUE, 1)
          RETURNING usu_uuid`,
-        ['Cliente Teste', 'cliente@teste.com', '12345678901', 'hash', 21625]
+        ['Cliente Teste', 'cliente@teste.com', '12345678901', 'hash', papelId]
       );
       const usuarioUuid = usuarioRes[0].usu_uuid;
 
@@ -115,10 +125,13 @@ describe('Integração - RepositorioVendasPostgres - Correção N+1 Queries', ()
       await contexto.db!.executar(`DELETE FROM livraria_comercial.vendas WHERE usu_id IN (SELECT usu_id FROM livraria_gestao.usuarios WHERE usu_cpf = '12345678902')`);
       await contexto.db!.executar(`DELETE FROM livraria_gestao.usuarios WHERE usu_cpf = '12345678902'`);
       
+      const papelId = await obterPapelClienteId();
+      
       const usuarioRes = await contexto.db!.executar<{ usu_uuid: string }>(
         `INSERT INTO livraria_gestao.usuarios (usu_nome, usu_email, usu_cpf, usu_senha_hash, pap_id, usu_ativo, loj_id)
-         VALUES ('Cliente Multi Itens', 'cliente.multi@teste.com', '12345678902', 'hash', 21625, TRUE, 1)
-         RETURNING usu_uuid`
+         VALUES ('Cliente Multi Itens', 'cliente.multi@teste.com', '12345678902', 'hash', $1, TRUE, 1)
+         RETURNING usu_uuid`,
+        [papelId]
       );
       const usuarioUuid = usuarioRes[0].usu_uuid;
 
@@ -192,10 +205,13 @@ describe('Integração - RepositorioVendasPostgres - Correção N+1 Queries', ()
       await contexto.db!.executar(`DELETE FROM livraria_comercial.vendas WHERE usu_id IN (SELECT usu_id FROM livraria_gestao.usuarios WHERE usu_cpf = '12345678903')`);
       await contexto.db!.executar(`DELETE FROM livraria_gestao.usuarios WHERE usu_cpf = '12345678903'`);
       
+      const papelId = await obterPapelClienteId();
+      
       const usuarioRes = await contexto.db!.executar<{ usu_uuid: string }>(
         `INSERT INTO livraria_gestao.usuarios (usu_nome, usu_email, usu_cpf, usu_senha_hash, pap_id, usu_ativo, loj_id)
-         VALUES ('Cliente Status Var', 'cliente.status@teste.com', '12345678903', 'hash', 21625, TRUE, 1)
-         RETURNING usu_uuid`
+         VALUES ('Cliente Status Var', 'cliente.status@teste.com', '12345678903', 'hash', $1, TRUE, 1)
+         RETURNING usu_uuid`,
+        [papelId]
       );
       const usuarioUuid = usuarioRes[0].usu_uuid;
 
@@ -266,10 +282,13 @@ describe('Integração - RepositorioVendasPostgres - Correção N+1 Queries', ()
       await contexto.db!.executar(`DELETE FROM livraria_comercial.vendas WHERE usu_id IN (SELECT usu_id FROM livraria_gestao.usuarios WHERE usu_cpf = '12345678904')`);
       await contexto.db!.executar(`DELETE FROM livraria_gestao.usuarios WHERE usu_cpf = '12345678904'`);
       
+      const papelId = await obterPapelClienteId();
+      
       const usuarioRes = await contexto.db!.executar<{ usu_uuid: string }>(
         `INSERT INTO livraria_gestao.usuarios (usu_nome, usu_email, usu_cpf, usu_senha_hash, pap_id, usu_ativo, loj_id)
-         VALUES ('Cliente Sem Itens', 'cliente.semitens@teste.com', '12345678904', 'hash', 21625, TRUE, 1)
-         RETURNING usu_uuid`
+         VALUES ('Cliente Sem Itens', 'cliente.semitens@teste.com', '12345678904', 'hash', $1, TRUE, 1)
+         RETURNING usu_uuid`,
+        [papelId]
       );
       const usuarioUuid = usuarioRes[0].usu_uuid;
 
@@ -308,11 +327,13 @@ describe('Integração - RepositorioVendasPostgres - Correção N+1 Queries', ()
       await contexto.db!.executar(`DELETE FROM livraria_comercial.vendas WHERE usu_id IN (SELECT usu_id FROM livraria_gestao.usuarios WHERE usu_cpf = '11111111111')`);
       await contexto.db!.executar(`DELETE FROM livraria_gestao.usuarios WHERE usu_cpf = '11111111111'`);
       
+      const papelId = await obterPapelClienteId();
+      
       const usuarioRes = await contexto.db!.executar<{ usu_uuid: string }>(
         `INSERT INTO livraria_gestao.usuarios (usu_nome, usu_email, usu_cpf, usu_senha_hash, pap_id, usu_ativo, loj_id)
          VALUES ($1, $2, $3, $4, $5, TRUE, 1)
          RETURNING usu_uuid`,
-        ['Cliente 1', 'cliente1@teste.com', '11111111111', 'hash', 21625]
+        ['Cliente 1', 'cliente1@teste.com', '11111111111', 'hash', papelId]
       );
       const usuario1Uuid = usuarioRes[0].usu_uuid;
 
@@ -325,7 +346,7 @@ describe('Integração - RepositorioVendasPostgres - Correção N+1 Queries', ()
         `INSERT INTO livraria_gestao.usuarios (usu_nome, usu_email, usu_cpf, usu_senha_hash, pap_id, usu_ativo, loj_id)
          VALUES ($1, $2, $3, $4, $5, TRUE, 1)
          RETURNING usu_uuid`,
-        ['Cliente 2', 'cliente2@teste.com', '22222222222', 'hash', 21625]
+        ['Cliente 2', 'cliente2@teste.com', '22222222222', 'hash', papelId]
       );
       const usuario2Uuid = usuario2Res[0].usu_uuid;
 
@@ -404,10 +425,13 @@ describe('Integração - RepositorioVendasPostgres - Correção N+1 Queries', ()
       await contexto.db!.executar(`DELETE FROM livraria_comercial.vendas WHERE usu_id IN (SELECT usu_id FROM livraria_gestao.usuarios WHERE usu_cpf = '33333333333')`);
       await contexto.db!.executar(`DELETE FROM livraria_gestao.usuarios WHERE usu_cpf = '33333333333'`);
       
+      const papelId = await obterPapelClienteId();
+      
       const usuarioRes = await contexto.db!.executar<{ usu_uuid: string }>(
         `INSERT INTO livraria_gestao.usuarios (usu_nome, usu_email, usu_cpf, usu_senha_hash, pap_id, usu_ativo, loj_id)
-         VALUES ('Cliente 3', 'cliente3@teste.com', '33333333333', 'hash', 21625, TRUE, 1)
-         RETURNING usu_uuid`
+         VALUES ('Cliente 3', 'cliente3@teste.com', '33333333333', 'hash', $1, TRUE, 1)
+         RETURNING usu_uuid`,
+        [papelId]
       );
       const usuarioUuid = usuarioRes[0].usu_uuid;
 

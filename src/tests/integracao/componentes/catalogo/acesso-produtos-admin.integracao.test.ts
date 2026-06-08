@@ -2,6 +2,8 @@ import request from 'supertest';
 import { configurarTesteIntegracao } from '@/tests/helpers/setup-integracao.util';
 import { obterTokenAdmin, registrarAdmin, registrarCliente, realizarLogin } from '@/tests/helpers/requisicoes-api.util';
 import { di } from '@/shared/infrastructure/di.container';
+import { servicoContextoLoja } from '@/shared/services/ServicoContextoLoja';
+import { limparCacheAutorizacaoLoja } from '@/shared/middlewares/autorizacaoLoja.middleware';
 
 /**
  * Testes de integração para verificação de acesso a produtos por tipo de admin.
@@ -11,9 +13,19 @@ import { di } from '@/shared/infrastructure/di.container';
  * - Admin sistema vê dados de todas as lojas (acesso global)
  * - Admin comum vê apenas dados da loja associada
  * - Cliente vê produtos de todas as lojas (catálogo compartilhado)
+ *
+ * MITIGAÇÃO DE CACHE: Este teste cria lojas e associa admins a lojas, o que afeta
+ * os caches globais de ServicoContextoLoja e autorizacaoLoja. Para evitar problemas
+ * em testes paralelos, os caches são limpos antes de cada teste.
  */
 describe('Integração - Acesso a Produtos por Tipo de Admin', () => {
   const contexto = configurarTesteIntegracao();
+
+  beforeEach(() => {
+    // Limpar caches globais para evitar interferência entre testes
+    servicoContextoLoja.limparCache();
+    limparCacheAutorizacaoLoja();
+  });
 
   describe('Acesso de Admin Sistema', () => {
     it('[RN0091] admin sistema deve conseguir criar livros', async () => {

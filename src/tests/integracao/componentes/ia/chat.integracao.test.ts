@@ -1,9 +1,10 @@
 /**
  * Testes de Integração — Endpoint de Chat com IA (POST /api/ia/chat)
  *
- * Verifica o comportamento do endpoint de chat contextualizado,
- * incluindo validação de entrada, estrutura de resposta e tratamento
- * de erros no serviço de geração de resposta textual.
+ * Abordagem HÍBRIDA:
+ * 1. Testes de Contrato (com mocks) - validam estrutura da resposta
+ * 2. Testes de Regressão (golden dataset) - validam consistência
+ * 3. Testes de Qualidade (dependências reais) - validam qualidade real
  *
  * RN-IA-002: Chat deve sempre incluir contexto do catálogo da livraria.
  */
@@ -14,6 +15,7 @@ import {
   mockGerarEmbedding,
   mockGerarRespostaChat,
 } from '@/tests/helpers/setupMocksIA.util';
+import { configurarGoldenDatasetMocks } from '@/tests/helpers/goldenEmbeddings.util';
 
 import request from 'supertest';
 import { configurarTesteIntegracao } from '@/tests/helpers/setup-integracao.util';
@@ -216,6 +218,81 @@ describe('[RF-IA-02] Integração - Chat com IA (POST /api/ia/chat)', () => {
 
       expect(resposta.status).toBe(500);
       expect(resposta.body.sucesso).toBe(false);
+    });
+  });
+
+  // ── SEÇÃO 2: Testes de Regressão (Golden Dataset) ────────────────────────
+  
+  describe('Regressão - Golden Dataset', () => {
+    beforeEach(() => {
+      configurarGoldenDatasetMocks();
+    });
+
+    it('[RN-IA-REGRESSAO] deve retornar resposta consistente para mensagens do golden dataset', async () => {
+      const resposta = await postIaChat(contexto.app, tokenCliente)
+        .send({ mensagem: 'recomende um livro' });
+
+      expect(resposta.status).toBe(200);
+      expect(resposta.body.dados.resposta).toBeDefined();
+      expect(typeof resposta.body.dados.resposta).toBe('string');
+    });
+
+    it('[RN-IA-REGRESSAO] deve usar embeddings fixos do golden dataset', async () => {
+      const mensagem = 'olá';
+
+      await postIaChat(contexto.app, tokenCliente)
+        .send({ mensagem });
+
+      // Valida que o embedding do golden dataset foi usado
+      expect(mockGerarEmbedding).toHaveBeenCalledWith(mensagem);
+    });
+  });
+
+  // ── SEÇÃO 3: Testes de Qualidade (Dependências Reais) ───────────────────────
+
+  describe('Qualidade - Dependências Reais', () => {
+    const DEPENDENCIAS_REAIS_DISPONIVEIS = 
+      process.env.CHROMADB_HOST && 
+      process.env.GEMINI_API_KEY;
+
+    const PULAR_TESTES_SEM_DEPENDENCIAS = !DEPENDENCIAS_REAIS_DISPONIVEIS;
+
+    beforeAll(() => {
+      if (PULAR_TESTES_SEM_DEPENDENCIAS) {
+        console.warn(
+          '[RN-IA-QUALIDADE] Testes de qualidade pulados: dependências externas não configuradas'
+        );
+      }
+    });
+
+    it('[RN-IA-QUALIDADE] deve retornar resposta relevante com dependências reais', async () => {
+      if (PULAR_TESTES_SEM_DEPENDENCIAS) {
+        pending('Dependências externas não configuradas');
+      }
+
+      // NÃO usa mock - valida qualidade real
+      const resposta = await postIaChat(contexto.app, tokenCliente)
+        .send({ mensagem: 'recomende um livro de ficção' });
+
+      expect(resposta.status).toBe(200);
+      expect(resposta.body.dados.resposta).toBeDefined();
+      expect(typeof resposta.body.dados.resposta).toBe('string');
+      expect(resposta.body.dados.resposta.length).toBeGreaterThan(0);
+    });
+
+    it('[RN-IA-QUALIDADE] deve completar em tempo razoável com dependências reais (< 10s)', async () => {
+      if (PULAR_TESTES_SEM_DEPENDENCIAS) {
+        pending('Dependências externas não configuradas');
+      }
+
+      // NÃO usa mock - valida performance real
+      const inicio = Date.now();
+      const resposta = await postIaChat(contexto.app, tokenCliente)
+        .send({ mensagem: 'recomende um livro de ficção' });
+      const duracaoMs = Date.now() - inicio;
+
+      expect(resposta.status).toBe(200);
+      expect(duracaoMs).toBeLessThan(10000);
     });
   });
 });
