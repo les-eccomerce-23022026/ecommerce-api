@@ -4,6 +4,7 @@ import { autenticacaoMiddleware } from '@/shared/middlewares/autenticacao.middle
 import { adminOnlyMiddleware } from '@/shared/middlewares/autorizacao.middleware';
 import { RepositorioPagamentosPostgres } from '@/modules/pagamentos/repositories/RepositorioPagamentosPostgres';
 import { ControladorCupom } from '@/modules/cupom/ControladorCupom';
+import { MENSAGENS_ERRO } from '@/shared/constants/mensagens-erro.constants';
 
 /**
  * Registra rotas de cupom no roteador.
@@ -143,7 +144,7 @@ export function registrarRotasCupom(router: Router): void {
       if (rowsPromocional.length === 0) {
         return res.status(400).json({
           ok: false,
-          erro: 'Cupom inválido, expirado ou não pertence ao usuário',
+          erro: MENSAGENS_ERRO.CUPOM_INVALIDO,
         });
       }
 
