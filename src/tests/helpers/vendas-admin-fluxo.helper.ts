@@ -38,7 +38,7 @@ export async function criarVendaPedido(
   }
 
   return {
-    vendaUuid: res.body.id as string,
+    vendaUuid: res.body.uuid || res.body.id as string,
     valorTotal: Number(res.body.totalVenda),
   };
 }

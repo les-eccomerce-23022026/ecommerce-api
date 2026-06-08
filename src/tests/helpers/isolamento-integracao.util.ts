@@ -35,7 +35,8 @@ export async function iniciarEscopoIsolamentoIntegracao(
   };
 
   await executarSqlOpcional(
-    `INSERT INTO livraria_comercial.status_venda (stv_descricao) VALUES ('FALHA NA ENTREGA')
+    `INSERT INTO livraria_comercial.status_venda (stv_descricao) 
+     VALUES ('FALHA NA ENTREGA'), ('TROCA AUTORIZADA'), ('TROCA REJEITADA'), ('CONCLUÍDA'), ('EM TRÂNSITO')
      ON CONFLICT (stv_descricao) DO NOTHING`,
     'status_venda_comercial',
   );

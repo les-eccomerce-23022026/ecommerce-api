@@ -58,7 +58,26 @@ export const mockVerificarConexaoChroma = jest.fn().mockResolvedValue(true);
 export const mockIndexarProduto = jest.fn().mockResolvedValue(undefined);
 export const mockRemoverProduto = jest.fn().mockResolvedValue(undefined);
 
-jest.mock('@/modules/ia/infrastructure/config/AdapterLangChainGemini', () => ({
+// Mocks do ServicoHealthCheckIA
+export const mockVerificarChromaDB = jest.fn().mockResolvedValue({
+  ok: true,
+  latencyMs: 50,
+});
+export const mockVerificarGemini = jest.fn().mockResolvedValue({
+  ok: true,
+  latencyMs: 75,
+});
+export const mockVerificarTodasDependencias = jest.fn().mockResolvedValue({
+  status: 'ok',
+  timestamp: new Date().toISOString(),
+  dependencias: {
+    chromadb: { ok: true, latencyMs: 50 },
+    gemini: { ok: true, latencyMs: 75 },
+  },
+});
+export const mockEstaSaudavel = jest.fn().mockReturnValue(true);
+
+jest.mock('@/modules/ia/adapterLangChainGemini', () => ({
   AdapterLangChainGemini: jest.fn().mockImplementation(() => ({
     gerarEmbedding: mockGerarEmbedding,
     gerarEmbeddingsLote: mockGerarEmbeddingsLote,
@@ -72,6 +91,8 @@ export const mockConfiguracaoRecomendacao = {
   quantidadeResultados: 5,
   limiarSimilaridade: 0.6,
   multiplicadorBusca: 2,
+  multiplicadorBuscaComContexto: 2,
+  multiplicadorBuscaSemContexto: 3,
   personalizacao: {
     boostCategoria: 1.2,
     boostAutor: 1.3,
@@ -79,8 +100,14 @@ export const mockConfiguracaoRecomendacao = {
   },
 };
 
-jest.mock('@/modules/ia/infrastructure/repositories/RepositorioEmbeddingChromaDB', () => ({
+/** Mock da função calcularMultiplicadorBusca — espelha a lógica real para testes */
+export const mockCalcularMultiplicadorBusca = jest.fn(
+  (temContexto: boolean) => (temContexto ? 2 : 3)
+);
+
+jest.mock('@/modules/ia/repositorioEmbeddingChromaDB', () => ({
   CONFIGURACAO_RECOMENDACAO: mockConfiguracaoRecomendacao,
+  calcularMultiplicadorBusca: mockCalcularMultiplicadorBusca,
   RepositorioEmbeddingChromaDB: jest.fn().mockImplementation(() => ({
     criar: mockCriarEmbedding,
     buscarPorProdutoUuid: mockBuscarPorProdutoUuid,
@@ -93,7 +120,7 @@ jest.mock('@/modules/ia/infrastructure/repositories/RepositorioEmbeddingChromaDB
   })),
 }));
 
-jest.mock('@/modules/ia/infrastructure/repositories/RepositorioRecomendacaoPostgres', () => ({
+jest.mock('@/modules/ia/repositorioRecomendacaoPostgres', () => ({
   RepositorioRecomendacaoPostgres: jest.fn().mockImplementation(() => ({
     buscarContexto: mockBuscarContexto,
     buscarPedidosRecentes: mockBuscarPedidosRecentes,
@@ -105,7 +132,7 @@ jest.mock('@/modules/ia/infrastructure/repositories/RepositorioRecomendacaoPostg
   })),
 }));
 
-jest.mock('@/modules/ia/application/services/ServicoIndexacaoProdutos', () => ({
+jest.mock('@/modules/ia/servicoIndexacaoProdutos', () => ({
   ServicoIndexacaoProdutos: jest.fn().mockImplementation(() => ({
     indexarCatalogo: mockIndexarCatalogo,
     indexarProduto: mockIndexarProduto,
@@ -113,9 +140,21 @@ jest.mock('@/modules/ia/application/services/ServicoIndexacaoProdutos', () => ({
   })),
 }));
 
+jest.mock('@/modules/ia/servicoHealthCheckIA', () => ({
+  ServicoHealthCheckIA: jest.fn().mockImplementation(() => ({
+    verificarChromaDB: mockVerificarChromaDB,
+    verificarGemini: mockVerificarGemini,
+    verificarTodasDependencias: mockVerificarTodasDependencias,
+    estaSaudavel: mockEstaSaudavel,
+  })),
+}));
+
 /** Reinicia contadores e implementações dos mocks entre testes (opcional). */
 export function reiniciarMocksIa(): void {
   jest.clearAllMocks();
+  mockCalcularMultiplicadorBusca.mockImplementation((temContexto: boolean) =>
+    temContexto ? 2 : 3
+  );
   mockGerarEmbedding.mockResolvedValue([0.1, 0.2, 0.3, 0.4, 0.5]);
   mockGerarEmbeddingsLote.mockResolvedValue([[0.1, 0.2, 0.3, 0.4, 0.5]]);
   mockGerarRespostaChat.mockResolvedValue('Resposta simulada do catálogo da livraria.');
@@ -138,4 +177,22 @@ export function reiniciarMocksIa(): void {
   mockBuscarTendenciasPorFaixaEtaria.mockResolvedValue([]);
   mockSalvarMetrica.mockResolvedValue(undefined);
   mockBuscarMetricasRepositorio.mockResolvedValue([]);
+  // ServicoHealthCheckIA
+  mockVerificarChromaDB.mockResolvedValue({
+    ok: true,
+    latencyMs: 50,
+  });
+  mockVerificarGemini.mockResolvedValue({
+    ok: true,
+    latencyMs: 75,
+  });
+  mockVerificarTodasDependencias.mockResolvedValue({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    dependencias: {
+      chromadb: { ok: true, latencyMs: 50 },
+      gemini: { ok: true, latencyMs: 75 },
+    },
+  });
+  mockEstaSaudavel.mockReturnValue(true);
 }

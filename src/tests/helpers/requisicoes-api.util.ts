@@ -170,14 +170,17 @@ async function resolverPapelGestao(descricao: string): Promise<IPapelUsuario> {
 export async function obterTokenCliente(
   app: Application,
   email = 'cliente.teste@email.com',
-  cpf = '529.982.247-25',
+  cpf?: string,
   limparDados = false
 ): Promise<string> {
   const repositorioUsuarios = di.repoUsuarios;
   const repositorioPerfil = di.repoPerfil;
 
+  // SOLID: Sempre gerar CPF único para evitar violação de constraint uq_usuarios_cpf
+  const cpfUnico = cpf || gerarCpfValidoUnico();
+
   if (limparDados) {
-    await repositorioUsuarios.limparDadosUsuarioPorCpf(cpf);
+    await repositorioUsuarios.limparDadosUsuarioPorCpf(cpfUnico);
   }
 
   // Mesma abordagem de obterTokenAdmin: cria/atualiza via repositório diretamente
@@ -192,7 +195,7 @@ export async function obterTokenCliente(
     const usuario = await repositorioUsuarios.criarUsuario({
       nome: 'Cliente Teste',
       email,
-      cpf,
+      cpf: cpfUnico,
       senhaHash,
       role: papelCliente,
       papeis: [papelCliente],
@@ -302,6 +305,131 @@ export async function obterTokenAdmin(app: Application): Promise<string> {
   }
 
   throw new Error('Não foi possível obter token do administrador inicial.');
+}
+
+/**
+ * Cria um administrador do sistema (apenas com papel admin_sistema) e retorna o token.
+ * Usado para testar permissões exclusivas do admin_sistema.
+ */
+export async function obterTokenAdminSistema(app: Application): Promise<string> {
+  const repositorioUsuarios = di.repoUsuarios;
+  const email = 'admin.sistema@livraria.com.br';
+  const adminExistente = await repositorioUsuarios.buscarPorEmail(email);
+
+  const papelAdminSistema = await resolverPapelGestao(PAPEL_ADMIN_SISTEMA.descricao);
+  const senhaHashAdmin = await bcrypt.hash('AdminSistema@123', 10);
+
+  if (!adminExistente) {
+    await repositorioUsuarios.criarUsuario({
+      nome: 'Administrador do Sistema',
+      email,
+      cpf: '000.000.000-01',
+      senhaHash: senhaHashAdmin,
+      role: papelAdminSistema,
+      papeis: [papelAdminSistema],
+    });
+  } else {
+    // Remove todos os papéis existentes e garante que apenas admin_sistema esteja ativo
+    await repositorioUsuarios.removerTodosPapeisUsuario(adminExistente.id);
+    await repositorioUsuarios.associarPapelUsuario(adminExistente.id, papelAdminSistema.id);
+    await repositorioUsuarios.atualizarUsuario(adminExistente.uuid, {
+      senhaHash: senhaHashAdmin,
+    });
+  }
+
+  const maximoTentativas = 5;
+
+  for (let tentativa = 1; tentativa <= maximoTentativas; tentativa += 1) {
+    // eslint-disable-next-line no-await-in-loop
+    const respostaLogin = await realizarLogin(app, email, 'AdminSistema@123');
+
+    if (respostaLogin.status === 200 && respostaLogin.body?.dados?.token) {
+      return respostaLogin.body.dados.token as string;
+    }
+
+    if (tentativa === maximoTentativas) {
+      // eslint-disable-next-line no-console
+      console.debug('[DEBUG] Falha temporária no login de admin sistema:', respostaLogin.status, JSON.stringify(respostaLogin.body));
+    }
+
+    // eslint-disable-next-line no-await-in-loop
+    await new Promise((resolve) => { setTimeout(resolve, 50); });
+  }
+
+  throw new Error(`Não foi possível obter token do administrador do sistema (${email}).`);
+}
+
+/**
+ * Cria um administrador comum (apenas com papel admin, sem admin_sistema) e retorna o token.
+ * Usado para testar restrições de multi-tenancy e permissões de admin comum.
+ */
+export async function obterTokenAdminComum(app: Application): Promise<string> {
+  const repositorioUsuarios = di.repoUsuarios;
+  const db = FabricaConexaoBanco.obterConexao();
+  const email = 'admin.comum@livraria.com.br';
+  const adminExistente = await repositorioUsuarios.buscarPorEmail(email);
+
+  const papelAdmin = await resolverPapelGestao(PAPEL_ADMIN.descricao);
+  const papelCliente = await resolverPapelGestao(PAPEL_CLIENTE.descricao);
+  const senhaHashAdmin = await bcrypt.hash('AdminComum@123', 10);
+
+  // Obter loja padrão para associar ao admin comum
+  const lojas = await db.executar<{ loj_id: number }>(
+    'SELECT loj_id FROM livraria_gestao.lojas WHERE loj_ativo = TRUE ORDER BY loj_id LIMIT 1'
+  );
+  const lojId = lojas.length > 0 ? lojas[0].loj_id : 1;
+
+  if (!adminExistente) {
+    await repositorioUsuarios.criarUsuario({
+      nome: 'Administrador Comum',
+      email,
+      cpf: '000.000.000-02',
+      senhaHash: senhaHashAdmin,
+      role: papelAdmin,
+      papeis: [papelCliente, papelAdmin],
+      lojId,
+    });
+  } else {
+    // Remove todos os papéis existentes e garante que apenas cliente e admin estejam ativos
+    await repositorioUsuarios.removerTodosPapeisUsuario(adminExistente.id);
+    await repositorioUsuarios.associarPapelUsuario(adminExistente.id, papelCliente.id);
+    await repositorioUsuarios.associarPapelUsuario(adminExistente.id, papelAdmin.id);
+    await repositorioUsuarios.atualizarUsuario(adminExistente.uuid, {
+      senhaHash: senhaHashAdmin,
+    });
+  }
+
+  // Associar admin à loja padrão na tabela admin_lojas
+  const usuarioAtualizado = await repositorioUsuarios.buscarPorEmail(email);
+  if (usuarioAtualizado) {
+    await db.executar(
+      `INSERT INTO livraria_gestao.admin_lojas (usu_id, loj_id, adl_papel, adl_ativo, adl_escopo)
+       VALUES ($1, $2, 'admin_principal', TRUE, 'LOJA')
+       ON CONFLICT (usu_id, loj_id) DO UPDATE SET adl_ativo = TRUE`,
+      [usuarioAtualizado.id, lojId]
+    );
+  }
+
+  const maximoTentativas = 5;
+
+  for (let tentativa = 1; tentativa <= maximoTentativas; tentativa += 1) {
+    // eslint-disable-next-line no-await-in-loop
+    const respostaLogin = await realizarLogin(app, email, 'AdminComum@123');
+
+    if (respostaLogin.status === 200 && respostaLogin.body?.dados?.token) {
+      return respostaLogin.body.dados.token as string;
+    }
+
+    if (tentativa === maximoTentativas) {
+      // eslint-disable-next-line no-console
+      console.debug('[DEBUG] Falha temporária no login de admin comum:', respostaLogin.status, JSON.stringify(respostaLogin.body));
+    }
+
+    // eslint-disable-next-line no-await-in-loop
+    await new Promise((resolve) => { setTimeout(resolve, 50); });
+  }
+
+  throw new Error(`Não foi possível obter token do administrador comum (${email}).`);
 }
 
 /**
