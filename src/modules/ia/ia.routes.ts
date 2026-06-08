@@ -4,10 +4,12 @@ import { RepositorioEmbeddingChromaDB } from './repositorioEmbeddingChromaDB';
 import { AdapterLangChainGemini } from './adapterLangChainGemini';
 import { ServicoGeracaoEmbedding } from './servicoGeracaoEmbedding';
 import { ServicoValidacaoProdutos } from './servicoValidacaoProdutos';
+import { ServicoCacheProdutos } from './servicoCacheProdutos';
 import { ServicoRecomendacaoRAG } from './servicoRecomendacaoRAG';
 import { ServicoRecomendacaoApplication } from './servicoRecomendacaoApplication';
 import { ServicoInterpretacaoIntencao } from './servicoInterpretacaoIntencao';
 import { ServicoIndexacaoProdutos } from './servicoIndexacaoProdutos';
+import { ServicoHealthCheckIA } from './servicoHealthCheckIA';
 import { IAdapterEmbedding } from './IAdapterEmbedding';
 import { RepositorioRecomendacaoPostgres } from './repositorioRecomendacaoPostgres';
 import { ConexaoPostgres } from '@/shared/infrastructure/database/ConexaoPostgres';
@@ -34,18 +36,23 @@ const pool = conexaoPostgres['poolProducao']; // Acessa o pool interno
 const repositorioEmbedding = new RepositorioEmbeddingChromaDB();
 const adapterLangChain = new AdapterLangChainGemini();
 const servicoGeracaoEmbedding = new ServicoGeracaoEmbedding();
-const servicoValidacaoProdutos = new ServicoValidacaoProdutos();
-const servicoRecomendacaoRAG = new ServicoRecomendacaoRAG(
-  repositorioEmbedding,
-  servicoGeracaoEmbedding,
-  servicoValidacaoProdutos
-);
 const repositorioRecomendacao = new RepositorioRecomendacaoPostgres(pool);
 
 // Dependências para indexação de produtos
 const repoLivros = new RepositorioLivrosPostgres(conexaoPostgres);
 const bulkInsertLivros = new RepositorioLivrosBulkInsert(conexaoPostgres);
 const servicoLivros = new ServicoLivros(repoLivros, bulkInsertLivros);
+
+// Cache de produtos com TTL 5 min — evita consulta ao catálogo a cada requisição de IA
+const cacheProdutos = new ServicoCacheProdutos(servicoLivros);
+const servicoValidacaoProdutos = new ServicoValidacaoProdutos(cacheProdutos);
+
+const servicoRecomendacaoRAG = new ServicoRecomendacaoRAG(
+  repositorioEmbedding,
+  servicoGeracaoEmbedding,
+  servicoValidacaoProdutos
+);
+
 const servicoIndexacaoProdutos = new ServicoIndexacaoProdutos(
   servicoLivros,
   repositorioEmbedding,
@@ -68,14 +75,24 @@ const servicoRecomendacao = new ServicoRecomendacaoApplication(
   servicoLivros,
   servicoInterpretacaoIntencao,
 );
-const controladorRecomendacao = new ControladorRecomendacao(servicoRecomendacao);
+
+const servicoHealthCheck = new ServicoHealthCheckIA(
+  repositorioEmbedding,
+  adapterLangChain
+);
+
+const controladorRecomendacao = new ControladorRecomendacao(
+  servicoRecomendacao,
+  servicoHealthCheck
+);
 
 const router = Router();
 
 // ── Middlewares globais ────────────────────────────────────────────────────────
 // Auditoria vem primeiro para capturar até requisições bloqueadas pelo rate limit
 router.use(logAuditoriaIA);
-router.use(limiteRequisicaoIA);
+// TEMPORARIAMENTE DESABILITADO DEVIDO A ERRO IPv6 NO express-rate-limit
+// router.use(limiteRequisicaoIA);
 
 // ── Rotas de clientes autenticados (plano IA 5.1 / 5.2) ───────────────────────
 router.post(

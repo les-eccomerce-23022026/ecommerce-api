@@ -21,8 +21,20 @@ export const CONFIGURACAO_RECOMENDACAO = {
   // Limiar mínimo de similaridade semântica aceito (0-1)
   limiarSimilaridade: parseFloat(process.env.RAG_SIMILARITY_THRESHOLD || '0.6'),
 
-  // Multiplicador de busca (recupera mais candidatos para filtrar pelo limiar depois)
+  // Multiplicador de busca padrão (mantido para compatibilidade)
   multiplicadorBusca: parseInt(process.env.RAG_SEARCH_MULTIPLIER || '2', 10),
+
+  // Multiplicador quando há contexto de cliente: 2x — contexto reduz incerteza
+  multiplicadorBuscaComContexto: parseInt(
+    process.env.RAG_SEARCH_MULTIPLIER_COM_CONTEXTO || '2',
+    10
+  ),
+
+  // Multiplicador sem contexto de cliente: 3x — sem sinal personalizado, precisa de maior cobertura
+  multiplicadorBuscaSemContexto: parseInt(
+    process.env.RAG_SEARCH_MULTIPLIER_SEM_CONTEXTO || '3',
+    10
+  ),
 
   // Fatores de personalização por perfil do cliente
   personalizacao: {
@@ -31,6 +43,22 @@ export const CONFIGURACAO_RECOMENDACAO = {
     boostPreco: parseFloat(process.env.RAG_PRICE_BOOST || '1.1'),
   },
 } as const;
+
+/**
+ * Calcula o multiplicador de busca com base na presença de contexto de cliente.
+ *
+ * - Com contexto: 2x — o perfil personalizado melhora a precisão do embedding,
+ *   portanto uma cobertura menor já é suficiente.
+ * - Sem contexto: 3x — sem sinal personalizado, recupera mais candidatos para
+ *   compensar a maior incerteza da busca semântica.
+ *
+ * @param temContexto true se há contexto de cliente disponível
+ */
+export function calcularMultiplicadorBusca(temContexto: boolean): number {
+  return temContexto
+    ? CONFIGURACAO_RECOMENDACAO.multiplicadorBuscaComContexto
+    : CONFIGURACAO_RECOMENDACAO.multiplicadorBuscaSemContexto;
+}
 
 /**
  * Implementação do Repositório de Embeddings usando ChromaDB
@@ -172,15 +200,18 @@ export class RepositorioEmbeddingChromaDB implements IRepositorioEmbedding {
 
   async buscarSimilares(
     queryEmbedding: number[],
-    limite: number
+    limite: number,
+    opcoes?: { temContexto?: boolean }
   ): Promise<{ produtoUuid: string; similaridade: number; metadados: any }[]> {
     const colecao = await this.inicializarColecao();
 
-    // Aplica multiplicadorBusca para recuperar mais candidatos e filtrar pelo limiarSimilaridade depois
-    const nResultados = limite * CONFIGURACAO_RECOMENDACAO.multiplicadorBusca;
+    // Multiplicador dinâmico: 2x com contexto de cliente, 3x sem contexto
+    // Com contexto o sinal personalizado aumenta precisão; sem contexto é necessária maior cobertura
+    const multiplicador = calcularMultiplicadorBusca(opcoes?.temContexto ?? true);
+    const nResultados = limite * multiplicador;
 
     Logger.debug(
-      `[RepositorioEmbeddingChromaDB] Buscando similares | quantidadeResultados=${limite} | nResults=${nResultados} (×${CONFIGURACAO_RECOMENDACAO.multiplicadorBusca}) | limiarSimilaridade=${CONFIGURACAO_RECOMENDACAO.limiarSimilaridade}`
+      `[RepositorioEmbeddingChromaDB] Buscando similares | limite=${limite} | nResults=${nResultados} (×${multiplicador} | temContexto=${opcoes?.temContexto ?? true}) | limiarSimilaridade=${CONFIGURACAO_RECOMENDACAO.limiarSimilaridade}`
     );
 
     const resultados = await colecao.query({

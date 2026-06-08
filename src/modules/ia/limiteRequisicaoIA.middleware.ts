@@ -27,7 +27,7 @@ export const limiteRequisicaoIA = rateLimit({
   },
   standardHeaders: true,  // Retorna informações nos headers RFC padrão (RateLimit-*)
   legacyHeaders: false,   // Desabilita headers legados (X-RateLimit-*)
-  keyGenerator: (req: Request) => req.ip || 'unknown',
+  skipFailedRequests: true,
   handler: (req: Request, res: Response, _proximo: NextFunction, opcoes: any) => {
     Logger.warn(`[limiteRequisicaoIA] Limite de requisições excedido para IP: ${req.ip}`);
     res.status(429).json(opcoes.message);

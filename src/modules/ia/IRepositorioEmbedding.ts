@@ -18,10 +18,15 @@ export interface IRepositorioEmbedding {
 
   /**
    * Busca embeddings similares por query
+   *
+   * @param opcoes.temContexto Indica se há contexto de cliente disponível.
+   *   Quando `true` aplica multiplicador 2x (contexto personalizado reduz incerteza);
+   *   quando `false` aplica multiplicador 3x (sem contexto exige maior cobertura).
    */
   buscarSimilares(
     queryEmbedding: number[],
-    limite: number
+    limite: number,
+    opcoes?: { temContexto?: boolean }
   ): Promise<{ produtoUuid: string; similaridade: number; metadados: any }[]>;
 
   /**

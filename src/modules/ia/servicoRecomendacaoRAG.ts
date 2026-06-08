@@ -6,6 +6,9 @@ import { CONFIGURACAO_RECOMENDACAO } from './repositorioEmbeddingChromaDB';
 import { MMRReranking, MMROption } from './MMRReranking';
 import { Logger } from '@/shared/utils/Logger.util';
 
+/** Taxa acima da qual um alerta de log é emitido para alucinação elevada. */
+const LIMIAR_TAXA_ALUCINACAO_ALERTA = 0.5;
+
 /**
  * Serviço de Domínio para Recomendação com RAG
  * 
@@ -33,13 +36,18 @@ export class ServicoRecomendacaoRAG {
     limite: number = CONFIGURACAO_RECOMENDACAO.quantidadeResultados,
     usarMMR: boolean = false
   ): Promise<RecomendacaoResultado> {
-    // Busca produtos similares no ChromaDB
-    // O repositório aplica CONFIGURACAO_RECOMENDACAO.multiplicadorBusca e CONFIGURACAO_RECOMENDACAO.limiarSimilaridade internamente
+    // Busca produtos similares no ChromaDB — mede tempo para métrica de busca vetorial
+    // Passa temContexto para o repositório aplicar o multiplicador dinâmico:
+    //   - 2x com contexto (sinal personalizado aumenta a precisão)
+    //   - 3x sem contexto (maior cobertura compensa incerteza da busca genérica)
     const limiteBusca = Math.max(limite * 4, 30);
+    const inicioBuscaVetorial = Date.now();
     const produtosSimilares = await this.repositorioEmbedding.buscarSimilares(
       queryEmbedding,
-      limiteBusca
+      limiteBusca,
+      { temContexto: contextoCliente !== null }
     );
+    const tempoBuscaVetorial = Date.now() - inicioBuscaVetorial;
 
     // Um livro pode ter vários chunks no Chroma — mantém o melhor score por produtoUuid
     const melhorPorProduto = new Map<
@@ -66,14 +74,29 @@ export class ServicoRecomendacaoRAG {
       ServicoRecomendacaoRAG.randomizarResultadosSimilares(candidatosUnicos);
     }
 
-    // Filtra apenas produtos que existem no BD (anti-alucinação), ignorando embeddings órfãos
+    // Filtro anti-alucinação — mede tempo e calcula taxa de candidatos inválidos
+    const inicioValidacao = Date.now();
     const produtosValidos = candidatosUnicos
       .filter((p) => produtosExistentes.has(p.produtoUuid))
       .map((p) => p.produtoUuid);
+    const tempoValidacao = Date.now() - inicioValidacao;
 
-    Logger.debug(`[ServicoRecomendacaoRAG] Filtro anti-alucinação: ${candidatosUnicos.length} candidatos → ${produtosValidos.length} válidos`);
-    
-    if (produtosValidos.length === 0 && candidatosUnicos.length > 0) {
+    const totalCandidatos = candidatosUnicos.length;
+    const totalValidos = produtosValidos.length;
+    const totalFiltrados = totalCandidatos - totalValidos;
+    const taxaAlucinacao = totalCandidatos > 0 ? totalFiltrados / totalCandidatos : 0;
+
+    Logger.debug(
+      `[ServicoRecomendacaoRAG] Anti-alucinação: ${totalCandidatos} candidatos → ${totalValidos} válidos (taxa: ${(taxaAlucinacao * 100).toFixed(1)}%)`
+    );
+
+    if (taxaAlucinacao > LIMIAR_TAXA_ALUCINACAO_ALERTA) {
+      Logger.warn(
+        `[ServicoRecomendacaoRAG] Taxa de alucinação elevada: ${(taxaAlucinacao * 100).toFixed(1)}% — ${totalFiltrados} de ${totalCandidatos} candidatos eram inválidos`
+      );
+    }
+
+    if (totalValidos === 0 && totalCandidatos > 0) {
       this.logarDetalhesFiltroCompleto(candidatosUnicos, produtosExistentes);
     }
 
@@ -94,8 +117,17 @@ export class ServicoRecomendacaoRAG {
       produtos: produtosFinaisMMR,
       contextoUsado: contextoCliente !== null,
       totalEncontrados: produtosSimilares.length,
-      totalValidos: produtosValidos.length,
+      totalValidos,
       rerankingAplicado: usarMMR,
+      metricasPipeline: {
+        taxaAlucinacao,
+        tempoEmbedding: 0, // preenchido pela camada de aplicação após medir o embedding
+        tempoBuscaVetorial,
+        tempoValidacao,
+        totalCandidatos,
+        totalValidos,
+        totalFiltrados,
+      },
     };
   }
 
@@ -291,6 +323,31 @@ export class ServicoRecomendacaoRAG {
   }
 }
 
+/**
+ * Métricas internas do pipeline RAG por execução.
+ * Populadas progressivamente: RAG preenche busca/validação,
+ * a camada de aplicação adiciona o tempo de embedding.
+ */
+export interface MetricasPipelineRAG {
+  /** Taxa de alucinação: totalFiltrados / totalCandidatos (0 a 1). */
+  taxaAlucinacao: number;
+  /**
+   * Tempo de geração do embedding da query (ms).
+   * Zerado pelo RAG; preenchido pela camada de aplicação após a chamada.
+   */
+  tempoEmbedding: number;
+  /** Tempo da busca vetorial no ChromaDB (ms). */
+  tempoBuscaVetorial: number;
+  /** Tempo do filtro anti-alucinação (ms). */
+  tempoValidacao: number;
+  /** Total de candidatos únicos após deduplicação por produto. */
+  totalCandidatos: number;
+  /** Candidatos válidos (presentes no catálogo). */
+  totalValidos: number;
+  /** Candidatos filtrados por não existirem no catálogo. */
+  totalFiltrados: number;
+}
+
 export interface RecomendacaoResultado {
   query: string;
   produtos: ProdutoRecomendado[];
@@ -298,6 +355,8 @@ export interface RecomendacaoResultado {
   totalEncontrados: number;
   totalValidos: number;
   rerankingAplicado?: boolean;
+  /** Métricas do pipeline — ausente se o RAG não foi executado. */
+  metricasPipeline?: MetricasPipelineRAG;
 }
 
 export interface ProdutoRecomendado {

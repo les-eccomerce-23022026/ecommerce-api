@@ -15,11 +15,16 @@ import { ErroIa } from './erroIa.middleware';
 import {
   sanitizarTextoEntrada,
   validarClienteUuidOpcional,
+  validarConteudoMensagemChat,
+  validarConteudoQuery,
   validarHistoricoChat,
   validarTamanhoMensagemChat,
+  validarTamanhoMinimoMensagemChat,
+  validarTamanhoMinimoQuery,
   validarTamanhoQuery,
 } from './validacaoEntradaIA.util';
 import { ServicoValidacaoSegurancaIA } from './servicoValidacaoSegurancaIA';
+import { ServicoHealthCheckIA } from './servicoHealthCheckIA';
 
 /** Períodos válidos para filtro de métricas de recomendação */
 const PERIODOS_VALIDOS: ReadonlySet<string> = new Set<PeriodoMetrica>([
@@ -37,7 +42,10 @@ const PERIODOS_VALIDOS: ReadonlySet<string> = new Set<PeriodoMetrica>([
 export class ControladorRecomendacao {
   private readonly servicoValidacaoSeguranca = new ServicoValidacaoSegurancaIA();
 
-  constructor(private servicoRecomendacao: ServicoRecomendacaoApplication) {}
+  constructor(
+    private servicoRecomendacao: ServicoRecomendacaoApplication,
+    private servicoHealthCheck: ServicoHealthCheckIA
+  ) {}
 
   private obterStatusHttpErro(erro: unknown, padrao: number): number {
     if (erro instanceof ErroIa) {
@@ -61,6 +69,16 @@ export class ControladorRecomendacao {
    */
   recomendar = async (req: Request, res: Response): Promise<void> => {
     try {
+      // Health check de dependências antes de processar requisição
+      const saude = await this.servicoHealthCheck.verificarTodasDependencias();
+      if (!this.servicoHealthCheck.estaSaudavel()) {
+        Logger.warn(
+          `[ControladorRecomendacao.recomendar] Dependências não saudáveis: ${JSON.stringify(saude.dependencias)}`
+        );
+        RespostaPadrao.enviarSucesso(res, 503, saude);
+        return;
+      }
+
       const dados: IRecomendarRequestDTO = req.body;
 
       // Validações básicas
@@ -72,6 +90,20 @@ export class ControladorRecomendacao {
       const querySanitizada = sanitizarTextoEntrada(dados.query);
       if (querySanitizada.length === 0) {
         RespostaPadrao.enviarErro(res, 400, 'Query é obrigatória e não pode ser vazia');
+        return;
+      }
+
+      // Validação antecipada de tamanho mínimo — executada antes da geração de embedding (custoso)
+      const erroTamanhoMinimoQuery = validarTamanhoMinimoQuery(querySanitizada);
+      if (erroTamanhoMinimoQuery) {
+        RespostaPadrao.enviarErro(res, 400, erroTamanhoMinimoQuery);
+        return;
+      }
+
+      // Validação antecipada de conteúdo — rejeita entradas sem caracteres alfanuméricos
+      const erroConteudoQuery = validarConteudoQuery(querySanitizada);
+      if (erroConteudoQuery) {
+        RespostaPadrao.enviarErro(res, 400, erroConteudoQuery);
         return;
       }
 
@@ -105,6 +137,7 @@ export class ControladorRecomendacao {
         ...dados,
         query: querySanitizada,
         clienteUuid,
+        incluirMetricas: dados.incluirMetricas ?? false,
       });
       RespostaPadrao.enviarSucesso(res, 200, resultado);
     } catch (erro) {
@@ -122,6 +155,16 @@ export class ControladorRecomendacao {
    */
   chat = async (req: Request, res: Response): Promise<void> => {
     try {
+      // Health check de dependências antes de processar requisição
+      const saude = await this.servicoHealthCheck.verificarTodasDependencias();
+      if (!this.servicoHealthCheck.estaSaudavel()) {
+        Logger.warn(
+          `[ControladorRecomendacao.chat] Dependências não saudáveis: ${JSON.stringify(saude.dependencias)}`
+        );
+        RespostaPadrao.enviarSucesso(res, 503, saude);
+        return;
+      }
+
       const dados: IChatRequestDTO = req.body;
 
       // Validações básicas
@@ -133,6 +176,20 @@ export class ControladorRecomendacao {
       const mensagemSanitizada = sanitizarTextoEntrada(dados.mensagem);
       if (mensagemSanitizada.length === 0) {
         RespostaPadrao.enviarErro(res, 400, 'Mensagem é obrigatória e não pode ser vazia');
+        return;
+      }
+
+      // Validação antecipada de tamanho mínimo — executada antes da geração de embedding (custoso)
+      const erroTamanhoMinimoMensagem = validarTamanhoMinimoMensagemChat(mensagemSanitizada);
+      if (erroTamanhoMinimoMensagem) {
+        RespostaPadrao.enviarErro(res, 400, erroTamanhoMinimoMensagem);
+        return;
+      }
+
+      // Validação antecipada de conteúdo — rejeita entradas sem caracteres alfanuméricos
+      const erroConteudoMensagem = validarConteudoMensagemChat(mensagemSanitizada);
+      if (erroConteudoMensagem) {
+        RespostaPadrao.enviarErro(res, 400, erroConteudoMensagem);
         return;
       }
 
@@ -172,6 +229,7 @@ export class ControladorRecomendacao {
         ...dados,
         mensagem: mensagemSanitizada,
         clienteUuid,
+        incluirMetricas: dados.incluirMetricas ?? false,
       });
       RespostaPadrao.enviarSucesso(res, 200, resultado);
     } catch (erro) {

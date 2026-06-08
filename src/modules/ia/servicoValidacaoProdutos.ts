@@ -1,10 +1,34 @@
+import { ServicoCacheProdutos } from './servicoCacheProdutos';
+
 /**
  * Serviço de Domínio para Validação de Produtos
- * 
+ *
  * Responsável por validar se os produtos recomendados existem na base de dados
  * (anti-alucinação - RN-IA-001 e RN-IA-004).
+ *
+ * Quando `ServicoCacheProdutos` é injetado, expõe o método `obterProdutosExistentes`
+ * que utiliza o cache em memória (TTL 5 min) para evitar consultas frequentes ao banco.
  */
 export class ServicoValidacaoProdutos {
+  constructor(private readonly cacheProdutos?: ServicoCacheProdutos) {}
+
+  /**
+   * Retorna o conjunto de UUIDs de produtos existentes no BD, via cache com TTL 5 min.
+   *
+   * Requer que `ServicoCacheProdutos` seja injetado no construtor.
+   *
+   * @throws Error se o cache não foi configurado no construtor
+   */
+  async obterProdutosExistentes(): Promise<Set<string>> {
+    if (!this.cacheProdutos) {
+      throw new Error(
+        '[ServicoValidacaoProdutos] ServicoCacheProdutos não configurado. ' +
+          'Injete ServicoCacheProdutos no construtor para usar este método.'
+      );
+    }
+    return this.cacheProdutos.obterProdutosExistentes();
+  }
+
   /**
    * Valida se uma lista de produtos existe na base de dados
    * 

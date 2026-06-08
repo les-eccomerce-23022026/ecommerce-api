@@ -2,10 +2,13 @@
  * DTOs para entrada/saída da API de Recomendação
  */
 
+import { IMetricasDeterministicas } from './IMetricasDeterministicas';
+
 export interface IRecomendarRequestDTO {
   query: string;
   clienteUuid?: string;
   limite?: number;
+  incluirMetricas?: boolean;
 }
 
 export interface IRecomendarResponseDTO {
@@ -15,6 +18,8 @@ export interface IRecomendarResponseDTO {
   totalEncontrados: number;
   totalValidos: number;
   tempoRespostaMs: number;
+  /** Métricas determinísticas do pipeline — presente apenas quando solicitado via `incluirMetricas=true`. */
+  metricas?: IMetricasDeterministicas;
 }
 
 export interface ProdutoRecomendadoDTO {
@@ -33,6 +38,7 @@ export interface IChatRequestDTO {
   mensagem: string;
   clienteUuid?: string;
   historico?: MensagemChatDTO[];
+  incluirMetricas?: boolean;
 }
 
 /**
@@ -67,6 +73,8 @@ export interface IChatResponseDTO {
   numeroTurno: number;
   perguntasFollowUp?: string[];
   intencaoResumida?: string;
+  /** Métricas determinísticas do pipeline — presente apenas quando solicitado via `incluirMetricas=true`. */
+  metricas?: IMetricasDeterministicas;
 }
 
 /** Produto citado em mensagem anterior do assistente (continuidade multi-turno) */

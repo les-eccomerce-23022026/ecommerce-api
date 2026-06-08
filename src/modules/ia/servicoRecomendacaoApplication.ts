@@ -16,7 +16,9 @@ import {
   ServicoRecomendacaoRAG,
   RecomendacaoResultado,
   ProdutoRecomendado,
+  MetricasPipelineRAG,
 } from './servicoRecomendacaoRAG';
+import { IMetricasDeterministicas } from './IMetricasDeterministicas';
 import { ServicoFiltroCatalogo } from './servicoFiltroCatalogo';
 import { AdapterLangChainGemini } from './adapterLangChainGemini';
 import { IContextoRecomendacao } from './IContextoRecomendacao.entity';
@@ -83,6 +85,12 @@ export interface OpcoesRecomendacaoInterna {
 
 type HistoricoGemini = { papel: 'user' | 'model'; conteudo: string }[] | undefined;
 
+/** Resultado interno da busca de produtos para chat com métricas de pipeline opcionais. */
+interface ResultadoBuscaProdutosChat {
+  produtos: ProdutoRecomendadoDTO[];
+  metricasPipeline?: MetricasPipelineRAG;
+}
+
 /**
  * Serviço de Aplicação para Recomendação e Assistente de Livraria
  *
@@ -114,12 +122,19 @@ export class ServicoRecomendacaoApplication {
    * Fluxo: Contexto cliente → Pipeline RAG → Remover duplicatas → Retornar resposta.
    * Útil para integrações diretas sem conversação.
    */
-  async recomendar(dados: IRecomendarRequestDTO): Promise<IRecomendarResponseDTO> {
+  async recomendar(dados: IRecomendarRequestDTO, incluirMetricas = false): Promise<IRecomendarResponseDTO> {
     const inicio = Date.now();
 
     try {
+      // Cache de contexto com escopo da requisição: evita múltiplas consultas ao banco
+      // caso obterContextoCliente seja chamado mais de uma vez dentro do mesmo fluxo
+      const cacheContextoRequisicao = new Map<string, IContextoRecomendacao | null>();
+
       // 1. Busca contexto personalizado do cliente (histórico, preferências)
-      const contextoCliente = await this.obterContextoCliente(dados.clienteUuid);
+      const contextoCliente = await this.obterContextoCliente(
+        dados.clienteUuid,
+        cacheContextoRequisicao
+      );
       
       // 2. Executa pipeline RAG: gera embedding, busca produtos, aplica filtros
       const resultado = await this.executarPipelineRecomendacao(
@@ -135,7 +150,7 @@ export class ServicoRecomendacaoApplication {
       );
       const tempoResposta = Date.now() - inicio;
 
-      return this.construirResposta(resultado, produtosDTO, tempoResposta);
+      return this.construirResposta(resultado, produtosDTO, tempoResposta, incluirMetricas);
     } catch (erro) {
       return this.tratarErroRecomendacao(erro);
     }
@@ -153,7 +168,7 @@ export class ServicoRecomendacaoApplication {
    * 
    * O despacho usa tabela de despacho (Record) ao invés de switch/case (regra U2).
    */
-  async chat(dados: IChatRequestDTO): Promise<IChatResponseDTO> {
+  async chat(dados: IChatRequestDTO, incluirMetricas = false): Promise<IChatResponseDTO> {
     const inicio = Date.now();
 
     try {
@@ -164,9 +179,16 @@ export class ServicoRecomendacaoApplication {
       const historicoParaLlm = this.servicoContextoConversa.limitarHistoricoPorTurnos(
         historicoNormalizado
       );
-      
+
+      // Cache de contexto com escopo da requisição: evita múltiplas consultas ao banco
+      // caso obterContextoCliente seja chamado mais de uma vez dentro do mesmo fluxo de chat
+      const cacheContextoRequisicao = new Map<string, IContextoRecomendacao | null>();
+
       // 3. Busca contexto personalizado do cliente (histórico de compras, preferências)
-      const contextoCliente = await this.obterContextoCliente(dados.clienteUuid);
+      const contextoCliente = await this.obterContextoCliente(
+        dados.clienteUuid,
+        cacheContextoRequisicao
+      );
       
       // 4. Analisa contexto do turno atual: é continuação? quais produtos já foram mostrados?
       const contextoTurno = this.servicoContextoConversa.analisar(
@@ -202,7 +224,8 @@ export class ServicoRecomendacaoApplication {
           historicoGemini,
           contextoTurno,
           inicio,
-          intencaoResumida
+          intencaoResumida,
+          incluirMetricas
         );
       }
 
@@ -211,31 +234,31 @@ export class ServicoRecomendacaoApplication {
       const despachoChat: Record<TipoIntencaoRecomendacao, () => Promise<IChatResponseDTO>> = {
         pos_venda: () =>
           this.processarChatPosvenda(
-            dados, intencao, contextoCliente, historicoGemini, contextoTurno, inicio, intencaoResumida
+            dados, intencao, contextoCliente, historicoGemini, contextoTurno, inicio, intencaoResumida, incluirMetricas
           ),
         tendencias: () =>
           this.processarChatTendencias(
-            dados, intencao, contextoCliente, historicoGemini, contextoTurno, inicio, intencaoResumida
+            dados, intencao, contextoCliente, historicoGemini, contextoTurno, inicio, intencaoResumida, incluirMetricas
           ),
         informacao: () =>
           this.processarChatInformacao(
-            dados, contextoCliente, historicoGemini, contextoTurno, inicio, intencaoResumida
+            dados, contextoCliente, historicoGemini, contextoTurno, inicio, intencaoResumida, incluirMetricas
           ),
         comparativo: () =>
           this.processarChatComparativo(
-            dados, intencao, contextoCliente, historicoGemini, contextoTurno, inicio, intencaoResumida
+            dados, intencao, contextoCliente, historicoGemini, contextoTurno, inicio, intencaoResumida, incluirMetricas
           ),
         recomendacao: () =>
           this.processarChatRecomendacao(
-            dados, intencao, contextoCliente, historicoGemini, contextoTurno, inicio, intencaoResumida
+            dados, intencao, contextoCliente, historicoGemini, contextoTurno, inicio, intencaoResumida, incluirMetricas
           ),
         esclarecimento: () =>
           this.processarChatRecomendacao(
-            dados, intencao, contextoCliente, historicoGemini, contextoTurno, inicio, intencaoResumida
+            dados, intencao, contextoCliente, historicoGemini, contextoTurno, inicio, intencaoResumida, incluirMetricas
           ),
         conversa: () =>
           this.processarChatRecomendacao(
-            dados, intencao, contextoCliente, historicoGemini, contextoTurno, inicio, intencaoResumida
+            dados, intencao, contextoCliente, historicoGemini, contextoTurno, inicio, intencaoResumida, incluirMetricas
           ),
       };
 
@@ -260,7 +283,8 @@ export class ServicoRecomendacaoApplication {
     historicoGemini: HistoricoGemini,
     contextoTurno: ContextoTurnoConversa,
     inicio: number,
-    intencaoResumida: string
+    intencaoResumida: string,
+    incluirMetricas: boolean
   ): Promise<IChatResponseDTO> {
     const respostaEsclarecimento = await this.adapterLangChain.gerarRespostaChat(
       dados.mensagem,
@@ -281,6 +305,7 @@ export class ServicoRecomendacaoApplication {
         tempoRespostaMs: Date.now() - inicio,
         tipoResposta: 'esclarecimento',
         intencaoResumida,
+        metricas: undefined,
       },
       intencao,
       contextoTurno
@@ -298,7 +323,8 @@ export class ServicoRecomendacaoApplication {
     historicoGemini: HistoricoGemini,
     contextoTurno: ContextoTurnoConversa,
     inicio: number,
-    intencaoResumida: string
+    intencaoResumida: string,
+    _incluirMetricas: boolean
   ): Promise<IChatResponseDTO> {
     const pedidos: IPedidoRecenteContexto[] = dados.clienteUuid
       ? await this.repositorioTendencias.buscarPedidosRecentes(dados.clienteUuid)
@@ -324,6 +350,7 @@ export class ServicoRecomendacaoApplication {
         tempoRespostaMs: Date.now() - inicio,
         tipoResposta: 'pos_venda',
         intencaoResumida,
+        metricas: undefined,
       },
       intencao,
       contextoTurno
@@ -341,7 +368,8 @@ export class ServicoRecomendacaoApplication {
     historicoGemini: HistoricoGemini,
     contextoTurno: ContextoTurnoConversa,
     inicio: number,
-    intencaoResumida: string
+    intencaoResumida: string,
+    incluirMetricas: boolean
   ): Promise<IChatResponseDTO> {
     const [tendenciasCategoria, tendenciasFaixa] = await Promise.all([
       this.repositorioTendencias.buscarTendenciasPorCategoria(
@@ -352,7 +380,7 @@ export class ServicoRecomendacaoApplication {
 
     const limiteRag = this.obterLimiteProdutosChat(intencao, 5);
     const intencaoSemFiltroGenero = this.intencaoApenasBuscaSemantica(intencao);
-    let produtosDTO = await this.buscarProdutosChat(
+    const resultadoBuscaTendencias = await this.buscarProdutosChat(
       dados,
       intencao,
       contextoCliente,
@@ -360,6 +388,8 @@ export class ServicoRecomendacaoApplication {
       limiteRag,
       intencaoSemFiltroGenero
     );
+    let produtosDTO = resultadoBuscaTendencias.produtos;
+    let metricasPipelineTendencias = resultadoBuscaTendencias.metricasPipeline;
 
     if (produtosDTO.length === 0) {
       const resultadoFallback = await this.executarPipelineRecomendacao(
@@ -368,6 +398,7 @@ export class ServicoRecomendacaoApplication {
         { intencao: intencaoSemFiltroGenero, limite: limiteRag }
       );
       produtosDTO = this.removerDuplicatasEOrdenar(resultadoFallback.produtos, limiteRag);
+      metricasPipelineTendencias = resultadoFallback.metricasPipeline;
     }
 
     const contextoTendencias = this.construirContextoTendencias(
@@ -402,6 +433,9 @@ export class ServicoRecomendacaoApplication {
         tempoRespostaMs: Date.now() - inicio,
         tipoResposta: 'tendencias',
         intencaoResumida,
+        metricas: incluirMetricas && metricasPipelineTendencias
+          ? this.montarMetricasDeterministicas(metricasPipelineTendencias, Date.now() - inicio)
+          : undefined,
       },
       intencao,
       contextoTurno
@@ -418,7 +452,8 @@ export class ServicoRecomendacaoApplication {
     historicoGemini: HistoricoGemini,
     contextoTurno: ContextoTurnoConversa,
     inicio: number,
-    intencaoResumida: string
+    intencaoResumida: string,
+    _incluirMetricas: boolean
   ): Promise<IChatResponseDTO> {
     const resposta = await this.adapterLangChain.gerarRespostaChat(
       dados.mensagem,
@@ -444,6 +479,7 @@ export class ServicoRecomendacaoApplication {
         tempoRespostaMs: Date.now() - inicio,
         tipoResposta: 'informacao',
         intencaoResumida,
+        metricas: undefined,
       },
       intencaoInformacao,
       contextoTurno
@@ -460,22 +496,26 @@ export class ServicoRecomendacaoApplication {
     historicoGemini: HistoricoGemini,
     contextoTurno: ContextoTurnoConversa,
     inicio: number,
-    intencaoResumida: string
+    intencaoResumida: string,
+    incluirMetricas: boolean
   ): Promise<IChatResponseDTO> {
     const limite = this.obterLimiteProdutosChat(intencao, 4);
     let produtosDTO: ProdutoRecomendadoDTO[] = [];
+    let metricasPipelineComparativo: MetricasPipelineRAG | undefined;
 
     if (intencao.comparar && intencao.comparar.length >= 2) {
       const produtosBrutos = await this.recomendarComparativo(intencao, contextoCliente, limite);
       produtosDTO = this.removerDuplicatasEOrdenar(produtosBrutos, limite);
     } else {
-      produtosDTO = await this.buscarProdutosChat(
+      const resultadoBusca = await this.buscarProdutosChat(
         dados,
         intencao,
         contextoCliente,
         contextoTurno,
         limite
       );
+      produtosDTO = resultadoBusca.produtos;
+      metricasPipelineComparativo = resultadoBusca.metricasPipeline;
     }
 
     const contextoChat = this.construirContextoChat(produtosDTO);
@@ -505,6 +545,9 @@ export class ServicoRecomendacaoApplication {
         tempoRespostaMs: Date.now() - inicio,
         tipoResposta: 'recomendacao',
         intencaoResumida,
+        metricas: incluirMetricas && metricasPipelineComparativo
+          ? this.montarMetricasDeterministicas(metricasPipelineComparativo, Date.now() - inicio)
+          : undefined,
       },
       intencao,
       contextoTurno
@@ -521,10 +564,11 @@ export class ServicoRecomendacaoApplication {
     historicoGemini: HistoricoGemini,
     contextoTurno: ContextoTurnoConversa,
     inicio: number,
-    intencaoResumida: string
+    intencaoResumida: string,
+    incluirMetricas: boolean
   ): Promise<IChatResponseDTO> {
     const limite = this.obterLimiteProdutosChat(intencao, 4);
-    const produtosDTO = await this.buscarProdutosChat(
+    const { produtos: produtosDTO, metricasPipeline } = await this.buscarProdutosChat(
       dados,
       intencao,
       contextoCliente,
@@ -558,6 +602,9 @@ export class ServicoRecomendacaoApplication {
         tempoRespostaMs: Date.now() - inicio,
         tipoResposta: 'recomendacao',
         intencaoResumida,
+        metricas: incluirMetricas && metricasPipeline
+          ? this.montarMetricasDeterministicas(metricasPipeline, Date.now() - inicio)
+          : undefined,
       },
       intencao,
       contextoTurno
@@ -583,11 +630,14 @@ export class ServicoRecomendacaoApplication {
     contextoCliente: IContextoRecomendacao | null,
     opcoes: OpcoesRecomendacaoInterna
   ): Promise<RecomendacaoResultado> {
-    // 1. Converte query em vetor numérico para busca semântica
+    // 1. Converte query em vetor numérico — mede tempo para métrica de embedding
+    const inicioEmbedding = Date.now();
     const queryEmbedding = await this.gerarEmbeddingQuery(query);
-    
-    // 2. Busca todos os produtos existentes para validar resultados (anti-alucinação)
-    const produtosExistentes = await this.buscarTodosProdutosExistentes();
+    const tempoEmbedding = Date.now() - inicioEmbedding;
+
+    // 2. Obtém produtos existentes via cache (TTL 5 min) para validação anti-alucinação
+    // Evita consulta ao banco a cada requisição de recomendação
+    const produtosExistentes = await this.servicoValidacaoProdutos.obterProdutosExistentes();
     
     // 3. Determina limite e se deve usar MMR (diversificação)
     const limite = opcoes.limite ?? opcoes.intencao?.quantidadeLivros ?? 5;
@@ -624,11 +674,14 @@ export class ServicoRecomendacaoApplication {
       }
     }
 
-    // 8. Retorna resultados limitados ao solicitado
+    // 8. Retorna resultados limitados ao solicitado, integrando tempoEmbedding às métricas
     return {
       ...resultadoRag,
       produtos: produtosFiltrados.slice(0, limite),
       query: opcoes.queryTexto ?? query,
+      metricasPipeline: resultadoRag.metricasPipeline
+        ? { ...resultadoRag.metricasPipeline, tempoEmbedding }
+        : undefined,
     };
   }
 
@@ -649,21 +702,21 @@ export class ServicoRecomendacaoApplication {
     contextoTurno: ContextoTurnoConversa,
     limite: number,
     intencaoBusca?: IntencaoRecomendacao
-  ): Promise<ProdutoRecomendadoDTO[]> {
+  ): Promise<ResultadoBuscaProdutosChat> {
     // 1. Monta query base com filtros da intenção + contexto do cliente
     const queryBase = this.montarQueryEnriquecida(
       intencao.queryBusca || dados.mensagem,
       intencao,
       contextoCliente
     );
-    
+
     // 2. Enriquece query com contexto da conversa (ex: "o livro de terror que mencionei")
     const queryEnriquecida = this.servicoContextoConversa.enriquecerQueryBusca(
       queryBase,
       contextoTurno,
       dados.mensagem
     );
-    
+
     // 3. Em continuações, busca +3 produtos para ter margem de seleção
     const limiteBusca = contextoTurno.ehContinuacao ? limite + 3 : limite;
 
@@ -678,7 +731,10 @@ export class ServicoRecomendacaoApplication {
       }
     );
 
-    return this.removerDuplicatasEOrdenar(resultado.produtos, limite);
+    return {
+      produtos: this.removerDuplicatasEOrdenar(resultado.produtos, limite),
+      metricasPipeline: resultado.metricasPipeline,
+    };
   }
 
   private finalizarRespostaChat(
@@ -914,17 +970,31 @@ export class ServicoRecomendacaoApplication {
 
   /**
    * Busca contexto personalizado do cliente para recomendações.
-   * 
+   *
    * Retorna null se não houver clienteUuid (usuário anônimo).
    * O contexto inclui: perfil, histórico de compras, preferências.
+   *
+   * @param cacheRequisicao Cache com escopo da requisição para evitar múltiplas
+   *   consultas ao banco pelo mesmo clienteUuid dentro do mesmo fluxo.
    */
   private async obterContextoCliente(
-    clienteUuid?: string
+    clienteUuid?: string,
+    cacheRequisicao?: Map<string, IContextoRecomendacao | null>
   ): Promise<IContextoRecomendacao | null> {
     if (!clienteUuid) {
-      return null; // Usuário anônimo sem contexto personalizado
+      return null; // Usuário anônimo — sem contexto personalizado
     }
-    return this.repositorioContextoCliente.buscarContexto(clienteUuid);
+
+    if (cacheRequisicao?.has(clienteUuid)) {
+      Logger.debug(
+        `[ServicoRecomendacaoApplication] Cache de contexto da requisição hit para cliente ${clienteUuid.slice(0, 8)}...`
+      );
+      return cacheRequisicao.get(clienteUuid)!;
+    }
+
+    const contexto = await this.repositorioContextoCliente.buscarContexto(clienteUuid);
+    cacheRequisicao?.set(clienteUuid, contexto);
+    return contexto;
   }
 
   /**
@@ -974,9 +1044,10 @@ export class ServicoRecomendacaoApplication {
   private construirResposta(
     resultado: RecomendacaoResultado,
     produtosDTO: ProdutoRecomendadoDTO[],
-    tempoResposta: number
+    tempoResposta: number,
+    incluirMetricas: boolean = false
   ): IRecomendarResponseDTO {
-    return {
+    const resposta: IRecomendarResponseDTO = {
       query: resultado.query,
       produtos: produtosDTO,
       contextoUsado: resultado.contextoUsado,
@@ -984,6 +1055,15 @@ export class ServicoRecomendacaoApplication {
       totalValidos: resultado.totalValidos,
       tempoRespostaMs: tempoResposta,
     };
+
+    if (incluirMetricas && resultado.metricasPipeline) {
+      resposta.metricas = {
+        ...resultado.metricasPipeline,
+        tempoTotal: tempoResposta,
+      };
+    }
+
+    return resposta;
   }
 
   private tratarErroRecomendacao(erro: unknown): never {
