@@ -64,12 +64,15 @@ async function carregarPerfilCheckout(
     const realCupons = await deps.repoPagamentos.listarCuponsTrocaPorUsuario(usuId);
     cuponsTroca = realCupons
       .filter((c) => c.ativo && c.valorAtual > 0)
-      .map((c) => ({
-        codigo: c.codigo,
-        valor: c.valorAtual,
-        tipo: 'troca' as const,
-        descricao: `Saldo de troca: R$ ${c.valorAtual.toFixed(2)}`,
-      }));
+      .map((c) => {
+        const valorAtualNumero = Number(c.valorAtual);
+        return {
+          codigo: c.codigo,
+          valor: valorAtualNumero,
+          tipo: 'troca' as const,
+          descricao: `Saldo de troca: R$ ${valorAtualNumero.toFixed(2)}`,
+        };
+      });
   }
   const enderecosCliente = (perfil.enderecos ?? []).map((e) => ({
     uuid: e.uuid ?? '',

@@ -50,8 +50,21 @@ export function validarDadosPagamento(dados: IPagamentoInputDto): void {
   validarParcelasCartaoSeInformado(dados);
 }
 
-function validarCupomPromocional(codigo: string, valor: number): boolean {
-  return codigo === 'DESCONTO10' && valor > 0;
+async function validarCupomPromocional(
+  repositorioPagamentos: IRepositorioPagamentos,
+  codigo: string,
+  valor: number
+): Promise<boolean> {
+  console.log('[DEBUG validarCupomPromocional] codigo:', codigo, 'valor:', valor);
+  if (!codigo || valor <= 0) return false;
+  const cupons = await repositorioPagamentos.listarCuponsPromocionais();
+  console.log('[DEBUG validarCupomPromocional] cupons encontrados:', cupons.length, cupons);
+  const cupom = cupons.find((c) => c.codigo === codigo && c.ativo);
+  console.log('[DEBUG validarCupomPromocional] cupom encontrado:', cupom);
+  if (!cupom) return false;
+  console.log('[DEBUG validarCupomPromocional] valor minimo:', cupom.valorMinimo, 'valor atual:', valor);
+  if (valor < cupom.valorMinimo) return false;
+  return true;
 }
 
 async function validarCupomTrocaSeNecessario(
@@ -71,9 +84,10 @@ async function validarCupomTrocaSeNecessario(
   if (!cupom.ativo) {
     throw new Error('Cupom de troca está inativo');
   }
-  if (cupom.valorAtual < valor) {
+  const valorAtualNumero = Number(cupom.valorAtual);
+  if (valorAtualNumero < valor) {
     throw new Error(
-      `Saldo insuficiente no cupom de troca. Saldo disponível: R$ ${cupom.valorAtual.toFixed(2)}, Valor solicitado: R$ ${valor.toFixed(2)}`
+      `Saldo insuficiente no cupom de troca. Saldo disponível: R$ ${valorAtualNumero.toFixed(2)}, Valor solicitado: R$ ${valor.toFixed(2)}`
     );
   }
 }
@@ -85,7 +99,7 @@ async function validarRegrasNegocio(
 ): Promise<void> {
   if (forma.isCupomPromocional()) {
     const codigo = forma.getDetalhes();
-    if (!codigo || !validarCupomPromocional(codigo, valor)) {
+    if (!codigo || !(await validarCupomPromocional(repositorioPagamentos, codigo, valor))) {
       throw new Error('Cupom promocional inválido');
     }
   }

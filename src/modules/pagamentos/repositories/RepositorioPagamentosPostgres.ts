@@ -6,6 +6,7 @@ import { CartaoCredito } from '../entities/CartaoCredito';
 import { StatusPagamento } from '../entities/IPagamento';
 import { ContextoRequisicao } from '@/shared/infrastructure/contexto/ContextoRequisicao';
 import { Logger } from '@/shared/utils/Logger.util';
+import { MENSAGENS_ERRO } from '@/shared/constants/mensagens-erro.constants';
 
 /**
  * Implementação do repositório de pagamentos para PostgreSQL.
@@ -54,7 +55,7 @@ export class RepositorioPagamentosPostgres implements IRepositorioPagamentos {
     // Obter ID interno da venda
     const vendaQuery = 'SELECT ven_id FROM livraria_comercial.vendas WHERE ven_uuid = $1';
     const vendaRes = await this.db.executar<{ ven_id: number }>(vendaQuery, [dados.vendaUuid]);
-    if (vendaRes.length === 0) throw new Error('Venda não encontrada');
+    if (vendaRes.length === 0) throw new Error(MENSAGENS_ERRO.VENDA_NAO_ENCONTRADA);
     const venId = vendaRes[0].ven_id;
 
     // Obter ID do tipo
@@ -151,7 +152,7 @@ export class RepositorioPagamentosPostgres implements IRepositorioPagamentos {
 
     // Obter ven_id da primeira venda (todas devem ser da mesma venda)
     const venId = await this.obterVenIdPorVendaUuid(pagamentos[0].vendaUuid);
-    if (venId === null) throw new Error('Venda não encontrada');
+    if (venId === null) throw new Error(MENSAGENS_ERRO.VENDA_NAO_ENCONTRADA);
 
     // Obter IDs de tipos e status em lote
     const tipos = await this.db.executar<{ tpg_id: number; tpg_descricao: string }>(
@@ -291,7 +292,7 @@ export class RepositorioPagamentosPostgres implements IRepositorioPagamentos {
   public async atualizar(uuid: string, dados: IPagamento): Promise<IPagamento> {
     const idQuery = 'SELECT pag_id FROM livraria_financeiro.pagamento WHERE pag_uuid = $1';
     const idRes = await this.db.executar<{ pag_id: number }>(idQuery, [uuid]);
-    if (idRes.length === 0) throw new Error('Pagamento não encontrado');
+    if (idRes.length === 0) throw new Error(MENSAGENS_ERRO.PAGAMENTO_NAO_ENCONTRADO);
     const pagId = idRes[0].pag_id;
 
     const statusQuery = 'SELECT stp_id FROM livraria_financeiro.status_pagamento WHERE stp_descricao = $1';

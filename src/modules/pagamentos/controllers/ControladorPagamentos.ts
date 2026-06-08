@@ -27,6 +27,7 @@ export class ControladorPagamentos {
   public definirMetodoLiquidacao = async (req: Request, res: Response): Promise<void> => {
     try {
       const dados: IPagamentoInputDto = req.body;
+      console.log('[DEBUG definirMetodoLiquidacao] dados recebidos:', JSON.stringify(dados));
       // Extrair idempotency key do header se não estiver no body
       const idempotencyKey = dados.idempotencyKey || req.headers['idempotency-key'] as string;
       if (idempotencyKey) {

@@ -5,6 +5,7 @@ import { StatusPagamento } from '@/modules/pagamentos/entities/IPagamento';
 import type { IProvedorPagamento } from '@/modules/pagamentos/provedoresPagamento/IProvedorPagamento';
 import { RepositorioEstoque } from '@/modules/estoque/repositorioEstoque';
 import type { IConexaoBanco } from '@/shared/infrastructure/database/IConexaoBanco';
+import { MENSAGENS_ERRO } from '@/shared/constants/mensagens-erro.constants';
 
 const MAPA_SATISFACAO_PAGAMENTO: Record<TipoPagamento, (p: IPagamento) => boolean> = {
   [TipoPagamento.CUPOM_PROMOCIONAL]: (p) =>
@@ -59,7 +60,7 @@ export async function obterResumoPagamentosVenda(
 ) {
   const venda = await repositorioVendas.obterPorUuid(vendaUuid);
   if (!venda || venda.usuarioUuid !== usuarioUuidCliente) {
-    throw new Error('Venda não encontrada');
+    throw new Error(MENSAGENS_ERRO.VENDA_NAO_ENCONTRADA);
   }
   const pagamentos = await repositorioPagamentos.listarPorVenda(vendaUuid);
   const detalhes = await Promise.all(
@@ -89,7 +90,7 @@ export async function solicitarAutorizacaoFinanceiraServico(
 ): Promise<IPagamento> {
   const pagamento = await repositorioPagamentos.obterPorUuid(pagamentoUuid);
   if (!pagamento) {
-    throw new Error('Pagamento não encontrado');
+    throw new Error(MENSAGENS_ERRO.PAGAMENTO_NAO_ENCONTRADO);
   }
   if (pagamento.status !== StatusPagamento.PENDENTE) {
     throw new Error('Pagamento já processado');

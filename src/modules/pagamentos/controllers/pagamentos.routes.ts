@@ -30,7 +30,12 @@ export function registrarRotasPagamentos(router: Router): void {
   router.post('/webhooks/pagamento-pix-simulado', controller.webhookPagamentoPixSimulado);
 
   // Endpoints tradicionais (DDD) para gerenciamento de pagamento
-  router.post('/pagamentos/selecionar', autenticacaoMiddleware, controller.definirMetodoLiquidacao);
+  router.post('/pagamentos/selecionar', (req, res, next) => {
+    console.log('[DEBUG ROUTE] POST /pagamentos/selecionar chamado');
+    console.log('[DEBUG ROUTE] body:', JSON.stringify(req.body));
+    console.log('[DEBUG ROUTE] headers:', JSON.stringify(req.headers));
+    next();
+  }, autenticacaoMiddleware, controller.definirMetodoLiquidacao);
   router.get(
     '/pagamentos/venda/:vendaUuid/resumo',
     autenticacaoMiddleware,

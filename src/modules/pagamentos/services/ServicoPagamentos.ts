@@ -15,6 +15,7 @@ import type { IProvedorPagamento } from '../provedoresPagamento/IProvedorPagamen
 import type { ResultadoIntencaoPagamento } from '../provedoresPagamento/DadosConfirmacaoProvedor';
 import type { IRepositorioIntencaoPagamento } from '../intencaoPagamento/IRepositorioIntencaoPagamento';
 import type { IConexaoBanco } from '@/shared/infrastructure/database/IConexaoBanco';
+import { MENSAGENS_ERRO } from '@/shared/constants/mensagens-erro.constants';
 
 /**
  * Serviço responsável pela lógica de negócios dos pagamentos (Livraria e-commerce).
@@ -41,7 +42,7 @@ export class ServicoPagamentos {
     }
     const venId = await this.repositorioPagamentos.obterVenIdPorVendaUuid(idVenda);
     if (venId === null) {
-      throw new Error('Venda não encontrada');
+      throw new Error(MENSAGENS_ERRO.VENDA_NAO_ENCONTRADA);
     }
     const ok = await this.repositorioIntencao.vincularVenda(idIntencao, venId);
     if (!ok) {
@@ -93,7 +94,7 @@ export class ServicoPagamentos {
 
   public async consultarPagamento(pagamentoUuid: string): Promise<IPagamento> {
     const p = await this.repositorioPagamentos.obterPorUuid(pagamentoUuid);
-    if (!p) throw new Error('Pagamento não encontrado');
+    if (!p) throw new Error(MENSAGENS_ERRO.PAGAMENTO_NAO_ENCONTRADO);
     return p;
   }
 }
