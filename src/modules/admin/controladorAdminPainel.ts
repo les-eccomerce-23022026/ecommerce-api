@@ -2,6 +2,8 @@ import { Request, Response } from 'express';
 import { RespostaPadrao } from '@/shared/errors/Iresposta-padrao';
 import { ServicoDashboardAdmin } from '@/modules/admin/servicoDashboardAdmin';
 import { ServicoPedidosAdmin } from '@/modules/admin/servicoPedidosAdmin';
+import { ServicoAnaliseVendas } from '@/modules/vendas/services/ServicoAnaliseVendas';
+import { FiltroAnaliseVendas } from '@/modules/vendas/dtos/AnaliseVendas.dto';
 
 /**
  * Rotas do painel administrativo: dashboard e pedidos (contrato do frontend).
@@ -10,6 +12,7 @@ export class ControladorAdminPainel {
   constructor(
     private readonly servicoDashboard: ServicoDashboardAdmin,
     private readonly servicoPedidosAdmin: ServicoPedidosAdmin,
+    private readonly servicoAnaliseVendas: ServicoAnaliseVendas,
   ) {}
 
   public obterDashboard = async (_req: Request, res: Response): Promise<Response> => {
@@ -84,6 +87,36 @@ export class ControladorAdminPainel {
       return res.status(200).json({ mensagem: 'Solicitação de reconfirmação de endereço enviada.' });
     } catch (erro) {
       const mensagem = RespostaPadrao.obterMensagemErro(erro, 'Erro ao solicitar reconfirmação de endereço.');
+      return RespostaPadrao.enviarErro(res, 400, mensagem);
+    }
+  };
+
+  public obterAnaliseVendasPorCategoria = async (req: Request, res: Response): Promise<Response> => {
+    try {
+      const { dataInicio, dataFim, categorias } = req.query;
+
+      if (!dataInicio || !dataFim) {
+        return RespostaPadrao.enviarErro(res, 400, 'Parâmetros dataInicio e dataFim são obrigatórios');
+      }
+
+      // Tratar categorias como array (pode vir como string separada por vírgulas ou como array do Express)
+      let categoriasArray: string[] | undefined;
+      if (categorias) {
+        categoriasArray = Array.isArray(categorias) 
+          ? categorias as string[] 
+          : (categorias as string).split(',');
+      }
+
+      const filtro: FiltroAnaliseVendas = {
+        dataInicio: new Date(dataInicio as string),
+        dataFim: new Date(dataFim as string),
+        categorias: categoriasArray,
+      };
+
+      const dados = await this.servicoAnaliseVendas.analisarVendasPorCategoria(filtro);
+      return RespostaPadrao.enviarSucesso(res, 200, dados);
+    } catch (erro) {
+      const mensagem = RespostaPadrao.obterMensagemErro(erro, 'Erro ao obter análise de vendas por categoria.');
       return RespostaPadrao.enviarErro(res, 400, mensagem);
     }
   };

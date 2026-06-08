@@ -5,6 +5,7 @@ import { ICriarAdminDto, IListaAdminDto, IRespostaAdminCriadoDto } from '@/modul
 import { verificarForcaSenha } from '@/shared/utils/senha.util';
 import { Logger } from '@/shared/utils/Logger.util';
 import { PAPEL_ADMIN, PAPEL_CLIENTE } from '@/shared/types/papeis';
+import { MENSAGENS_ERRO } from '@/shared/constants/mensagens-erro.constants';
 
 /**
  * Serviço responsável por tarefas de administração do sistema.
@@ -72,13 +73,13 @@ export class ServicoAdmin {
     
     if (!admin) {
       Logger.warn('[inativarAdministrador] Administrador não encontrado', { uuid });
-      throw new Error('Administrador não encontrado.');
+      throw new Error(MENSAGENS_ERRO.ADMINISTRADOR_NAO_ENCONTRADO);
     }
     
     const temPapelAdmin = admin.papeis.some(p => p.id === PAPEL_ADMIN.id);
     if (!temPapelAdmin) {
       Logger.warn('[inativarAdministrador] Usuário não tem papel admin', { uuid, papeis: admin.papeis.map(p => p.descricao) });
-      throw new Error('Administrador não encontrado.');
+      throw new Error(MENSAGENS_ERRO.ADMINISTRADOR_NAO_ENCONTRADO);
     }
 
     if (!admin.ativo) {
@@ -99,13 +100,13 @@ export class ServicoAdmin {
     
     if (!admin) {
       Logger.warn('[ativarAdministrador] Administrador não encontrado', { uuid });
-      throw new Error('Administrador não encontrado.');
+      throw new Error(MENSAGENS_ERRO.ADMINISTRADOR_NAO_ENCONTRADO);
     }
     
     const temPapelAdmin = admin.papeis.some(p => p.id === PAPEL_ADMIN.id);
     if (!temPapelAdmin) {
       Logger.warn('[ativarAdministrador] Usuário não tem papel admin', { uuid, papeis: admin.papeis.map(p => p.descricao) });
-      throw new Error('Administrador não encontrado.');
+      throw new Error(MENSAGENS_ERRO.ADMINISTRADOR_NAO_ENCONTRADO);
     }
 
     if (admin.ativo) {
@@ -128,13 +129,13 @@ export class ServicoAdmin {
     
     if (!admin) {
       Logger.warn('[atualizarAdministrador] Administrador não encontrado', { uuid });
-      throw new Error('Administrador não encontrado.');
+      throw new Error(MENSAGENS_ERRO.ADMINISTRADOR_NAO_ENCONTRADO);
     }
     
     const temPapelAdmin = admin.papeis.some(p => p.id === PAPEL_ADMIN.id);
     if (!temPapelAdmin) {
       Logger.warn('[atualizarAdministrador] Usuário não tem papel admin', { uuid, papeis: admin.papeis.map(p => p.descricao) });
-      throw new Error('Administrador não encontrado.');
+      throw new Error(MENSAGENS_ERRO.ADMINISTRADOR_NAO_ENCONTRADO);
     }
 
     const dadosAtualizar: { nome?: string; email?: string; cpf?: string } = {};

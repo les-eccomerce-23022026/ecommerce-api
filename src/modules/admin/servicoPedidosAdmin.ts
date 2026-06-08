@@ -4,6 +4,7 @@ import { vendaParaPayloadPedidoAdmin } from '@/modules/admin/mappers/pedido-admi
 import { ServicoMockCorreios } from '@/modules/logistica-mocks/servicoMockCorreios';
 import { ServicoMockLoggi } from '@/modules/logistica-mocks/servicoMockLoggi';
 import { IServicoNotificacao } from '@/modules/entrega/ports/IServicoNotificacao';
+import { MENSAGENS_ERRO } from '@/shared/constants/mensagens-erro.constants';
 
 const ENDERECO_PADRAO_ADMIN = {
   logradouro: 'Despacho administrativo',
@@ -31,7 +32,7 @@ export class ServicoPedidosAdmin {
   async despachar(vendaUuid: string): Promise<Record<string, unknown>> {
     const venda = await this.repositorioVendas.obterPorUuid(vendaUuid);
     if (!venda) {
-      throw new Error('Pedido não encontrado.');
+      throw new Error(MENSAGENS_ERRO.PEDIDO_NAO_ENCONTRADO);
     }
     const statusAtual = venda.status.trim().toUpperCase();
     if (process.env.NODE_ENV === 'test') {
@@ -115,7 +116,7 @@ export class ServicoPedidosAdmin {
   async confirmarEntrega(vendaUuid: string): Promise<Record<string, unknown>> {
     const venda = await this.repositorioVendas.obterPorUuid(vendaUuid);
     if (!venda) {
-      throw new Error('Pedido não encontrado.');
+      throw new Error(MENSAGENS_ERRO.PEDIDO_NAO_ENCONTRADO);
     }
     const statusAtual = venda.status.trim().toUpperCase();
     if (statusAtual !== 'EM TRÂNSITO') {
@@ -138,7 +139,7 @@ export class ServicoPedidosAdmin {
   async marcarFalhaEntrega(vendaUuid: string, motivo: string): Promise<Record<string, unknown>> {
     const venda = await this.repositorioVendas.obterPorUuid(vendaUuid);
     if (!venda) {
-      throw new Error('Pedido não encontrado.');
+      throw new Error(MENSAGENS_ERRO.PEDIDO_NAO_ENCONTRADO);
     }
     const statusAtual = venda.status.trim().toUpperCase();
     if (statusAtual !== 'EM TRÂNSITO') {
@@ -163,7 +164,7 @@ export class ServicoPedidosAdmin {
   async redespachar(vendaUuid: string): Promise<Record<string, unknown>> {
     const venda = await this.repositorioVendas.obterPorUuid(vendaUuid);
     if (!venda) {
-      throw new Error('Pedido não encontrado.');
+      throw new Error(MENSAGENS_ERRO.PEDIDO_NAO_ENCONTRADO);
     }
     const statusAtual = venda.status.trim().toUpperCase();
     if (statusAtual !== 'FALHOU') {
@@ -225,7 +226,7 @@ export class ServicoPedidosAdmin {
   async solicitarReconfirmacaoEndereco(vendaUuid: string): Promise<void> {
     const venda = await this.repositorioVendas.obterPorUuid(vendaUuid);
     if (!venda) {
-      throw new Error('Pedido não encontrado.');
+      throw new Error(MENSAGENS_ERRO.PEDIDO_NAO_ENCONTRADO);
     }
     const statusAtual = venda.status.trim().toUpperCase();
     if (statusAtual !== 'FALHOU') {

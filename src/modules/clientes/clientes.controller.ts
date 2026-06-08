@@ -3,6 +3,7 @@ import { di } from '@/shared/infrastructure/di.container';
 import { RespostaPadrao } from '@/shared/errors/Iresposta-padrao';
 import { obterErroValidacaoCadastroPublico } from '@/modules/clientes/clientesCadastroPublicoValidacao.util';
 import { ConexaoPostgres } from '@/shared/infrastructure/database/ConexaoPostgres';
+import { MENSAGENS_ERRO } from '@/shared/constants/mensagens-erro.constants';
 import type { IRepositorioPagamentos } from '@/modules/pagamentos/repositories/IRepositorioPagamentos';
 
 const { gestaoIdentidadeCliente, repositorioPagamentos } = di;
@@ -93,7 +94,7 @@ export class ControladorClientes {
       const dados = requisicao.body ?? {};
 
       if (!uuid) {
-        return RespostaPadrao.enviarErro(resposta, 401, 'Identificador de usuário não encontrado.');
+        return RespostaPadrao.enviarErro(resposta, 401, MENSAGENS_ERRO.IDENTIFICADOR_USUARIO_NAO_ENCONTRADO);
       }
 
       const clienteAtualizado = await gestaoIdentidadeCliente.atualizarCliente(uuid, dados);
@@ -238,7 +239,7 @@ export class ControladorClientes {
 
       const usuId = await repositorioPagamentos.obterUsuarioIdInternoPorUuid(uuid);
       if (!usuId) {
-        return RespostaPadrao.enviarErro(resposta, 404, 'Usuário não encontrado.');
+        return RespostaPadrao.enviarErro(resposta, 404, MENSAGENS_ERRO.USUARIO_NAO_ENCONTRADO);
       }
 
       // Buscar cupons de troca usando repositório existente

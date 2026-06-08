@@ -24,6 +24,7 @@ import {
 } from '@/modules/clientes/gestaoIdentidadeClienteTexto.util';
 import { ServicoLojas } from '@/modules/lojas/servicoLojas';
 import { UsuarioNaoEncontradoError, OperacaoNaoPermitidaError } from '@/shared/exceptions/Exceptions';
+import { MENSAGENS_ERRO } from '@/shared/constants/mensagens-erro.constants';
 
 /**
  * Serviço responsável pelo fluxo de cadastro público de clientes.
@@ -103,7 +104,7 @@ export class GestaoIdentidadeCliente {
     const todosEnderecos = await this.repositorioEndereco.buscarPorIdUsuario(usuario.id);
     const enderecoExistente = todosEnderecos.find((e) => e.uuid === uuidEndereco);
     if (!enderecoExistente) {
-      throw new OperacaoNaoPermitidaError('Endereço não encontrado.');
+      throw new OperacaoNaoPermitidaError(MENSAGENS_ERRO.ENDERECO_NAO_ENCONTRADO);
     }
     await this.repositorioEndereco.deletar(usuario.id, uuidEndereco);
   }

@@ -1,18 +1,19 @@
 import { IRouter } from 'express';
 import { ControladorCartoes } from './cartoes.controller';
 import { autenticacaoMiddleware } from '../../shared/middlewares/autenticacao.middleware';
+import { clienteOnlyMiddleware } from '../../shared/middlewares/autorizacao.middleware';
 
 /**
  * Registra as rotas relacionadas a cartões de crédito.
  */
 export function registrarRotasCartoes(app: IRouter): void {
   // Listar cartões do usuário autenticado
-  app.get('/clientes/perfil/cartoes', autenticacaoMiddleware, (req, res) =>
+  app.get('/clientes/perfil/cartoes', autenticacaoMiddleware, clienteOnlyMiddleware, (req, res) =>
     ControladorCartoes.listarCartoesUsuario(req, res)
   );
 
   // Cadastrar novo cartão
-  app.post('/clientes/perfil/cartoes', autenticacaoMiddleware, (req, res) =>
+  app.post('/clientes/perfil/cartoes', autenticacaoMiddleware, clienteOnlyMiddleware, (req, res) =>
     ControladorCartoes.cadastrarCartao(req, res)
   );
 

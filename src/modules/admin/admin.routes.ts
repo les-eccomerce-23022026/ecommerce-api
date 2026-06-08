@@ -6,6 +6,7 @@ import { ServicoDashboardAdmin } from '@/modules/admin/servicoDashboardAdmin';
 import { ServicoPedidosAdmin } from '@/modules/admin/servicoPedidosAdmin';
 import { ConexaoPostgres } from '@/shared/infrastructure/database/ConexaoPostgres';
 import { RepositorioVendasPostgres } from '@/modules/vendas/repositories/RepositorioVendasPostgres';
+import { ServicoAnaliseVendas } from '@/modules/vendas/services/ServicoAnaliseVendas';
 import { RepositorioEntregaPostgres } from '@/modules/entrega/RepositorioEntregaPostgres';
 import { ServicoEntrega } from '@/modules/entrega/ServicoEntrega';
 import { ServicoNotificacaoEmail } from '@/modules/entrega/adapters/ServicoNotificacaoEmail';
@@ -41,7 +42,8 @@ export function registrarRotasAdmin(app: IRouter): void {
   const servicoMockLoggi = new ServicoMockLoggi(repoRastreamento, repoEventoRastreamento);
   const servicoPedidosAdmin = new ServicoPedidosAdmin(repoVendas, servicoEntrega, servicoMockCorreios, servicoMockLoggi, servicoNotificacao);
   const servicoDashboardAdmin = new ServicoDashboardAdmin(db);
-  const controladorPainel = new ControladorAdminPainel(servicoDashboardAdmin, servicoPedidosAdmin);
+  const servicoAnaliseVendas = new ServicoAnaliseVendas(repoVendas);
+  const controladorPainel = new ControladorAdminPainel(servicoDashboardAdmin, servicoPedidosAdmin, servicoAnaliseVendas);
   
   // Estoque
   const repoEstoque = new RepositorioEstoque(db);
@@ -53,6 +55,14 @@ export function registrarRotasAdmin(app: IRouter): void {
     autenticacaoMiddleware,
     adminOnlyMiddleware,
     controladorPainel.obterDashboard,
+  );
+
+  app.get(
+    '/admin/analise-vendas-categoria',
+    autenticacaoMiddleware,
+    contextoLojaMiddleware,
+    adminOnlyMiddleware,
+    controladorPainel.obterAnaliseVendasPorCategoria,
   );
 
   app.get(

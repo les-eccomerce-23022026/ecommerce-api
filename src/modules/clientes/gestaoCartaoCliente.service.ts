@@ -1,6 +1,8 @@
 import { IRepositorioCartaoUsuario } from '@/modules/cartoes/IRepositorioCartaoUsuario';
 import { ICartaoDto } from '@/modules/clientes/Iclientes.dto';
+import { ICartaoUsuario } from '@/shared/types/ICartaoUsuario';
 import { DadosInvalidosError } from '@/shared/exceptions/Exceptions';
+import { MENSAGENS_ERRO } from '@/shared/constants/mensagens-erro.constants';
 
 /**
  * Constantes de validação de negócio
@@ -34,7 +36,7 @@ export class GestaoCartaoCliente {
     dados: ICartaoDto,
     principal: boolean = false
   ): Promise<ICartaoDto> {
-    this.validarDadosCartao(dados);
+    GestaoCartaoCliente.validarDadosCartao(dados);
 
     // Validar limite de cartões por cliente
     const cartoesExistentes = await this.repositorioCartoes.buscarPorUsuario(idUsuario);
@@ -48,16 +50,26 @@ export class GestaoCartaoCliente {
       await this.removerPrincipalDeTodosCartoes(idUsuario);
     }
 
+    // Obter idBandeira a partir da descrição
+    const idBandeira = await this.obterIdBandeiraPorDescricao(dados.bandeira);
+    if (!idBandeira) {
+      throw new DadosInvalidosError(MENSAGENS_ERRO.BANDEIRA_NAO_ENCONTRADA);
+    }
+
+    // Gerar token para o cartão (simulado - em produção viria do gateway de pagamento)
+    const token = GestaoCartaoCliente.gerarTokenCartao(dados.ultimosDigitosCartao);
+
     const cartao = await this.repositorioCartoes.criar({
       idUsuario,
+      idBandeira,
+      token,
       ultimosDigitosCartao: dados.ultimosDigitosCartao,
       nomeImpresso: dados.nomeImpresso,
-      bandeira: dados.bandeira,
-      validade: new Date(dados.validade + '-01'),
+      validade: new Date(`${dados.validade}-01`),
       principal,
     });
 
-    return this.converterParaDto(cartao);
+    return GestaoCartaoCliente.converterParaDto(cartao);
   }
 
   /**
@@ -77,27 +89,41 @@ export class GestaoCartaoCliente {
     const cartaoExistente = cartoesExistentes.find((c) => c.uuid === uuidCartao);
     
     if (!cartaoExistente) {
-      throw new DadosInvalidosError('Cartão não encontrado.');
+      throw new DadosInvalidosError(MENSAGENS_ERRO.CARTAO_NAO_ENCONTRADO);
     }
 
     if (dados.ultimosDigitosCartao || dados.nomeImpresso || dados.bandeira || dados.validade) {
-      this.validarDadosCartao(dados as ICartaoDto);
+      GestaoCartaoCliente.validarDadosCartao(dados as ICartaoDto);
     }
 
     if (dados.principal) {
       await this.removerPrincipalDeTodosCartoes(idUsuario);
     }
 
-    const cartaoAtualizado = await this.repositorioCartoes.atualizar({
-      ...cartaoExistente,
+    // Preparar dados para atualização
+    const dadosAtualizacao: Partial<Omit<ICartaoUsuario, 'id' | 'uuid' | 'idUsuario'>> = {
       ultimosDigitosCartao: dados.ultimosDigitosCartao || cartaoExistente.ultimosDigitosCartao,
       nomeImpresso: dados.nomeImpresso || cartaoExistente.nomeImpresso,
-      bandeira: dados.bandeira || cartaoExistente.bandeira,
-      validade: dados.validade ? new Date(dados.validade + '-01') : cartaoExistente.validade,
+      validade: dados.validade ? new Date(`${dados.validade}-01`) : cartaoExistente.validade,
       principal: dados.principal !== undefined ? dados.principal : cartaoExistente.principal,
-    });
+    };
 
-    return this.converterParaDto(cartaoAtualizado);
+    // Se bandeira foi alterada, obter novo idBandeira
+    if (dados.bandeira && dados.bandeira !== cartaoExistente.bandeira) {
+      const idBandeira = await this.obterIdBandeiraPorDescricao(dados.bandeira);
+      if (!idBandeira) {
+        throw new DadosInvalidosError(MENSAGENS_ERRO.BANDEIRA_NAO_ENCONTRADA);
+      }
+      dadosAtualizacao.idBandeira = idBandeira;
+    }
+
+    const cartaoAtualizado = await this.repositorioCartoes.atualizar(uuidCartao, dadosAtualizacao);
+
+    if (!cartaoAtualizado) {
+      throw new DadosInvalidosError(MENSAGENS_ERRO.CARTAO_NAO_ENCONTRADO);
+    }
+
+    return GestaoCartaoCliente.converterParaDto(cartaoAtualizado);
   }
 
   /**
@@ -111,10 +137,10 @@ export class GestaoCartaoCliente {
     const cartaoExistente = cartoesExistentes.find((c) => c.uuid === uuidCartao);
     
     if (!cartaoExistente) {
-      throw new DadosInvalidosError('Cartão não encontrado.');
+      throw new DadosInvalidosError(MENSAGENS_ERRO.CARTAO_NAO_ENCONTRADO);
     }
 
-    await this.repositorioCartoes.deletar(idUsuario, uuidCartao);
+    await this.repositorioCartoes.excluir(uuidCartao);
   }
 
   /**
@@ -128,15 +154,12 @@ export class GestaoCartaoCliente {
     const cartaoExistente = cartoesExistentes.find((c) => c.uuid === uuidCartao);
     
     if (!cartaoExistente) {
-      throw new DadosInvalidosError('Cartão não encontrado.');
+      throw new DadosInvalidosError(MENSAGENS_ERRO.CARTAO_NAO_ENCONTRADO);
     }
 
     await this.removerPrincipalDeTodosCartoes(idUsuario);
 
-    await this.repositorioCartoes.atualizar({
-      ...cartaoExistente,
-      principal: true,
-    });
+    await this.repositorioCartoes.atualizar(uuidCartao, { principal: true });
   }
 
   /**
@@ -147,7 +170,7 @@ export class GestaoCartaoCliente {
    */
   public async buscarCartoesPorUsuario(idUsuario: number): Promise<ICartaoDto[]> {
     const cartoes = await this.repositorioCartoes.buscarPorUsuario(idUsuario);
-    return cartoes.map((c) => this.converterParaDto(c));
+    return cartoes.map((c) => GestaoCartaoCliente.converterParaDto(c));
   }
 
   /**
@@ -160,7 +183,7 @@ export class GestaoCartaoCliente {
     const cartoes = await this.repositorioCartoes.buscarPorUsuario(idUsuario);
     const cartaoPrincipal = cartoes.find((c) => c.principal) || cartoes[0];
     
-    return cartaoPrincipal ? this.converterParaDto(cartaoPrincipal) : null;
+    return cartaoPrincipal ? GestaoCartaoCliente.converterParaDto(cartaoPrincipal) : null;
   }
 
   /**
@@ -169,7 +192,7 @@ export class GestaoCartaoCliente {
    * @param dados - Dados do cartão
    * @throws Error se os dados forem inválidos
    */
-  private validarDadosCartao(dados: ICartaoDto): void {
+  private static validarDadosCartao(dados: ICartaoDto): void {
     if (!dados.ultimosDigitosCartao || dados.ultimosDigitosCartao.length !== 4) {
       throw new DadosInvalidosError('Últimos 4 dígitos do cartão são obrigatórios e devem ter 4 caracteres.');
     }
@@ -182,11 +205,11 @@ export class GestaoCartaoCliente {
       throw new DadosInvalidosError('Bandeira do cartão é obrigatória.');
     }
 
-    if (!dados.validade || !this.validarFormatoValidade(dados.validade)) {
+    if (!dados.validade || !GestaoCartaoCliente.validarFormatoValidade(dados.validade)) {
       throw new DadosInvalidosError('Validade do cartão é obrigatória e deve estar no formato YYYY-MM.');
     }
 
-    if (this.cartaoExpirado(dados.validade)) {
+    if (GestaoCartaoCliente.cartaoExpirado(dados.validade)) {
       throw new DadosInvalidosError('Cartão expirado.');
     }
   }
@@ -197,7 +220,7 @@ export class GestaoCartaoCliente {
    * @param validade - Validade no formato YYYY-MM
    * @returns true se o formato for válido
    */
-  private validarFormatoValidade(validade: string): boolean {
+  private static validarFormatoValidade(validade: string): boolean {
     const regex = /^\d{4}-\d{2}$/;
     return regex.test(validade);
   }
@@ -208,7 +231,7 @@ export class GestaoCartaoCliente {
    * @param validade - Validade no formato YYYY-MM
    * @returns true se o cartão estiver expirado
    */
-  private cartaoExpirado(validade: string): boolean {
+  private static cartaoExpirado(validade: string): boolean {
     const [ano, mes] = validade.split('-').map(Number);
     const dataExpiracao = new Date(ano, mes - 1);
     const dataAtual = new Date();
@@ -224,7 +247,7 @@ export class GestaoCartaoCliente {
     const cartoes = await this.repositorioCartoes.buscarPorUsuario(idUsuario);
     await Promise.all(
       cartoes.map((c) =>
-        this.repositorioCartoes.atualizar({ ...c, principal: false })
+        this.repositorioCartoes.atualizar(c.uuid, { principal: false })
       )
     );
   }
@@ -235,7 +258,7 @@ export class GestaoCartaoCliente {
    * @param cartao - Entidade do cartão
    * @returns DTO do cartão
    */
-  private converterParaDto(cartao: any): ICartaoDto {
+  private static converterParaDto(cartao: ICartaoUsuario): ICartaoDto {
     return {
       uuid: cartao.uuid,
       ultimosDigitosCartao: cartao.ultimosDigitosCartao,
@@ -244,5 +267,54 @@ export class GestaoCartaoCliente {
       validade: cartao.validade.toISOString().substring(0, 7),
       principal: cartao.principal,
     };
+  }
+
+  /**
+   * Obtém o ID da bandeira a partir da descrição.
+   * 
+   * @param descricao - Descrição da bandeira
+   * @returns ID da bandeira ou null se não encontrada
+   */
+  private async obterIdBandeiraPorDescricao(descricao: string): Promise<number | null> {
+    // Em um cenário real, isso poderia buscar no banco de dados
+    // Por enquanto, vamos usar um mapeamento simples
+    const bandeiras: Record<string, number> = {
+      'Visa': 1,
+      'Mastercard': 2,
+      'American Express': 3,
+      'Elo': 4,
+      'Hipercard': 5,
+    };
+
+    const chaveNormalizada = descricao.toLowerCase().trim();
+    const bandeiraEncontrada = Object.entries(bandeiras).find(([nome]) => 
+      nome.toLowerCase() === chaveNormalizada
+    );
+    
+    if (bandeiraEncontrada) {
+      return bandeiraEncontrada[1];
+    }
+
+    // Tenta buscar no repositório se disponível
+    try {
+      const idBandeira = await this.repositorioCartoes.buscarIdBandeiraPorUuid(descricao);
+      return idBandeira;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Gera um token para o cartão (simulado).
+   * Em produção, isso viria do gateway de pagamento.
+   * 
+   * @param ultimosDigitos - Últimos 4 dígitos do cartão
+   * @returns Token gerado
+   */
+  private static gerarTokenCartao(ultimosDigitos: string): string {
+    // Simulação de token - em produção viria do gateway
+    const timestamp = Date.now().toString(36);
+    const random = Math.random().toString(36).substring(2, 8);
+    return `tok_${ultimosDigitos}_${timestamp}${random}`;
   }
 }

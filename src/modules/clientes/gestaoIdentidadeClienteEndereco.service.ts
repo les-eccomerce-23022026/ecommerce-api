@@ -6,6 +6,7 @@ import { IUsuario } from '@/modules/usuarios/IUsuario.entity';
 import { IRowIdSimples } from '@/shared/types/db-rows.types';
 import { GestaoEnderecoLeituras } from '@/modules/clientes/gestaoIdentidadeClienteEndereco.leituras';
 import { mapearEnderecoUsuarioParaDto } from '@/modules/clientes/gestaoIdentidadeClienteEndereco.dto.mapper';
+import { MENSAGENS_ERRO } from '@/shared/constants/mensagens-erro.constants';
 
 /**
  * Constantes de validação de negócio
@@ -265,7 +266,7 @@ export class GestaoEnderecoCliente {
     const todosEnderecos = await this.repositorioEndereco.buscarPorIdUsuario(usuario.id);
     const enderecoExistente = todosEnderecos.find((e) => e.uuid === uuidEndereco);
     if (!enderecoExistente) {
-      throw new Error('Endereço não encontrado.');
+      throw new Error(MENSAGENS_ERRO.ENDERECO_NAO_ENCONTRADO);
     }
     const [dtoAtual] = await this.converterEnderecosParaDto([enderecoExistente]);
     const ref: RefEnderecoUsuario = { current: enderecoExistente };

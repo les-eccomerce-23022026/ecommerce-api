@@ -1,5 +1,6 @@
 import { IRepositorioCartaoUsuario } from './IRepositorioCartaoUsuario';
 import { ICartaoUsuario } from '../../shared/types/ICartaoUsuario';
+import { MENSAGENS_ERRO } from '@/shared/constants/mensagens-erro.constants';
 
 export interface ICriarCartaoDto {
   uuidBandeira: string;
@@ -46,7 +47,7 @@ export class ServicoCartoes {
     // Buscar ID interno da bandeira pelo UUID público
     const idBandeira = await this.repositorioCartoes.buscarIdBandeiraPorUuid(dados.uuidBandeira);
     if (!idBandeira) {
-      throw new Error('Bandeira não encontrada.');
+      throw new Error(MENSAGENS_ERRO.BANDEIRA_NAO_ENCONTRADA);
     }
 
     const cartao = await this.repositorioCartoes.criar({
@@ -79,7 +80,7 @@ export class ServicoCartoes {
   ): Promise<ICartaoUsuario | null> {
     const cartaoExistente = await this.repositorioCartoes.buscarPorUuid(uuid);
     if (!cartaoExistente || cartaoExistente.idUsuario !== idUsuario) {
-      throw new Error('Cartão não encontrado.');
+      throw new Error(MENSAGENS_ERRO.CARTAO_NAO_ENCONTRADO);
     }
 
     // Se estiver definindo como principal, remove dos outros
@@ -93,7 +94,7 @@ export class ServicoCartoes {
     if (dados.uuidBandeira) {
       const idBandeira = await this.repositorioCartoes.buscarIdBandeiraPorUuid(dados.uuidBandeira);
       if (!idBandeira) {
-        throw new Error('Bandeira não encontrada.');
+        throw new Error(MENSAGENS_ERRO.BANDEIRA_NAO_ENCONTRADA);
       }
       payloadRepositorio.idBandeira = idBandeira;
       delete payloadRepositorio.uuidBandeira;
@@ -108,12 +109,12 @@ export class ServicoCartoes {
   async removerCartao(idUsuario: number, uuid: string): Promise<void> {
     const cartaoExistente = await this.repositorioCartoes.buscarPorUuid(uuid);
     if (!cartaoExistente || cartaoExistente.idUsuario !== idUsuario) {
-      throw new Error('Cartão não encontrado.');
+      throw new Error(MENSAGENS_ERRO.CARTAO_NAO_ENCONTRADO);
     }
 
     const removido = await this.repositorioCartoes.excluir(uuid);
     if (!removido) {
-      throw new Error('Cartão não encontrado.');
+      throw new Error(MENSAGENS_ERRO.CARTAO_NAO_ENCONTRADO);
     }
   }
 
@@ -123,7 +124,7 @@ export class ServicoCartoes {
   async definirCartaoPrincipal(uuid: string, idUsuario: number): Promise<void> {
     const definido = await this.repositorioCartoes.definirComoPrincipal(uuid, idUsuario);
     if (!definido) {
-      throw new Error('Cartão não encontrado ou não pertence ao usuário.');
+      throw new Error(MENSAGENS_ERRO.CARTAO_NAO_PERTENCE_AO_USUARIO);
     }
   }
 }
