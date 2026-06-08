@@ -32,7 +32,9 @@ export function usuarioTemPapelAdmin(usuario: { papeis?: unknown[]; role?: unkno
   if (!usuario) {
     return false;
   }
-  const temPapel = possuiPapel(usuario, PAPEL_ADMIN.descricao);
+  const temPapelAdmin = possuiPapel(usuario, PAPEL_ADMIN.descricao);
+  const temPapelAdminSistema = possuiPapel(usuario, PAPEL_ADMIN_SISTEMA.descricao);
+  const temPapel = temPapelAdmin || temPapelAdminSistema;
   if (process.env.NODE_ENV === 'test' && temPapel) {
     console.log(`[DEBUG-AUTH] Usuário TEM papel admin. Role: ${JSON.stringify(usuario.role)}, Papeis: ${JSON.stringify(usuario.papeis)}`);
   }
