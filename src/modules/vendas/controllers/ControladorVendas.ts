@@ -45,19 +45,17 @@ export class ControladorVendas {
         return;
       }
 
-      // Calcular valorTotalItens automaticamente
-      const valorTotalItens = itens.reduce((acc: number, item: any) => {
-        if (!item.livroUuid || !item.quantidade || !item.precoUnitario) {
-          throw new Error('Cada item deve conter livroUuid, quantidade e precoUnitario');
+      // Validar que cada item tem livroUuid e quantidade (preço será buscado do catálogo)
+      itens.forEach((item: any) => {
+        if (!item.livroUuid || !item.quantidade) {
+          throw new Error('Cada item deve conter livroUuid e quantidade');
         }
-        return acc + (item.quantidade * item.precoUnitario);
-      }, 0);
-
-      // Usar valorFrete fornecido ou padrão 0
+      });
+      
+      // valorTotalItens e valorTotal serão calculados pelo serviço a partir do catálogo
+      const valorTotalItens = 0;
+      const valorTotal = req.body.valorTotal || 0;
       const valorFreteFinal = valorFrete || 0;
-
-      // Usar valorTotal fornecido ou calcular automaticamente
-      const valorTotal = req.body.valorTotal !== undefined ? req.body.valorTotal : valorTotalItens + valorFreteFinal;
 
       const vInput = {
         usuarioUuid: usuarioUuidFinal,

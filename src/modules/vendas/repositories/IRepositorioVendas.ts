@@ -1,10 +1,11 @@
 import { IVendaInputDto } from '../dtos/IVenda.dto';
+import { DadoAnaliseVendas, FiltroAnaliseVendas } from '../dtos/AnaliseVendas.dto';
 
 /**
  * Interface para a entidade de Venda no domínio.
  */
 export interface IVenda {
-  id: string; // PUBLIC UUID
+  uuid: string; // PUBLIC UUID
   totalItens: number;
   frete: number;
   totalVenda: number;
@@ -15,13 +16,15 @@ export interface IVenda {
   motivoTroca?: string;
   /** Data e hora em que a entrega foi confirmada. Usada para calcular o prazo de 7 dias para troca (RN0043). */
   dataHoraEntrega?: Date;
+  /** ID interno da loja (multi-tenancy). Usado para validação de isolamento de dados por loja (RN0091). */
+  lojId?: number;
 }
 
 /**
  * Interface para a entidade de Item de Venda no domínio.
  */
 export interface IItemVenda {
-  id: string; // PUBLIC UUID
+  uuid: string; // PUBLIC UUID
   livroUuid: string;
   quantidade: number;
   precoUnitario: number;
@@ -39,7 +42,7 @@ export interface IRepositorioVendas {
   listarTodas(limite?: number): Promise<IVenda[]>;
   atualizarStatus(vendaUuid: string, novoStatus: string): Promise<void>;
 
-  /** 
+  /**
    * Registra solicitação de troca na venda e marca itens.
    * Altera status da venda para 'EM TROCA'.
    */
@@ -58,4 +61,10 @@ export interface IRepositorioVendas {
 
   /** Preço de venda ativo no catálogo para validação de integridade (U5). */
   obterPrecoVendaPorLivroUuid(livroUuid: string): Promise<number | null>;
+
+  /**
+   * Analisa vendas por categoria e período.
+   * Retorna dados agregados por categoria e mês para gráfico de linhas.
+   */
+  analiseVendasPorCategoria(filtro: FiltroAnaliseVendas): Promise<DadoAnaliseVendas[]>;
 }

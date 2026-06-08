@@ -45,6 +45,7 @@ export const VENDAS_QUERIES = {
       v.ven_uuid, v.ven_total_itens, v.ven_frete, v.ven_total_venda,
       v.ven_criado_em, v.ven_data_hora_entrega, s.stv_descricao as status,
       u.usu_uuid as "usuarioUuid", v.ven_motivo_troca as "motivoTroca",
+      v.loj_id,
       i.itv_uuid as id, i.liv_uuid as "livroUuid", i.itv_quantidade as quantidade,
       i.itv_preco_unitario as "precoUnitario", i.itv_em_troca as "emTroca"
     FROM livraria_comercial.vendas v

@@ -1,10 +1,12 @@
 /**
  * DTO para entrada de item de venda.
+ * Per rule U5: Preços validados no backend com dados do BD, não do cliente
  */
 export interface IItemVendaDto {
   livroUuid: string;
   quantidade: number;
-  precoUnitario: number;
+  /** Populado pelo serviço a partir do catálogo (não enviado pelo cliente). */
+  precoUnitario?: number;
 }
 
 /**
@@ -21,9 +23,9 @@ export interface IPagamentoSplitDto {
 export interface IVendaInputDto {
   usuarioUuid: string;
   itens: IItemVendaDto[];
-  valorTotalItens: number;
   valorFrete: number;
-  valorTotal: number;
+  /** Opcional - se não fornecido, backend calculará a partir do catálogo (regra U5). */
+  valorTotal?: number;
   /** UUID da cotação persistida no checkout (preferencial sobre valorFrete isolado). */
   cotacaoUuid?: string;
   /** Preenchido pelo serviço após resolver a cotação; usado na persistência. */
@@ -32,4 +34,6 @@ export interface IVendaInputDto {
   parcelas?: number;
   /** Lista de pagamentos split. Usado apenas para validação RN0034. */
   pagamentos?: IPagamentoSplitDto[];
+  /** Calculado pelo serviço a partir do catálogo (não enviado pelo cliente). */
+  valorTotalItens?: number;
 }

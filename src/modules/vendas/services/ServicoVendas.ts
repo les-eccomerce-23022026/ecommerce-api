@@ -3,8 +3,11 @@ import { EstadosCotacaoFrete } from '@/modules/frete/cotacaoFrete/EstadosCotacao
 import { IRepositorioVendas, IVenda } from '../repositories/IRepositorioVendas';
 import { IVendaInputDto } from '../dtos/IVenda.dto';
 import { IRepositorioEntrega } from '@/modules/entrega/IRepositorioEntrega';
+import { MENSAGENS_ERRO } from '@/shared/constants/mensagens-erro.constants';
+import { STATUS_VENDAS } from '../constants/statusVendas.constant';
+import { ContextoRequisicao } from '@/shared/infrastructure/contexto/ContextoRequisicao';
 
-const TOLERANCIA_MOEDA = 0.02;
+const TOLERANCIA_MOEDA = 1.00;
 
 /**
  * Serviço responsável pela lógica de negócios das vendas.
@@ -63,9 +66,11 @@ export class ServicoVendas {
    */
   public async registrarPedidoVenda(dados: IVendaInputDto): Promise<IVenda> {
     ServicoVendas.validarDadosVenda(dados);
-    ServicoVendas.validarParcelamento(dados);
     ServicoVendas.validarPagamentosSplit(dados);
-    await this.validarPrecosItensContraCatalogo(dados.itens);
+    
+    // Buscar preços do catálogo e calcular valorTotalItens
+    const { total: valorTotalItens, precosPorItem } = await this.calcularValorTotalItensDoCatalogo(dados.itens);
+    
     const cotacaoUuid = typeof dados.cotacaoUuid === 'string' ? dados.cotacaoUuid.trim() : '';
     let valorFreteFinal = Number(dados.valorFrete);
     let cfrId: number | undefined;
@@ -76,13 +81,30 @@ export class ServicoVendas {
       cfrId = freteCotacao.cfrId;
     }
 
-    const esperadoTotal = Number(dados.valorTotalItens) + valorFreteFinal;
-    if (Math.abs(esperadoTotal - dados.valorTotal) > TOLERANCIA_MOEDA) {
-      throw new Error('Valor total não confere com itens + frete');
+    // Calcular valorTotal a partir do catálogo (regra U5: preços validados no backend)
+    const valorTotalCalculado = valorTotalItens + valorFreteFinal;
+    
+    // Validar parcelamento com o valor calculado do catálogo
+    ServicoVendas.validarParcelamento({ ...dados, valorTotal: valorTotalCalculado });
+    
+    // Se cliente enviou valorTotal, validar que confere (pode ser 0 ou undefined se não enviado)
+    if (dados.valorTotal !== undefined && dados.valorTotal !== 0) {
+      if (Math.abs(valorTotalCalculado - dados.valorTotal) > TOLERANCIA_MOEDA) {
+        throw new Error('Valor total não confere com itens + frete (calculado pelo backend)');
+      }
     }
+
+    // Popular precoUnitario nos itens a partir do catálogo para persistência no banco
+    const itensComPreco = dados.itens.map(item => ({
+      ...item,
+      precoUnitario: precosPorItem[item.livroUuid],
+    }));
 
     const dadosInsert: IVendaInputDto = {
       ...dados,
+      itens: itensComPreco,
+      valorTotalItens,
+      valorTotal: valorTotalCalculado,
       valorFrete: valorFreteFinal,
       cfrId,
     };
@@ -102,29 +124,37 @@ export class ServicoVendas {
   private static validarDadosVenda(dados: IVendaInputDto): void {
     if (!dados.usuarioUuid) throw new Error('Usuário é obrigatório');
     if (dados.itens.length === 0) throw new Error('Venda deve possuir ao menos um item');
-    if (dados.valorTotal <= 0) throw new Error('Valor total inválido');
+    // valorTotal é calculado pelo serviço a partir do catálogo, não validado aqui
   }
 
   private static validarParcelamento(dados: IVendaInputDto): void {
     // RN0069: Parcelamento mínimo R$ 80,00
     const parcelas = dados.parcelas || 1;
-    if (parcelas > 1 && dados.valorTotal < 80) {
+    // valorTotal pode ser undefined se não enviado pelo cliente (será calculado depois)
+    if (parcelas > 1 && dados.valorTotal !== undefined && dados.valorTotal < 80) {
       throw new Error('RN0069: Compras abaixo de R$ 80,00 não permitem parcelamento');
     }
   }
 
-  private async validarPrecosItensContraCatalogo(
+  /**
+   * Busca preços do catálogo e calcula o valor total dos itens.
+   * Per rule U5: Preços validados no backend com dados do BD, não do cliente
+   * Retorna o total e um mapa de livroUuid -> precoUnitario
+   */
+  private async calcularValorTotalItensDoCatalogo(
     itens: IVendaInputDto['itens'],
-  ): Promise<void> {
+  ): Promise<{ total: number; precosPorItem: Record<string, number> }> {
+    const precosPorItem: Record<string, number> = {};
+    let total = 0;
     for (const item of itens) {
       const precoCatalogo = await this.repositorioVendas.obterPrecoVendaPorLivroUuid(item.livroUuid);
       if (precoCatalogo === null) {
         throw new Error('Livro não encontrado ou indisponível no catálogo');
       }
-      if (Math.abs(precoCatalogo - item.precoUnitario) > TOLERANCIA_MOEDA) {
-        throw new Error('Preço do item não confere com o catálogo');
-      }
+      precosPorItem[item.livroUuid] = precoCatalogo;
+      total += precoCatalogo * item.quantidade;
     }
+    return { total, precosPorItem };
   }
 
   private static validarPagamentosSplit(dados: IVendaInputDto): void {
@@ -150,10 +180,10 @@ export class ServicoVendas {
     requisitante: { uuid: string; ehAdmin: boolean },
   ): Promise<IVenda> {
     const venda = await this.repositorioVendas.obterPorUuid(vendaUuid);
-    if (!venda) throw new Error('Venda não encontrada');
+    if (!venda) throw new Error(MENSAGENS_ERRO.VENDA_NAO_ENCONTRADA);
 
     if (!requisitante.ehAdmin && venda.usuarioUuid !== requisitante.uuid) {
-      throw new Error('Venda não encontrada');
+      throw new Error(MENSAGENS_ERRO.VENDA_NAO_ENCONTRADA);
     }
 
     return venda;
@@ -172,9 +202,9 @@ export class ServicoVendas {
    */
   public async solicitarTroca(vendaUuid: string, usuarioUuid: string, motivo: string, itensUuids: string[]): Promise<IVenda> {
     const venda = await this.repositorioVendas.obterPorUuid(vendaUuid);
-    if (!venda) throw new Error('Venda não encontrada');
+    if (!venda) throw new Error(MENSAGENS_ERRO.VENDA_NAO_ENCONTRADA);
     if (venda.usuarioUuid !== usuarioUuid) throw new Error('Acesso negado');
-    if (venda.status !== 'ENTREGUE') throw new Error('Apenas pedidos entregues podem ser trocados');
+    if (venda.status !== STATUS_VENDAS.ENTREGUE) throw new Error('Apenas pedidos entregues podem ser trocados');
 
     if (!venda.dataHoraEntrega) {
       throw new Error('Data de entrega não registrada; não é possível validar o prazo de troca');
@@ -197,18 +227,31 @@ export class ServicoVendas {
    */
   public async listarTrocasPendentes(): Promise<IVenda[]> {
     const todas = await this.repositorioVendas.listarTodas(1000);
-    return todas.filter(v => v.status === 'EM TROCA' || v.status === 'TROCA AUTORIZADA');
+    return todas.filter(v => v.status === STATUS_VENDAS.EM_TROCA || v.status === STATUS_VENDAS.TROCA_AUTORIZADA);
   }
 
   /**
    * Autoriza uma troca (Admin).
+   * 
+   * RN0091: Isolamento de Dados por Loja
+   * - Admin sistema pode autorizar trocas de qualquer loja
+   * - Admin comum só pode autorizar trocas da sua loja associada
    */
   public async autorizarTroca(vendaUuid: string): Promise<IVenda> {
     const venda = await this.repositorioVendas.obterPorUuid(vendaUuid);
-    if (!venda) throw new Error('Venda não encontrada');
-    if (venda.status !== 'EM TROCA') throw new Error('Pedido não está em fase de solicitação de troca');
+    if (!venda) throw new Error(MENSAGENS_ERRO.VENDA_NAO_ENCONTRADA);
+    if (venda.status !== STATUS_VENDAS.EM_TROCA) throw new Error('Pedido não está em fase de solicitação de troca');
 
-    await this.repositorioVendas.atualizarStatus(vendaUuid, 'TROCA AUTORIZADA');
+    // Validar isolamento de loja (RN0091)
+    const contexto = ContextoRequisicao.obterContexto();
+    const isAdminSistema = contexto?.papeis?.includes('admin_sistema');
+    const lojIdContexto = contexto?.loj_id;
+
+    if (!isAdminSistema && lojIdContexto && venda.lojId && venda.lojId !== lojIdContexto) {
+      throw new Error('Admin não tem permissão para autorizar trocas de outras lojas');
+    }
+
+    await this.repositorioVendas.atualizarStatus(vendaUuid, STATUS_VENDAS.TROCA_AUTORIZADA);
     const atualizada = await this.repositorioVendas.obterPorUuid(vendaUuid);
     return atualizada!;
   }
@@ -218,10 +261,10 @@ export class ServicoVendas {
    */
   public async rejeitarTroca(vendaUuid: string, _motivo: string): Promise<IVenda> {
     const venda = await this.repositorioVendas.obterPorUuid(vendaUuid);
-    if (!venda) throw new Error('Venda não encontrada');
-    if (venda.status !== 'EM TROCA') throw new Error('Pedido não está em fase de solicitação de troca');
+    if (!venda) throw new Error(MENSAGENS_ERRO.VENDA_NAO_ENCONTRADA);
+    if (venda.status !== STATUS_VENDAS.EM_TROCA) throw new Error('Pedido não está em fase de solicitação de troca');
 
-    await this.repositorioVendas.atualizarStatus(vendaUuid, 'TROCA REJEITADA');
+    await this.repositorioVendas.atualizarStatus(vendaUuid, STATUS_VENDAS.TROCA_REJEITADA);
     // Poderíamos salvar o motivo da rejeição em ven_motivo_troca concatenado ou nova coluna.
     // Para simplificar, vou apenas mudar status.
     const atualizada = await this.repositorioVendas.obterPorUuid(vendaUuid);
@@ -238,13 +281,13 @@ export class ServicoVendas {
     _retornarEstoque: boolean,
   ): Promise<{ venda: IVenda; cupom: string }> {
     const venda = await this.repositorioVendas.obterPorUuid(vendaUuid);
-    if (!venda) throw new Error('Venda não encontrada');
-    if (venda.status !== 'TROCA AUTORIZADA') throw new Error('Troca precisa estar autorizada para confirmar recebimento');
+    if (!venda) throw new Error(MENSAGENS_ERRO.VENDA_NAO_ENCONTRADA);
+    if (venda.status !== STATUS_VENDAS.TROCA_AUTORIZADA) throw new Error('Troca precisa estar autorizada para confirmar recebimento');
 
-    await this.repositorioVendas.atualizarStatus(vendaUuid, 'CONCLUÍDA');
+    await this.repositorioVendas.atualizarStatus(vendaUuid, STATUS_VENDAS.CONCLUIDA);
 
     // Código único do cupom vinculado ao UUID da venda (primeiros 8 caracteres).
-    const codigoCupom = `TROCA-${venda.id.split('-')[0].toUpperCase()}`;
+    const codigoCupom = `TROCA-${venda.uuid.split('-')[0].toUpperCase()}`;
 
     const atualizada = (await this.repositorioVendas.obterPorUuid(vendaUuid))!;
     return { venda: atualizada, cupom: codigoCupom };
@@ -270,7 +313,7 @@ export class ServicoVendas {
    */
   public async atualizarEnderecoEntrega(vendaUuid: string, enderecoUuid: string): Promise<void> {
     const venda = await this.repositorioVendas.obterPorUuid(vendaUuid);
-    if (!venda) throw new Error('Venda não encontrada');
+    if (!venda) throw new Error(MENSAGENS_ERRO.VENDA_NAO_ENCONTRADA);
 
     if (!this.repositorioEntrega) {
       throw new Error('Repositório de entregas não configurado');

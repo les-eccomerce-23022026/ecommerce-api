@@ -5,6 +5,9 @@ import { IVendaInputDto } from '@/modules/vendas/dtos/IVenda.dto';
 import { STATUS_VENDAS } from '@/modules/vendas/constants/statusVendas.constant';
 import { ContextoRequisicao } from '@/shared/infrastructure/contexto/ContextoRequisicao';
 import { VENDAS_QUERIES } from '@/modules/vendas/repositories/vendas.queries';
+import { DadoAnaliseVendas, FiltroAnaliseVendas } from '@/modules/vendas/dtos/AnaliseVendas.dto';
+import { ANALISE_VENDAS_POR_CATEGORIA } from '@/modules/vendas/repositories/analise-vendas.queries';
+import { MENSAGENS_ERRO } from '@/shared/constants/mensagens-erro.constants';
 
 /**
  * Implementação do repositório de vendas para PostgreSQL.
@@ -29,7 +32,7 @@ export class RepositorioVendasPostgres implements IRepositorioVendas {
     const usuRes = await this.db.executar<{ usu_id: number }>(VENDAS_QUERIES.SELECT_USUARIO_POR_UUID, [dados.usuarioUuid]);
 
     if (usuRes.length === 0) {
-      throw new Error('Usuário não encontrado');
+      throw new Error(MENSAGENS_ERRO.USUARIO_NAO_ENCONTRADO);
     }
     const usuId = usuRes[0].usu_id;
 
@@ -83,7 +86,7 @@ export class RepositorioVendasPostgres implements IRepositorioVendas {
 
       const itemRows = await this.db.executar<{ itv_uuid: string }>(itemQuery, itemValues);
       return {
-        id: itemRows[0].itv_uuid,
+        uuid: itemRows[0].itv_uuid,
         livroUuid: item.livroUuid,
         quantidade: item.quantidade,
         precoUnitario: item.precoUnitario,
@@ -94,7 +97,7 @@ export class RepositorioVendasPostgres implements IRepositorioVendas {
 
     return {
       venda: {
-        id: vendaRow.ven_uuid as string,
+        uuid: vendaRow.ven_uuid as string,
         usuarioUuid: dados.usuarioUuid,
         status: STATUS_VENDAS.EM_PROCESSAMENTO,
         totalItens: Number(dados.valorTotalItens),
@@ -108,13 +111,16 @@ export class RepositorioVendasPostgres implements IRepositorioVendas {
   }
 
   public async obterPorUuid(uuid: string): Promise<IVenda | null> {
+    // Para operações de admin, não filtrar por loj_id (permite acesso cross-loja)
     const loj_id = this.obterLojId();
     let query = VENDAS_QUERIES.SELECT_VENDA_POR_UUID;
     
     const parametros: DbParametro[] = [uuid];
 
-    // Se multi-tenancy estiver habilitado, filtrar por loj_id
-    if (loj_id) {
+    // Se multi-tenancy estiver habilitado e não for admin de sistema, filtrar por loj_id
+    // Admin de sistema pode acessar vendas de qualquer loja
+    const isAdminSistema = ContextoRequisicao.obterContexto()?.papeis?.includes('admin_sistema');
+    if (loj_id && !isAdminSistema) {
       query += VENDAS_QUERIES.FILTRO_LOJ_ID;
       parametros.push(loj_id);
     }
@@ -123,6 +129,7 @@ export class RepositorioVendasPostgres implements IRepositorioVendas {
       ven_uuid: string; ven_total_itens: number; ven_frete: number;
       ven_total_venda: number; ven_criado_em: string; ven_data_hora_entrega: string | null;
       status: string; usuarioUuid: string; motivoTroca: string | null;
+      loj_id: number;
       id: string | null; livroUuid: string | null; quantidade: number | null;
       precoUnitario: number | null; emTroca: boolean | null;
     }>(query, parametros);
@@ -135,7 +142,7 @@ export class RepositorioVendasPostgres implements IRepositorioVendas {
     const itens = rows
       .filter((row) => row.id !== null)
       .map((i) => ({
-        id: i.id!,
+        uuid: i.id!,
         livroUuid: i.livroUuid!,
         quantidade: Number(i.quantidade),
         precoUnitario: Number(i.precoUnitario),
@@ -143,7 +150,7 @@ export class RepositorioVendasPostgres implements IRepositorioVendas {
       }));
 
     return {
-      id: v.ven_uuid,
+      uuid: v.ven_uuid,
       usuarioUuid: v.usuarioUuid,
       status: v.status,
       totalItens: Number(v.ven_total_itens),
@@ -152,6 +159,7 @@ export class RepositorioVendasPostgres implements IRepositorioVendas {
       criadoEm: new Date(v.ven_criado_em),
       dataHoraEntrega: v.ven_data_hora_entrega ? new Date(v.ven_data_hora_entrega) : undefined,
       motivoTroca: v.motivoTroca || undefined,
+      lojId: v.loj_id,
       itens,
     };
   }
@@ -195,7 +203,7 @@ export class RepositorioVendasPostgres implements IRepositorioVendas {
     rows.forEach((row) => {
       if (!mapaVendas.has(row.ven_uuid)) {
         mapaVendas.set(row.ven_uuid, {
-          id: row.ven_uuid,
+          uuid: row.ven_uuid,
           usuarioUuid: row.usuarioUuid,
           status: row.status,
           totalItens: Number(row.ven_total_itens),
@@ -212,7 +220,7 @@ export class RepositorioVendasPostgres implements IRepositorioVendas {
       if (row.itv_id) {
         const venda = mapaVendas.get(row.ven_uuid)!;
         venda.itens.push({
-          id: row.itv_id,
+          uuid: row.itv_id,
           livroUuid: row.itv_livroUuid!,
           quantidade: Number(row.itv_quantidade),
           precoUnitario: Number(row.itv_precoUnitario),
@@ -257,7 +265,7 @@ export class RepositorioVendasPostgres implements IRepositorioVendas {
     rows.forEach((row) => {
       if (!mapaVendas.has(row.ven_uuid)) {
         mapaVendas.set(row.ven_uuid, {
-          id: row.ven_uuid,
+          uuid: row.ven_uuid,
           usuarioUuid: row.usuarioUuid,
           status: row.status,
           totalItens: Number(row.ven_total_itens),
@@ -274,7 +282,7 @@ export class RepositorioVendasPostgres implements IRepositorioVendas {
       if (row.itv_id) {
         const venda = mapaVendas.get(row.ven_uuid)!;
         venda.itens.push({
-          id: row.itv_id,
+          uuid: row.itv_id,
           livroUuid: row.itv_livroUuid!,
           quantidade: Number(row.itv_quantidade),
           precoUnitario: Number(row.itv_precoUnitario),
@@ -335,5 +343,28 @@ export class RepositorioVendasPostgres implements IRepositorioVendas {
       return null;
     }
     return Number(rows[0].preco);
+  }
+
+  public async analiseVendasPorCategoria(filtro: FiltroAnaliseVendas): Promise<DadoAnaliseVendas[]> {
+    const lojId = this.obterLojId() ?? 4; // Loja Padrão como fallback
+
+    const params: DbParametro[] = [
+      filtro.dataInicio,
+      filtro.dataFim,
+      lojId,
+      filtro.categorias ?? null,
+    ];
+
+    const rows = await this.db.executar<{
+      categoria: string;
+      mes: Date;
+      quantidade: string;
+    }>(ANALISE_VENDAS_POR_CATEGORIA, params);
+
+    return rows.map(row => ({
+      categoria: row.categoria,
+      mes: row.mes,
+      quantidade: parseInt(row.quantidade, 10),
+    }));
   }
 }
