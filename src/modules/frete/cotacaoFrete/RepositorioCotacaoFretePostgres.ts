@@ -44,6 +44,12 @@ export class RepositorioCotacaoFretePostgres implements IRepositorioCotacaoFrete
     return CotacaoFreteMapper.mapearParaEntidade(rows[0] as Record<string, unknown>);
   }
 
+  public async vincularVenda(cfrUuid: string, venId: number): Promise<void> {
+    await this.db.executar(COTACAO_FRETE_QUERIES.VINCULAR_VENDA, [
+      venId, cfrUuid, EstadosCotacaoFrete.CRIADA,
+    ]);
+  }
+
   public async marcarConsumida(cfrUuid: string, venId: number): Promise<void> {
     await this.db.executar(COTACAO_FRETE_QUERIES.MARCAR_CONSUMIDA, [
       EstadosCotacaoFrete.CONSUMIDA, venId, cfrUuid, EstadosCotacaoFrete.CRIADA,
