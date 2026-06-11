@@ -27,8 +27,14 @@ export function registrarRotasVendas(router: Router): void {
   router.get('/vendas/:uuid', autenticacaoMiddleware, controller.visualizarDetalhesVenda);
   router.get('/minhas-vendas', autenticacaoMiddleware, controller.listarVendasCliente);
 
+  // Confirmação de recebimento pelo cliente
+  router.patch('/vendas/:uuid/confirmar-entrega', autenticacaoMiddleware, controller.confirmarRecebimentoCliente);
+
   // Trocas (Cliente)
   router.post('/vendas/:uuid/troca', autenticacaoMiddleware, controller.solicitarTroca);
+
+  // Devoluções (Cliente)
+  router.post('/vendas/:uuid/devolucao', autenticacaoMiddleware, controller.solicitarDevolucao);
 
   // Trocas (Admin)
   // contextoLojaMiddleware removido para permitir que admin_sistema acesse vendas de qualquer loja
@@ -36,6 +42,12 @@ export function registrarRotasVendas(router: Router): void {
   router.patch('/admin/pedidos/:uuid/autorizar-troca', autenticacaoMiddleware, adminOnlyMiddleware, controller.autorizarTroca);
   router.patch('/admin/pedidos/:uuid/rejeitar-troca', autenticacaoMiddleware, adminOnlyMiddleware, controller.rejeitarTroca);
   router.patch('/admin/pedidos/:uuid/confirmar-recebimento', autenticacaoMiddleware, adminOnlyMiddleware, controller.confirmarRecebimentoTroca);
+
+  // Devoluções (Admin)
+  router.get('/admin/pedidos/devolucoes', autenticacaoMiddleware, adminOnlyMiddleware, controller.listarDevolucoesPendentes);
+  router.patch('/admin/pedidos/:uuid/autorizar-devolucao', autenticacaoMiddleware, adminOnlyMiddleware, controller.autorizarDevolucao);
+  router.patch('/admin/pedidos/:uuid/rejeitar-devolucao', autenticacaoMiddleware, adminOnlyMiddleware, controller.rejeitarDevolucao);
+  router.patch('/admin/pedidos/:uuid/confirmar-recebimento-devolucao', autenticacaoMiddleware, adminOnlyMiddleware, controller.confirmarRecebimentoDevolucao);
 
   // Atualizar endereço de entrega (para redespacho após falha)
   router.put('/vendas/:uuid/endereco-entrega', autenticacaoMiddleware, controller.atualizarEnderecoEntrega);

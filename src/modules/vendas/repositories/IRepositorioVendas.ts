@@ -16,6 +16,8 @@ export interface IVenda {
   motivoTroca?: string;
   /** Data e hora em que a entrega foi confirmada. Usada para calcular o prazo de 7 dias para troca (RN0043). */
   dataHoraEntrega?: Date;
+  /** Data prevista de entrega calculada no despacho. Usada para auto-confirmação e exibição ao cliente. */
+  dataPrevistaEntrega?: Date;
   /** ID interno da loja (multi-tenancy). Usado para validação de isolamento de dados por loja (RN0091). */
   lojId?: number;
 }
@@ -49,6 +51,12 @@ export interface IRepositorioVendas {
   registrarSolicitacaoTroca(vendaUuid: string, motivo: string, itensUuids: string[]): Promise<void>;
 
   /**
+   * Registra solicitação de devolução na venda e marca itens.
+   * Altera status da venda para 'EM DEVOLUÇÃO'.
+   */
+  registrarSolicitacaoDevolucao(vendaUuid: string, motivo: string, itensUuids: string[]): Promise<void>;
+
+  /**
    * Obtém o e-mail do usuário vinculado a uma venda.
    */
   obterEmailUsuarioPorVenda(vendaUuid: string): Promise<string | null>;
@@ -67,4 +75,13 @@ export interface IRepositorioVendas {
    * Retorna dados agregados por categoria e mês para gráfico de linhas.
    */
   analiseVendasPorCategoria(filtro: FiltroAnaliseVendas): Promise<DadoAnaliseVendas[]>;
+
+  /** Persiste a data prevista de entrega calculada no despacho. */
+  salvarDataPrevistaEntrega(vendaUuid: string, data: Date): Promise<void>;
+
+  /**
+   * Lista UUIDs de vendas em trânsito cuja data prevista de entrega já passou.
+   * Usado pelo job de auto-confirmação de entrega.
+   */
+  listarVendasEmTransitoComPrazoVencido(): Promise<string[]>;
 }

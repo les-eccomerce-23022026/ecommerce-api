@@ -112,10 +112,10 @@ export class ControladorVendas {
 
       const vendas = await this.servicoVendas.listarVendasCliente(usuarioUuid);
       
-      // Mapear dataHoraEntrega para dataEntrega para compatibilidade com frontend
       const vendasMapeadas = vendas.map((venda) => ({
         ...venda,
         dataEntrega: venda.dataHoraEntrega ? venda.dataHoraEntrega.toISOString() : undefined,
+        dataPrevistaEntrega: venda.dataPrevistaEntrega ? venda.dataPrevistaEntrega.toISOString() : undefined,
       }));
       
       res.json(vendasMapeadas);
@@ -156,6 +156,18 @@ export class ControladorVendas {
   };
 
   /**
+   * Listar devoluções pendentes: GET /admin/pedidos/devolucoes
+   */
+  public listarDevolucoesPendentes = async (_req: Request, res: Response) => {
+    try {
+      const devolucoes = await this.servicoVendas.listarDevolucoesPendentes();
+      res.json(devolucoes);
+    } catch (err: unknown) {
+      res.status(400).json({ erro: (err as Error).message });
+    }
+  };
+
+  /**
    * Autorizar troca: PUT /admin/pedidos/:uuid/autorizar-troca
    */
   public autorizarTroca = async (req: Request, res: Response) => {
@@ -177,6 +189,69 @@ export class ControladorVendas {
       const { motivo } = req.body;
       const venda = await this.servicoVendas.rejeitarTroca(uuid, motivo);
       res.json(venda);
+    } catch (err: unknown) {
+      res.status(400).json({ erro: (err as Error).message });
+    }
+  };
+
+  /**
+   * Solicitar devolução: POST /vendas/:uuid/devolucao
+   */
+  public solicitarDevolucao = async (req: Request, res: Response) => {
+    try {
+      const { uuid } = req.params;
+      const { motivo, itensUuids } = req.body;
+      const usuarioUuid = req.usuario?.uuid;
+      if (!usuarioUuid) throw new Error('Não autenticado');
+
+      const venda = await this.servicoVendas.solicitarDevolucao(uuid, usuarioUuid, motivo, itensUuids);
+      res.json(venda);
+    } catch (err: unknown) {
+      res.status(400).json({ erro: (err as Error).message });
+    }
+  };
+
+  /**
+   * Autorizar devolução: PUT /admin/pedidos/:uuid/autorizar-devolucao
+   */
+  public autorizarDevolucao = async (req: Request, res: Response) => {
+    try {
+      const { uuid } = req.params;
+      const venda = await this.servicoVendas.autorizarDevolucao(uuid);
+      res.json(venda);
+    } catch (err: unknown) {
+      res.status(400).json({ erro: (err as Error).message });
+    }
+  };
+
+  /**
+   * Rejeitar devolução: PUT /admin/pedidos/:uuid/rejeitar-devolucao
+   */
+  public rejeitarDevolucao = async (req: Request, res: Response) => {
+    try {
+      const { uuid } = req.params;
+      const { motivo } = req.body;
+      const venda = await this.servicoVendas.rejeitarDevolucao(uuid, motivo);
+      res.json(venda);
+    } catch (err: unknown) {
+      res.status(400).json({ erro: (err as Error).message });
+    }
+  };
+
+  /**
+   * Confirmar recebimento de devolução: PUT /admin/pedidos/:uuid/confirmar-recebimento-devolucao
+   */
+  public confirmarRecebimentoDevolucao = async (req: Request, res: Response) => {
+    try {
+      const { uuid } = req.params;
+      const { retornarEstoque } = req.body;
+
+      const { venda, reembolsoProcessado } = await this.servicoVendas.confirmarRecebimentoDevolucao(
+        uuid,
+        Boolean(retornarEstoque),
+      );
+
+      res.json({ pedido: venda, reembolsoProcessado });
     } catch (err: unknown) {
       res.status(400).json({ erro: (err as Error).message });
     }
@@ -244,6 +319,32 @@ export class ControladorVendas {
       const { uuid } = req.params;
       await this.servicoVendas.atualizarStatus(uuid, 'Entregue');
       res.json({ status: 'Entregue' });
+    } catch (err: unknown) {
+      res.status(400).json({ erro: (err as Error).message });
+    }
+  };
+
+  /**
+   * Confirmação de recebimento pelo cliente: PATCH /vendas/:uuid/confirmar-entrega
+   * Busca a entrega mais recente da venda e confirma o recebimento.
+   */
+  public confirmarRecebimentoCliente = async (req: Request, res: Response) => {
+    try {
+      const { uuid } = req.params;
+
+      if (!this.repoEntrega) {
+        res.status(501).json({ erro: 'Módulo de entrega não configurado.' });
+        return;
+      }
+
+      const entregas = await this.repoEntrega.listarPorVendaUuid(uuid);
+      if (entregas.length === 0) {
+        res.status(404).json({ erro: 'Nenhuma entrega encontrada para este pedido.' });
+        return;
+      }
+
+      await this.servicoVendas.atualizarStatus(uuid, 'ENTREGUE');
+      res.status(204).send();
     } catch (err: unknown) {
       res.status(400).json({ erro: (err as Error).message });
     }

@@ -111,8 +111,10 @@ export class ServicoVendas {
 
     const { venda, venId } = await this.repositorioVendas.cadastrar(dadosInsert);
 
+    // Vincular a cotação à venda (sem consumir ainda) para evitar reutilização
+    // e permitir recuperação caso o pagamento falhe.
     if (dados.cotacaoUuid && this.repositorioCotacaoFrete) {
-      await this.repositorioCotacaoFrete.marcarConsumida(dados.cotacaoUuid, venId);
+      await this.repositorioCotacaoFrete.vincularVenda(dados.cotacaoUuid, venId);
     }
 
     return venda;
@@ -210,10 +212,20 @@ export class ServicoVendas {
       throw new Error('Data de entrega não registrada; não é possível validar o prazo de troca');
     }
 
-    // RN0043: Prazo de arrependimento — 7 dias a partir da data de entrega confirmada
-    const SETE_DIAS_EM_MS = 7 * 24 * 60 * 60 * 1000;
-    const dataLimite = new Date(venda.dataHoraEntrega.getTime() + SETE_DIAS_EM_MS);
-    if (new Date() > dataLimite) {
+    // RN0043: Prazo de arrependimento — 7 dias corridos a partir da data de entrega confirmada
+    const dataEntrega = new Date(venda.dataHoraEntrega);
+    const hoje = new Date();
+    
+    // Normalizar para meia-noite para calcular dias corridos corretamente
+    const dataEntregaNormalizada = new Date(dataEntrega);
+    dataEntregaNormalizada.setHours(0, 0, 0, 0);
+    
+    const hojeNormalizado = new Date(hoje);
+    hojeNormalizado.setHours(0, 0, 0, 0);
+    
+    const diffDias = Math.floor((hojeNormalizado.getTime() - dataEntregaNormalizada.getTime()) / (1000 * 60 * 60 * 24));
+    
+    if (diffDias >= 7) {
       throw new Error('Prazo de 7 dias para troca expirado');
     }
 
@@ -228,6 +240,14 @@ export class ServicoVendas {
   public async listarTrocasPendentes(): Promise<IVenda[]> {
     const todas = await this.repositorioVendas.listarTodas(1000);
     return todas.filter(v => v.status === STATUS_VENDAS.EM_TROCA || v.status === STATUS_VENDAS.TROCA_AUTORIZADA);
+  }
+
+  /**
+   * Lista vendas com solicitação de devolução (Admin).
+   */
+  public async listarDevolucoesPendentes(): Promise<IVenda[]> {
+    const todas = await this.repositorioVendas.listarTodas(1000);
+    return todas.filter(v => v.status === STATUS_VENDAS.EM_DEVOLUCAO || v.status === STATUS_VENDAS.DEVOLUCAO_AUTORIZADA);
   }
 
   /**
@@ -269,6 +289,101 @@ export class ServicoVendas {
     // Para simplificar, vou apenas mudar status.
     const atualizada = await this.repositorioVendas.obterPorUuid(vendaUuid);
     return atualizada!;
+  }
+
+  /**
+   * Solicita devolução de itens de uma venda.
+   * RN0043: prazo de 7 dias contados a partir da data de entrega confirmada.
+   */
+  public async solicitarDevolucao(vendaUuid: string, usuarioUuid: string, motivo: string, itensUuids: string[]): Promise<IVenda> {
+    const venda = await this.repositorioVendas.obterPorUuid(vendaUuid);
+    if (!venda) throw new Error(MENSAGENS_ERRO.VENDA_NAO_ENCONTRADA);
+    if (venda.usuarioUuid !== usuarioUuid) throw new Error('Acesso negado');
+    if (venda.status !== STATUS_VENDAS.ENTREGUE) throw new Error('Apenas pedidos entregues podem ser devolvidos');
+
+    if (!venda.dataHoraEntrega) {
+      throw new Error('Data de entrega não registrada; não é possível validar o prazo de devolução');
+    }
+
+    // RN0043: Prazo de arrependimento — 7 dias corridos a partir da data de entrega confirmada
+    const dataEntrega = new Date(venda.dataHoraEntrega);
+    const hoje = new Date();
+    
+    // Normalizar para meia-noite para calcular dias corridos corretamente
+    const dataEntregaNormalizada = new Date(dataEntrega);
+    dataEntregaNormalizada.setHours(0, 0, 0, 0);
+    
+    const hojeNormalizado = new Date(hoje);
+    hojeNormalizado.setHours(0, 0, 0, 0);
+    
+    const diffDias = Math.floor((hojeNormalizado.getTime() - dataEntregaNormalizada.getTime()) / (1000 * 60 * 60 * 24));
+    
+    if (diffDias >= 7) {
+      throw new Error('Prazo de 7 dias para devolução expirado');
+    }
+
+    await this.repositorioVendas.registrarSolicitacaoDevolucao(vendaUuid, motivo, itensUuids);
+    const atualizada = await this.repositorioVendas.obterPorUuid(vendaUuid);
+    return atualizada!;
+  }
+
+  /**
+   * Autoriza uma devolução (Admin).
+   * 
+   * RN0091: Isolamento de Dados por Loja
+   * - Admin sistema pode autorizar devoluções de qualquer loja
+   * - Admin comum só pode autorizar devoluções da sua loja associada
+   */
+  public async autorizarDevolucao(vendaUuid: string): Promise<IVenda> {
+    const venda = await this.repositorioVendas.obterPorUuid(vendaUuid);
+    if (!venda) throw new Error(MENSAGENS_ERRO.VENDA_NAO_ENCONTRADA);
+    if (venda.status !== STATUS_VENDAS.EM_DEVOLUCAO) throw new Error('Pedido não está em fase de solicitação de devolução');
+
+    // Validar isolamento de loja (RN0091)
+    const contexto = ContextoRequisicao.obterContexto();
+    const isAdminSistema = contexto?.papeis?.includes('admin_sistema');
+    const lojIdContexto = contexto?.loj_id;
+
+    if (!isAdminSistema && lojIdContexto && venda.lojId && venda.lojId !== lojIdContexto) {
+      throw new Error('Admin não tem permissão para autorizar devoluções de outras lojas');
+    }
+
+    await this.repositorioVendas.atualizarStatus(vendaUuid, STATUS_VENDAS.DEVOLUCAO_AUTORIZADA);
+    const atualizada = await this.repositorioVendas.obterPorUuid(vendaUuid);
+    return atualizada!;
+  }
+
+  /**
+   * Rejeita uma devolução (Admin).
+   */
+  public async rejeitarDevolucao(vendaUuid: string, _motivo: string): Promise<IVenda> {
+    const venda = await this.repositorioVendas.obterPorUuid(vendaUuid);
+    if (!venda) throw new Error(MENSAGENS_ERRO.VENDA_NAO_ENCONTRADA);
+    if (venda.status !== STATUS_VENDAS.EM_DEVOLUCAO) throw new Error('Pedido não está em fase de solicitação de devolução');
+
+    await this.repositorioVendas.atualizarStatus(vendaUuid, STATUS_VENDAS.DEVOLUCAO_REJEITADA);
+    const atualizada = await this.repositorioVendas.obterPorUuid(vendaUuid);
+    return atualizada!;
+  }
+
+  /**
+   * Confirma recebimento da devolução (Admin).
+   * Atualiza status para 'CONCLUÍDA' e processa o reembolso.
+   */
+  public async confirmarRecebimentoDevolucao(
+    vendaUuid: string,
+    _retornarEstoque: boolean,
+  ): Promise<{ venda: IVenda; reembolsoProcessado: boolean }> {
+    const venda = await this.repositorioVendas.obterPorUuid(vendaUuid);
+    if (!venda) throw new Error(MENSAGENS_ERRO.VENDA_NAO_ENCONTRADA);
+    if (venda.status !== STATUS_VENDAS.DEVOLUCAO_AUTORIZADA) throw new Error('Devolução precisa estar autorizada para confirmar recebimento');
+
+    await this.repositorioVendas.atualizarStatus(vendaUuid, STATUS_VENDAS.CONCLUIDA);
+
+    // TODO: Implementar lógica de reembolso através do módulo de pagamentos
+    // Por enquanto, apenas marcamos como processado
+    const atualizada = (await this.repositorioVendas.obterPorUuid(vendaUuid))!;
+    return { venda: atualizada, reembolsoProcessado: false };
   }
 
   /**

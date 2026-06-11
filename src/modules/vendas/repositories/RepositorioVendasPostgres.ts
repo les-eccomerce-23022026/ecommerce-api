@@ -128,6 +128,7 @@ export class RepositorioVendasPostgres implements IRepositorioVendas {
     const rows = await this.db.executar<{
       ven_uuid: string; ven_total_itens: number; ven_frete: number;
       ven_total_venda: number; ven_criado_em: string; ven_data_hora_entrega: string | null;
+      ven_data_prevista_entrega: string | null;
       status: string; usuarioUuid: string; motivoTroca: string | null;
       loj_id: number;
       id: string | null; livroUuid: string | null; quantidade: number | null;
@@ -145,7 +146,7 @@ export class RepositorioVendasPostgres implements IRepositorioVendas {
         uuid: i.id!,
         livroUuid: i.livroUuid!,
         quantidade: Number(i.quantidade),
-        precoUnitario: Number(i.precoUnitario),
+        precoUnitario: i.precoUnitario !== null ? Number(i.precoUnitario) : 0,
         emTroca: i.emTroca!,
       }));
 
@@ -158,6 +159,7 @@ export class RepositorioVendasPostgres implements IRepositorioVendas {
       totalVenda: Number(v.ven_total_venda),
       criadoEm: new Date(v.ven_criado_em),
       dataHoraEntrega: v.ven_data_hora_entrega ? new Date(v.ven_data_hora_entrega) : undefined,
+      dataPrevistaEntrega: v.ven_data_prevista_entrega ? new Date(v.ven_data_prevista_entrega) : undefined,
       motivoTroca: v.motivoTroca || undefined,
       lojId: v.loj_id,
       itens,
@@ -169,6 +171,14 @@ export class RepositorioVendasPostgres implements IRepositorioVendas {
 
     if (itensUuids.length > 0) {
       await this.db.executar(VENDAS_QUERIES.UPDATE_ITENS_TROCA, [itensUuids]);
+    }
+  }
+
+  public async registrarSolicitacaoDevolucao(vendaUuid: string, motivo: string, itensUuids: string[]): Promise<void> {
+    await this.db.executar(VENDAS_QUERIES.UPDATE_SolicitacaoDevolucao, [motivo, STATUS_VENDAS.EM_DEVOLUCAO, vendaUuid]);
+
+    if (itensUuids.length > 0) {
+      await this.db.executar(VENDAS_QUERIES.UPDATE_ITENS_DEVOLUCAO, [itensUuids]);
     }
   }
 
@@ -191,6 +201,7 @@ export class RepositorioVendasPostgres implements IRepositorioVendas {
     const rows = await this.db.executar<{
       ven_uuid: string; ven_total_itens: number; ven_frete: number;
       ven_total_venda: number; ven_criado_em: string; ven_data_hora_entrega: string | null;
+      ven_data_prevista_entrega: string | null;
       status: string; usuarioUuid: string; motivoTroca: string | null;
       itv_id: string | null; itv_livroUuid: string | null;
       itv_quantidade: number | null; itv_precoUnitario: number | null; itv_emTroca: boolean | null;
@@ -199,7 +210,7 @@ export class RepositorioVendasPostgres implements IRepositorioVendas {
 
     // Agrupar itens por venda
     const mapaVendas = new Map<string, IVenda>();
-    
+
     rows.forEach((row) => {
       if (!mapaVendas.has(row.ven_uuid)) {
         mapaVendas.set(row.ven_uuid, {
@@ -211,6 +222,7 @@ export class RepositorioVendasPostgres implements IRepositorioVendas {
           totalVenda: Number(row.ven_total_venda),
           criadoEm: new Date(row.ven_criado_em),
           dataHoraEntrega: row.ven_data_hora_entrega ? new Date(row.ven_data_hora_entrega) : undefined,
+          dataPrevistaEntrega: row.ven_data_prevista_entrega ? new Date(row.ven_data_prevista_entrega) : undefined,
           motivoTroca: row.motivoTroca || undefined,
           itens: [],
         });
@@ -223,7 +235,7 @@ export class RepositorioVendasPostgres implements IRepositorioVendas {
           uuid: row.itv_id,
           livroUuid: row.itv_livroUuid!,
           quantidade: Number(row.itv_quantidade),
-          precoUnitario: Number(row.itv_precoUnitario),
+          precoUnitario: row.itv_precoUnitario !== null ? Number(row.itv_precoUnitario) : 0,
           emTroca: row.itv_emTroca!,
         });
       }
@@ -285,7 +297,7 @@ export class RepositorioVendasPostgres implements IRepositorioVendas {
           uuid: row.itv_id,
           livroUuid: row.itv_livroUuid!,
           quantidade: Number(row.itv_quantidade),
-          precoUnitario: Number(row.itv_precoUnitario),
+          precoUnitario: row.itv_precoUnitario !== null ? Number(row.itv_precoUnitario) : 0,
           emTroca: row.itv_emTroca!,
         });
       }
@@ -343,6 +355,18 @@ export class RepositorioVendasPostgres implements IRepositorioVendas {
       return null;
     }
     return Number(rows[0].preco);
+  }
+
+  public async salvarDataPrevistaEntrega(vendaUuid: string, data: Date): Promise<void> {
+    await this.db.executar(VENDAS_QUERIES.UPDATE_DATA_PREVISTA_ENTREGA, [data, vendaUuid]);
+  }
+
+  public async listarVendasEmTransitoComPrazoVencido(): Promise<string[]> {
+    const rows = await this.db.executar<{ ven_uuid: string }>(
+      VENDAS_QUERIES.SELECT_VENDAS_TRANSITO_PRAZO_VENCIDO,
+      [],
+    );
+    return rows.map((r) => r.ven_uuid);
   }
 
   public async analiseVendasPorCategoria(filtro: FiltroAnaliseVendas): Promise<DadoAnaliseVendas[]> {

@@ -41,9 +41,10 @@ export const VENDAS_QUERIES = {
   INSERT_ITEM_VENDA_RETORNO: `) RETURNING itv_uuid`,
   
   SELECT_VENDA_POR_UUID: `
-    SELECT 
+    SELECT
       v.ven_uuid, v.ven_total_itens, v.ven_frete, v.ven_total_venda,
-      v.ven_criado_em, v.ven_data_hora_entrega, s.stv_descricao as status,
+      v.ven_criado_em, v.ven_data_hora_entrega, v.ven_data_prevista_entrega,
+      s.stv_descricao as status,
       u.usu_uuid as "usuarioUuid", v.ven_motivo_troca as "motivoTroca",
       v.loj_id,
       i.itv_uuid as id, i.liv_uuid as "livroUuid", i.itv_quantidade as quantidade,
@@ -58,11 +59,12 @@ export const VENDAS_QUERIES = {
   FILTRO_LOJ_ID: ` AND v.loj_id = $2`,
   
   SELECT_VENDAS_POR_USUARIO: `
-    SELECT 
+    SELECT
       v.ven_uuid, v.ven_total_itens, v.ven_frete, v.ven_total_venda,
-      v.ven_criado_em, v.ven_data_hora_entrega, s.stv_descricao as status,
+      v.ven_criado_em, v.ven_data_hora_entrega, v.ven_data_prevista_entrega,
+      s.stv_descricao as status,
       u.usu_uuid as "usuarioUuid", v.ven_motivo_troca as "motivoTroca",
-      i.itv_uuid as "itv_id", i.liv_uuid as "itv_livroUuid", 
+      i.itv_uuid as "itv_id", i.liv_uuid as "itv_livroUuid",
       i.itv_quantidade as "itv_quantidade", i.itv_preco_unitario as "itv_precoUnitario",
       i.itv_em_troca as "itv_emTroca"
     FROM livraria_comercial.vendas v
@@ -103,6 +105,20 @@ export const VENDAS_QUERIES = {
     SET itv_em_troca = TRUE, itv_atualizado_em = NOW()
     WHERE itv_uuid = ANY($1::uuid[])
   `,
+
+  UPDATE_SolicitacaoDevolucao: `
+    UPDATE livraria_comercial.vendas 
+    SET ven_motivo_troca = $1, 
+        stv_id = (SELECT stv_id FROM livraria_comercial.status_venda WHERE stv_descricao = $2),
+        ven_atualizado_em = NOW()
+    WHERE ven_uuid = $3
+  `,
+  
+  UPDATE_ITENS_DEVOLUCAO: `
+    UPDATE livraria_comercial.itens_venda
+    SET itv_em_troca = TRUE, itv_atualizado_em = NOW()
+    WHERE itv_uuid = ANY($1::uuid[])
+  `,
   
   UPDATE_STATUS_ENTREGUE: `
     UPDATE livraria_comercial.vendas SET stv_id = $1, ven_atualizado_em = NOW(), ven_data_hora_entrega = NOW() WHERE ven_uuid = $2
@@ -117,5 +133,20 @@ export const VENDAS_QUERIES = {
     FROM livraria_comercial.vendas v
     JOIN livraria_gestao.usuarios u ON v.usu_id = u.usu_id
     WHERE v.ven_uuid = $1
+  `,
+
+  UPDATE_DATA_PREVISTA_ENTREGA: `
+    UPDATE livraria_comercial.vendas
+    SET ven_data_prevista_entrega = $1, ven_atualizado_em = NOW()
+    WHERE ven_uuid = $2
+  `,
+
+  SELECT_VENDAS_TRANSITO_PRAZO_VENCIDO: `
+    SELECT v.ven_uuid
+    FROM livraria_comercial.vendas v
+    JOIN livraria_comercial.status_venda s ON v.stv_id = s.stv_id
+    WHERE s.stv_descricao = 'EM TRÂNSITO'
+      AND v.ven_data_prevista_entrega IS NOT NULL
+      AND v.ven_data_prevista_entrega < NOW()
   `,
 };
