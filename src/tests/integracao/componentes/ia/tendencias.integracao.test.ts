@@ -23,7 +23,7 @@ import { obterTokenClienteParaIa, postIaChat } from '@/tests/helpers/ia-integrac
 import type {
   ITendenciaCategoriaContexto,
   ITendenciaFaixaEtariaContexto,
-} from '@/modules/ia/domain/entities/IContextoRecomendacao.entity';
+} from '@/modules/ia/IContextoRecomendacao.entity';
 
 /** Intenção de tendências sem filtro de categoria (consulta geral). */
 const intencaoTendenciasGeral = {

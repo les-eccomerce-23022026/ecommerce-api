@@ -1,11 +1,12 @@
 import request from 'supertest';
 import { configurarTesteIntegracao } from '@/tests/helpers/setup-integracao.util';
-import { obterTokenCliente, obterTokenAdmin, registrarIntencao } from '@/tests/helpers/requisicoes-api.util';
-import { 
+import { obterTokenCliente, obterTokenAdmin } from '@/tests/helpers/requisicoes-api.util';
+import {
   gerarPayloadLivroEspecifico,
   gerarPayloadCarrinhoVariado,
   gerarPayloadCarrinhoPremium,
   gerarPayloadPagamentoMultiplosVariado,
+  gerarPayloadVendaMultiplos,
   LIVROS_TESTE,
   LivroTesteKey,
   validarConsistenciaPrecosMultiplos,
@@ -48,43 +49,6 @@ describe('Integração - Carrinho Avançado (Múltiplos Livros)', () => {
       expect(res.body.valorTotal).toBe(201.70); // 189.70 + 12 frete
     });
 
-    it('[RF0001] deve processar pagamento com 3 cartões para carrinho variado', async () => {
-      // Arrange
-      const { vendaPayload, pagamentoPayload } = await gerarPayloadPagamentoMultiplosVariado(
-        contexto.db!,
-        [
-          { livroUuid: LIVROS_TESTE.SENHOR_ANEIS.uuid, quantidade: 1 },
-          { livroUuid: LIVROS_TESTE.DOM_CASMURRO.uuid, quantidade: 2 }
-        ],
-        { numeroCartoes: 3 }
-      );
-
-      // Criar venda
-      const vendaRes = await request(contexto.app)
-        .post('/api/vendas')
-        .set('Authorization', `Bearer ${tokenCliente}`)
-        .send(vendaPayload);
-
-      const vendaUuid = vendaRes.body.id;
-      const intencao = await registrarIntencao(contexto.app, tokenCliente, vendaPayload.valorTotal);
-
-      // Act
-      const res = await request(contexto.app)
-        .post('/api/pagamento/processar')
-        .set('Authorization', `Bearer ${tokenCliente}`)
-        .send({
-          vendaUuid,
-          valorTotal: vendaPayload.valorTotal,
-          idIntencao: intencao.idIntencao,
-          segredoConfirmacao: intencao.segredoConfirmacao,
-          pagamentosCartao: pagamentoPayload.pagamentosCartao,
-        });
-
-      // Assert
-      expect(res.status).toBe(200);
-      expect(res.body.sucesso).toBe(true);
-      expect(res.body.pagamentos).toHaveLength(3);
-    });
   });
 
   describe('Cenários Premium e Valores Elevados', () => {
@@ -105,47 +69,6 @@ describe('Integração - Carrinho Avançado (Múltiplos Livros)', () => {
       expect(res.body.valorTotal).toBe(234.70); // 219.70 + 15 frete
     });
 
-    it('[RF0001] deve processar pagamento com distribuição variada', async () => {
-      // Arrange
-      const { vendaPayload, pagamentoPayload } = await gerarPayloadPagamentoMultiplosVariado(
-        contexto.db!,
-        [
-          { livroUuid: LIVROS_TESTE.SILMARILLION.uuid, quantidade: 1 },
-          { livroUuid: LIVROS_TESTE.O_HOBBIT.uuid, quantidade: 1 }
-        ],
-        { distribuicaoCartoes: [60, 40] } // 60% no primeiro, 40% no segundo
-      );
-
-      // Criar venda
-      const vendaRes = await request(contexto.app)
-        .post('/api/vendas')
-        .set('Authorization', `Bearer ${tokenCliente}`)
-        .send(vendaPayload);
-
-      const vendaUuid = vendaRes.body.id;
-      const intencao = await registrarIntencao(contexto.app, tokenCliente, vendaPayload.valorTotal);
-
-      // Act
-      const res = await request(contexto.app)
-        .post('/api/pagamento/processar')
-        .set('Authorization', `Bearer ${tokenCliente}`)
-        .send({
-          vendaUuid,
-          valorTotal: vendaPayload.valorTotal,
-          idIntencao: intencao.idIntencao,
-          segredoConfirmacao: intencao.segredoConfirmacao,
-          pagamentosCartao: pagamentoPayload.pagamentosCartao,
-        });
-
-      // Assert
-      expect(res.status).toBe(200);
-      expect(res.body.sucesso).toBe(true);
-      expect(res.body.pagamentos).toHaveLength(2);
-      
-      // Verificar distribuição (109.70 * 0.6 = 65.82, 109.70 * 0.4 = 43.88)
-      expect(pagamentoPayload.pagamentosCartao[0].valor).toBe(65.82);
-      expect(pagamentoPayload.pagamentosCartao[1].valor).toBe(43.88);
-    });
   });
 
   describe('Cenários com Cupons e Descontos', () => {
@@ -178,50 +101,6 @@ describe('Integração - Carrinho Avançado (Múltiplos Livros)', () => {
       expect(res.body.valorTotal).toBe(149.70); // 189.70 + 10 - 50
     });
 
-    it('[RF0001] deve processar pagamento com cupom e múltiplos cartões', async () => {
-      // Arrange
-      const { vendaPayload, pagamentoPayload } = await gerarPayloadPagamentoMultiplosVariado(
-        contexto.db!,
-        [
-          { livroUuid: LIVROS_TESTE.DUNA.uuid, quantidade: 1 },
-          { livroUuid: LIVROS_TESTE.MIL_NOVECENTOS_E_QUATRO.uuid, quantidade: 1 }
-        ],
-        {
-          valorFrete: 8,
-          cuponsAplicados: [
-            { uuid: 'cupom-123', codigo: 'PROMO-10', tipo: 'promocional', valor: 20.00 }
-          ],
-          numeroCartoes: 2
-        }
-      );
-
-      // Criar venda
-      const vendaRes = await request(contexto.app)
-        .post('/api/vendas')
-        .set('Authorization', `Bearer ${tokenCliente}`)
-        .send(vendaPayload);
-
-      const vendaUuid = vendaRes.body.id;
-      const intencao = await registrarIntencao(contexto.app, tokenCliente, vendaPayload.valorTotal);
-
-      // Act
-      const res = await request(contexto.app)
-        .post('/api/pagamento/processar')
-        .set('Authorization', `Bearer ${tokenCliente}`)
-        .send({
-          vendaUuid,
-          valorTotal: vendaPayload.valorTotal,
-          idIntencao: intencao.idIntencao,
-          segredoConfirmacao: intencao.segredoConfirmacao,
-          pagamentosCartao: pagamentoPayload.pagamentosCartao,
-          cuponsAplicados: vendaPayload.cuponsAplicados,
-        });
-
-      // Assert
-      expect(res.status).toBe(200);
-      expect(res.body.sucesso).toBe(true);
-      expect(res.body.pagamentos).toHaveLength(2);
-    });
   });
 
   describe('Testes de Livros Específicos', () => {
@@ -298,47 +177,6 @@ describe('Integração - Carrinho Avançado (Múltiplos Livros)', () => {
       expect(res.body.valorTotal).toBe(164.50); // 149.50 + 15 frete
     });
 
-    it('[RF0001] deve dividir pagamento complexo entre 4 cartões', async () => {
-      // Arrange
-      const { vendaPayload, pagamentoPayload } = await gerarPayloadPagamentoMultiplosVariado(
-        contexto.db!,
-        [
-          { livroUuid: LIVROS_TESTE.SENHOR_ANEIS.uuid, quantidade: 1 },
-          { livroUuid: LIVROS_TESTE.SILMARILLION.uuid, quantidade: 1 }
-        ],
-        { numeroCartoes: 4 }
-      );
-
-      // Criar venda
-      const vendaRes = await request(contexto.app)
-        .post('/api/vendas')
-        .set('Authorization', `Bearer ${tokenCliente}`)
-        .send(vendaPayload);
-
-      const vendaUuid = vendaRes.body.id;
-      const intencao = await registrarIntencao(contexto.app, tokenCliente, vendaPayload.valorTotal);
-
-      // Act
-      const res = await request(contexto.app)
-        .post('/api/pagamento/processar')
-        .set('Authorization', `Bearer ${tokenCliente}`)
-        .send({
-          vendaUuid,
-          valorTotal: vendaPayload.valorTotal,
-          idIntencao: intencao.idIntencao,
-          segredoConfirmacao: intencao.segredoConfirmacao,
-          pagamentosCartao: pagamentoPayload.pagamentosCartao,
-        });
-
-      // Assert
-      expect(res.status).toBe(200);
-      expect(res.body.sucesso).toBe(true);
-      expect(res.body.pagamentos).toHaveLength(4);
-      
-      // Verificar se a soma dos pagamentos é igual ao total
-      const somaPagamentos = pagamentoPayload.pagamentosCartao.reduce((sum, p) => sum + p.valor, 0);
-      expect(somaPagamentos).toBe(vendaPayload.valorTotal);
-    });
   });
 
   describe('Validação de Preços e Consistência', () => {

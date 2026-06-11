@@ -315,7 +315,7 @@ describe('Integração - RepositorioVendasPostgres - Correção N+1 Queries', ()
 
       // Assert
       expect(vendas).toHaveLength(1);
-      expect(vendas[0].id).toBe(vendaUuid);
+      expect(vendas[0].uuid).toBe(vendaUuid);
       expect(vendas[0].itens).toHaveLength(0); // Venda sem itens deve retornar array vazio
     });
   });
@@ -396,14 +396,14 @@ describe('Integração - RepositorioVendasPostgres - Correção N+1 Queries', ()
       const vendas = await repositorio.listarTodas(10);
 
       // Assert - Validar que as vendas criadas estão nos resultados
-      const uuidsEncontrados = vendas.map(v => v.id);
+      const uuidsEncontrados = vendas.map(v => v.uuid);
       vendasCriadas.forEach(uuid => {
         expect(uuidsEncontrados).toContain(uuid);
       });
       
       // Verificar que as vendas criadas têm itens carregados (prova de N+1 fix)
       vendasCriadas.forEach(uuid => {
-        const venda = vendas.find(v => v.id === uuid);
+        const venda = vendas.find(v => v.uuid === uuid);
         expect(venda).toBeDefined();
         expect(venda!.itens).toHaveLength(1);
         expect(venda!.status).toBe('EM PROCESSAMENTO');
@@ -474,7 +474,7 @@ describe('Integração - RepositorioVendasPostgres - Correção N+1 Queries', ()
 
       // Assert
       expect(venda).not.toBeNull();
-      expect(venda!.id).toBe(vendaUuid);
+      expect(venda!.uuid).toBe(vendaUuid);
       expect(venda!.usuarioUuid).toBe(usuarioUuid);
       expect(venda!.itens).toHaveLength(1);
       expect(venda!.itens[0].livroUuid).toBe(livroUuid);

@@ -20,7 +20,7 @@ import {
 import { configurarTesteIntegracao } from '@/tests/helpers/setup-integracao.util';
 import { obterTokenClienteParaIa, postIaChat } from '@/tests/helpers/ia-integracao.helper';
 import { STATUS_VENDAS } from '@/modules/vendas/constants/statusVendas.constant';
-import type { IPedidoRecenteContexto } from '@/modules/ia/domain/entities/IContextoRecomendacao.entity';
+import type { IPedidoRecenteContexto } from '@/modules/ia/IContextoRecomendacao.entity';
 
 /** Intenção de pós-venda padrão para este arquivo. */
 const intencaoPosVenda = {

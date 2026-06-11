@@ -125,7 +125,7 @@ describe('[RF-IA-07] Integração - Chat Informação (intenção informacao)', 
       expect(contextoPassado).toContain(STATUS_VENDAS.ENTREGUE);
       expect(contextoPassado).toContain(STATUS_VENDAS.CANCELADA);
       expect(contextoPassado).toContain(STATUS_VENDAS.EM_TROCA);
-      expect(contextoPassado).toContain(STATUS_VENDAS.TROCA_CONCLUIDA);
+      expect(contextoPassado).toContain(STATUS_VENDAS.CONCLUIDA);
     });
 
     it('[RN-IA-005] deve incluir descrição "aguardando confirmação de pagamento" para EM_PROCESSAMENTO', async () => {
@@ -146,7 +146,7 @@ describe('[RF-IA-07] Integração - Chat Informação (intenção informacao)', 
 
       expect(mockGerarRespostaChat).toHaveBeenCalledWith(
         expect.any(String),
-        expect.stringContaining(STATUS_VENDAS.TROCA_CONCLUIDA),
+        expect.stringContaining(STATUS_VENDAS.CONCLUIDA),
         undefined,
         expect.anything(),
       );
