@@ -2,23 +2,6 @@ import type { Request, Response } from 'express';
 import type { IRepositorioPagamentos } from '@/modules/pagamentos/repositories/IRepositorioPagamentos';
 import { ConexaoPostgres } from '@/shared/infrastructure/database/ConexaoPostgres';
 
-/** Cupons promocionais simulados (checkout BDD — ver EXPORT-BDD-7-ENTREGA-API). */
-const CUPONS_PROMOCIONAIS_FIXOS = [
-  {
-    uuid: 'uuid-descuento10',
-    codigo: 'DESCONTO10',
-    tipo: 'promocional' as const,
-    valorDesconto: 10,
-    valorMinimo: 0,
-  },
-  {
-    uuid: 'uuid-descuento20',
-    codigo: 'DESCONTO20',
-    tipo: 'promocional' as const,
-    valorDesconto: 20,
-    valorMinimo: 50,
-  },
-];
 
 export class ControladorCupom {
   constructor(private readonly repositorioPagamentos: IRepositorioPagamentos) {}
@@ -40,14 +23,24 @@ export class ControladorCupom {
                 uuid: c.uuid,
                 codigo: c.codigo,
                 tipo: 'troca' as const,
-                valorDesconto: c.valorAtual,
+                valor: c.valorAtual,
                 valorMinimo: 0,
               }))
           : [];
 
+      const lojId = req.usuario?.loj_id_atual ?? null;
+      const cuponsPromocionais = await this.repositorioPagamentos.listarCuponsPromocionais(lojId);
+      const cuponsPromocionaisMapeados = cuponsPromocionais.map((c) => ({
+        uuid: c.uuid,
+        codigo: c.codigo,
+        tipo: 'promocional' as const,
+        valor: c.valorDesconto,
+        valorMinimo: c.valorMinimo,
+      }));
+
       res.status(200).json({
         ok: true,
-        dados: [...CUPONS_PROMOCIONAIS_FIXOS, ...cuponsTroca],
+        dados: [...cuponsPromocionaisMapeados, ...cuponsTroca],
       });
     } catch (erro) {
       res.status(500).json({ ok: false, erro: (erro as Error).message });

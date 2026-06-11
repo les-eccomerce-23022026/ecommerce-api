@@ -109,7 +109,7 @@ export function registrarRotasCupom(router: Router): void {
             uuid: cupom.cpt_uuid,
             codigo: cupom.cpt_codigo,
             tipo: 'troca',
-            valorDesconto: Number(cupom.cpt_valor),
+            valor: Number(cupom.cpt_valor),
           },
         });
       }
@@ -156,7 +156,7 @@ export function registrarRotasCupom(router: Router): void {
           uuid: cupom.cup_uuid,
           codigo: cupom.cup_codigo,
           tipo: cupom.cup_tipo,
-          valorDesconto: Number(cupom.cup_valor_desconto),
+          valor: Number(cupom.cup_valor_desconto),
         },
       });
     } catch (erro) {

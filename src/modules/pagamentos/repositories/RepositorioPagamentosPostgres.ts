@@ -8,6 +8,20 @@ import { ContextoRequisicao } from '@/shared/infrastructure/contexto/ContextoReq
 import { Logger } from '@/shared/utils/Logger.util';
 import { MENSAGENS_ERRO } from '@/shared/constants/mensagens-erro.constants';
 
+interface IPagamentoRow {
+  pag_uuid: string;
+  pag_valor: string | number;
+  pag_detalhes_cupom?: string;
+  pag_criado_em: string | Date;
+  pag_processado_em?: string | Date;
+  stp_descricao: string;
+  tpg_descricao: string;
+  cpp_numero_tokenizado?: string;
+  cpp_nome_titular?: string;
+  cpp_validade?: string;
+  cpp_bandeira?: string;
+}
+
 /**
  * Implementação do repositório de pagamentos para PostgreSQL.
  */
@@ -124,15 +138,15 @@ export class RepositorioPagamentosPostgres implements IRepositorioPagamentos {
       params.push(loj_id);
     }
 
-    const rows = await this.db.executar(query, params);
+    const rows = await this.db.executar<IPagamentoRow>(query, params);
     if (rows.length === 0) return null;
 
     const row = rows[0];
     const cartao = row.cpp_numero_tokenizado ? new CartaoCredito(
       row.cpp_numero_tokenizado,
-      row.cpp_nome_titular,
-      row.cpp_validade,
-      row.cpp_bandeira
+      row.cpp_nome_titular || '',
+      row.cpp_validade || '',
+      row.cpp_bandeira || ''
     ) : undefined;
 
     return {
@@ -490,15 +504,10 @@ export class RepositorioPagamentosPostgres implements IRepositorioPagamentos {
       ativo: boolean;
     }>(query, [usuarioId]);
     Logger.info('[listarCuponsTrocaPorUsuario] Cupons encontrados', { quantidade: rows.length });
-    return rows.map((r) => ({
-      uuid: r.uuid,
-      codigo: r.codigo,
-      valorAtual: Number(r.valorAtual),
-      ativo: r.ativo,
-    }));
+    return rows;
   }
 
-  public async listarCuponsPromocionais(): Promise<Array<{
+  public async listarCuponsPromocionais(lojId?: number | null): Promise<Array<{
     uuid: string;
     codigo: string;
     valorDesconto: number;
@@ -512,16 +521,17 @@ export class RepositorioPagamentosPostgres implements IRepositorioPagamentos {
              cup_valor_minimo AS "valorMinimo",
              cup_ativo AS ativo
       FROM livraria_comercial.cupom
-      WHERE cup_tipo = 'promocional' AND cup_ativo = true
+      WHERE cup_tipo = 'promocional'
+        AND cup_ativo = true
+        AND (loj_id IS NULL OR loj_id = $1)
     `;
-    const rows = await this.db.executar<{
+    return this.db.executar<{
       uuid: string;
       codigo: string;
       valorDesconto: number;
       valorMinimo: number;
       ativo: boolean;
-    }>(query);
-    return rows;
+    }>(query, [lojId ?? null]);
   }
 
   public async obterUsuarioIdInternoPorUuid(usuarioUuid: string): Promise<number | null> {

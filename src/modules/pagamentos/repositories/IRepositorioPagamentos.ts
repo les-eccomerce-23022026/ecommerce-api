@@ -53,7 +53,7 @@ export interface IRepositorioPagamentos {
     ativo: boolean;
   }>>;
 
-  listarCuponsPromocionais(): Promise<Array<{
+  listarCuponsPromocionais(lojId?: number | null): Promise<Array<{
     uuid: string;
     codigo: string;
     valorDesconto: number;

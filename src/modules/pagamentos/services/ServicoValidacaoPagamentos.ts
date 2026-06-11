@@ -66,6 +66,6 @@ export class ServicoValidacaoPagamentos {
   }
 
   private static validarCupomTroca(codigo: string, valor: number): boolean {
-    return codigo === 'TROCA50' && valor <= 50;
+    return !!codigo && valor > 0;
   }
 }
