@@ -5,6 +5,12 @@ import { SimuladorAtualizacaoRastreamento } from '@/modules/logistica-mocks/Simu
 import { RepositorioRastreamentoPostgres } from '@/modules/logistica-mocks/repositorios/RepositorioRastreamentoPostgres';
 import { RepositorioEventoRastreamentoPostgres } from '@/modules/logistica-mocks/repositorios/RepositorioEventoRastreamentoPostgres';
 import { ConexaoPostgres } from '@/shared/infrastructure/database/ConexaoPostgres';
+import { JobAutoConfirmacaoEntrega } from '@/modules/entrega/jobs/JobAutoConfirmacaoEntrega';
+import { RepositorioVendasPostgres } from '@/modules/vendas/repositories/RepositorioVendasPostgres';
+import { RepositorioEntregaPostgres } from '@/modules/entrega/RepositorioEntregaPostgres';
+import { ServicoEntrega } from '@/modules/entrega/ServicoEntrega';
+import { ServicoNotificacaoBanco } from '@/modules/entrega/adapters/ServicoNotificacaoBanco';
+import { RepositorioNotificacoes } from '@/modules/entrega/RepositorioNotificacoes';
 
 dotenv.config();
 
@@ -64,6 +70,31 @@ if (process.env.NODE_ENV === 'development') {
 app.listen(Number(porta), () => {
   Logger.info(`Servidor iniciado na porta ${porta}`);
 });
+
+// Job de auto-confirmação de entregas com prazo vencido
+try {
+  const db = ConexaoPostgres.obterInstancia();
+  const repoVendasJob = new RepositorioVendasPostgres(db);
+  const repoRastreamentoJob = new RepositorioRastreamentoPostgres(db);
+  const repoEntregaJob = new RepositorioEntregaPostgres(db, repoRastreamentoJob);
+  const repoNotificacoesJob = new RepositorioNotificacoes(db);
+  const servicoNotificacaoJob = new ServicoNotificacaoBanco(repoNotificacoesJob);
+  const servicoEntregaJob = new ServicoEntrega(repoEntregaJob, repoVendasJob, servicoNotificacaoJob);
+
+  const jobAutoConfirmacao = new JobAutoConfirmacaoEntrega(
+    repoVendasJob,
+    repoEntregaJob,
+    servicoEntregaJob,
+    60,
+  );
+  jobAutoConfirmacao.iniciar();
+
+  process.on('SIGTERM', () => jobAutoConfirmacao.parar());
+  process.on('SIGINT', () => jobAutoConfirmacao.parar());
+} catch (erro) {
+  const msg = erro instanceof Error ? erro.message : String(erro);
+  Logger.warn(`[Server] Job de auto-confirmação fora do ar. Causa: ${msg}`);
+}
 
 // Parar simulador ao encerrar o servidor (temporariamente desabilitado)
 /*

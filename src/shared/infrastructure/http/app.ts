@@ -69,7 +69,7 @@ export function criarAplicacao(): Application {
   app.use(express.json());
   // middlewareTrocaBanco deve vir antes de contextoLojaMiddleware para garantir que
   // o contexto de banco de teste seja aplicado antes de consultar a tabela de lojas
-  if (process.env.NODE_ENV === 'test' || process.env.ENABLE_TEST_DB_SWITCH === 'true') {
+  if (process.env.NODE_ENV === 'test') { // [BANCO DE TESTES DESABILITADO] || process.env.ENABLE_TEST_DB_SWITCH === 'true'
     app.use(middlewareTrocaBanco);
   }
   app.use(contextoLojaMiddleware);

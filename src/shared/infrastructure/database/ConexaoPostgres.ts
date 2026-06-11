@@ -1,4 +1,7 @@
-import { Client, Pool, type PoolClient } from 'pg';
+import { Client, Pool, type PoolClient, types } from 'pg';
+
+// DECIMAL/NUMERIC (OID 1700) e FLOAT8 (701) chegam como string por padrão no node-postgres
+types.setTypeParser(1700, (val) => parseFloat(val));
 import { existsSync } from 'node:fs';
 import { IConexaoBanco, DbParametro } from './IConexaoBanco';
 import { obterTipoBancoAtual, obterTransacaoAtual, contextoBanco, obterContextoAtual, definirTransacaoGlobalParaTestes } from './ContextoBanco';

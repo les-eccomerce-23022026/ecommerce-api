@@ -1,4 +1,20 @@
 services:
+  chromadb:
+    image: chromadb/chroma
+    container_name: ecm_chromadb
+    restart: unless-stopped
+    ports:
+      - "8001:8000"
+    volumes:
+      - chromadb_data:/data
+    environment:
+      - CHROMA_SERVER_HOST=0.0.0.0
+      - CHROMA_SERVER_HTTP_PORT=8000
+      - CHROMA_SERVER_CORS_ALLOW_ORIGINS=*
+      - ANONYMIZED_TELEMETRY=False
+    networks:
+      - ecm_network
+
   postgres:
     image: postgres:16-alpine
     container_name: ecm_postgres
@@ -34,6 +50,13 @@ services:
       dockerfile: Dockerfile
     container_name: ecm_app
     restart: unless-stopped
+    # Roda tini como PID 1: sem um init, o ts-node-dev vira PID 1 e não consegue
+    # matar/reapear o processo filho, travando o respawn (hot-reload) no restart.
+    init: true
+    # Hot-reload sob bind mount: inotify não propaga eventos host→container, e o
+    # respawn do ts-node-dev é instável nesse cenário. Usamos nodemon com
+    # --legacy-watch (polling incondicional), que reinicia de forma confiável.
+    command: npm run dev:docker
     ports:
       # host:container — valores em .env (PORTA_HTTP_EXTERNA / PORTA_HTTP)
       - "${PORTA_HTTP_EXTERNA:-3002}:${PORTA_HTTP:-3000}"
@@ -57,6 +80,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      chromadb:
+        condition: service_started
     environment:
       - NODE_ENV=development
       - DEFAULT_LOJA_ID=1
@@ -66,6 +91,7 @@ services:
       - POSTGRES_USER=ecm_user
       - POSTGRES_PASSWORD=ecm_senha
       - POSTGRES_DB=ecm_livraria
+      - CHROMADB_HOST=http://chromadb:8000
     deploy:
       resources:
         limits:
@@ -83,4 +109,5 @@ networks:
 
 volumes:
   postgres_data:
+  chromadb_data:
 
