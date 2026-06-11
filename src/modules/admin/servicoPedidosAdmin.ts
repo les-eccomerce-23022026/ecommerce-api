@@ -81,9 +81,11 @@ export class ServicoPedidosAdmin {
       local: 'São Paulo/SP',
     });
 
+    await this.repositorioVendas.salvarDataPrevistaEntrega(vendaUuid, new Date(calculoFrete.dataPrevistaEntrega));
+
     const atualizada = await this.repositorioVendas.obterPorUuid(vendaUuid);
     if (!atualizada) throw new Error('Pedido não encontrado após despacho.');
-    
+
     const payload = vendaParaPayloadPedidoAdmin(atualizada);
     return {
       ...payload,
@@ -207,6 +209,8 @@ export class ServicoPedidosAdmin {
       data: new Date().toISOString(),
       local: 'São Paulo/SP',
     });
+
+    await this.repositorioVendas.salvarDataPrevistaEntrega(vendaUuid, new Date(calculoFrete.dataPrevistaEntrega));
 
     // Atualizar status para EM TRÂNSITO
     await this.repositorioVendas.atualizarStatus(vendaUuid, 'EM TRÂNSITO');
