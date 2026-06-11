@@ -24,18 +24,19 @@ export class GestaoPerfilCliente {
    * @param dados - Dados do perfil
    * @returns Perfil criado
    */
-  public async criarPerfil(idUsuario: number, dados: IPerfilClienteDto): Promise<IPerfilClienteDto> {
+  public async criarPerfil(idUsuario: number, dados: IPerfilClienteDto): Promise<Pick<IPerfilClienteDto, 'genero' | 'dataNascimento'>> {
     this.validarDadosPerfil(dados);
 
-    const perfil = await this.repositorioPerfil.criar({
+    const perfilEntity: IPerfilCliente = {
       idUsuario,
       genero: dados.genero,
-      dataNascimento: dados.dataNascimento 
+      dataNascimento: dados.dataNascimento
         ? this.parsearDataNascimento(dados.dataNascimento)
         : undefined,
-    });
+    };
 
-    return this.converterParaDto(perfil);
+    await this.repositorioPerfil.criar(perfilEntity);
+    return this.converterParaDto(perfilEntity);
   }
 
   /**
@@ -45,9 +46,9 @@ export class GestaoPerfilCliente {
    * @param dados - Novos dados do perfil
    * @returns Perfil atualizado
    */
-  public async atualizarPerfil(idUsuario: number, dados: Partial<IPerfilClienteDto>): Promise<IPerfilClienteDto> {
+  public async atualizarPerfil(idUsuario: number, dados: Partial<IPerfilClienteDto>): Promise<Pick<IPerfilClienteDto, 'genero' | 'dataNascimento'>> {
     const perfilExistente = await this.repositorioPerfil.buscarPorIdUsuario(idUsuario);
-    
+
     if (dados.genero !== undefined || dados.dataNascimento !== undefined) {
       this.validarDadosPerfil(dados as IPerfilClienteDto);
     }
@@ -55,19 +56,18 @@ export class GestaoPerfilCliente {
     const perfilAtualizado: IPerfilCliente = {
       idUsuario,
       genero: dados.genero !== undefined ? dados.genero : perfilExistente?.genero,
-      dataNascimento: dados.dataNascimento !== undefined 
+      dataNascimento: dados.dataNascimento !== undefined
         ? this.parsearDataNascimento(dados.dataNascimento)
         : perfilExistente?.dataNascimento,
     };
 
-    let perfilResultado;
     if (perfilExistente) {
-      perfilResultado = await this.repositorioPerfil.atualizar(perfilAtualizado);
+      await this.repositorioPerfil.atualizar(perfilAtualizado);
     } else {
-      perfilResultado = await this.repositorioPerfil.criar(perfilAtualizado);
+      await this.repositorioPerfil.criar(perfilAtualizado);
     }
 
-    return this.converterParaDto(perfilResultado);
+    return this.converterParaDto(perfilAtualizado);
   }
 
   /**
@@ -76,7 +76,7 @@ export class GestaoPerfilCliente {
    * @param idUsuario - ID interno do usuário
    * @returns Perfil do usuário ou null
    */
-  public async buscarPerfilPorUsuario(idUsuario: number): Promise<IPerfilClienteDto | null> {
+  public async buscarPerfilPorUsuario(idUsuario: number): Promise<Pick<IPerfilClienteDto, 'genero' | 'dataNascimento'> | null> {
     const perfil = await this.repositorioPerfil.buscarPorIdUsuario(idUsuario);
     
     if (!perfil) {
@@ -157,7 +157,7 @@ export class GestaoPerfilCliente {
    * @param perfil - Entidade do perfil
    * @returns DTO do perfil
    */
-  private converterParaDto(perfil: IPerfilCliente): IPerfilClienteDto {
+  private converterParaDto(perfil: IPerfilCliente): Pick<IPerfilClienteDto, 'genero' | 'dataNascimento'> {
     return {
       genero: perfil.genero,
       dataNascimento: perfil.dataNascimento

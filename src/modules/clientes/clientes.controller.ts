@@ -249,7 +249,7 @@ export class ControladorClientes {
         .map((c: { codigo: string; valorAtual: number }) => ({
           tipo: 'troca' as const,
           codigo: c.codigo,
-          valorDesconto: c.valorAtual,
+          valor: c.valorAtual,
         }));
 
       // Buscar cupons promocionais usando repositório existente
@@ -257,7 +257,7 @@ export class ControladorClientes {
       const cuponsPromocionaisFormatados = cuponsPromocionais.map((c: { codigo: string; valorDesconto: number }) => ({
         tipo: 'promocional' as const,
         codigo: c.codigo,
-        valorDesconto: c.valorDesconto,
+        valor: c.valorDesconto,
       }));
 
       // Combinar e formatar para o frontend

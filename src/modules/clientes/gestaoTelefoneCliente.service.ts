@@ -35,14 +35,15 @@ export class GestaoTelefoneCliente {
       throw new DadosInvalidosError('Telefone deve ter 10 ou 11 dígitos (DDD + número).');
     }
 
-    const telefone = await this.repositorioTelefone.criar({
+    const novoTelefone = {
       idUsuario,
       idTipoTelefone: mapearTipoTelefone(dados.tipo),
       numero: numeroNormalizado,
       principal,
-    });
+    };
 
-    return converterTelefoneParaDto(telefone);
+    await this.repositorioTelefone.criar(novoTelefone);
+    return converterTelefoneParaDto(novoTelefone);
   }
 
   /**
@@ -71,12 +72,13 @@ export class GestaoTelefoneCliente {
       throw new DadosInvalidosError('Telefone deve ter 10 ou 11 dígitos (DDD + número).');
     }
 
-    const telefoneAtualizado = await this.repositorioTelefone.atualizar({
+    const telefoneAtualizado = {
       ...telefoneExistente,
       idTipoTelefone: mapearTipoTelefone(dados.tipo),
       numero: numeroNormalizado,
-    });
+    };
 
+    await this.repositorioTelefone.atualizar(telefoneAtualizado);
     return converterTelefoneParaDto(telefoneAtualizado);
   }
 

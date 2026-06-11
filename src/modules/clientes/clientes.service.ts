@@ -137,16 +137,11 @@ export class GestaoIdentidadeCliente {
     let telefoneFinal = telefone;
     if (!telefoneFinal && usuario.telefoneRapido) {
       telefoneFinal = {
-        id: 0,
-        uuid: '',
-        idUsuario: usuario.id,
-        idTipoTelefone: 1,
-        ddd: '',
+        tipo: 'Celular',
         numero: usuario.telefoneRapido,
-        principal: true,
       };
     }
-    
+
     return {
       uuid: usuario.uuid,
       nome: usuario.nome,
@@ -156,7 +151,7 @@ export class GestaoIdentidadeCliente {
       cpfMascarado: usuario.cpf ? mascararCpf(usuario.cpf) : undefined,
       genero: perfil?.genero,
       dataNascimento: perfil?.dataNascimento,
-      telefone: telefoneFinal,
+      telefone: telefoneFinal ?? undefined,
       enderecos: enderecosDto,
       cartoes: cartoes,
     };
