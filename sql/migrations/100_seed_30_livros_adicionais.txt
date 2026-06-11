@@ -1,0 +1,13 @@
+INSERT 0 36
+ERROR:  insert or update on table "livro_categorias" violates foreign key constraint "livro_categorias_liv_id_fkey"
+DETAIL:  Key (liv_id)=(21) is not present in table "livros".
+INSERT 0 0
+UPDATE 0
+               info               | valor 
+----------------------------------+-------
+ Total de livros no catálogo:     |    56
+ Total de livros novos inseridos: |    56
+ Média de estoque:                |    26
+ Total em estoque:                |   521
+(4 rows)
+
