@@ -116,3 +116,25 @@ export function clienteOnlyMiddleware(
 
   next();
 }
+
+/**
+ * Middleware para garantir que o usuário esteja autenticado (qualquer papel).
+ * Permite acesso a clientes, administradores de loja e administradores do sistema.
+ */
+export function autenticadoMiddleware(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): void {
+  const { usuario } = req;
+
+  if (!usuario) {
+    res.status(401).json({
+      mensagem: 'Acesso negado. Usuário não autenticado.',
+      sucesso: false,
+    });
+    return;
+  }
+
+  next();
+}

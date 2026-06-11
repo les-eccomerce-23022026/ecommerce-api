@@ -7,10 +7,12 @@ import { Logger } from '../utils/Logger.util';
  * Verifica o cabeçalho 'x-use-test-db'. Se presente e for 'true', muda o contexto.
  */
 export const middlewareTrocaBanco = (req: Request, _res: Response, next: NextFunction): void => {
-  const headerBancoTeste = String(req.headers['x-use-test-db'] ?? '').trim().toLowerCase();
-  const switchExplcitoHabilitado = process.env.ENABLE_TEST_DB_SWITCH === 'true';
-  const usarBancoTeste = process.env.NODE_ENV === 'test'
-    || (switchExplcitoHabilitado && headerBancoTeste === 'true');
+  // [BANCO DE TESTES DESABILITADO]
+  // const headerBancoTeste = String(req.headers['x-use-test-db'] ?? '').trim().toLowerCase();
+  // const switchExplcitoHabilitado = process.env.ENABLE_TEST_DB_SWITCH === 'true';
+  const usarBancoTeste = process.env.NODE_ENV === 'test';
+  // const usarBancoTeste = process.env.NODE_ENV === 'test'
+  //   || (switchExplcitoHabilitado && headerBancoTeste === 'true');
   const ambiente: TipoAmbienteBanco = usarBancoTeste ? 'teste' : 'producao';
 
   const contextoExistente = obterContextoAtual();
@@ -28,8 +30,8 @@ export const middlewareTrocaBanco = (req: Request, _res: Response, next: NextFun
         rota: req.path,
         metodo: req.method,
         ambiente,
-        headerBancoTeste,
-        switchExplcitoHabilitado,
+        // headerBancoTeste,         // [BANCO DE TESTES DESABILITADO]
+        // switchExplcitoHabilitado, // [BANCO DE TESTES DESABILITADO]
       });
     }
     next();

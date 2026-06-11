@@ -68,20 +68,15 @@ export async function autenticacaoMiddleware(
       return;
     }
 
-    // CORREÇÃO: Validar papéis do token vs banco para prevenir bypass
-    // Se o token contiver array de papéis, validar contra o banco
-    if (decodificado.lojas && Array.isArray(decodificado.lojas)) {
-      const papeisBanco = new Set(usuario.papeis.map(p => p.descricao));
-      
-      // Verificar se o role principal do token está no banco
-      if (!papeisBanco.has(decodificado.role)) {
-        Logger.warn(`[auth] Papel no token não corresponde ao banco. Token: ${decodificado.role}, Banco: ${Array.from(papeisBanco).join(', ')}`);
-        res.status(401).json({
-          mensagem: 'Token inválido: papel não autorizado.',
-          sucesso: false,
-        });
-        return;
-      }
+    // Validar papel do token contra o banco para prevenir bypass por adulteração de JWT
+    const papeisBanco = new Set(usuario.papeis.map(p => p.descricao));
+    if (!papeisBanco.has(decodificado.role)) {
+      Logger.warn(`[auth] Papel no token não corresponde ao banco. Token: ${decodificado.role}, Banco: ${Array.from(papeisBanco).join(', ')}`);
+      res.status(401).json({
+        mensagem: 'Token inválido: papel não autorizado.',
+        sucesso: false,
+      });
+      return;
     }
 
     // Validar IP e fingerprint (proteção contra replay attack)

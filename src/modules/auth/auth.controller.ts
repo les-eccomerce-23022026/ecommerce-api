@@ -66,9 +66,8 @@ export class ControladorAutenticacao {
       // Em produção, o JWT está protegido em cookie HttpOnly.
       // Refresh token retornado em cookie HttpOnly separado.
       const incluirTokenNoCorpo =
-        process.env.NODE_ENV === 'test' || 
-        process.env.NODE_ENV === 'development' ||
-        requisicao.headers['x-use-test-db'] === 'true';
+        process.env.NODE_ENV === 'test' ||
+        process.env.NODE_ENV === 'development';
       
       // Cookie HttpOnly para refresh token
       if (resultado.refreshToken) {
@@ -178,8 +177,13 @@ export class ControladorAutenticacao {
       sameSite: 'strict' as const,
     });
     
-    // Revogar refresh tokens se usuário estiver autenticado
-    if (requisicao.usuario?.id) {
+    // Revogar refresh token pelo valor do cookie (não depende de autenticação no middleware)
+    const nomeCookieRefresh = `${nomeCookie}_refresh`;
+    const refreshTokenCookie = requisicao.cookies?.[nomeCookieRefresh];
+    if (refreshTokenCookie) {
+      await repoRefreshTokens.revogarPorTokenPlano(refreshTokenCookie);
+    } else if (requisicao.usuario?.id) {
+      // Fallback: revogar todos se o usuário estiver autenticado via middleware
       await repoRefreshTokens.revogarTodosDoUsuario(requisicao.usuario.id);
     }
     
@@ -224,7 +228,7 @@ export class ControladorAutenticacao {
       });
 
       const incluirTokenNoCorpo =
-        process.env.NODE_ENV === 'test' || requisicao.headers['x-use-test-db'] === 'true';
+        process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'development';
       const respostaCorpo = incluirTokenNoCorpo
         ? { token: resultado.token, user: resultado.user }
         : { user: resultado.user };

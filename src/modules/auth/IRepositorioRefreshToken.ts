@@ -25,6 +25,11 @@ export interface IRepositorioRefreshToken {
   revogar(uuid: string): Promise<void>;
 
   /**
+   * Revoga um refresh token pelo seu valor em texto plano (hash calculado internamente)
+   */
+  revogarPorTokenPlano(token: string): Promise<void>;
+
+  /**
    * Revoga todos os refresh tokens do usuário
    */
   revogarTodosDoUsuario(usuarioId: number): Promise<void>;
