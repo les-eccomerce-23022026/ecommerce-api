@@ -25,6 +25,10 @@ import {
 } from './validacaoEntradaIA.util';
 import { ServicoValidacaoSegurancaIA } from './servicoValidacaoSegurancaIA';
 import { ServicoHealthCheckIA } from './servicoHealthCheckIA';
+import { IAdapterEmbedding } from './IAdapterEmbedding';
+import { AdapterLangChainGemini } from './adapterLangChainGemini';
+import { ServicoCachePadroesValidacaoIA } from './servicoCachePadroesValidacaoIA';
+import type { IClassificadorDominio } from './IClassificadorDominio';
 
 /** Períodos válidos para filtro de métricas de recomendação */
 const PERIODOS_VALIDOS: ReadonlySet<string> = new Set<PeriodoMetrica>([
@@ -40,12 +44,18 @@ const PERIODOS_VALIDOS: ReadonlySet<string> = new Set<PeriodoMetrica>([
  * Expõe endpoints para recomendação de produtos usando RAG com ChromaDB e Gemini.
  */
 export class ControladorRecomendacao {
-  private readonly servicoValidacaoSeguranca = new ServicoValidacaoSegurancaIA();
+  private readonly servicoValidacaoSeguranca: ServicoValidacaoSegurancaIA;
 
   constructor(
     private servicoRecomendacao: ServicoRecomendacaoApplication,
-    private servicoHealthCheck: ServicoHealthCheckIA
-  ) {}
+    private servicoHealthCheck: ServicoHealthCheckIA,
+    private adapterEmbedding?: IAdapterEmbedding,
+    private adapterLLM?: AdapterLangChainGemini,
+    private cachePadroesValidacao?: ServicoCachePadroesValidacaoIA,
+    private classificadorDominio?: IClassificadorDominio
+  ) {
+    this.servicoValidacaoSeguranca = new ServicoValidacaoSegurancaIA(adapterEmbedding, adapterLLM, cachePadroesValidacao, classificadorDominio);
+  }
 
   private obterStatusHttpErro(erro: unknown, padrao: number): number {
     if (erro instanceof ErroIa) {
@@ -114,7 +124,7 @@ export class ControladorRecomendacao {
       }
 
       // Validação de segurança contra injeção de prompt e solicitações impossíveis
-      const resultadoSeguranca = this.servicoValidacaoSeguranca.validarEntrada(querySanitizada);
+      const resultadoSeguranca = await this.servicoValidacaoSeguranca.validarEntrada(querySanitizada);
       if (!resultadoSeguranca.seguro) {
         const mensagemRejeicao = ServicoValidacaoSegurancaIA.gerarMensagemRejeicao(resultadoSeguranca);
         RespostaPadrao.enviarErro(res, 400, mensagemRejeicao);
@@ -200,7 +210,7 @@ export class ControladorRecomendacao {
       }
 
       // Validação de segurança contra injeção de prompt e solicitações impossíveis
-      const resultadoSeguranca = this.servicoValidacaoSeguranca.validarEntrada(mensagemSanitizada);
+      const resultadoSeguranca = await this.servicoValidacaoSeguranca.validarEntrada(mensagemSanitizada);
       if (!resultadoSeguranca.seguro) {
         const mensagemRejeicao = ServicoValidacaoSegurancaIA.gerarMensagemRejeicao(resultadoSeguranca);
         RespostaPadrao.enviarErro(res, 400, mensagemRejeicao);
@@ -216,6 +226,15 @@ export class ControladorRecomendacao {
       if (erroHistorico) {
         RespostaPadrao.enviarErro(res, 400, erroHistorico);
         return;
+      }
+
+      if (dados.historico && dados.historico.length > 0) {
+        const resultadoHistorico = await this.servicoValidacaoSeguranca.validarConteudoHistorico(dados.historico);
+        if (!resultadoHistorico.seguro) {
+          Logger.warn(`[ControladorRecomendacao.chat] Histórico bloqueado na mensagem ${resultadoHistorico.indice} (${resultadoHistorico.papel})`);
+          RespostaPadrao.enviarErro(res, 400, ServicoValidacaoSegurancaIA.gerarMensagemRejeicao(resultadoHistorico));
+          return;
+        }
       }
 
       const clienteUuid = req.usuario?.uuid ?? dados.clienteUuid;

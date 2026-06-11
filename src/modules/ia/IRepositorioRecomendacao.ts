@@ -28,7 +28,7 @@ export interface IRepositorioMetricasRecomendacao {
   /**
    * Salva uma métrica de avaliação de recomendação
    */
-  salvarMetrica(metrica: IMetricaRecomendacao): Promise<void>;
+  salvarMetrica(metrica: ICriarMetricaRecomendacaoDto): Promise<void>;
 
   /**
    * Busca métricas de recomendação por período

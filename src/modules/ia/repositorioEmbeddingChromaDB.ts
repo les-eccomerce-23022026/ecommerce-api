@@ -1,9 +1,7 @@
 import { ChromaClient, Collection } from 'chromadb';
 import { v4 as uuidv4 } from 'uuid';
-import {
-  IRepositorioEmbedding,
-  ICriarProdutoEmbeddingDto,
-} from './IRepositorioEmbedding';
+import { IRepositorioEmbedding } from './IRepositorioEmbedding';
+import { ICriarProdutoEmbeddingDto } from './IProdutoEmbedding.entity';
 import { IProdutoEmbedding } from './IProdutoEmbedding.entity';
 import { Logger } from '@/shared/utils/Logger.util';
 
@@ -74,10 +72,36 @@ export class RepositorioEmbeddingChromaDB implements IRepositorioEmbedding {
   constructor() {
     // Inicializa cliente ChromaDB com persistência local
     // Usa modo HTTP para evitar problemas com path de arquivo
-    const chromaPath = process.env.CHROMADB_PATH || 'http://localhost:8000';
+    // Prioridade: CHROMADB_HOST (testes/local) → CHROMADB_PATH (Docker)
+    // Lança erro se nenhuma variável estiver configurada
+    const chromaPath = process.env.CHROMADB_HOST || process.env.CHROMADB_PATH;
+    
+    if (!chromaPath) {
+      throw new Error(
+        'Variável de ambiente CHROMADB_HOST ou CHROMADB_PATH não configurada. ' +
+        'Configure uma delas no .env para conectar ao ChromaDB.'
+      );
+    }
+    
+    // Parse da URL para extrair host e port (API moderna chromadb v3.4+)
+    let host: string;
+    let port: number;
+    
+    try {
+      const url = new URL(chromaPath);
+      host = url.hostname;
+      port = parseInt(url.port, 10) || (url.protocol === 'https:' ? 443 : 80);
+    } catch (erro) {
+      throw new Error(
+        `URL do ChromaDB inválida: ${chromaPath}. Erro: ${erro instanceof Error ? erro.message : String(erro)}`
+      );
+    }
+    
     this.cliente = new ChromaClient({
-      path: chromaPath,
+      host,
+      port,
     });
+    Logger.info(`[RepositorioEmbeddingChromaDB] Inicializando ChromaClient com host: ${host}, port: ${port}`);
   }
 
   /**
@@ -107,10 +131,10 @@ export class RepositorioEmbeddingChromaDB implements IRepositorioEmbedding {
         metadata: {
           descricao: 'Embeddings de produtos da livraria',
           configuracao_rag: 'v1.0',
+          // Cosseno é a métrica correta para embeddings de texto (Gemini text-embedding)
+          // pois permite comparar direção semântica independente da magnitude do vetor
+          'hnsw:space': 'cosine',
         },
-        // Configuração de embedding function do Gemini
-        // NOTA: ChromaDB HTTP mode não suporta embedding function nativa
-        // Embeddings são gerados externamente via AdapterLangChainGemini
       });
       Logger.info('[RepositorioEmbeddingChromaDB] Nova coleção criada com metadata configuracao_rag: v1.0');
       Logger.info('[RepositorioEmbeddingChromaDB] Configurações de recomendação ativas:', {
@@ -295,7 +319,7 @@ export class RepositorioEmbeddingChromaDB implements IRepositorioEmbedding {
     await colecao.update({
       ids: [uuid],
       embeddings: [embeddingAtualizado],
-      metadados: [
+      metadatas: [
         {
           produto_uuid: dados.produtoUuid || existente.produtoUuid,
           titulo: metadadosAtualizados.titulo,
@@ -339,14 +363,13 @@ export class RepositorioEmbeddingChromaDB implements IRepositorioEmbedding {
 
   async verificarConexao(): Promise<boolean> {
     try {
-      // Tenta listar coleções como verificação simples de conexão
-      // O heartbeat foi descontinuado na API v2 do ChromaDB
+      // Usa heartbeat para verificação de conexão (disponível na API v3)
       const timeoutPromise = new Promise<boolean>((_, reject) => {
         setTimeout(() => reject(new Error('Timeout na verificação de conexão')), 5000);
       });
       
       await Promise.race([
-        this.cliente.listCollections(),
+        this.cliente.heartbeat(),
         timeoutPromise
       ]);
       

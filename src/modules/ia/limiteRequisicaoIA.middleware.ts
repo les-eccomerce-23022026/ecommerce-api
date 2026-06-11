@@ -19,7 +19,7 @@ export const limiteRequisicaoIA = rateLimit({
   skip: (req: Request) => {
     // Desabilita apenas quando header explícito de teste é enviado
     // NODE_ENV=test sozinho não é mais suficiente para bypass
-    return req.headers['x-use-test-db'] === 'true';
+    return false; // [BANCO DE TESTES DESABILITADO] req.headers['x-use-test-db'] === 'true'
   },
   message: {
     sucesso: false,

@@ -7,6 +7,8 @@ import { IAdapterEmbedding } from './IAdapterEmbedding';
 import { IntencaoRecomendacao } from './IntencaoRecomendacao.entity';
 import type { ContextoInterpretacaoIntencao } from './IntencaoRecomendacao.entity';
 import type { MensagemChatDTO } from './IRecomendacao.dto';
+import type { IAdapterLLMChat } from './IAdapterLLMChat';
+import { AdapterOpenRouter } from './adapterOpenRouter';
 
 /**
  * Implementação personalizada de embeddings usando API do Groq
@@ -98,11 +100,15 @@ export class AdapterLangChainGemini implements IAdapterEmbedding {
   private genAI: GoogleGenerativeAI | null = null;
   private modeloAtual: string | null = null;
   private provedorAtual: 'gemini' | 'groq' | null = null;
+  private fallbackChat: IAdapterLLMChat | null = null;
 
   constructor() {
-    // Valida variável de ambiente obrigatória (regra U3)
     if (!process.env.GEMINI_API_KEY && !process.env.GROQ_API_KEY) {
       throw new Error('GEMINI_API_KEY ou GROQ_API_KEY não está definida nas variáveis de ambiente');
+    }
+    if (process.env.OPENROUTER_API_KEY) {
+      this.fallbackChat = new AdapterOpenRouter();
+      Logger.info('[AdapterLangChainGemini] Fallback OpenRouter configurado para operações de chat');
     }
   }
 
@@ -265,7 +271,7 @@ export class AdapterLangChainGemini implements IAdapterEmbedding {
     contexto: ContextoInterpretacaoIntencao
   ): Promise<IntencaoRecomendacao> {
     const genAI = this.inicializarGenAI();
-    const modeloChat = process.env.GEMINI_CHAT_MODEL || 'gemini-2.5-flash';
+    const modeloChat = process.env.GEMINI_CHAT_MODEL || 'gemini-3.1-flash-lite';
 
     const model = genAI.getGenerativeModel({
       model: modeloChat,
@@ -342,8 +348,16 @@ export class AdapterLangChainGemini implements IAdapterEmbedding {
       .filter(Boolean)
       .join('\n');
 
-    const resultado = await model.generateContent(prompt);
-    const texto = resultado.response.text();
+    let texto: string;
+    try {
+      const resultado = await model.generateContent(prompt);
+      texto = resultado.response.text();
+    } catch (erroGemini) {
+      const msg = erroGemini instanceof Error ? erroGemini.message : String(erroGemini);
+      Logger.warn(`[AdapterLangChainGemini] interpretarIntencao falhou no Gemini: ${msg}. Tentando OpenRouter...`);
+      if (!this.fallbackChat) throw erroGemini;
+      return this.fallbackChat.interpretarIntencao(mensagem, historico, contexto);
+    }
     const parsed = JSON.parse(texto) as IntencaoRecomendacao;
 
     const quantidadePadrao = parsed.tipo === 'tendencias' ? 5 : 1;
@@ -393,8 +407,18 @@ export class AdapterLangChainGemini implements IAdapterEmbedding {
       }
 
       const genAI = this.inicializarGenAI();
-      const modeloChat = process.env.GEMINI_CHAT_MODEL || 'gemini-2.5-flash';
-      const model = genAI.getGenerativeModel({ model: modeloChat });
+      const modeloChat = process.env.GEMINI_CHAT_MODEL || 'gemini-3.1-flash-lite';
+      const model = genAI.getGenerativeModel({
+        model: modeloChat,
+        generationConfig: {
+          responseMimeType: 'application/json',
+          responseSchema: {
+            type: SchemaType.OBJECT,
+            properties: { resposta: { type: SchemaType.STRING } },
+            required: ['resposta'],
+          },
+        },
+      });
 
       const tomPerfil = this.montarInstrucaoTomPerfil(opcoes?.perfil);
 
@@ -411,9 +435,7 @@ export class AdapterLangChainGemini implements IAdapterEmbedding {
         'Use APENAS os dados fornecidos no contexto — nunca invente títulos, autores, preços, status de pedido ou rankings.',
         'Se o contexto não tiver a informação solicitada, diga honestamente e oriente o cliente para "Meus Pedidos" ou para o suporte humano quando necessário.',
         'Responda em português do Brasil, de forma acolhedora e objetiva.',
-        'Formate a resposta em tópicos curtos: use linhas iniciadas com "• " (não escreva parágrafos longos).',
-        'Estruture com 3 a 5 tópicos quando possível (ex.: saudação, destaques, preços, próximo passo).',
-        'Cada tópico deve ter no máximo uma frase objetiva.',
+        'O campo "resposta" deve conter tópicos curtos iniciados com "• " (3 a 5 tópicos, cada um com no máximo uma frase objetiva).',
         regrasPosvenda,
         tomPerfil,
       ]
@@ -444,20 +466,44 @@ export class AdapterLangChainGemini implements IAdapterEmbedding {
         ],
       });
 
-      const resultado = await model.generateContent({
-        systemInstruction,
-        contents,
-      });
+      let texto: string;
+      try {
+        const resultado = await model.generateContent({ systemInstruction, contents });
+        texto = resultado.response.text();
+      } catch (erroGemini) {
+        const msg = erroGemini instanceof Error ? erroGemini.message : String(erroGemini);
+        Logger.warn(`[AdapterLangChainGemini] gerarRespostaChat falhou no Gemini: ${msg}. Tentando OpenRouter...`);
+        if (this.fallbackChat) {
+          return this.fallbackChat.gerarRespostaChat(pergunta, contexto, historicoConversa, opcoes);
+        }
+        throw erroGemini;
+      }
 
-      const texto = resultado.response.text();
       if (!texto || texto.trim().length === 0) {
+        if (this.fallbackChat) {
+          Logger.warn('[AdapterLangChainGemini] Resposta vazia do Gemini, usando OpenRouter...');
+          return this.fallbackChat.gerarRespostaChat(pergunta, contexto, historicoConversa, opcoes);
+        }
         return this.respostaChatFallback(contexto);
       }
-      return texto.trim();
+      return this.parsearRespostaChat(texto, contexto);
     } catch (erro) {
       const mensagem = erro instanceof Error ? erro.message : String(erro);
       Logger.error(`[AdapterLangChainGemini] Erro ao gerar resposta de chat: ${mensagem}`);
       return this.respostaChatFallback(contexto);
+    }
+  }
+
+  private parsearRespostaChat(json: string, contexto: string): string {
+    try {
+      const parsed = JSON.parse(json) as { resposta?: string };
+      const resposta = parsed.resposta?.trim();
+      if (!resposta) throw new Error('campo resposta vazio');
+      return resposta;
+    } catch {
+      Logger.warn('[AdapterLangChainGemini] JSON inválido em gerarRespostaChat, usando texto bruto');
+      const texto = json.trim();
+      return texto || this.respostaChatFallback(contexto);
     }
   }
 
@@ -519,6 +565,37 @@ export class AdapterLangChainGemini implements IAdapterEmbedding {
     }
     
     return livros;
+  }
+
+  /**
+   * Valida coerência semântica usando LLM
+   * Usado pelo ValidadorCoerenciaLLM para detectar incoerências sutis
+   * 
+   * @param prompt - Prompt de validação
+   * @returns Resposta JSON do LLM
+   */
+  async validarCoerencia(prompt: string): Promise<string> {
+    try {
+      const genAI = this.inicializarGenAI();
+      const modeloChat = process.env.GEMINI_CHAT_MODEL || 'gemini-3.1-flash-lite';
+      const model = genAI.getGenerativeModel({ model: modeloChat });
+
+      const resultado = await model.generateContent(prompt);
+      const texto = resultado.response.text();
+
+      if (!texto || texto.trim().length === 0) {
+        throw new Error('Resposta vazia do LLM');
+      }
+
+      return texto.trim();
+    } catch (erro) {
+      const mensagem = erro instanceof Error ? erro.message : String(erro);
+      Logger.warn(`[AdapterLangChainGemini] validarCoerencia falhou no Gemini: ${mensagem}. Tentando OpenRouter...`);
+      if (this.fallbackChat) {
+        return this.fallbackChat.validarCoerencia(prompt);
+      }
+      throw new Error(`Falha ao validar coerência: ${mensagem}`);
+    }
   }
 
   /**

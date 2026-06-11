@@ -43,6 +43,9 @@ import {
   ServicoContextoConversa,
   ContextoTurnoConversa,
 } from './servicoContextoConversa';
+import { ValidadorSemanticaDinamico } from './validadorSemanticaDinamico';
+import { ValidadorCoerenciaLLM } from './validadorCoerenciaLLM';
+import { AprendizadoAlucinacoes } from './aprendizadoAlucinacoes';
 
 /**
  * Políticas fixas da loja enviadas ao assistente nos modos pós-venda e informação.
@@ -56,7 +59,7 @@ const POLITICAS_LOJA = [
   `  "${STATUS_VENDAS.ENTREGUE}" — pedido recebido pelo cliente;`,
   `  "${STATUS_VENDAS.CANCELADA}" — pedido cancelado;`,
   `  "${STATUS_VENDAS.EM_TROCA}" — solicitação de troca em aberto;`,
-  `  "${STATUS_VENDAS.TROCA_CONCLUIDA}" — troca finalizada.`,
+  `  "${STATUS_VENDAS.CONCLUIDA}" — troca finalizada.`,
   `Para rastreamento detalhado ou suporte humano, oriente o cliente a acessar "Meus Pedidos".`,
 ].join('\n');
 
@@ -100,6 +103,9 @@ interface ResultadoBuscaProdutosChat {
 export class ServicoRecomendacaoApplication {
   private readonly servicoFiltroCatalogo = new ServicoFiltroCatalogo();
   private readonly servicoContextoConversa = new ServicoContextoConversa();
+  private readonly validadorSemantica: ValidadorSemanticaDinamico;
+  private readonly validadorCoerenciaLLM: ValidadorCoerenciaLLM;
+  private readonly aprendizadoAlucinacoes: AprendizadoAlucinacoes;
 
   constructor(
     private repositorioEmbedding: IRepositorioEmbedding,
@@ -114,7 +120,12 @@ export class ServicoRecomendacaoApplication {
     private servicoIndexacaoProdutos: ServicoIndexacaoProdutos,
     private servicoLivros: ServicoLivros,
     private servicoInterpretacaoIntencao: ServicoInterpretacaoIntencao
-  ) {}
+  ) {
+    // Inicializa validadores de alucinações (Camadas 2, 3 e 4)
+    this.validadorSemantica = new ValidadorSemanticaDinamico(adapterLangChain);
+    this.validadorCoerenciaLLM = new ValidadorCoerenciaLLM(adapterLangChain);
+    this.aprendizadoAlucinacoes = new AprendizadoAlucinacoes();
+  }
 
   /**
    * Endpoint: recomendar — fluxo simples de recomendação sem chat.
@@ -143,12 +154,105 @@ export class ServicoRecomendacaoApplication {
         { limite: dados.limite || 5 }
       );
 
-      // 3. Remove duplicatas e ordena por similaridade (maior primeiro)
+      // 3. FASE 2: Validação semântica dinâmica (Camada 2)
+      const resultadoSemantica = await this.validadorSemantica.validarCoerenciaSemantica(
+        dados.query,
+        resultado.produtos
+      );
+
+      if (!resultadoSemantica.valido) {
+        // Registra alucinação detectada (Camada 4)
+        this.aprendizadoAlucinacoes.registrarAlucinacao(
+          dados.query,
+          resultadoSemantica.motivo,
+          resultado.produtos.length
+        );
+
+        Logger.warn(
+          `[ServicoRecomendacaoApplication] Validação semântica falhou: ${resultadoSemantica.motivo}. Tentando fallback.`
+        );
+
+        // Tenta fallback
+        const resultadoFallback = await this.tentarQuerySimplificada(
+          dados.query,
+          contextoCliente,
+          dados.limite || 5
+        );
+
+        if (resultadoFallback.produtos.length > 0) {
+          const produtosFallback = this.removerDuplicatasEOrdenar(
+            resultadoFallback.produtos,
+            dados.limite || 5
+          );
+          return this.construirResposta(resultadoFallback, produtosFallback, Date.now() - inicio, incluirMetricas);
+        }
+
+        return this.construirRespostaVazia(dados.query, resultado, Date.now() - inicio);
+      }
+
+      // 4. FASE 3: Validação de coerência contextual via LLM (Camada 3 - condicional)
+      // Ativar apenas se similaridade média estiver entre 0.35 e 0.50 (zona cinza)
+      if (resultadoSemantica.similaridadeMedia && 
+          resultadoSemantica.similaridadeMedia >= 0.35 && 
+          resultadoSemantica.similaridadeMedia < 0.50) {
+        
+        const resultadoLLM = await this.validadorCoerenciaLLM.validarCoerenciaContextual(
+          dados.query,
+          resultado.produtos
+        );
+
+        if (!resultadoLLM.valido) {
+          // Registra alucinação detectada (Camada 4)
+          this.aprendizadoAlucinacoes.registrarAlucinacao(
+            dados.query,
+            resultadoLLM.motivo,
+            resultado.produtos.length
+          );
+
+          Logger.warn(
+            `[ServicoRecomendacaoApplication] Validação LLM falhou: ${resultadoLLM.motivo}.`
+          );
+
+          return this.construirRespostaVazia(dados.query, resultado, Date.now() - inicio);
+        }
+      }
+
+      // 5. Registra query válida para aprendizado (Camada 4)
+      this.aprendizadoAlucinacoes.registrarQueryValida(
+        dados.query,
+        resultado.produtos.length
+      );
+
+      // 6. Remove duplicatas e ordena por similaridade (maior primeiro)
       const produtosDTO = this.removerDuplicatasEOrdenar(
         resultado.produtos,
         dados.limite || 5
       );
       const tempoResposta = Date.now() - inicio;
+
+      // Fallback: se não houver produtos, tenta query simplificada
+      if (produtosDTO.length === 0 && resultado.totalEncontrados > 0) {
+        Logger.warn(`[ServicoRecomendacaoApplication] Todos os produtos foram filtrados. Tentando query simplificada.`);
+
+        const resultadoFallback = await this.tentarQuerySimplificada(
+          dados.query,
+          contextoCliente,
+          dados.limite || 5
+        );
+
+        if (resultadoFallback.produtos.length > 0) {
+          const produtosFallback = this.removerDuplicatasEOrdenar(
+            resultadoFallback.produtos,
+            dados.limite || 5
+          );
+          return this.construirResposta(resultadoFallback, produtosFallback, Date.now() - inicio, incluirMetricas);
+        }
+      }
+
+      // Se ainda não houver produtos, retorna mensagem explicativa
+      if (produtosDTO.length === 0) {
+        return this.construirRespostaVazia(dados.query, resultado, Date.now() - inicio);
+      }
 
       return this.construirResposta(resultado, produtosDTO, tempoResposta, incluirMetricas);
     } catch (erro) {
@@ -953,8 +1057,21 @@ export class ServicoRecomendacaoApplication {
    * 
    * Formato: "tipo · gêneros · preço" (ex: "recomendacao · terror, suspense · até R$50").
    */
+  private montarMetricasDeterministicas(pipeline: MetricasPipelineRAG, tempoTotal: number): IMetricasDeterministicas {
+    return {
+      taxaAlucinacao: pipeline.taxaAlucinacao,
+      tempoEmbedding: pipeline.tempoEmbedding,
+      tempoBuscaVetorial: pipeline.tempoBuscaVetorial,
+      tempoValidacao: pipeline.tempoValidacao,
+      tempoTotal,
+      totalCandidatos: pipeline.totalCandidatos,
+      totalValidos: pipeline.totalValidos,
+      totalFiltrados: pipeline.totalCandidatos - pipeline.totalValidos,
+    };
+  }
+
   private resumirIntencao(intencao: IntencaoRecomendacao): string {
-    const partes = [intencao.tipo];
+    const partes: string[] = [intencao.tipo];
     if (intencao.generos.length) {
       partes.push(intencao.generos.join(', '));
     }
@@ -1321,5 +1438,55 @@ export class ServicoRecomendacaoApplication {
       );
       return new Set<string>();
     }
+  }
+
+  /**
+   * Tenta query simplificada removendo contexto absurdo
+   */
+  private async tentarQuerySimplificada(
+    queryOriginal: string,
+    contextoCliente: IContextoRecomendacao | null,
+    limite: number
+  ): Promise<RecomendacaoResultado> {
+    // Remove contextos temporais impossíveis
+    const querySimplificada = queryOriginal
+      .replace(/enquanto estou [a-z]+/gi, '')
+      .replace(/durante [a-z]+/gi, '')
+      .replace(/para [a-z]+ [a-z]+/gi, '')
+      .trim();
+
+    if (querySimplificada === queryOriginal || querySimplificada.length < 10) {
+      return { produtos: [], contextoUsado: false, totalEncontrados: 0, totalValidos: 0, query: querySimplificada };
+    }
+
+    Logger.info(`[ServicoRecomendacaoApplication] Tentando query simplificada: "${querySimplificada}"`);
+
+    return this.executarPipelineRecomendacao(querySimplificada, contextoCliente, { limite });
+  }
+
+  /**
+   * Constrói resposta vazia com explicação ao usuário
+   */
+  private construirRespostaVazia(
+    query: string,
+    resultado: RecomendacaoResultado,
+    tempoResposta: number
+  ): IRecomendarResponseDTO {
+    let mensagem = 'Não encontrei livros que correspondam à sua solicitação.';
+
+    if (resultado.totalEncontrados === 0) {
+      mensagem += ' Tente ser mais específico sobre o gênero ou autor.';
+    } else if (resultado.totalValidos === 0) {
+      mensagem += ' A combinação de termos pode não ter correspondência no catálogo. Tente simplificar sua busca.';
+    }
+
+    return {
+      query,
+      produtos: [],
+      contextoUsado: resultado.contextoUsado,
+      totalEncontrados: resultado.totalEncontrados,
+      totalValidos: resultado.totalValidos,
+      tempoRespostaMs: tempoResposta,
+    };
   }
 }

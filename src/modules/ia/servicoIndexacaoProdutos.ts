@@ -20,8 +20,16 @@ export interface IServicoLivros {
  * para busca semântica. Utiliza chunking automático via ServicoGeracaoEmbedding
  * para produtos com sinopses longas, armazenando múltiplos embeddings por
  * produto quando necessário para melhor cobertura semântica no RAG.
+ * 
+ * Processamento paralelo:
+ * - Livros são processados em batches de 5 (concorrência controlada)
+ * - Chunks de cada livro são processados em paralelo
+ * - Limitação de concorrência para evitar rate limiting da API Gemini
  */
 export class ServicoIndexacaoProdutos {
+  private readonly TAMANHO_BATCH_LIVROS = 5; // Processa 5 livros em paralelo
+  private readonly MAX_CONCORRENCIA_EMBEDDINGS = 3; // Max 3 embeddings simultâneos por livro
+
   constructor(
     private servicoLivros: IServicoLivros,
     private repositorioEmbedding: IRepositorioEmbedding,
@@ -32,10 +40,10 @@ export class ServicoIndexacaoProdutos {
   /**
    * Indexa todos os produtos do catálogo no ChromaDB.
    *
-   * Para cada livro:
-   * - Gera chunks do texto (1 chunk para sinopses curtas, N chunks para longas)
-   * - Gera embedding individual por chunk via Gemini
-   * - Armazena cada embedding com o mesmo produtoUuid no ChromaDB
+   * Processamento paralelo:
+   * - Livros são processados em batches de 5 (concorrência controlada)
+   * - Chunks de cada livro são processados em paralelo
+   * - Limitação de concorrência para evitar rate limiting da API Gemini
    *
    * @returns Total de produtos indexados com sucesso (independente do nº de chunks)
    */
@@ -43,7 +51,7 @@ export class ServicoIndexacaoProdutos {
     const inicio = Date.now();
 
     try {
-      Logger.info('[ServicoIndexacaoProdutos] Iniciando indexação do catálogo com chunking');
+      Logger.info('[ServicoIndexacaoProdutos] Iniciando indexação do catálogo com processamento paralelo');
 
       const livros = await this.servicoLivros.listarParaAdmin(1000);
       Logger.info(`[ServicoIndexacaoProdutos] ${livros.length} livros encontrados`);
@@ -56,28 +64,34 @@ export class ServicoIndexacaoProdutos {
       let indexados = 0;
       let totalChunksGerados = 0;
 
-      for (const livro of livros) {
-        try {
-          const chunksGerados = await this.indexarLivro(livro);
+      // Processa livros em batches para controlar concorrência
+      for (let i = 0; i < livros.length; i += this.TAMANHO_BATCH_LIVROS) {
+        const batch = livros.slice(i, i + this.TAMANHO_BATCH_LIVROS);
+        
+        Logger.info(`[ServicoIndexacaoProdutos] Processando batch ${Math.floor(i / this.TAMANHO_BATCH_LIVROS) + 1} (${batch.length} livros)`);
 
-          Logger.debug(
-            `[ServicoIndexacaoProdutos] "${livro.titulo}": ${chunksGerados} chunk(s)`
-          );
+        // Processa todos os livros do batch em paralelo
+        const resultados = await Promise.allSettled(
+          batch.map((livro) => this.indexarLivro(livro))
+        );
 
-          totalChunksGerados += chunksGerados;
-          indexados++;
-        } catch (erro) {
-          const mensagem = erro instanceof Error ? erro.message : String(erro);
-          Logger.error(
-            `[ServicoIndexacaoProdutos] Erro ao indexar livro ${livro.uuid}: ${mensagem}`
-          );
+        // Conta sucessos e falhas
+        for (const resultado of resultados) {
+          if (resultado.status === 'fulfilled') {
+            totalChunksGerados += resultado.value;
+            indexados++;
+          } else {
+            const mensagem = resultado.reason instanceof Error ? resultado.reason.message : String(resultado.reason);
+            Logger.error(`[ServicoIndexacaoProdutos] Erro ao indexar livro: ${mensagem}`);
+          }
         }
       }
 
       const tempoExecucao = Date.now() - inicio;
       Logger.info(
         `[ServicoIndexacaoProdutos] Indexação concluída: ${indexados}/${livros.length} livros` +
-          ` | ${totalChunksGerados} embeddings gerados | ${tempoExecucao}ms`
+          ` | ${totalChunksGerados} embeddings gerados | ${tempoExecucao}ms` +
+          ` | ${(tempoExecucao / 1000).toFixed(2)}s`
       );
 
       return indexados;
@@ -147,6 +161,10 @@ export class ServicoIndexacaoProdutos {
    * Para sinopses longas, aplica chunking automático (via ServicoGeracaoEmbedding)
    * e armazena um embedding por chunk, todos associados ao mesmo produtoUuid.
    * Método privado reutilizado por indexarCatalogo() e indexarProduto().
+   * 
+   * Processamento paralelo:
+   * - Chunks são processados em paralelo com limitação de concorrência
+   * - Evita rate limiting da API Gemini
    *
    * @param livro - Dados do livro a indexar
    * @returns Número de chunks/embeddings gerados para o livro
@@ -172,28 +190,56 @@ export class ServicoIndexacaoProdutos {
     // Obtém chunks — 1 para sinopses curtas, N para longas (chunking automático)
     const chunks = this.servicoGeracaoEmbedding.gerarChunksDoProduto(metadados);
 
-    // Gera e armazena embedding para cada chunk individualmente
-    for (let indiceChunk = 0; indiceChunk < chunks.length; indiceChunk++) {
-      const embedding = await this.adapterEmbedding.gerarEmbedding(chunks[indiceChunk]);
+    // Processa chunks em paralelo com limitação de concorrência
+    const embeddings = await this.processarChunksEmParalelo(chunks);
 
-      await this.repositorioEmbedding.criar({
-        produtoUuid: livro.uuid,
-        embedding,
-        metadados: {
-          titulo: metadados.titulo,
-          autor: metadados.autor,
-          categoria: metadados.categoria,
-          sinopse: metadados.sinopse,
-          isbn: metadados.isbn,
-          preco: metadados.preco,
-          numeroPaginas: metadados.numeroPaginas,
-          anoPublicacao: metadados.anoPublicacao,
-          idioma: metadados.idioma,
-          tags: metadados.tags?.join(','),
-        },
-      });
-    }
+    // Armazena todos os embeddings em paralelo
+    await Promise.all(
+      embeddings.map((embedding) =>
+        this.repositorioEmbedding.criar({
+          produtoUuid: livro.uuid,
+          embedding,
+          metadados: {
+            titulo: metadados.titulo,
+            autor: metadados.autor,
+            categoria: metadados.categoria,
+            sinopse: metadados.sinopse,
+            isbn: metadados.isbn,
+            preco: metadados.preco,
+            numeroPaginas: metadados.numeroPaginas,
+            anoPublicacao: metadados.anoPublicacao,
+            idioma: metadados.idioma,
+            tags: metadados.tags?.join(','),
+          },
+        })
+      )
+    );
 
     return chunks.length;
+  }
+
+  /**
+   * Processa chunks em paralelo com limitação de concorrência.
+   * Evita rate limiting da API Gemini.
+   * 
+   * @param chunks - Array de chunks para gerar embeddings
+   * @returns Array de embeddings gerados
+   */
+  private async processarChunksEmParalelo(chunks: string[]): Promise<number[][]> {
+    const embeddings: number[][] = [];
+    
+    // Processa chunks em batches controlados
+    for (let i = 0; i < chunks.length; i += this.MAX_CONCORRENCIA_EMBEDDINGS) {
+      const batch = chunks.slice(i, i + this.MAX_CONCORRENCIA_EMBEDDINGS);
+      
+      // Gera embeddings do batch em paralelo
+      const batchEmbeddings = await Promise.all(
+        batch.map((chunk) => this.adapterEmbedding.gerarEmbedding(chunk))
+      );
+      
+      embeddings.push(...batchEmbeddings);
+    }
+    
+    return embeddings;
   }
 }

@@ -12,15 +12,18 @@ import { ServicoIndexacaoProdutos } from './servicoIndexacaoProdutos';
 import { ServicoHealthCheckIA } from './servicoHealthCheckIA';
 import { IAdapterEmbedding } from './IAdapterEmbedding';
 import { RepositorioRecomendacaoPostgres } from './repositorioRecomendacaoPostgres';
+import { RepositorioPadroesValidacaoIA } from './repositorioPadroesValidacaoIA';
+import { ServicoCachePadroesValidacaoIA } from './servicoCachePadroesValidacaoIA';
 import { ConexaoPostgres } from '@/shared/infrastructure/database/ConexaoPostgres';
 import { ServicoLivros } from '@/modules/livros/servicoLivros';
 import { RepositorioLivrosPostgres } from '@/modules/livros/repositorioLivrosPostgres';
 import { RepositorioLivrosBulkInsert } from '@/modules/livros/repositorioLivrosBulkInsert';
+import { ClassificadorDominioIA } from './classificadorDominioIA';
 import { middlewareErroIa } from './erroIa.middleware';
 import { limiteRequisicaoIA } from './limiteRequisicaoIA.middleware';
 import { logAuditoriaIA } from './logAuditoriaIA.middleware';
 import { autenticacaoMiddleware } from '@/shared/middlewares/autenticacao.middleware';
-import { adminOnlyMiddleware, clienteOnlyMiddleware } from '@/shared/middlewares/autorizacao.middleware';
+import { adminOnlyMiddleware, clienteOnlyMiddleware, autenticadoMiddleware } from '@/shared/middlewares/autorizacao.middleware';
 
 /**
  * Rotas do módulo de Recomendação de Produtos
@@ -42,6 +45,10 @@ const repositorioRecomendacao = new RepositorioRecomendacaoPostgres(pool);
 const repoLivros = new RepositorioLivrosPostgres(conexaoPostgres);
 const bulkInsertLivros = new RepositorioLivrosBulkInsert(conexaoPostgres);
 const servicoLivros = new ServicoLivros(repoLivros, bulkInsertLivros);
+
+// Cache de padrões de validação com TTL 10 min — permite aprendizado automático sem redeploy
+const repositorioPadroesValidacao = new RepositorioPadroesValidacaoIA(pool);
+const cachePadroesValidacao = new ServicoCachePadroesValidacaoIA(repositorioPadroesValidacao);
 
 // Cache de produtos com TTL 5 min — evita consulta ao catálogo a cada requisição de IA
 const cacheProdutos = new ServicoCacheProdutos(servicoLivros);
@@ -81,9 +88,15 @@ const servicoHealthCheck = new ServicoHealthCheckIA(
   adapterLangChain
 );
 
+const classificadorDominio = new ClassificadorDominioIA(adapterLangChain);
+
 const controladorRecomendacao = new ControladorRecomendacao(
   servicoRecomendacao,
-  servicoHealthCheck
+  servicoHealthCheck,
+  adapterLangChain,
+  adapterLangChain,
+  cachePadroesValidacao,
+  classificadorDominio
 );
 
 const router = Router();
@@ -94,17 +107,17 @@ router.use(logAuditoriaIA);
 // TEMPORARIAMENTE DESABILITADO DEVIDO A ERRO IPv6 NO express-rate-limit
 // router.use(limiteRequisicaoIA);
 
-// ── Rotas de clientes autenticados (plano IA 5.1 / 5.2) ───────────────────────
+// ── Rotas de usuários autenticados (qualquer papel: cliente, admin, admin_sistema) ─────
 router.post(
   '/recomendar',
   autenticacaoMiddleware,
-  clienteOnlyMiddleware,
+  autenticadoMiddleware,
   controladorRecomendacao.recomendar,
 );
 router.post(
   '/chat',
   autenticacaoMiddleware,
-  clienteOnlyMiddleware,
+  autenticadoMiddleware,
   controladorRecomendacao.chat,
 );
 
@@ -116,9 +129,9 @@ router.get('/metricas/:periodo', controladorRecomendacao.buscarMetricas);
 router.get('/metricas', controladorRecomendacao.buscarMetricas);
 
 // ── Rotas administrativas ──────────────────────────────────────────────────────
-// Rota protegida: exige autenticação válida (autenticacaoMiddleware) e papel de
-// administrador (adminOnlyMiddleware) para disparar a reindexação do catálogo.
-router.post('/reindexar', autenticacaoMiddleware, adminOnlyMiddleware, controladorRecomendacao.reindexar);
+// Rota protegida: exige autenticação válida (autenticacaoMiddleware) para disparar
+// a reindexação do catálogo. Acessível por todos os papéis autenticados.
+router.post('/reindexar', autenticacaoMiddleware, autenticadoMiddleware, controladorRecomendacao.reindexar);
 
 // ── Utilitários ────────────────────────────────────────────────────────────────
 router.get('/saude', controladorRecomendacao.saude);

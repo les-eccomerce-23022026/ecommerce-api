@@ -55,7 +55,8 @@ export class FixedSizeChunking implements ChunkingStrategy {
 
       // Se houver separador configurado, tenta quebrar no separador mais próximo
       if (this.config.separador && fim < texto.length) {
-        const ultimaSeparacao = chunkTexto.lastIndexOf(this.config.separador);
+        const sep = Array.isArray(this.config.separador) ? this.config.separador[0] : this.config.separador;
+        const ultimaSeparacao = chunkTexto.lastIndexOf(sep);
         if (ultimaSeparacao > tamanho * 0.5) {
           chunkTexto = chunkTexto.substring(0, ultimaSeparacao + 1);
         }
@@ -88,7 +89,8 @@ export class SemanticChunking implements ChunkingStrategy {
 
   chunkificar(texto: string): Chunk[] {
     const chunks: Chunk[] = [];
-    const separador = this.config.separador!;
+    const separadorRaw = this.config.separador!;
+    const separador = Array.isArray(separadorRaw) ? separadorRaw[0] : separadorRaw;
     const partes = texto.split(separador);
     
     let chunkAtual = '';
