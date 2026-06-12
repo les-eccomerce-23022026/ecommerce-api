@@ -9,6 +9,8 @@ import {
   IChatResponseDTO,
   IReindexarRequestDTO,
   IReindexarResponseDTO,
+  ContextoRequisicaoIA,
+  TipoContextoIA,
 } from './IRecomendacao.dto';
 import { PeriodoMetrica } from './IRepositorioRecomendacao';
 import { ErroIa } from './erroIa.middleware';
@@ -29,6 +31,7 @@ import { IAdapterEmbedding } from './IAdapterEmbedding';
 import { AdapterLangChainGemini } from './adapterLangChainGemini';
 import { ServicoCachePadroesValidacaoIA } from './servicoCachePadroesValidacaoIA';
 import type { IClassificadorDominio } from './IClassificadorDominio';
+import { PAPEL_CLIENTE, PAPEL_ADMIN, PAPEL_ADMIN_SISTEMA } from '@/shared/types/papeis';
 
 /** Períodos válidos para filtro de métricas de recomendação */
 const PERIODOS_VALIDOS: ReadonlySet<string> = new Set<PeriodoMetrica>([
@@ -57,6 +60,55 @@ export class ControladorRecomendacao {
     this.servicoValidacaoSeguranca = new ServicoValidacaoSegurancaIA(adapterEmbedding, adapterLLM, cachePadroesValidacao, classificadorDominio);
   }
 
+  /**
+   * Determina o contexto de requisição IA baseado no papel do usuário.
+   * 
+   * SRP: Single Responsibility Principle - isolada para facilitar testes e manutenção.
+   * 
+   * @param req Requisição Express com usuário autenticado
+   * @returns Contexto de requisição com tipo, clienteUuid e lojId
+   */
+  private determinarContextoRequisicao(req: Request): ContextoRequisicaoIA {
+    const { usuario } = req;
+
+    if (!usuario || !usuario.papeis || usuario.papeis.length === 0) {
+      throw new ErroIa('USUARIO_NAO_AUTENTICADO', 'Usuário não autenticado ou sem papéis definidos.', 401);
+    }
+
+    const papeis = usuario.papeis;
+    const lojId = usuario.loj_id_atual || 1;
+
+    // Prioridade: admin_sistema > admin > cliente
+    if (papeis.includes(PAPEL_ADMIN_SISTEMA.descricao)) {
+      return {
+        tipo: TipoContextoIA.ADMIN_SISTEMA,
+        clienteUuid: null, // Admin sistema não tem contexto de cliente específico
+        lojId,
+        papeis,
+      };
+    }
+
+    if (papeis.includes(PAPEL_ADMIN.descricao)) {
+      return {
+        tipo: TipoContextoIA.ADMIN_LOJA,
+        clienteUuid: null, // Admin loja não tem contexto de cliente específico
+        lojId,
+        papeis,
+      };
+    }
+
+    if (papeis.includes(PAPEL_CLIENTE.descricao)) {
+      return {
+        tipo: TipoContextoIA.CLIENTE,
+        clienteUuid: usuario.uuid, // Cliente acessa apenas seus próprios dados
+        lojId,
+        papeis,
+      };
+    }
+
+    throw new ErroIa('PAPEL_NAO_AUTORIZADO', 'Papel não autorizado para chat de recomendação.', 403);
+  }
+
   private obterStatusHttpErro(erro: unknown, padrao: number): number {
     if (erro instanceof ErroIa) {
       return erro.statusCode;
@@ -79,6 +131,9 @@ export class ControladorRecomendacao {
    */
   recomendar = async (req: Request, res: Response): Promise<void> => {
     try {
+      // Determina contexto baseado no papel do usuário (SRP)
+      const contextoIA = this.determinarContextoRequisicao(req);
+
       // Health check de dependências antes de processar requisição
       const saude = await this.servicoHealthCheck.verificarTodasDependencias();
       if (!this.servicoHealthCheck.estaSaudavel()) {
@@ -131,7 +186,10 @@ export class ControladorRecomendacao {
         return;
       }
 
-      const clienteUuid = req.usuario?.uuid ?? dados.clienteUuid;
+      // CORREÇÃO: Usa clienteUuid do contexto determinado pelo papel
+      // Se for admin, clienteUuid será null (acesso a dados agregados)
+      // Se for cliente, clienteUuid será o UUID do próprio cliente
+      const clienteUuid = contextoIA.clienteUuid ?? dados.clienteUuid;
       const erroClienteUuid = validarClienteUuidOpcional(clienteUuid);
       if (erroClienteUuid) {
         RespostaPadrao.enviarErro(res, 400, erroClienteUuid);
@@ -148,6 +206,7 @@ export class ControladorRecomendacao {
         query: querySanitizada,
         clienteUuid,
         incluirMetricas: dados.incluirMetricas ?? false,
+        contextoIA, // Passa contexto para serviço de aplicação
       });
       RespostaPadrao.enviarSucesso(res, 200, resultado);
     } catch (erro) {
@@ -165,6 +224,9 @@ export class ControladorRecomendacao {
    */
   chat = async (req: Request, res: Response): Promise<void> => {
     try {
+      // Determina contexto baseado no papel do usuário (SRP)
+      const contextoIA = this.determinarContextoRequisicao(req);
+
       // Health check de dependências antes de processar requisição
       const saude = await this.servicoHealthCheck.verificarTodasDependencias();
       if (!this.servicoHealthCheck.estaSaudavel()) {
@@ -237,7 +299,10 @@ export class ControladorRecomendacao {
         }
       }
 
-      const clienteUuid = req.usuario?.uuid ?? dados.clienteUuid;
+      // CORREÇÃO: Usa clienteUuid do contexto determinado pelo papel
+      // Se for admin, clienteUuid será null (acesso a dados agregados)
+      // Se for cliente, clienteUuid será o UUID do próprio cliente
+      const clienteUuid = contextoIA.clienteUuid ?? dados.clienteUuid;
       const erroClienteUuid = validarClienteUuidOpcional(clienteUuid);
       if (erroClienteUuid) {
         RespostaPadrao.enviarErro(res, 400, erroClienteUuid);
@@ -249,6 +314,7 @@ export class ControladorRecomendacao {
         mensagem: mensagemSanitizada,
         clienteUuid,
         incluirMetricas: dados.incluirMetricas ?? false,
+        contextoIA, // Passa contexto para serviço de aplicação
       });
       RespostaPadrao.enviarSucesso(res, 200, resultado);
     } catch (erro) {

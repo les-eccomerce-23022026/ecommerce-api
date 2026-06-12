@@ -24,6 +24,50 @@ import { limiteRequisicaoIA } from './limiteRequisicaoIA.middleware';
 import { logAuditoriaIA } from './logAuditoriaIA.middleware';
 import { autenticacaoMiddleware } from '@/shared/middlewares/autenticacao.middleware';
 import { adminOnlyMiddleware, clienteOnlyMiddleware, autenticadoMiddleware } from '@/shared/middlewares/autorizacao.middleware';
+import { PAPEL_CLIENTE, PAPEL_ADMIN, PAPEL_ADMIN_SISTEMA } from '@/shared/types/papeis';
+import { Request, Response, NextFunction } from 'express';
+
+/**
+ * Middleware para validar acesso ao chat de recomendação IA.
+ * 
+ * Permite acesso a clientes e administradores, mas garante que o contexto
+ * seja isolado baseado no papel do usuário:
+ * - Cliente: acesso apenas aos próprios dados (vendas, pedidos, histórico)
+ * - Admin: acesso a dados agregados da loja (não dados pessoais de clientes)
+ * - Admin Sistema: acesso a dados agregados globais
+ * 
+ * Este middleware não bloqueia acesso, apenas valida que o usuário
+ * tem um papel válido. A lógica de isolamento de contexto é implementada
+ * no serviço de aplicação (SRP - Single Responsibility Principle).
+ */
+function validarAcessoChatIA(req: Request, res: Response, next: NextFunction): void {
+  const { usuario } = req;
+
+  if (!usuario || !usuario.papeis || usuario.papeis.length === 0) {
+    res.status(401).json({
+      mensagem: 'Usuário não autenticado ou sem papéis definidos.',
+      sucesso: false,
+    });
+    return;
+  }
+
+  const temPapelValido = usuario.papeis.some(
+    (papel) => 
+      papel === PAPEL_CLIENTE.descricao || 
+      papel === PAPEL_ADMIN.descricao || 
+      papel === PAPEL_ADMIN_SISTEMA.descricao
+  );
+
+  if (!temPapelValido) {
+    res.status(403).json({
+      mensagem: 'Acesso negado. Papel não autorizado para chat de recomendação.',
+      sucesso: false,
+    });
+    return;
+  }
+
+  next();
+}
 
 /**
  * Rotas do módulo de Recomendação de Produtos
@@ -108,16 +152,18 @@ router.use(logAuditoriaIA);
 // router.use(limiteRequisicaoIA);
 
 // ── Rotas de usuários autenticados (qualquer papel: cliente, admin, admin_sistema) ─────
+// Middleware validarAcessoChatIA garante que apenas papéis válidos acessem o chat
+// A lógica de isolamento de contexto é implementada no serviço de aplicação
 router.post(
   '/recomendar',
   autenticacaoMiddleware,
-  autenticadoMiddleware,
+  validarAcessoChatIA,
   controladorRecomendacao.recomendar,
 );
 router.post(
   '/chat',
   autenticacaoMiddleware,
-  autenticadoMiddleware,
+  validarAcessoChatIA,
   controladorRecomendacao.chat,
 );
 

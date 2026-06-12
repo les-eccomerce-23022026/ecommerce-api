@@ -18,13 +18,25 @@ export class ServicoInterpretacaoIntencao {
     historico: MensagemChatDTO[] | undefined,
     contexto: ContextoInterpretacaoIntencao
   ): Promise<IntencaoRecomendacao> {
+    // Fast-path heurístico: para mensagens simples sem histórico (primeiro turno)
+    // e com sinal claro (gênero explícito, pós-venda óbvio), evita o round-trip
+    // ao Gemini (~3-8s). Princípio: tiered classification — use o classificador
+    // mais barato que resolve o caso. Confiança >= 0.75 indica sinal suficiente.
+    const heuristica = this.intencaoHeuristica(mensagem);
+    if (heuristica.confianca >= 0.75 && !historico?.length) {
+      Logger.debug(
+        `[ServicoInterpretacaoIntencao] Fast-path heurístico (confiança=${heuristica.confianca}, tipo=${heuristica.tipo}) — Gemini ignorado`
+      );
+      return ajustarPrecisaEsclarecer(heuristica);
+    }
+
     try {
       const intencao = await this.adapterGemini.interpretarIntencao(mensagem, historico, contexto);
       return ajustarPrecisaEsclarecer(intencao);
     } catch (erro) {
       const msg = erro instanceof Error ? erro.message : String(erro);
       Logger.warn(`[ServicoInterpretacaoIntencao] Fallback heurístico: ${msg}`);
-      return ajustarPrecisaEsclarecer(this.intencaoHeuristica(mensagem));
+      return ajustarPrecisaEsclarecer(heuristica);
     }
   }
 
@@ -87,36 +99,78 @@ export class ServicoInterpretacaoIntencao {
     return 1;
   }
 
+  // Pré-compilados no nível de classe: compilar regex no hot path a cada call é
+  // alocação desnecessária — aqui são constantes determinísticas (sem estado).
+  private static readonly REGEX_PRECO = /(?:até|max|máximo)\s*r?\$?\s*(\d+)/;
+  private static readonly REGEX_PAGINAS = /(\d+)\s*p[aá]ginas?/;
+  private static readonly REGEX_QUANTIDADE = /(\d+)\s+livros?/;
+  private static readonly SINAIS_POSVENDA = /\b(pedido|entrega|rastreamento|prazo|cancelar|troca|devolucao|devolução|status|chegou|chegará|onde está)\b/;
+  private static readonly SINAIS_TENDENCIAS = /\b(mais vendidos?|populares?|ranking|tendência|tendencia|lançamentos?)\b/;
+  private static readonly MAPA_GENEROS: ReadonlyArray<readonly [string, string]> = [
+    ['ficção científica', 'ficcao_cientifica'],
+    ['ficcao cientifica', 'ficcao_cientifica'],
+    ['romance histórico', 'romance_historico'],
+    ['romance historico', 'romance_historico'],
+    ['romance', 'romance'],
+    ['terror', 'terror'],
+    ['suspense', 'suspense'],
+    ['fantasia', 'fantasia'],
+    ['mistério', 'misterio'],
+    ['misterio', 'misterio'],
+    ['humor', 'humor'],
+    ['distopia', 'distopia'],
+    ['infantil', 'infantil'],
+    ['juvenil', 'juvenil'],
+    ['tecnologia', 'tecnologia'],
+    ['programação', 'programacao'],
+    ['programacao', 'programacao'],
+  ];
+
   private intencaoHeuristica(mensagem: string): IntencaoRecomendacao {
     const texto = mensagem.toLowerCase();
-    const precoMatch = texto.match(/(?:até|max|máximo)\s*r?\$?\s*(\d+)/);
-    const paginasMatch = texto.match(/(\d+)\s*p[aá]ginas?/);
-    const quantidadeMatch = texto.match(/(\d+)\s+livros?/);
 
+    // Sinalização de pós-venda — confiança alta, tipo determinístico
+    if (ServicoInterpretacaoIntencao.SINAIS_POSVENDA.test(texto)) {
+      return {
+        tipo: 'pos_venda',
+        generos: [],
+        quantidadeLivros: 1,
+        precisaEsclarecer: false,
+        queryBusca: mensagem,
+        confianca: 0.85,
+      };
+    }
+
+    // Sinalização de tendências — confiança alta
+    if (ServicoInterpretacaoIntencao.SINAIS_TENDENCIAS.test(texto)) {
+      return {
+        tipo: 'tendencias',
+        generos: [],
+        quantidadeLivros: 5,
+        precisaEsclarecer: false,
+        queryBusca: mensagem,
+        confianca: 0.80,
+      };
+    }
+
+    const precoMatch = ServicoInterpretacaoIntencao.REGEX_PRECO.exec(texto);
+    const paginasMatch = ServicoInterpretacaoIntencao.REGEX_PAGINAS.exec(texto);
+    const quantidadeMatch = ServicoInterpretacaoIntencao.REGEX_QUANTIDADE.exec(texto);
     const precoMax = this.extrairPrecoMaximo(texto, precoMatch);
 
     const generos: string[] = [];
-    const mapaGeneros: Record<string, string> = {
-      romance: 'romance',
-      terror: 'terror',
-      suspense: 'suspense',
-      fantasia: 'fantasia',
-      'ficção científica': 'ficcao_cientifica',
-      'ficcao cientifica': 'ficcao_cientifica',
-      mistério: 'misterio',
-      misterio: 'misterio',
-      humor: 'humor',
-      distopia: 'distopia',
-    };
-
-    for (const [termo, tag] of Object.entries(mapaGeneros)) {
-      if (texto.includes(termo)) {
+    for (const [termo, tag] of ServicoInterpretacaoIntencao.MAPA_GENEROS) {
+      if (texto.includes(termo) && !generos.includes(tag)) {
         generos.push(tag);
       }
     }
 
     const ambiguo = this.verificarAmbiguidadePresente(texto);
     const quantidadeLivros = this.determinarQuantidadeLivros(texto, quantidadeMatch, generos.length);
+
+    // Confiança alta: gênero explícito identificado sem ambiguidade
+    // Confiança baixa: mensagem genérica sem sinal claro → Gemini decide
+    const confianca = !ambiguo && generos.length > 0 ? 0.80 : 0.4;
 
     return {
       tipo: ambiguo ? 'esclarecimento' : 'recomendacao',
@@ -129,7 +183,7 @@ export class ServicoInterpretacaoIntencao {
         ? ['Para quem é o presente e qual a faixa etária do destinatário?']
         : undefined,
       queryBusca: mensagem,
-      confianca: 0.4,
+      confianca,
     };
   }
 }

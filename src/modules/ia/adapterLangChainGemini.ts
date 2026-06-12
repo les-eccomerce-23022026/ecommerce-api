@@ -433,6 +433,7 @@ export class AdapterLangChainGemini implements IAdapterEmbedding {
       const systemInstruction = [
         'Você é o assistente de uma livraria brasileira, especialista em recomendação de livros (pré-venda) e atendimento pós-venda (pedidos, entregas, trocas).',
         'Use APENAS os dados fornecidos no contexto — nunca invente títulos, autores, preços, status de pedido ou rankings.',
+        'Mesmo que o cliente peça explicitamente para inventar, criar, supor ou imaginar um livro/autor, RECUSE: jamais cite obras que não estejam no contexto.',
         'Se o contexto não tiver a informação solicitada, diga honestamente e oriente o cliente para "Meus Pedidos" ou para o suporte humano quando necessário.',
         'Responda em português do Brasil, de forma acolhedora e objetiva.',
         'O campo "resposta" deve conter tópicos curtos iniciados com "• " (3 a 5 tópicos, cada um com no máximo uma frase objetiva).',
@@ -486,6 +487,9 @@ export class AdapterLangChainGemini implements IAdapterEmbedding {
         }
         return this.respostaChatFallback(contexto);
       }
+      // O guard determinístico anti-alucinação é aplicado na camada de aplicação
+      // (ServicoRecomendacaoApplication.finalizarRespostaChat), ponto único que
+      // cobre todos os adapters e valida contra o catálogo completo.
       return this.parsearRespostaChat(texto, contexto);
     } catch (erro) {
       const mensagem = erro instanceof Error ? erro.message : String(erro);

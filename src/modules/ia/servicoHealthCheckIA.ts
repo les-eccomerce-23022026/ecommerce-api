@@ -41,6 +41,13 @@ const PREFIXO_LOG = '[ServicoHealthCheckIA]';
 /** Tempo máximo de espera por verificação, em milissegundos */
 const TIMEOUT_VERIFICACAO_MS = 2000;
 
+/**
+ * TTL do cache de health check (ms).
+ * Evita disparar um embedding Gemini em CADA requisição de chat/recomendar.
+ * 30s é conservador: detecta falhas rapidamente sem custo por request.
+ */
+const HEALTH_CACHE_TTL_MS = 30_000;
+
 /** Texto mínimo enviado ao Gemini como requisição de ping */
 const TEXTO_PING_GEMINI = 'ping';
 
@@ -131,6 +138,10 @@ function resolverChaveStatus(
  * ```
  */
 export class ServicoHealthCheckIA {
+  /** Cache do último resultado de saúde — evita hit em Gemini/ChromaDB por request. */
+  private cacheResultado: ISaudeIaResultado | null = null;
+  private cacheExpiresAt = 0;
+
   constructor(
     private readonly repositorioChromaDB: IRepositorioEmbedding,
     private readonly adapterGemini: IAdapterEmbedding,
@@ -239,6 +250,15 @@ export class ServicoHealthCheckIA {
    * @returns `ISaudeIaResultado` com status consolidado, timestamp e detalhes
    */
   async verificarTodasDependencias(): Promise<ISaudeIaResultado> {
+    // Cache hit: evita embedding Gemini em cada request de chat/recomendar.
+    // Princípio: health checks são probes de disponibilidade, não devem ser
+    // blocking I/O no critical path — TTL de 30s é conservador e suficiente.
+    const agora = Date.now();
+    if (this.cacheResultado && agora < this.cacheExpiresAt) {
+      Logger.debug(`${PREFIXO_LOG} Cache hit (expira em ${Math.round((this.cacheExpiresAt - agora) / 1000)}s)`);
+      return this.cacheResultado;
+    }
+
     Logger.info(`${PREFIXO_LOG} Iniciando verificação paralela de dependências...`);
 
     const [chromadb, gemini] = await Promise.all([
@@ -260,6 +280,9 @@ export class ServicoHealthCheckIA {
       ` | chromadb: ${chromadb.ok} (${chromadb.latencyMs}ms)` +
       ` | gemini: ${gemini.ok} (${gemini.latencyMs}ms)`,
     );
+
+    this.cacheResultado = resultado;
+    this.cacheExpiresAt = agora + HEALTH_CACHE_TTL_MS;
 
     return resultado;
   }

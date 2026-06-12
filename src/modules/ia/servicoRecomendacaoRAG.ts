@@ -10,6 +10,17 @@ import { Logger } from '@/shared/utils/Logger.util';
 const LIMIAR_TAXA_ALUCINACAO_ALERTA = 0.5;
 
 /**
+ * Lambda do MMR (trade-off relevância × diversidade), configurável via env.
+ * Valores altos priorizam relevância semântica — evita que itens de categoria
+ * muito distinta (ex.: Tecnologia numa busca de Romance) sejam promovidos
+ * apenas por maximizarem a diversidade de metadados. Default 0.7.
+ */
+const MMR_LAMBDA = (() => {
+  const valor = parseFloat(process.env.RAG_MMR_LAMBDA || '0.7');
+  return Number.isFinite(valor) && valor >= 0 && valor <= 1 ? valor : 0.7;
+})();
+
+/**
  * Serviço de Domínio para Recomendação com RAG
  * 
  * Responsável por orquestrar o fluxo de recomendação usando RAG:
@@ -208,8 +219,8 @@ export class ServicoRecomendacaoRAG {
       };
     });
 
-    // Aplica MMR com lambda balanceado (0.5)
-    const mmr = new MMRReranking({ lambda: 0.5 });
+    // Aplica MMR com lambda configurável (env RAG_MMR_LAMBDA, default 0.7 = prioriza relevância)
+    const mmr = new MMRReranking({ lambda: MMR_LAMBDA });
     const reranked = mmr.reranking(mmrOptions, limite);
 
     // Converte de volta para ProdutoRecomendado

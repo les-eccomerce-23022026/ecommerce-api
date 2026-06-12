@@ -42,3 +42,19 @@ export interface ICriarProdutoEmbeddingDto {
     tags?: string;
   };
 }
+
+/**
+ * Metadados de domínio de um produto (camelCase), compartilhados entre a
+ * entidade e os resultados de busca semântica.
+ */
+export type MetadadosProdutoEmbedding = IProdutoEmbedding['metadados'];
+
+/**
+ * Item retornado pela busca por similaridade no vector store.
+ * Tipagem forte do `metadados` — substitui o antigo `any`.
+ */
+export interface IResultadoBuscaSimilar {
+  produtoUuid: string;
+  similaridade: number;
+  metadados: MetadadosProdutoEmbedding;
+}

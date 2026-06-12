@@ -12,6 +12,7 @@ import {
 } from './IRepositorioRecomendacao';
 import { ServicoGeracaoEmbedding } from './servicoGeracaoEmbedding';
 import { ServicoValidacaoProdutos } from './servicoValidacaoProdutos';
+import { ServicoCacheProdutos } from './servicoCacheProdutos';
 import {
   ServicoRecomendacaoRAG,
   RecomendacaoResultado,
@@ -33,6 +34,8 @@ import {
   IChatResponseDTO,
   ProdutoRecomendadoDTO,
   MensagemChatDTO,
+  ContextoRequisicaoIA,
+  TipoContextoIA,
 } from './IRecomendacao.dto';
 import { STATUS_VENDAS } from '@/modules/vendas/constants/statusVendas.constant';
 import { Logger } from '@/shared/utils/Logger.util';
@@ -84,9 +87,20 @@ export interface OpcoesRecomendacaoInterna {
   limite?: number;
   /** UUIDs já exibidos em turnos anteriores — prioriza títulos novos */
   excluirUuids?: string[];
+  /**
+   * Embedding pré-computado da mensagem original.
+   * Quando presente, evita re-chamar a API de embedding dentro do pipeline.
+   * Produzido pela fase paralela do chat (dados.mensagem antes do enriquecimento).
+   */
+  embeddingPreComputado?: number[];
 }
 
 type HistoricoGemini = { papel: 'user' | 'model'; conteudo: string }[] | undefined;
+
+/** Timeouts para chamadas externas (ms). Evita que uma lentidão da API Gemini/Chroma bloqueie a requisição. */
+const TIMEOUT_EMBEDDING_MS = 8_000;
+const TIMEOUT_INTENCAO_MS = 12_000;
+const TIMEOUT_RESPOSTA_CHAT_MS = 15_000;
 
 /** Resultado interno da busca de produtos para chat com métricas de pipeline opcionais. */
 interface ResultadoBuscaProdutosChat {
@@ -132,20 +146,29 @@ export class ServicoRecomendacaoApplication {
    * 
    * Fluxo: Contexto cliente → Pipeline RAG → Remover duplicatas → Retornar resposta.
    * Útil para integrações diretas sem conversação.
+   * 
+   * CORREÇÃO: Implementa isolamento de contexto baseado em papel:
+   * - CLIENTE: busca contexto do próprio cliente
+   * - ADMIN_LOJA: usa contexto null (acesso a dados agregados da loja)
+   * - ADMIN_SISTEMA: usa contexto null (acesso a dados agregados globais)
    */
   async recomendar(dados: IRecomendarRequestDTO, incluirMetricas = false): Promise<IRecomendarResponseDTO> {
     const inicio = Date.now();
 
     try {
+      // CORREÇÃO: Determina se deve buscar contexto do cliente baseado no papel
+      const contextoIA = dados.contextoIA;
+      const deveBuscarContextoCliente = contextoIA?.tipo === TipoContextoIA.CLIENTE && contextoIA.clienteUuid;
+
       // Cache de contexto com escopo da requisição: evita múltiplas consultas ao banco
       // caso obterContextoCliente seja chamado mais de uma vez dentro do mesmo fluxo
       const cacheContextoRequisicao = new Map<string, IContextoRecomendacao | null>();
 
       // 1. Busca contexto personalizado do cliente (histórico, preferências)
-      const contextoCliente = await this.obterContextoCliente(
-        dados.clienteUuid,
-        cacheContextoRequisicao
-      );
+      // CORREÇÃO: Apenas busca contexto se for CLIENTE com UUID válido
+      const contextoCliente = deveBuscarContextoCliente && contextoIA.clienteUuid
+        ? await this.obterContextoCliente(contextoIA.clienteUuid, cacheContextoRequisicao)
+        : null;
       
       // 2. Executa pipeline RAG: gera embedding, busca produtos, aplica filtros
       const resultado = await this.executarPipelineRecomendacao(
@@ -265,10 +288,15 @@ export class ServicoRecomendacaoApplication {
    * 
    * Fluxo completo:
    * 1. Normaliza e limita histórico para não sobrecarregar a LLM
-   * 2. Busca contexto personalizado do cliente
+   * 2. Busca contexto personalizado do cliente (apenas se for CLIENTE)
    * 3. Analisa contexto da conversa (turno atual, produtos mencionados)
    * 4. Interpreta intenção via Gemini (recomendação, pós-venda, tendências, etc.)
    * 5. Despacha para handler específico baseado na intenção
+   * 
+   * CORREÇÃO: Implementa isolamento de contexto baseado em papel:
+   * - CLIENTE: busca contexto do próprio cliente
+   * - ADMIN_LOJA: usa contexto null (acesso a dados agregados da loja)
+   * - ADMIN_SISTEMA: usa contexto null (acesso a dados agregados globais)
    * 
    * O despacho usa tabela de despacho (Record) ao invés de switch/case (regra U2).
    */
@@ -276,65 +304,52 @@ export class ServicoRecomendacaoApplication {
     const inicio = Date.now();
 
     try {
-      // 1. Normaliza histórico para formato consistente (papel: 'user' | 'assistant')
+      const contextoIA = dados.contextoIA;
+      const deveBuscarContextoCliente = contextoIA?.tipo === TipoContextoIA.CLIENTE && contextoIA.clienteUuid;
+
+      // Fase síncrona — sem I/O, instantâneo
       const historicoNormalizado = this.normalizarHistorico(dados.historico);
-      
-      // 2. Limita histórico a últimos 3 turnos para economizar tokens e manter contexto relevante
-      const historicoParaLlm = this.servicoContextoConversa.limitarHistoricoPorTurnos(
-        historicoNormalizado
-      );
-
-      // Cache de contexto com escopo da requisição: evita múltiplas consultas ao banco
-      // caso obterContextoCliente seja chamado mais de uma vez dentro do mesmo fluxo de chat
+      const historicoParaLlm = this.servicoContextoConversa.limitarHistoricoPorTurnos(historicoNormalizado);
       const cacheContextoRequisicao = new Map<string, IContextoRecomendacao | null>();
+      const contextoTurno = this.servicoContextoConversa.analisar(historicoParaLlm, dados.mensagem);
+      const historicoGemini = this.converterHistoricoGemini(historicoParaLlm, dados.mensagem);
 
-      // 3. Busca contexto personalizado do cliente (histórico de compras, preferências)
-      const contextoCliente = await this.obterContextoCliente(
-        dados.clienteUuid,
-        cacheContextoRequisicao
-      );
-      
-      // 4. Analisa contexto do turno atual: é continuação? quais produtos já foram mostrados?
-      const contextoTurno = this.servicoContextoConversa.analisar(
-        historicoParaLlm,
-        dados.mensagem
-      );
-      
-      // 5. Converte histórico para formato Gemini (papel: 'user' | 'model')
-      const historicoGemini = this.converterHistoricoGemini(
-        historicoParaLlm,
-        dados.mensagem
-      );
+      // Fase paralela — 3 operações independentes disparadas ao mesmo tempo:
+      //   • obterContextoCliente : consulta ao banco (~50-200ms)
+      //   • interpretar          : Gemini classifica a intenção (~3-8s)
+      //   • gerarEmbedding       : Gemini vetoriza a mensagem (~1-3s)
+      // Tempo total ≈ max(db, interpretar, embedding) em vez de soma sequencial.
+      // Tradeoff aceito: interpretar não recebe perfil do cliente, mas o tipo de intenção
+      // ("fantasia", "pos_venda", etc.) independe do histórico de compras.
+      const [contextoCliente, intencao, embeddingMensagem] = await Promise.all([
+        deveBuscarContextoCliente && contextoIA.clienteUuid
+          ? this.obterContextoCliente(contextoIA.clienteUuid, cacheContextoRequisicao)
+          : Promise.resolve(null),
+        this.comTimeout(
+          this.servicoInterpretacaoIntencao.interpretar(dados.mensagem, historicoParaLlm, {
+            perfil: undefined,
+            resumoCompras: undefined,
+          }),
+          TIMEOUT_INTENCAO_MS,
+          'interpretacao-intencao'
+        ),
+        this.comTimeout(
+          this.adapterLangChain.gerarEmbedding(dados.mensagem),
+          TIMEOUT_EMBEDDING_MS,
+          'embedding-mensagem'
+        ),
+      ]);
 
-      // 6. Interpreta intenção via Gemini: o que o usuário quer? (recomendação, pós-venda, etc.)
-      const intencao = await this.servicoInterpretacaoIntencao.interpretar(
-        dados.mensagem,
-        historicoParaLlm,
-        {
-          perfil: contextoCliente?.perfil,
-          resumoCompras: this.resumirCompras(contextoCliente),
-        }
-      );
-
-      // 7. Resume intenção para logs e debugging
       const intencaoResumida = this.resumirIntencao(intencao);
 
       // Esclarecimento tem prioridade máxima — resposta imediata sem RAG
       if (intencao.precisaEsclarecer) {
         return this.processarChatEsclarecimento(
-          dados,
-          intencao,
-          contextoCliente,
-          historicoGemini,
-          contextoTurno,
-          inicio,
-          intencaoResumida,
-          incluirMetricas
+          dados, intencao, contextoCliente, historicoGemini, contextoTurno, inicio, intencaoResumida, incluirMetricas
         );
       }
 
       // Despacho por tipo de intenção — sem switch/case (regra U2)
-      // Cada intenção tem seu handler especializado que entende o contexto específico
       const despachoChat: Record<TipoIntencaoRecomendacao, () => Promise<IChatResponseDTO>> = {
         pos_venda: () =>
           this.processarChatPosvenda(
@@ -342,7 +357,7 @@ export class ServicoRecomendacaoApplication {
           ),
         tendencias: () =>
           this.processarChatTendencias(
-            dados, intencao, contextoCliente, historicoGemini, contextoTurno, inicio, intencaoResumida, incluirMetricas
+            dados, intencao, contextoCliente, historicoGemini, contextoTurno, inicio, intencaoResumida, incluirMetricas, embeddingMensagem
           ),
         informacao: () =>
           this.processarChatInformacao(
@@ -350,19 +365,19 @@ export class ServicoRecomendacaoApplication {
           ),
         comparativo: () =>
           this.processarChatComparativo(
-            dados, intencao, contextoCliente, historicoGemini, contextoTurno, inicio, intencaoResumida, incluirMetricas
+            dados, intencao, contextoCliente, historicoGemini, contextoTurno, inicio, intencaoResumida, incluirMetricas, embeddingMensagem
           ),
         recomendacao: () =>
           this.processarChatRecomendacao(
-            dados, intencao, contextoCliente, historicoGemini, contextoTurno, inicio, intencaoResumida, incluirMetricas
+            dados, intencao, contextoCliente, historicoGemini, contextoTurno, inicio, intencaoResumida, incluirMetricas, embeddingMensagem
           ),
         esclarecimento: () =>
           this.processarChatRecomendacao(
-            dados, intencao, contextoCliente, historicoGemini, contextoTurno, inicio, intencaoResumida, incluirMetricas
+            dados, intencao, contextoCliente, historicoGemini, contextoTurno, inicio, intencaoResumida, incluirMetricas, embeddingMensagem
           ),
         conversa: () =>
           this.processarChatRecomendacao(
-            dados, intencao, contextoCliente, historicoGemini, contextoTurno, inicio, intencaoResumida, incluirMetricas
+            dados, intencao, contextoCliente, historicoGemini, contextoTurno, inicio, intencaoResumida, incluirMetricas, embeddingMensagem
           ),
       };
 
@@ -473,7 +488,8 @@ export class ServicoRecomendacaoApplication {
     contextoTurno: ContextoTurnoConversa,
     inicio: number,
     intencaoResumida: string,
-    incluirMetricas: boolean
+    incluirMetricas: boolean,
+    embeddingPreComputado?: number[]
   ): Promise<IChatResponseDTO> {
     const [tendenciasCategoria, tendenciasFaixa] = await Promise.all([
       this.repositorioTendencias.buscarTendenciasPorCategoria(
@@ -490,7 +506,8 @@ export class ServicoRecomendacaoApplication {
       contextoCliente,
       contextoTurno,
       limiteRag,
-      intencaoSemFiltroGenero
+      intencaoSemFiltroGenero,
+      embeddingPreComputado
     );
     let produtosDTO = resultadoBuscaTendencias.produtos;
     let metricasPipelineTendencias = resultadoBuscaTendencias.metricasPipeline;
@@ -499,7 +516,7 @@ export class ServicoRecomendacaoApplication {
       const resultadoFallback = await this.executarPipelineRecomendacao(
         dados.mensagem,
         contextoCliente,
-        { intencao: intencaoSemFiltroGenero, limite: limiteRag }
+        { intencao: intencaoSemFiltroGenero, limite: limiteRag, embeddingPreComputado }
       );
       produtosDTO = this.removerDuplicatasEOrdenar(resultadoFallback.produtos, limiteRag);
       metricasPipelineTendencias = resultadoFallback.metricasPipeline;
@@ -537,6 +554,7 @@ export class ServicoRecomendacaoApplication {
         tempoRespostaMs: Date.now() - inicio,
         tipoResposta: 'tendencias',
         intencaoResumida,
+        respostaDeterministica: produtosDTO.length > 0,
         metricas: incluirMetricas && metricasPipelineTendencias
           ? this.montarMetricasDeterministicas(metricasPipelineTendencias, Date.now() - inicio)
           : undefined,
@@ -601,7 +619,8 @@ export class ServicoRecomendacaoApplication {
     contextoTurno: ContextoTurnoConversa,
     inicio: number,
     intencaoResumida: string,
-    incluirMetricas: boolean
+    incluirMetricas: boolean,
+    embeddingPreComputado?: number[]
   ): Promise<IChatResponseDTO> {
     const limite = this.obterLimiteProdutosChat(intencao, 4);
     let produtosDTO: ProdutoRecomendadoDTO[] = [];
@@ -616,7 +635,9 @@ export class ServicoRecomendacaoApplication {
         intencao,
         contextoCliente,
         contextoTurno,
-        limite
+        limite,
+        undefined,
+        embeddingPreComputado
       );
       produtosDTO = resultadoBusca.produtos;
       metricasPipelineComparativo = resultadoBusca.metricasPipeline;
@@ -649,6 +670,7 @@ export class ServicoRecomendacaoApplication {
         tempoRespostaMs: Date.now() - inicio,
         tipoResposta: 'recomendacao',
         intencaoResumida,
+        respostaDeterministica: produtosDTO.length > 0,
         metricas: incluirMetricas && metricasPipelineComparativo
           ? this.montarMetricasDeterministicas(metricasPipelineComparativo, Date.now() - inicio)
           : undefined,
@@ -669,7 +691,8 @@ export class ServicoRecomendacaoApplication {
     contextoTurno: ContextoTurnoConversa,
     inicio: number,
     intencaoResumida: string,
-    incluirMetricas: boolean
+    incluirMetricas: boolean,
+    embeddingPreComputado?: number[]
   ): Promise<IChatResponseDTO> {
     const limite = this.obterLimiteProdutosChat(intencao, 4);
     const { produtos: produtosDTO, metricasPipeline } = await this.buscarProdutosChat(
@@ -677,7 +700,9 @@ export class ServicoRecomendacaoApplication {
       intencao,
       contextoCliente,
       contextoTurno,
-      limite
+      limite,
+      undefined,
+      embeddingPreComputado
     );
     const contextoChat = this.construirContextoChat(produtosDTO);
 
@@ -706,6 +731,7 @@ export class ServicoRecomendacaoApplication {
         tempoRespostaMs: Date.now() - inicio,
         tipoResposta: 'recomendacao',
         intencaoResumida,
+        respostaDeterministica: produtosDTO.length > 0,
         metricas: incluirMetricas && metricasPipeline
           ? this.montarMetricasDeterministicas(metricasPipeline, Date.now() - inicio)
           : undefined,
@@ -734,21 +760,22 @@ export class ServicoRecomendacaoApplication {
     contextoCliente: IContextoRecomendacao | null,
     opcoes: OpcoesRecomendacaoInterna
   ): Promise<RecomendacaoResultado> {
-    // 1. Converte query em vetor numérico — mede tempo para métrica de embedding
+    // 1. Usa embedding pré-computado (fase paralela do chat) ou gera agora.
+    //    O embedding da mensagem original é semanticamente equivalente ao da query
+    //    enriquecida para os fins de busca vetorial — os filtros estruturais de gênero
+    //    e preço são aplicados na Fase 5 via servicoFiltroCatalogo, não no embedding.
     const inicioEmbedding = Date.now();
-    const queryEmbedding = await this.gerarEmbeddingQuery(query);
-    const tempoEmbedding = Date.now() - inicioEmbedding;
+    const queryEmbedding = opcoes.embeddingPreComputado
+      ?? await this.gerarEmbeddingQuery(query);
+    const tempoEmbedding = opcoes.embeddingPreComputado ? 0 : Date.now() - inicioEmbedding;
 
-    // 2. Obtém produtos existentes via cache (TTL 5 min) para validação anti-alucinação
-    // Evita consulta ao banco a cada requisição de recomendação
+    // 2. Produtos existentes via cache (TTL 5 min) — validação anti-alucinação
     const produtosExistentes = await this.servicoValidacaoProdutos.obterProdutosExistentes();
-    
-    // 3. Determina limite e se deve usar MMR (diversificação)
-    const limite = opcoes.limite ?? opcoes.intencao?.quantidadeLivros ?? 5;
-    const usarMMR = limite > 1; // MMR só faz sentido para múltiplos resultados
 
-    // 4. Executa RAG: busca vetorial + MMR se aplicável
-    //    Busca 2x o limite para ter margem após filtros e MMR
+    const limite = opcoes.limite ?? opcoes.intencao?.quantidadeLivros ?? 5;
+    const usarMMR = limite > 1;
+
+    // 3. RAG: busca vetorial + deduplicação + anti-alucinação + MMR
     const resultadoRag = await this.servicoRecomendacaoRAG.gerarRecomendacao(
       query,
       queryEmbedding,
@@ -758,18 +785,29 @@ export class ServicoRecomendacaoApplication {
       usarMMR
     );
 
-    // 5. Extrai filtros da intenção (preço, páginas, gênero, etc.)
+    // 4. Filtros estruturais da intenção (preço, páginas, gênero)
     const filtros = opcoes.intencao
       ? this.servicoFiltroCatalogo.filtrosDeIntencao(opcoes.intencao)
       : {};
-    
-    // 6. Aplica filtros estruturados sobre resultados do RAG
+
     let { produtos: produtosFiltrados } = this.servicoFiltroCatalogo.aplicar(
       resultadoRag.produtos,
       filtros
     );
 
-    // 7. Remove produtos já mostrados em turnos anteriores (evita repetição)
+    // 5. Fallback semântico: se o filtro de gênero eliminou todos os candidatos RAG,
+    //    retorna os resultados semânticos sem filtro estrutural.
+    //    Motivo: o Gemini pode classificar gêneros em termos que não batem exatamente
+    //    com as categorias do catálogo (ex: "ficção" vs "Ficção Científica").
+    //    O RAG já garante relevância semântica — o filtro é complementar, não bloqueante.
+    if (produtosFiltrados.length === 0 && resultadoRag.produtos.length > 0 && filtros.generos?.length) {
+      Logger.warn(
+        `[ServicoRecomendacaoApplication] Filtro de gênero ${JSON.stringify(filtros.generos)} eliminou todos os ${resultadoRag.produtos.length} candidatos RAG — aplicando fallback semântico`
+      );
+      produtosFiltrados = resultadoRag.produtos;
+    }
+
+    // 6. Remove produtos já exibidos em turnos anteriores
     if (opcoes.excluirUuids && opcoes.excluirUuids.length > 0) {
       const excluir = new Set(opcoes.excluirUuids);
       const semRepeticao = produtosFiltrados.filter((p) => !excluir.has(p.uuid));
@@ -778,7 +816,6 @@ export class ServicoRecomendacaoApplication {
       }
     }
 
-    // 8. Retorna resultados limitados ao solicitado, integrando tempoEmbedding às métricas
     return {
       ...resultadoRag,
       produtos: produtosFiltrados.slice(0, limite),
@@ -805,26 +842,21 @@ export class ServicoRecomendacaoApplication {
     contextoCliente: IContextoRecomendacao | null,
     contextoTurno: ContextoTurnoConversa,
     limite: number,
-    intencaoBusca?: IntencaoRecomendacao
+    intencaoBusca?: IntencaoRecomendacao,
+    embeddingPreComputado?: number[]
   ): Promise<ResultadoBuscaProdutosChat> {
-    // 1. Monta query base com filtros da intenção + contexto do cliente
     const queryBase = this.montarQueryEnriquecida(
       intencao.queryBusca || dados.mensagem,
       intencao,
       contextoCliente
     );
-
-    // 2. Enriquece query com contexto da conversa (ex: "o livro de terror que mencionei")
     const queryEnriquecida = this.servicoContextoConversa.enriquecerQueryBusca(
       queryBase,
       contextoTurno,
       dados.mensagem
     );
-
-    // 3. Em continuações, busca +3 produtos para ter margem de seleção
     const limiteBusca = contextoTurno.ehContinuacao ? limite + 3 : limite;
 
-    // 4. Executa pipeline RAG excluindo produtos já mostrados (evita repetição)
     const resultado = await this.executarPipelineRecomendacao(
       queryEnriquecida,
       contextoCliente,
@@ -832,6 +864,7 @@ export class ServicoRecomendacaoApplication {
         intencao: intencaoBusca ?? intencao,
         limite: limiteBusca,
         excluirUuids: contextoTurno.uuidsJaMostrados,
+        embeddingPreComputado,
       }
     );
 
@@ -841,20 +874,105 @@ export class ServicoRecomendacaoApplication {
     };
   }
 
-  private finalizarRespostaChat(
-    base: Omit<IChatResponseDTO, 'perguntasFollowUp' | 'numeroTurno'>,
+  private async finalizarRespostaChat(
+    base: Omit<IChatResponseDTO, 'perguntasFollowUp' | 'numeroTurno'> & {
+      respostaDeterministica?: boolean;
+    },
     intencao: IntencaoRecomendacao,
     contextoTurno: ContextoTurnoConversa
-  ): IChatResponseDTO {
+  ): Promise<IChatResponseDTO> {
+    const { respostaDeterministica, ...baseResposta } = base;
+
+    // Guard anti-alucinação (ponto único): aplica-se a respostas geradas por LLM
+    // (Gemini ou fallback). Substitui a resposta caso a IA cite títulos
+    // inexistentes no catálogo — independe da obediência do LLM. RN-IA-001.
+    //
+    // Respostas determinísticas (montarRespostaEmTopicos) são montadas só com
+    // produtos reais já validados pelo pipeline RAG: não há alucinação possível.
+    // Pular o guard nesses casos evita trabalho redundante e falsos positivos.
+    const respostaAncorada = respostaDeterministica
+      ? baseResposta.resposta
+      : await this.garantirRespostaAncorada(baseResposta.resposta);
+
     return {
-      ...base,
+      ...baseResposta,
+      resposta: respostaAncorada,
       numeroTurno: contextoTurno.numeroTurno,
       perguntasFollowUp: this.servicoContextoConversa.gerarPerguntasFollowUp(
         intencao,
         contextoTurno,
-        base.produtosRecomendados.length
+        baseResposta.produtosRecomendados.length
       ),
     };
+  }
+
+  /**
+   * Verifica se todo título citado na resposta existe no catálogo. Se encontrar
+   * um título inventado (multipalavra, ausente do catálogo), substitui a resposta
+   * inteira por uma mensagem honesta — barreira determinística contra alucinação.
+   */
+  private async garantirRespostaAncorada(resposta: string): Promise<string> {
+    if (!resposta || resposta.trim().length === 0) {
+      return resposta;
+    }
+
+    // Títulos citados aparecem sempre entre aspas; extrair só de aspas evita
+    // capturar prosa solta (ex.: "...livro de fantasia no catálogo...").
+    const candidatos = new Set<string>();
+    const regexAspas = /["“]([^"”\n]{4,})["”]/g;
+    let m: RegExpExecArray | null;
+    while ((m = regexAspas.exec(resposta)) !== null) candidatos.add(m[1]);
+
+    // Termos de UI/CTA e termos de consulta que o LLM pode envolver em aspas mas nunca são títulos.
+    const EXCLUIR_UI = new Set([
+      'ver detalhes', 'saiba mais', 'clique aqui', 'comprar agora', 'adicionar ao carrinho',
+      'ver mais', 'ver todos', 'continuar', 'voltar', 'fechar', 'confirmar',
+      // Termos de busca/intenção que o LLM às vezes cita entre aspas na resposta
+      'mais vendidos', 'mais populares', 'mais procurados', 'mais lidos',
+      'livros de fantasia', 'livros de terror', 'livros de romance', 'livros de suspense',
+    ]);
+
+    // Apenas frases com aparência de título (multipalavra) — evita falso positivo
+    // com termos genéricos ("romance", "fantasia") e termos de UI.
+    const titulosCitados = Array.from(candidatos)
+      .map((t) => ServicoCacheProdutos.normalizarTitulo(t))
+      .filter((t) => t.includes(' ') && !EXCLUIR_UI.has(t));
+
+    if (titulosCitados.length === 0) {
+      return resposta;
+    }
+
+    const catalogoTitulos = await this.servicoValidacaoProdutos.obterTitulosExistentes();
+    // Fail-open: sem catálogo carregado, não há como validar — mantém resposta.
+    if (catalogoTitulos.size === 0) {
+      return resposta;
+    }
+
+    const inventado = titulosCitados.find(
+      (titulo) => !this.tituloExisteNoCatalogo(titulo, catalogoTitulos)
+    );
+
+    if (inventado) {
+      Logger.warn(
+        `[ServicoRecomendacaoApplication] Guard anti-alucinação acionado: título "${inventado}" ausente do catálogo.`
+      );
+      return 'Não encontrei nenhum livro com essas características no nosso catálogo no momento. Posso recomendar títulos disponíveis se você indicar um gênero, autor ou tema do seu interesse.';
+    }
+
+    return resposta;
+  }
+
+  /** Aceita correspondência exata ou por contiguidade (título citado contém/está contido). */
+  private tituloExisteNoCatalogo(titulo: string, catalogo: Set<string>): boolean {
+    if (catalogo.has(titulo)) {
+      return true;
+    }
+    for (const real of catalogo) {
+      if (real.includes(titulo) || titulo.includes(real)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private async recomendarComparativo(
@@ -1082,7 +1200,27 @@ export class ServicoRecomendacaoApplication {
   }
 
   private async gerarEmbeddingQuery(query: string): Promise<number[]> {
-    return this.adapterLangChain.gerarEmbedding(query);
+    return this.comTimeout(
+      this.adapterLangChain.gerarEmbedding(query),
+      TIMEOUT_EMBEDDING_MS,
+      'embedding'
+    );
+  }
+
+  /**
+   * Wraps a promise with a hard timeout — fail-fast se a API externa travar.
+   * Lança Error com mensagem descritiva para facilitar diagnóstico nos logs.
+   */
+  private comTimeout<T>(promessa: Promise<T>, ms: number, rotulo: string): Promise<T> {
+    return Promise.race([
+      promessa,
+      new Promise<never>((_, rejeitar) =>
+        setTimeout(
+          () => rejeitar(new Error(`[ServicoRecomendacaoApplication] Timeout de ${ms}ms em "${rotulo}"`)),
+          ms
+        )
+      ),
+    ]);
   }
 
   /**

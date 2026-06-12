@@ -10,6 +10,7 @@ import type { ILivroCatalogoDto } from '@/modules/livros/ILivroCatalogo.dto';
  */
 export interface IServicoLivros {
   listarParaAdmin(limite: number): Promise<ILivroCatalogoDto[]>;
+  listarCatalogoGlobal(limite: number): Promise<ILivroCatalogoDto[]>;
   obterPorUuid(uuid: string): Promise<ILivroCatalogoDto | null>;
 }
 
@@ -51,10 +52,12 @@ export class ServicoIndexacaoProdutos {
     const inicio = Date.now();
 
     try {
-      Logger.info('[ServicoIndexacaoProdutos] Iniciando indexação do catálogo com processamento paralelo');
+      Logger.info('[ServicoIndexacaoProdutos] Iniciando indexação do catálogo global com processamento paralelo');
 
-      const livros = await this.servicoLivros.listarParaAdmin(1000);
-      Logger.info(`[ServicoIndexacaoProdutos] ${livros.length} livros encontrados`);
+      // CORREÇÃO: Usa listarCatalogoGlobal para indexar TODOS os livros do catálogo,
+      // não apenas os da loja do admin. Clientes podem comprar de qualquer loja.
+      const livros = await this.servicoLivros.listarCatalogoGlobal(1000);
+      Logger.info(`[ServicoIndexacaoProdutos] ${livros.length} livros encontrados no catálogo global`);
 
       if (livros.length === 0) {
         Logger.warn('[ServicoIndexacaoProdutos] Nenhum livro para indexar');

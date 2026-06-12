@@ -1,9 +1,63 @@
-import { ChromaClient, Collection } from 'chromadb';
+import { ChromaClient, Collection, Metadata } from 'chromadb';
 import { v4 as uuidv4 } from 'uuid';
 import { IRepositorioEmbedding } from './IRepositorioEmbedding';
 import { ICriarProdutoEmbeddingDto } from './IProdutoEmbedding.entity';
-import { IProdutoEmbedding } from './IProdutoEmbedding.entity';
+import {
+  IProdutoEmbedding,
+  IResultadoBuscaSimilar,
+  MetadadosProdutoEmbedding,
+} from './IProdutoEmbedding.entity';
 import { Logger } from '@/shared/utils/Logger.util';
+
+/**
+ * Tipo de um valor individual de metadado, conforme a tipagem do ChromaDB.
+ * Inclui escalares, arrays e SparseVector — nossos campos são sempre escalares,
+ * então os leitores abaixo descartam formatos não esperados via fallback.
+ */
+type ValorMetadadoChroma = Metadata[string];
+
+/** Lê um campo textual dos metadados brutos com fallback seguro. */
+function lerTexto(valor: ValorMetadadoChroma | undefined, padrao = ''): string {
+  if (typeof valor === 'string') {
+    return valor;
+  }
+  if (typeof valor === 'number' || typeof valor === 'boolean') {
+    return String(valor);
+  }
+  return padrao; // null, undefined, arrays ou SparseVector → fallback
+}
+
+/** Lê um campo numérico dos metadados brutos com fallback seguro. */
+function lerNumero(valor: ValorMetadadoChroma | undefined, padrao = 0): number {
+  if (typeof valor === 'number') {
+    return valor;
+  }
+  if (typeof valor === 'string') {
+    const numero = Number(valor);
+    return Number.isFinite(numero) ? numero : padrao;
+  }
+  return padrao; // boolean, null, undefined, arrays ou SparseVector → fallback
+}
+
+/**
+ * Converte os metadados brutos do ChromaDB (snake_case) para o formato de
+ * domínio (camelCase). Mapper único — elimina a duplicação que existia em
+ * `buscarPorProdutoUuid` e `buscarSimilares`.
+ */
+function mapearMetadadosDominio(bruto: Metadata): MetadadosProdutoEmbedding {
+  return {
+    titulo: lerTexto(bruto.titulo),
+    autor: lerTexto(bruto.autor),
+    categoria: lerTexto(bruto.categoria),
+    sinopse: lerTexto(bruto.sinopse),
+    isbn: lerTexto(bruto.isbn),
+    preco: lerNumero(bruto.preco),
+    numeroPaginas: lerNumero(bruto.numero_paginas),
+    anoPublicacao: lerNumero(bruto.ano_publicacao),
+    idioma: lerTexto(bruto.idioma, 'português'),
+    tags: lerTexto(bruto.tags),
+  };
+}
 
 /**
  * Configurações de recomendação e recuperação de contexto (RAG)
@@ -18,6 +72,13 @@ export const CONFIGURACAO_RECOMENDACAO = {
 
   // Limiar mínimo de similaridade semântica aceito (0-1)
   limiarSimilaridade: parseFloat(process.env.RAG_SIMILARITY_THRESHOLD || '0.6'),
+
+  // Gate de relevância relativa ao topo (0-1): descarta candidatos cuja
+  // similaridade fique mais que `gapRelevancia` abaixo do melhor resultado da
+  // própria query. Adaptativo — corta outliers de outra categoria (ex.: um livro
+  // de Tecnologia numa busca de Romance) sem precisar de um limiar global alto
+  // que prejudicaria o recall de queries esparsas. Default 0.04.
+  gapRelevancia: parseFloat(process.env.RAG_RELEVANCE_GAP || '0.04'),
 
   // Multiplicador de busca padrão (mantido para compatibilidade)
   multiplicadorBusca: parseInt(process.env.RAG_SEARCH_MULTIPLIER || '2', 10),
@@ -198,25 +259,21 @@ export class RepositorioEmbeddingChromaDB implements IRepositorioEmbedding {
 
     const id = resultados.ids[0];
     const embedding = resultados.embeddings?.[0] || [];
-    const metadados = resultados.metadatas?.[0] as any;
+    const metadadosBruto = resultados.metadatas?.[0];
+
+    if (!metadadosBruto) {
+      Logger.error(
+        `[RepositorioEmbeddingChromaDB] Metadados ausentes para o embedding ${id} do produto ${produtoUuid}.`
+      );
+      throw new Error(`Metadados não encontrados para embedding ${id}`);
+    }
 
     return {
       id: 0,
       uuid: id,
-      produtoUuid: metadados.produto_uuid,
+      produtoUuid: lerTexto(metadadosBruto.produto_uuid),
       embedding,
-      metadados: {
-        titulo: metadados.titulo,
-        autor: metadados.autor,
-        categoria: metadados.categoria,
-        sinopse: metadados.sinopse,
-        isbn: metadados.isbn,
-        preco: metadados.preco,
-        numeroPaginas: metadados.numero_paginas,
-        anoPublicacao: metadados.ano_publicacao,
-        idioma: metadados.idioma,
-        tags: metadados.tags,
-      },
+      metadados: mapearMetadadosDominio(metadadosBruto),
       criadoEm: new Date(),
       atualizadoEm: new Date(),
     };
@@ -226,7 +283,7 @@ export class RepositorioEmbeddingChromaDB implements IRepositorioEmbedding {
     queryEmbedding: number[],
     limite: number,
     opcoes?: { temContexto?: boolean }
-  ): Promise<{ produtoUuid: string; similaridade: number; metadados: any }[]> {
+  ): Promise<IResultadoBuscaSimilar[]> {
     const colecao = await this.inicializarColecao();
 
     // Multiplicador dinâmico: 2x com contexto de cliente, 3x sem contexto
@@ -255,14 +312,14 @@ export class RepositorioEmbeddingChromaDB implements IRepositorioEmbedding {
     }
 
     // Mapeia todos os resultados convertendo distância → similaridade
-    const todosResultados = resultados.ids[0].map((id, index) => {
-      const metadados = resultados.metadatas?.[0]?.[index] as any;
+    const todosResultados: IResultadoBuscaSimilar[] = resultados.ids[0].map((id, index) => {
+      const metadadosBruto = resultados.metadatas?.[0]?.[index];
       const distancia = resultados.distances?.[0]?.[index] || 0;
       // Converte distância para similaridade (1 - distância para cosseno)
       const similaridade = 1 - distancia;
 
       // Valida se metadados existe antes de acessar
-      if (!metadados) {
+      if (!metadadosBruto) {
         Logger.error(
           `[RepositorioEmbeddingChromaDB] Metadados não encontrados para ID ${id}. Metadados completos:`,
           resultados.metadatas
@@ -272,24 +329,13 @@ export class RepositorioEmbeddingChromaDB implements IRepositorioEmbedding {
 
       // Log para debug dos primeiros 3 resultados
       if (index < 3) {
-        Logger.debug(`[RepositorioEmbeddingChromaDB] Resultado ${index}: ID=${id}, produto_uuid=${metadados.produto_uuid}, titulo=${metadados.titulo}`);
+        Logger.debug(`[RepositorioEmbeddingChromaDB] Resultado ${index}: ID=${id}, produto_uuid=${lerTexto(metadadosBruto.produto_uuid)}, titulo=${lerTexto(metadadosBruto.titulo)}`);
       }
 
       return {
-        produtoUuid: metadados.produto_uuid,
+        produtoUuid: lerTexto(metadadosBruto.produto_uuid),
         similaridade,
-        metadados: {
-          titulo: metadados.titulo,
-          autor: metadados.autor,
-          categoria: metadados.categoria,
-          sinopse: metadados.sinopse,
-          isbn: metadados.isbn,
-          preco: metadados.preco,
-          numeroPaginas: metadados.numero_paginas,
-          anoPublicacao: metadados.ano_publicacao,
-          idioma: metadados.idioma,
-          tags: metadados.tags,
-        },
+        metadados: mapearMetadadosDominio(metadadosBruto),
       };
     });
 
@@ -302,7 +348,23 @@ export class RepositorioEmbeddingChromaDB implements IRepositorioEmbedding {
       `[RepositorioEmbeddingChromaDB] Após filtro por limiarSimilaridade ${CONFIGURACAO_RECOMENDACAO.limiarSimilaridade}: ${todosResultados.length} → ${resultadosFiltrados.length} resultados`
     );
 
-    return resultadosFiltrados;
+    // Gate de relevância relativa: remove outliers muito abaixo do melhor match
+    // da própria query. Preserva sempre ao menos o topo (resultadosFiltrados[0]).
+    if (resultadosFiltrados.length <= 1) {
+      return resultadosFiltrados;
+    }
+
+    const topSimilaridade = Math.max(...resultadosFiltrados.map((r) => r.similaridade));
+    const pisoRelevancia = topSimilaridade - CONFIGURACAO_RECOMENDACAO.gapRelevancia;
+    const resultadosRelevantes = resultadosFiltrados.filter(
+      (r) => r.similaridade >= pisoRelevancia
+    );
+
+    Logger.debug(
+      `[RepositorioEmbeddingChromaDB] Após gate de relevância (top=${topSimilaridade.toFixed(4)}, piso=${pisoRelevancia.toFixed(4)}): ${resultadosFiltrados.length} → ${resultadosRelevantes.length} resultados`
+    );
+
+    return resultadosRelevantes;
   }
 
   async atualizar(uuid: string, dados: Partial<ICriarProdutoEmbeddingDto>): Promise<IProdutoEmbedding> {

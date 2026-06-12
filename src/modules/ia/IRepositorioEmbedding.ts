@@ -1,4 +1,4 @@
-import { IProdutoEmbedding, ICriarProdutoEmbeddingDto } from './IProdutoEmbedding.entity';
+import { IProdutoEmbedding, ICriarProdutoEmbeddingDto, IResultadoBuscaSimilar } from './IProdutoEmbedding.entity';
 
 /**
  * Interface de Repositório de Embeddings
@@ -27,7 +27,7 @@ export interface IRepositorioEmbedding {
     queryEmbedding: number[],
     limite: number,
     opcoes?: { temContexto?: boolean }
-  ): Promise<{ produtoUuid: string; similaridade: number; metadados: any }[]>;
+  ): Promise<IResultadoBuscaSimilar[]>;
 
   /**
    * Atualiza um embedding existente

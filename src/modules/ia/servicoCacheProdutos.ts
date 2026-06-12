@@ -34,9 +34,33 @@ export interface EstatisticasCacheProdutos {
  */
 export class ServicoCacheProdutos {
   private cache: Set<string> | null = null;
+  private cacheTitulos: Set<string> | null = null;
   private ultimaAtualizacaoMs: number | null = null;
 
   constructor(private readonly servicoLivros: ServicoLivros) {}
+
+  /** Normaliza título para comparação robusta (sem acento, minúsculo, espaços colapsados). */
+  static normalizarTitulo(titulo: string): string {
+    return titulo
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  /**
+   * Retorna o conjunto de títulos normalizados do catálogo (mesma fonte/TTL do
+   * cache de UUIDs). Usado pelo guard anti-alucinação para verificar se um título
+   * citado pela IA realmente existe.
+   */
+  async obterTitulosNormalizados(): Promise<Set<string>> {
+    if (this.estaValido() && this.cacheTitulos !== null) {
+      return this.cacheTitulos;
+    }
+    await this.atualizar();
+    return this.cacheTitulos ?? new Set<string>();
+  }
 
   /**
    * Retorna o conjunto de UUIDs de produtos existentes no BD.
@@ -69,6 +93,7 @@ export class ServicoCacheProdutos {
    */
   invalidar(): void {
     this.cache = null;
+    this.cacheTitulos = null;
     this.ultimaAtualizacaoMs = null;
     Logger.debug('[ServicoCacheProdutos] Cache invalidado');
   }
@@ -101,11 +126,17 @@ export class ServicoCacheProdutos {
 
   private async atualizar(): Promise<void> {
     try {
-      const livros = await this.servicoLivros.listarParaAdmin(LIMITE_PRODUTOS_CACHE);
+      // CORREÇÃO: Usa listarCatalogoGlobal para incluir TODOS os livros do catálogo,
+      // não apenas os da loja do admin. Isso garante que a validação anti-alucinação
+      // não filtre livros de outras lojas que foram indexados no ChromaDB.
+      const livros = await this.servicoLivros.listarCatalogoGlobal(LIMITE_PRODUTOS_CACHE);
       this.cache = new Set(livros.map((livro) => livro.uuid));
+      this.cacheTitulos = new Set(
+        livros.map((livro) => ServicoCacheProdutos.normalizarTitulo(livro.titulo))
+      );
       this.ultimaAtualizacaoMs = Date.now();
       Logger.info(
-        `[ServicoCacheProdutos] Cache atualizado — ${this.cache.size} produtos carregados`
+        `[ServicoCacheProdutos] Cache atualizado — ${this.cache.size} produtos carregados (catálogo global)`
       );
     } catch (erro) {
       const mensagem = erro instanceof Error ? erro.message : String(erro);

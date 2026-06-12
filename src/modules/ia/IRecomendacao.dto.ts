@@ -4,11 +4,32 @@
 
 import { IMetricasDeterministicas } from './IMetricasDeterministicas';
 
+/**
+ * Tipo de contexto para isolamento de dados baseado em papel
+ */
+export enum TipoContextoIA {
+  CLIENTE = 'cliente',
+  ADMIN_LOJA = 'admin_loja',
+  ADMIN_SISTEMA = 'admin_sistema',
+}
+
+/**
+ * Interface para contexto de requisição IA
+ */
+export interface ContextoRequisicaoIA {
+  tipo: TipoContextoIA;
+  clienteUuid: string | null;
+  lojId: number;
+  papeis: string[];
+}
+
 export interface IRecomendarRequestDTO {
   query: string;
   clienteUuid?: string;
   limite?: number;
   incluirMetricas?: boolean;
+  /** Contexto de requisição baseado em papel (opcional, injetado pelo controller) */
+  contextoIA?: ContextoRequisicaoIA;
 }
 
 export interface IRecomendarResponseDTO {
@@ -39,6 +60,8 @@ export interface IChatRequestDTO {
   clienteUuid?: string;
   historico?: MensagemChatDTO[];
   incluirMetricas?: boolean;
+  /** Contexto de requisição baseado em papel (opcional, injetado pelo controller) */
+  contextoIA?: ContextoRequisicaoIA;
 }
 
 /**

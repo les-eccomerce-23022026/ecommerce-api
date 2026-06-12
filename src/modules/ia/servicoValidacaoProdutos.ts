@@ -30,6 +30,18 @@ export class ServicoValidacaoProdutos {
   }
 
   /**
+   * Retorna o conjunto de títulos normalizados existentes no catálogo, via cache.
+   * Usado pelo guard anti-alucinação do chat. Retorna Set vazio se o cache não
+   * foi configurado (fail-open para não quebrar fluxos sem cache).
+   */
+  async obterTitulosExistentes(): Promise<Set<string>> {
+    if (!this.cacheProdutos) {
+      return new Set<string>();
+    }
+    return this.cacheProdutos.obterTitulosNormalizados();
+  }
+
+  /**
    * Valida se uma lista de produtos existe na base de dados
    * 
    * @param produtosUuids Lista de UUIDs de produtos a validar
