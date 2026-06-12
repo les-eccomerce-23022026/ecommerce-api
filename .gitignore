@@ -23,6 +23,7 @@ scripts/config/credentials.sh
 .DS_Store
 Thumbs.db
 .idea
+.claude/
 
 # Ferramentas
 *.tsbuildinfo
