@@ -6,22 +6,22 @@ import type { IVenda } from '@/modules/vendas/repositories/IRepositorioVendas';
 export function mapStatusVendaParaPedidoFrontend(status: string): string {
   const key = status.trim().toUpperCase();
   const map: Record<string, string> = {
-    'EM PROCESSAMENTO': 'Em Processamento',
+    'EM_PROCESSAMENTO': 'Em Processamento',
     APROVADA: 'Em Processamento',
-    'AGUARDANDO PAGAMENTO': 'Aguardando Pagamento',
+    'AGUARDANDO_PAGAMENTO': 'Aguardando Pagamento',
     REPROVADA: 'Cancelado',
     CANCELADA: 'Cancelado',
-    'EM TRÂNSITO': 'Em Trânsito',
-    'FALHA NA ENTREGA': 'Em Trânsito',
+    'EM_TRANSITO': 'Em Trânsito',
+    'FALHA_NA_ENTREGA': 'Em Trânsito',
     ENTREGUE: 'Entregue',
-    'EM TROCA': 'Em Troca',
-    'TROCA AUTORIZADA': 'Troca Autorizada',
-    'TROCA REJEITADA': 'Troca Rejeitada',
-    'TROCA CONCLUÍDA': 'Trocado',
-    CONCLUÍDA: 'Trocado',
-    'EM DEVOLUÇÃO': 'Devoluções',
-    'DEVOLUÇÃO AUTORIZADA': 'Devoluções',
-    'DEVOLUÇÃO REJEITADA': 'Devoluções',
+    'EM_TROCA': 'Em Troca',
+    'TROCA_AUTORIZADA': 'Troca Autorizada',
+    'TROCA_REJEITADA': 'Troca Rejeitada',
+    'TROCA_CONCLUIDA': 'Trocado',
+    CONCLUIDA: 'Trocado',
+    'EM_DEVOLUCAO': 'Em Devolução',
+    'DEVOLUCAO_AUTORIZADA': 'Devolução Autorizada',
+    'DEVOLUCAO_REJEITADA': 'Devolução Rejeitada',
   };
   // Fallback neutro: status desconhecido NÃO deve virar 'Em Processamento',
   // senão o admin renderia botão "Despachar" indevido e o backend rejeita com 400.
@@ -36,7 +36,7 @@ export function vendaParaPayloadPedidoAdmin(v: IVenda): Record<string, unknown> 
     data: criado.toISOString(),
     clienteUuid: v.usuarioUuid,
     total: v.totalVenda,
-    status: mapStatusVendaParaPedidoFrontend(v.status),
+    status: v.status,
     itens: v.itens.map((i) => ({
       livroUuid: i.livroUuid,
       quantidade: i.quantidade,

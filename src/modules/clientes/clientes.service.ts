@@ -92,10 +92,13 @@ export class GestaoIdentidadeCliente {
   public async adicionarEndereco(
     uuid: string,
     dados: IEnderecoDto & { tipoEndereco?: 'cobranca' | 'entrega' },
-  ): Promise<IEnderecoDto> {
+  ): Promise<IEnderecoDto[]> {
     const usuario = await this.repositorioUsuarios.buscarPorUuid(uuid);
     if (!usuario) throw new UsuarioNaoEncontradoError(uuid);
-    return this.endereco.criarEndereco(usuario.id, dados, dados.tipoEndereco || 'entrega', false);
+    await this.endereco.criarEndereco(usuario.id, dados, dados.tipoEndereco || 'entrega', false);
+    // Retorna a lista completa e atualizada (o frontend espera IEnderecoCliente[]).
+    const enderecos = await this.repositorioEndereco.buscarPorIdUsuario(usuario.id);
+    return this.endereco.converterEnderecosParaDto(enderecos);
   }
 
   public async removerEndereco(uuidUsuario: string, uuidEndereco: string): Promise<void> {

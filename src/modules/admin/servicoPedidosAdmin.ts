@@ -38,7 +38,7 @@ export class ServicoPedidosAdmin {
     if (process.env.NODE_ENV === 'test') {
       console.log(`[DEBUG-DESPACHO] Pedido ${vendaUuid} Status Atual no BD: "${venda.status}" (Trimmed: "${statusAtual}")`);
     }
-    const statusPermitidos = new Set(['EM PROCESSAMENTO', 'APROVADA', 'APROVADO']);
+    const statusPermitidos = new Set(['EM_PROCESSAMENTO', 'APROVADA', 'APROVADO']);
     if (!statusPermitidos.has(statusAtual)) {
       throw new Error('Somente pedidos em processamento ou aprovados podem ser despachados.');
     }
@@ -121,7 +121,7 @@ export class ServicoPedidosAdmin {
       throw new Error(MENSAGENS_ERRO.PEDIDO_NAO_ENCONTRADO);
     }
     const statusAtual = venda.status.trim().toUpperCase();
-    if (statusAtual !== 'EM TRÂNSITO') {
+    if (statusAtual !== 'EM_TRANSITO') {
       throw new Error('Somente pedidos em trânsito podem ter entrega confirmada.');
     }
 
@@ -144,7 +144,7 @@ export class ServicoPedidosAdmin {
       throw new Error(MENSAGENS_ERRO.PEDIDO_NAO_ENCONTRADO);
     }
     const statusAtual = venda.status.trim().toUpperCase();
-    if (statusAtual !== 'EM TRÂNSITO') {
+    if (statusAtual !== 'EM_TRANSITO') {
       throw new Error('Somente pedidos em trânsito podem ter falha de entrega marcada.');
     }
 
@@ -213,7 +213,7 @@ export class ServicoPedidosAdmin {
     await this.repositorioVendas.salvarDataPrevistaEntrega(vendaUuid, new Date(calculoFrete.dataPrevistaEntrega));
 
     // Atualizar status para EM TRÂNSITO
-    await this.repositorioVendas.atualizarStatus(vendaUuid, 'EM TRÂNSITO');
+    await this.repositorioVendas.atualizarStatus(vendaUuid, 'EM_TRANSITO');
 
     const atualizada = await this.repositorioVendas.obterPorUuid(vendaUuid);
     if (!atualizada) throw new Error('Pedido não encontrado após redespacho.');

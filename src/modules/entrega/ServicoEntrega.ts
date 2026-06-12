@@ -44,7 +44,7 @@ export class ServicoEntrega {
     const entrega = await this.repositorioEntrega.cadastrar(dados);
 
     // 3. Atualizar o status da venda para 'EM TRÂNSITO' conforme regra de negócio
-    await this.repositorioVendas.atualizarStatus(dados.vendaUuid, 'EM TRÂNSITO');
+    await this.repositorioVendas.atualizarStatus(dados.vendaUuid, 'EM_TRANSITO');
 
     // 4. Enviar notificação de rastreio
     const email = await this.repositorioVendas.obterEmailUsuarioPorVenda(dados.vendaUuid);
@@ -64,7 +64,7 @@ export class ServicoEntrega {
     if (!entrega) {
       throw new Error('Entrega não encontrada.');
     }
-    await this.repositorioVendas.atualizarStatus(entrega.vendaUuid, 'FALHA NA ENTREGA');
+    await this.repositorioVendas.atualizarStatus(entrega.vendaUuid, 'FALHA_NA_ENTREGA');
   }
 
   /**
@@ -82,7 +82,7 @@ export class ServicoEntrega {
     await this.repositorioEntrega.atualizarEndereco(entregaUuid, novoEndereco);
 
     // 2. Voltar status para EM PROCESSAMENTO para permitir novo despacho
-    await this.repositorioVendas.atualizarStatus(entrega.vendaUuid, 'EM PROCESSAMENTO');
+    await this.repositorioVendas.atualizarStatus(entrega.vendaUuid, 'EM_PROCESSAMENTO');
   }
 
   /**

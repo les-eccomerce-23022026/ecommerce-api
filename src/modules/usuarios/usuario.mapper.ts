@@ -1,5 +1,5 @@
 import { IUsuario } from '@/modules/usuarios/IUsuario.entity';
-import { PAPEL_CLIENTE, PAPEL_ADMIN } from '@/shared/types/papeis';
+import { PAPEL_CLIENTE, PAPEL_ADMIN, PAPEL_ADMIN_SISTEMA } from '@/shared/types/papeis';
 
 /** Tipo que representa uma linha bruta retornada pelo banco de dados */
 export type LinhaResultadoUsuario = Record<string, unknown>;
@@ -10,11 +10,12 @@ export class UsuarioMapper {
    */
   public static mapearParaEntidade(row: LinhaResultadoUsuario, papeis?: LinhaResultadoUsuario[]): IUsuario {
     const papeisArray = papeis || [];
-    
-    // Prioridade: admin > cliente > qualquer outro
+
+    // Prioridade: admin_sistema > admin > cliente > qualquer outro
+    const papelAdminSistema = papeisArray.find((p) => p.descricao === PAPEL_ADMIN_SISTEMA.descricao);
     const papelAdmin = papeisArray.find((p) => p.descricao === PAPEL_ADMIN.descricao);
     const papelCliente = papeisArray.find((p) => p.descricao === PAPEL_CLIENTE.descricao);
-    const papelPrincipal = papelAdmin ?? papelCliente ?? (papeisArray.length > 0 ? papeisArray[0] : row);
+    const papelPrincipal = papelAdminSistema ?? papelAdmin ?? papelCliente ?? (papeisArray.length > 0 ? papeisArray[0] : row);
     
     return {
       id: Number(row.id),

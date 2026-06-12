@@ -23,6 +23,13 @@ export interface IEntradaEstoque {
   dataEntrada?: Date;
 }
 
+export interface IAtualizacaoEstoque {
+  estoqueUuid: string;
+  quantidadeDisponivel?: number;
+  precoVenda?: number;
+  valorCustoAtual?: number;
+}
+
 export class RepositorioEstoque {
   constructor(private readonly db: IConexaoBanco) {}
 
@@ -242,6 +249,55 @@ export class RepositorioEstoque {
         AND etq_ativo = TRUE
         AND loj_id = $3
     `, [quantidade, livroUuid, lojId]);
+  }
+
+  async atualizarEstoque(dados: IAtualizacaoEstoque): Promise<void> {
+    const lojId = this.obterLojId();
+
+    const campos: string[] = [];
+    const valores: any[] = [];
+    let indiceParametro = 1;
+
+    if (dados.quantidadeDisponivel !== undefined) {
+      campos.push(`etq_quantidade_disponivel = $${indiceParametro++}`);
+      valores.push(dados.quantidadeDisponivel);
+    }
+
+    if (dados.precoVenda !== undefined) {
+      campos.push(`etq_preco_venda = $${indiceParametro++}`);
+      valores.push(dados.precoVenda);
+    }
+
+    if (dados.valorCustoAtual !== undefined) {
+      campos.push(`etq_valor_custo_atual = $${indiceParametro++}`);
+      valores.push(dados.valorCustoAtual);
+    }
+
+    if (campos.length === 0) {
+      throw new Error('Nenhum campo fornecido para atualização.');
+    }
+
+    campos.push(`etq_atualizado_em = CURRENT_TIMESTAMP`);
+    valores.push(dados.estoqueUuid);
+
+    if (lojId) {
+      valores.push(lojId);
+    }
+
+    const sql = `
+      UPDATE estoques
+      SET ${campos.join(', ')}
+      WHERE etq_uuid = $${indiceParametro++}
+        ${lojId ? `AND loj_id = $${indiceParametro++}` : ''}
+        AND etq_ativo = TRUE
+      RETURNING etq_uuid
+    `;
+
+    const linhasAtualizadas = await this.db.executar<{ etq_uuid: string }>(sql, valores);
+
+    if (linhasAtualizadas.length === 0) {
+      throw new Error('Estoque não encontrado ou não pertence à loja.');
+    }
   }
 
   async calcularValorTotalEstoque(): Promise<number> {

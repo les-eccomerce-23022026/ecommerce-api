@@ -61,6 +61,16 @@ export class ServicoLivros {
     return this.repo.listarTodosAdmin(limite);
   }
 
+  /**
+   * Lista todos os livros do catálogo global sem filtro de loja.
+   * Usado para indexação no ChromaDB (IA de recomendação).
+   * Clientes podem comprar de qualquer loja, então a IA precisa
+   * ter acesso ao catálogo completo.
+   */
+  listarCatalogoGlobal(limite = 1000): Promise<ILivroCatalogoDto[]> {
+    return this.repo.listarCatalogoGlobal(limite);
+  }
+
   async criarLivro(dados: {
     uuid: string;
     titulo: string;
@@ -105,6 +115,8 @@ export class ServicoLivros {
     const mapaCategorias = await this.bulkInsert.buscarIdsPorNomes('categorias', 'cat_nome', 'cat_id', [dados.categoriaNome]);
     const categoriaId = mapaCategorias.get(dados.categoriaNome);
 
+    const lojaUuid = ContextoRequisicao.obterLojUuid();
+
     // Criar livro com transação
     await this.bulkInsert.criarLivroComTransacao({
       uuid: dados.uuid,
@@ -127,6 +139,7 @@ export class ServicoLivros {
       quantidadeEstoque: dados.quantidadeEstoque,
       precoVenda: dados.precoVenda,
       valorCusto: dados.valorCusto,
+      lojaUuid,
     });
 
     // Invalidar cache do catálogo

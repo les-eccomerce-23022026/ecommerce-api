@@ -34,7 +34,7 @@ export async function sincronizarStatusVendaAposPagamentos(
     return;
   }
   if (pagamentos.some((p) => p.formaPagamento.getTipo() === TipoPagamento.PIX && p.status === StatusPagamento.PENDENTE)) {
-    await repositorioVendas.atualizarStatus(vendaUuid, 'AGUARDANDO PAGAMENTO');
+    await repositorioVendas.atualizarStatus(vendaUuid, 'AGUARDANDO_PAGAMENTO');
     return;
   }
   if (pagamentos.every((p) => pagamentoSatisfeitoParaVenda(p))) {

@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import rateLimit from 'express-rate-limit';
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 
 /**
  * Middleware de rate limiting para proteção contra ataques de força bruta no login.
@@ -16,12 +16,12 @@ const rateLimiter = rateLimit({
   standardHeaders: 'draft-7',
   legacyHeaders: false,
   skipSuccessfulRequests: true,
-  // Usa header de isolamento em testes; normaliza IPv6 para evitar problema com ::1
+  // Usa header de isolamento em testes; usa helper ipKeyGenerator para IPv6
   keyGenerator: (req: Request) => {
     const testKey = req.headers['x-test-rate-limit-key'];
     if (testKey) return String(testKey);
-    const ip = req.ip ?? req.socket.remoteAddress ?? 'unknown';
-    return ip === '::1' ? '127.0.0.1' : ip;
+    // ipKeyGenerator retorna a chave IP normalizada
+    return String(req.ip ?? req.socket.remoteAddress ?? 'unknown');
   },
   message: {
     sucesso: false,

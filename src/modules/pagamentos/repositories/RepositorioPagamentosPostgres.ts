@@ -496,6 +496,7 @@ export class RepositorioPagamentosPostgres implements IRepositorioPagamentos {
       FROM livraria_comercial.cupons_troca ct
       JOIN livraria_gestao.clientes c ON c.cli_id = ct.cpt_cliente_id
       WHERE c.usu_id = $1
+      ORDER BY ct.cpt_criado_em DESC, ct.cpt_id DESC
     `;
     const rows = await this.db.executar<{
       uuid: string;
@@ -523,7 +524,7 @@ export class RepositorioPagamentosPostgres implements IRepositorioPagamentos {
       FROM livraria_comercial.cupom
       WHERE cup_tipo = 'promocional'
         AND cup_ativo = true
-        AND (loj_id IS NULL OR loj_id = $1)
+        AND (loj_id IS NULL OR $1::integer IS NULL OR loj_id = $1::integer)
     `;
     return this.db.executar<{
       uuid: string;

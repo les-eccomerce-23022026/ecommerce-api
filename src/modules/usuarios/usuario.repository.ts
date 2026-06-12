@@ -552,10 +552,10 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
     return parseInt(rows[0].count) > 0;
   }
 
-  public async buscarUsuariosPorPapel(idPapel: number): Promise<IUsuario[]> {
+  public async buscarUsuariosPorPapel(descricaoPapel: string): Promise<IUsuario[]> {
     const rows = await this.db.executar(
-      USUARIO_QUERIES.SELECT_USUARIOS_POR_PAPEL, 
-      [idPapel],
+      USUARIO_QUERIES.SELECT_USUARIOS_POR_PAPEL,
+      [descricaoPapel],
       { searchPath: 'livraria_comercial, livraria_financeiro, livraria_gestao, livraria_logistica, livraria_ref, public' }
     );
     

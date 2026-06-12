@@ -78,4 +78,28 @@ export class ControladorEstoque {
       RespostaPadrao.enviarErro(res, 500, msg);
     }
   };
+
+  atualizarEstoque = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const dados = req.body;
+
+      if (!dados.estoqueUuid) {
+        RespostaPadrao.enviarErro(res, 400, 'UUID do estoque é obrigatório.');
+        return;
+      }
+
+      await this.servico.atualizarEstoque({
+        estoqueUuid: dados.estoqueUuid,
+        quantidadeDisponivel: dados.quantidadeDisponivel,
+        precoVenda: dados.precoVenda,
+        valorCustoAtual: dados.valorCustoAtual,
+      });
+
+      RespostaPadrao.enviarSucesso(res, 200, { mensagem: 'Estoque atualizado com sucesso.' });
+    } catch (err: unknown) {
+      const msg = RespostaPadrao.obterMensagemErro(err, 'Erro ao atualizar estoque');
+      Logger.error(`[ControladorEstoque.atualizarEstoque] Erro: ${msg}`, err instanceof Error ? err.stack : String(err));
+      RespostaPadrao.enviarErro(res, 500, msg);
+    }
+  };
 }

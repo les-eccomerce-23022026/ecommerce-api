@@ -53,33 +53,40 @@ export class ClientesEnderecoService {
   }
 
   public async converterEnderecosParaDto(enderecos: IEnderecoUsuario[]): Promise<IEnderecoDto[]> {
-    return Promise.all(enderecos.map((e) => this.mapearEnderecoEntidadeParaDto(e)));
-  }
+    if (enderecos.length === 0) return [];
 
-  private async mapearEnderecoEntidadeParaDto(endereco: IEnderecoUsuario): Promise<IEnderecoDto> {
-    const [cidade, bairro, cep, pais, tipoResidencia, logradouro] = await Promise.all([
-      ClientesUtils.obterCidadePorId(this.db, endereco.idCidade),
-      ClientesUtils.obterBairroPorId(this.db, endereco.idBairro),
-      ClientesUtils.obterCepPorId(this.db, String(endereco.idCep)),
-      ClientesUtils.obterPaisPorId(this.db, endereco.idPais),
-      ClientesUtils.obterTipoResidenciaPorId(this.db, endereco.idTipoResidencia),
-      ClientesUtils.obterLogradouroPorId(this.db, endereco.idLogradouro),
-    ]);
+    const refs = await ClientesUtils.buscarReferenciasBulk(this.db, {
+      cidades: [...new Set(enderecos.map((e) => e.idCidade))],
+      bairros: [...new Set(enderecos.map((e) => e.idBairro))],
+      ceps: [...new Set(enderecos.map((e) => String(e.idCep)))],
+      paises: [...new Set(enderecos.map((e) => e.idPais))],
+      tiposResidencia: [...new Set(enderecos.map((e) => e.idTipoResidencia))],
+      logradouros: [...new Set(enderecos.map((e) => e.idLogradouro))],
+    });
 
-    return {
-      uuid: endereco.uuid,
-      apelido: endereco.apelido || (endereco.principal ? 'Principal' : `Endereço ${endereco.id}`),
-      tipoResidencia: tipoResidencia?.dscTipoResidencia || 'Casa',
-      tipoLogradouro: logradouro?.tipoLogradouro || 'Rua',
-      logradouro: logradouro?.dscLogradouro || '',
-      numero: endereco.numero,
-      complemento: endereco.complemento,
-      bairro: bairro?.dscBairro || '',
-      cep: cep?.numCep || '',
-      cidade: cidade?.dscCidade || '',
-      estado: cidade?.dscEstado || '',
-      pais: pais?.dscPais || 'Brasil',
-    };
+    return enderecos.map((endereco) => {
+      const cidade = refs.cidades.get(endereco.idCidade);
+      const bairro = refs.bairros.get(endereco.idBairro);
+      const cep = refs.ceps.get(String(endereco.idCep));
+      const pais = refs.paises.get(endereco.idPais);
+      const tipoResidencia = refs.tiposResidencia.get(endereco.idTipoResidencia);
+      const logradouro = refs.logradouros.get(endereco.idLogradouro);
+
+      return {
+        uuid: endereco.uuid,
+        apelido: endereco.apelido || (endereco.principal ? 'Principal' : `Endereço ${endereco.id}`),
+        tipoResidencia: tipoResidencia?.dscTipoResidencia || 'Casa',
+        tipoLogradouro: logradouro?.tipoLogradouro || 'Rua',
+        logradouro: logradouro?.dscLogradouro || '',
+        numero: endereco.numero,
+        complemento: endereco.complemento,
+        bairro: bairro?.dscBairro || '',
+        cep: cep?.numCep || '',
+        cidade: cidade?.dscCidade || '',
+        estado: cidade?.dscEstado || '',
+        pais: pais?.dscPais || 'Brasil',
+      };
+    });
   }
 
   public async editarEndereco(

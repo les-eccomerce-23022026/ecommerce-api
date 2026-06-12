@@ -121,7 +121,7 @@ export const VENDAS_QUERIES = {
   `,
   
   UPDATE_STATUS_ENTREGUE: `
-    UPDATE livraria_comercial.vendas SET stv_id = $1, ven_atualizado_em = NOW(), ven_data_hora_entrega = NOW() WHERE ven_uuid = $2
+    UPDATE livraria_comercial.vendas SET stv_id = (SELECT stv_id FROM livraria_comercial.status_venda WHERE stv_descricao = $1), ven_atualizado_em = NOW(), ven_data_hora_entrega = $3 WHERE ven_uuid = $2
   `,
   
   UPDATE_STATUS_PADRAO: `
@@ -145,7 +145,7 @@ export const VENDAS_QUERIES = {
     SELECT v.ven_uuid
     FROM livraria_comercial.vendas v
     JOIN livraria_comercial.status_venda s ON v.stv_id = s.stv_id
-    WHERE s.stv_descricao = 'EM TRÂNSITO'
+    WHERE s.stv_descricao = 'EM_TRANSITO'
       AND v.ven_data_prevista_entrega IS NOT NULL
       AND v.ven_data_prevista_entrega < NOW()
   `,

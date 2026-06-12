@@ -16,6 +16,7 @@ import { criarRotasLogisticaMocks } from '@/modules/logistica-mocks/logisticaMoc
 import { registrarRotasLojas } from '@/modules/lojas/lojas.routes';
 import rotasUsuarioPapeis from '@/modules/usuarios/usuarioPapeis.routes';
 import { registrarRotasIA } from '@/modules/ia/ia.routes';
+import { registrarRotasAdminSistema } from '@/modules/admin-sistema/adminSistema.routes';
 import { ServicoMockCorreios } from '@/modules/logistica-mocks/servicoMockCorreios';
 import { ServicoMockLoggi } from '@/modules/logistica-mocks/servicoMockLoggi';
 import { RepositorioRastreamentoPostgres } from '@/modules/logistica-mocks/repositorios/RepositorioRastreamentoPostgres';
@@ -41,12 +42,12 @@ export function criarAplicacao(): Application {
   const apiRouter = Router();
   const db = ConexaoPostgres.obterInstancia();
 
-  // Logging de todas as requisições para debug
-  app.use((req, res, next) => {
-    console.log(`[REQUEST] ${req.method} ${req.url}`);
-    Logger.info(`[REQUEST] ${req.method} ${req.url}`);
-    next();
-  });
+  if (process.env.NODE_ENV === 'development') {
+    app.use((req, _res, next) => {
+      Logger.info(`[REQUEST] ${req.method} ${req.url}`);
+      next();
+    });
+  }
 
   app.use(cookieParser());
   app.use(
@@ -100,6 +101,7 @@ export function criarAplicacao(): Application {
   registrarRotasCupom(apiRouter);
   registrarRotasLojas(apiRouter);
   registrarRotasIA(apiRouter);
+  registrarRotasAdminSistema(apiRouter);
   apiRouter.use('/usuarios/papeis', rotasUsuarioPapeis);
   
   // Rotas mockadas para APIs de logística (Correios e Loggi)

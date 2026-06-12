@@ -304,8 +304,8 @@ export class ControladorVendas {
   public despacharPedido = async (req: Request, res: Response) => {
     try {
       const { uuid } = req.params;
-      await this.servicoVendas.atualizarStatus(uuid, 'EM TRÂNSITO');
-      res.json({ status: 'EM TRÂNSITO' });
+      await this.servicoVendas.atualizarStatus(uuid, 'EM_TRANSITO');
+      res.json({ status: 'EM_TRANSITO' });
     } catch (err: unknown) {
       res.status(400).json({ erro: (err as Error).message });
     }
@@ -317,7 +317,7 @@ export class ControladorVendas {
   public confirmarEntrega = async (req: Request, res: Response) => {
     try {
       const { uuid } = req.params;
-      await this.servicoVendas.atualizarStatus(uuid, 'Entregue');
+      await this.servicoVendas.confirmarEntregaAdmin(uuid);
       res.json({ status: 'Entregue' });
     } catch (err: unknown) {
       res.status(400).json({ erro: (err as Error).message });

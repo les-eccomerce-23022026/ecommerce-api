@@ -1,4 +1,4 @@
-import { RepositorioEstoque, IItemEstoque, IEntradaEstoque } from './repositorioEstoque';
+import { RepositorioEstoque, IItemEstoque, IEntradaEstoque, IAtualizacaoEstoque } from './repositorioEstoque';
 
 export interface IKpisEstoque {
   totalLivros: number;
@@ -56,5 +56,21 @@ export class ServicoEstoque {
     }
 
     await this.repositorio.registrarEntrada(dados);
+  }
+
+  async atualizarEstoque(dados: IAtualizacaoEstoque): Promise<void> {
+    if (dados.quantidadeDisponivel !== undefined && dados.quantidadeDisponivel < 0) {
+      throw new Error('Quantidade disponível não pode ser negativa.');
+    }
+
+    if (dados.precoVenda !== undefined && dados.precoVenda <= 0) {
+      throw new Error('Preço de venda deve ser maior que zero.');
+    }
+
+    if (dados.valorCustoAtual !== undefined && dados.valorCustoAtual < 0) {
+      throw new Error('Valor de custo atual não pode ser negativo.');
+    }
+
+    await this.repositorio.atualizarEstoque(dados);
   }
 }

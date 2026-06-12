@@ -118,8 +118,8 @@ export class ControladorClientes {
         return RespostaPadrao.enviarErro(resposta, 401, 'Usuário não autenticado.');
       }
 
-      const novoEndereco = await gestaoIdentidadeCliente.adicionarEndereco(uuid, dados);
-      return RespostaPadrao.enviarSucesso(resposta, 201, novoEndereco);
+      const enderecosAtualizados = await gestaoIdentidadeCliente.adicionarEndereco(uuid, dados);
+      return RespostaPadrao.enviarSucesso(resposta, 201, enderecosAtualizados);
     } catch (erro) {
       const mensagem = RespostaPadrao.obterMensagemErro(erro, 'Erro ao adicionar endereço.');
       return RespostaPadrao.enviarErro(resposta, 400, mensagem);
@@ -262,8 +262,8 @@ export class ControladorClientes {
 
       // Combinar e formatar para o frontend
       const cuponsFormatados = [
-        ...cuponsPromocionaisFormatados,
         ...cuponsTrocaFormatados,
+        ...cuponsPromocionaisFormatados,
       ];
 
       return RespostaPadrao.enviarSucesso(resposta, 200, cuponsFormatados);

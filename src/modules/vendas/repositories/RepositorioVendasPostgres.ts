@@ -40,7 +40,7 @@ export class RepositorioVendasPostgres implements IRepositorioVendas {
     const statusRes = await this.db.executar<{ stv_id: number }>(VENDAS_QUERIES.SELECT_STATUS_POR_DESCRICAO, [STATUS_VENDAS.EM_PROCESSAMENTO]);
     
     if (statusRes.length === 0) {
-      throw new Error('Status EM PROCESSAMENTO não encontrado');
+      throw new Error('Status EM_PROCESSAMENTO não encontrado');
     }
     const statusId = statusRes[0].stv_id;
 
@@ -314,12 +314,13 @@ export class RepositorioVendasPostgres implements IRepositorioVendas {
     const stvId = resStatus[0].stv_id;
 
     // Registra data/hora de entrega ao confirmar recebimento (RN0043: prazo de 7 dias para troca).
-    const queryUpdate =
-      novoStatus === STATUS_VENDAS.ENTREGUE
-        ? VENDAS_QUERIES.UPDATE_STATUS_ENTREGUE
-        : VENDAS_QUERIES.UPDATE_STATUS_PADRAO;
+    // UPDATE_STATUS_ENTREGUE resolve o status por descrição ($1) e grava a data de entrega ($3).
+    if (novoStatus === STATUS_VENDAS.ENTREGUE) {
+      await this.db.executar(VENDAS_QUERIES.UPDATE_STATUS_ENTREGUE, [novoStatus, vendaUuid, new Date()]);
+      return;
+    }
 
-    await this.db.executar(queryUpdate, [stvId, vendaUuid]);
+    await this.db.executar(VENDAS_QUERIES.UPDATE_STATUS_PADRAO, [stvId, vendaUuid]);
   }
 
   public async obterEmailUsuarioPorVenda(vendaUuid: string): Promise<string | null> {
@@ -359,6 +360,10 @@ export class RepositorioVendasPostgres implements IRepositorioVendas {
 
   public async salvarDataPrevistaEntrega(vendaUuid: string, data: Date): Promise<void> {
     await this.db.executar(VENDAS_QUERIES.UPDATE_DATA_PREVISTA_ENTREGA, [data, vendaUuid]);
+  }
+
+  public async atualizarStatusComDataEntrega(vendaUuid: string, novoStatus: string, dataEntrega: Date): Promise<void> {
+    await this.db.executar(VENDAS_QUERIES.UPDATE_STATUS_ENTREGUE, [novoStatus, vendaUuid, dataEntrega]);
   }
 
   public async listarVendasEmTransitoComPrazoVencido(): Promise<string[]> {

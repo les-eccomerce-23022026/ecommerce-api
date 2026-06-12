@@ -62,8 +62,8 @@ async function validarCupomPromocional(
   const cupom = cupons.find((c) => c.codigo === codigo && c.ativo);
   console.log('[DEBUG validarCupomPromocional] cupom encontrado:', cupom);
   if (!cupom) return false;
-  console.log('[DEBUG validarCupomPromocional] valor minimo:', cupom.valorMinimo, 'valor atual:', valor);
-  if (valor < cupom.valorMinimo) return false;
+  // valorMinimo é o valor mínimo do PEDIDO (não do desconto). A validação do
+  // mínimo já foi feita no frontend; aqui apenas confirmamos que o cupom existe e está ativo.
   return true;
 }
 

@@ -1,6 +1,6 @@
 import { ITelefoneUsuario } from '@/shared/types/ITelefoneUsuario';
 import { ITelefoneDto } from '@/modules/clientes/Iclientes.dto';
-import { IConexaoBanco } from '@/shared/infrastructure/database/IConexaoBanco';
+import { IConexaoBanco, DbParametro } from '@/shared/infrastructure/database/IConexaoBanco';
 import {
   IRowIdSimples,
   IRowCidadeEstado,
@@ -216,5 +216,76 @@ export class ClientesUtils {
                    WHERE l.log_id = $1`;
     const result = await db.executar<IRowLogradouroTipo>(query, [idLogradouro]);
     return result.length > 0 ? result[0] : null;
+  }
+
+  public static async buscarReferenciasBulk(
+    db: IConexaoBanco,
+    ids: {
+      cidades: number[];
+      bairros: number[];
+      ceps: string[];
+      paises: number[];
+      tiposResidencia: number[];
+      logradouros: number[];
+    },
+  ): Promise<{
+    cidades: Map<number, IRowCidadeEstado>;
+    bairros: Map<number, IRowBairro>;
+    ceps: Map<string, IRowCep>;
+    paises: Map<number, IRowPais>;
+    tiposResidencia: Map<number, IRowTipoResidencia>;
+    logradouros: Map<number, IRowLogradouroTipo>;
+  }> {
+    const [cidades, bairros, ceps, paises, tiposResidencia, logradouros] = await Promise.all([
+      ids.cidades.length > 0
+        ? db.executar<IRowCidadeEstado & { cid_id: number }>(
+            `SELECT c.cid_id, c.cid_nome as "dscCidade", e.est_sigla as "dscEstado"
+             FROM cidades c JOIN estados e ON c.est_id = e.est_id
+             WHERE c.cid_id = ANY($1::int[])`,
+            [ids.cidades as unknown as DbParametro],
+          )
+        : Promise.resolve([]),
+      ids.bairros.length > 0
+        ? db.executar<IRowBairro & { bai_id: number }>(
+            `SELECT bai_id, bai_nome as "dscBairro" FROM bairros WHERE bai_id = ANY($1::int[])`,
+            [ids.bairros as unknown as DbParametro],
+          )
+        : Promise.resolve([]),
+      ids.ceps.length > 0
+        ? db.executar<IRowCep & { cep_numero: string }>(
+            `SELECT cep_numero as "numCep", cep_numero FROM ceps WHERE cep_numero = ANY($1::text[])`,
+            [ids.ceps as unknown as DbParametro],
+          )
+        : Promise.resolve([]),
+      ids.paises.length > 0
+        ? db.executar<IRowPais & { pai_id: number }>(
+            `SELECT pai_id, pai_nome as "dscPais" FROM paises WHERE pai_id = ANY($1::int[])`,
+            [ids.paises as unknown as DbParametro],
+          )
+        : Promise.resolve([]),
+      ids.tiposResidencia.length > 0
+        ? db.executar<IRowTipoResidencia & { tre_id: number }>(
+            `SELECT tre_id, tre_descricao as "dscTipoResidencia" FROM tipos_residencias WHERE tre_id = ANY($1::int[])`,
+            [ids.tiposResidencia as unknown as DbParametro],
+          )
+        : Promise.resolve([]),
+      ids.logradouros.length > 0
+        ? db.executar<IRowLogradouroTipo & { log_id: number }>(
+            `SELECT l.log_id, l.log_nome as "dscLogradouro", tl.tlo_descricao as "tipoLogradouro"
+             FROM logradouros l JOIN tipos_logradouros tl ON l.tlo_id = tl.tlo_id
+             WHERE l.log_id = ANY($1::int[])`,
+            [ids.logradouros as unknown as DbParametro],
+          )
+        : Promise.resolve([]),
+    ]);
+
+    return {
+      cidades: new Map((cidades as Array<IRowCidadeEstado & { cid_id: number }>).map((r) => [r.cid_id, r])),
+      bairros: new Map((bairros as Array<IRowBairro & { bai_id: number }>).map((r) => [r.bai_id, r])),
+      ceps: new Map((ceps as Array<IRowCep & { cep_numero: string }>).map((r) => [r.cep_numero, r])),
+      paises: new Map((paises as Array<IRowPais & { pai_id: number }>).map((r) => [r.pai_id, r])),
+      tiposResidencia: new Map((tiposResidencia as Array<IRowTipoResidencia & { tre_id: number }>).map((r) => [r.tre_id, r])),
+      logradouros: new Map((logradouros as Array<IRowLogradouroTipo & { log_id: number }>).map((r) => [r.log_id, r])),
+    };
   }
 }

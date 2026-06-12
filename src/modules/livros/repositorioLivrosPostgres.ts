@@ -236,6 +236,50 @@ export class RepositorioLivrosPostgres {
     return rows.map(mapRow);
   }
 
+  /**
+   * Lista todos os livros do catálogo global sem filtro de loja.
+   * Usado para indexação no ChromaDB (IA de recomendação).
+   * Clientes podem comprar de qualquer loja, então a IA precisa
+   * ter acesso ao catálogo completo.
+   */
+  async listarCatalogoGlobal(limite: number): Promise<ILivroCatalogoDto[]> {
+    const sql = `
+      WITH livro_categorias AS (
+        SELECT
+          lc.liv_id,
+          string_agg(DISTINCT c.cat_nome, '|' ORDER BY c.cat_nome) AS categorias_agregadas
+        FROM livraria_comercial.livro_categorias lc
+        INNER JOIN livraria_comercial.categorias c ON lc.cat_id = c.cat_id AND c.cat_ativo = TRUE
+        GROUP BY lc.liv_id
+      )
+      SELECT
+        l.liv_uuid,
+        l.liv_titulo,
+        l.liv_isbn,
+        l.liv_sinopse,
+        l.liv_imagem_url,
+        a.aut_nome,
+        MIN(e.etq_preco_venda) as etq_preco_venda,
+        SUM(e.etq_quantidade_disponivel) as etq_quantidade_disponivel,
+        l.liv_ativo,
+        l.liv_numero_paginas,
+        l.liv_ano,
+        COALESCE(lc.categorias_agregadas, '') AS categorias_agregadas
+      FROM livraria_comercial.livros l
+      INNER JOIN livraria_comercial.autores a ON l.aut_id = a.aut_id
+      INNER JOIN livraria_comercial.estoques e ON e.liv_id = l.liv_id
+      LEFT JOIN livro_categorias lc ON l.liv_id = lc.liv_id
+      WHERE l.liv_ativo = TRUE AND e.etq_ativo = TRUE
+      GROUP BY l.liv_uuid, l.liv_titulo, l.liv_isbn, l.liv_sinopse, l.liv_imagem_url, a.aut_nome, l.liv_ativo, l.liv_numero_paginas, l.liv_ano, lc.categorias_agregadas
+      HAVING SUM(e.etq_quantidade_disponivel) > 0
+      ORDER BY l.liv_titulo ASC
+      LIMIT $1
+    `;
+
+    const rows = await this.db.executar<RowLivro>(sql, [limite]);
+    return rows.map(mapRow);
+  }
+
   async obterEstoqueDisponivelPorLivId(livId: number): Promise<number | null> {
     const lojaUuid = this.obterLojaUuid();
     

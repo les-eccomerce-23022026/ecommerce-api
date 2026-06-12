@@ -239,7 +239,7 @@ export class ServicoVendas {
    */
   public async listarTrocasPendentes(): Promise<IVenda[]> {
     const todas = await this.repositorioVendas.listarTodas(1000);
-    return todas.filter(v => v.status === STATUS_VENDAS.EM_TROCA || v.status === STATUS_VENDAS.TROCA_AUTORIZADA);
+    return todas.filter(v => v.status === STATUS_VENDAS.EM_TROCA || v.status === STATUS_VENDAS.TROCA_AUTORIZADA || v.status === STATUS_VENDAS.TROCA_REJEITADA);
   }
 
   /**
@@ -247,7 +247,7 @@ export class ServicoVendas {
    */
   public async listarDevolucoesPendentes(): Promise<IVenda[]> {
     const todas = await this.repositorioVendas.listarTodas(1000);
-    return todas.filter(v => v.status === STATUS_VENDAS.EM_DEVOLUCAO || v.status === STATUS_VENDAS.DEVOLUCAO_AUTORIZADA);
+    return todas.filter(v => v.status === STATUS_VENDAS.EM_DEVOLUCAO || v.status === STATUS_VENDAS.DEVOLUCAO_AUTORIZADA || v.status === STATUS_VENDAS.DEVOLUCAO_REJEITADA);
   }
 
   /**
@@ -364,6 +364,18 @@ export class ServicoVendas {
     await this.repositorioVendas.atualizarStatus(vendaUuid, STATUS_VENDAS.DEVOLUCAO_REJEITADA);
     const atualizada = await this.repositorioVendas.obterPorUuid(vendaUuid);
     return atualizada!;
+  }
+
+  /**
+   * Confirma entrega do pedido (Admin) - atualiza status e data_hora_entrega
+   * Usado em testes E2E para simular entrega completa
+   */
+  public async confirmarEntregaAdmin(vendaUuid: string): Promise<void> {
+    const venda = await this.repositorioVendas.obterPorUuid(vendaUuid);
+    if (!venda) throw new Error(MENSAGENS_ERRO.VENDA_NAO_ENCONTRADA);
+    if (venda.status !== STATUS_VENDAS.EM_TRANSITO) throw new Error('Pedido não está em trânsito');
+
+    await this.repositorioVendas.atualizarStatusComDataEntrega(vendaUuid, STATUS_VENDAS.ENTREGUE, new Date());
   }
 
   /**

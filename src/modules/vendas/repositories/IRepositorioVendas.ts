@@ -80,6 +80,12 @@ export interface IRepositorioVendas {
   salvarDataPrevistaEntrega(vendaUuid: string, data: Date): Promise<void>;
 
   /**
+   * Atualiza status e data_hora_entrega simultaneamente.
+   * Usado para confirmar entrega do pedido (admin/testes).
+   */
+  atualizarStatusComDataEntrega(vendaUuid: string, novoStatus: string, dataEntrega: Date): Promise<void>;
+
+  /**
    * Lista UUIDs de vendas em trânsito cuja data prevista de entrega já passou.
    * Usado pelo job de auto-confirmação de entrega.
    */
