@@ -37,11 +37,11 @@ export class ServicoAdmin {
    */
   public async listarAdministradores(): Promise<IListaAdminDto[]> {
     Logger.info('[listarAdministradores] Buscando administradores via usuario_papeis');
-    const todos = await this.repositorioUsuarios.buscarUsuariosPorPapel(PAPEL_ADMIN.id);
+    const todos = await this.repositorioUsuarios.buscarUsuariosPorPapel(PAPEL_ADMIN.descricao);
     Logger.info('[listarAdministradores] Administradores encontrados', { quantidade: todos.length });
     
     // Contar vendas com status de troca pendente por loja
-    const trocasPorLoja = await this.repositorioVendas.contarVendasPorStatusELoja(['EM TROCA', 'TROCA AUTORIZADA']);
+    const trocasPorLoja = await this.repositorioVendas.contarVendasPorStatusELoja(['EM_TROCA', 'TROCA_AUTORIZADA']);
     
     // Para cada administrador, buscar suas lojas e somar as trocas pendentes
     const administradoresComTrocas = await Promise.all(
@@ -76,7 +76,7 @@ export class ServicoAdmin {
       throw new Error(MENSAGENS_ERRO.ADMINISTRADOR_NAO_ENCONTRADO);
     }
     
-    const temPapelAdmin = admin.papeis.some(p => p.id === PAPEL_ADMIN.id);
+    const temPapelAdmin = admin.papeis.some(p => p.descricao === PAPEL_ADMIN.descricao);
     if (!temPapelAdmin) {
       Logger.warn('[inativarAdministrador] Usuário não tem papel admin', { uuid, papeis: admin.papeis.map(p => p.descricao) });
       throw new Error(MENSAGENS_ERRO.ADMINISTRADOR_NAO_ENCONTRADO);
@@ -97,13 +97,13 @@ export class ServicoAdmin {
   public async ativarAdministrador(uuid: string): Promise<void> {
     Logger.info('[ativarAdministrador] Iniciando ativação', { uuid });
     const admin = await this.repositorioUsuarios.buscarPorUuid(uuid);
-    
+
     if (!admin) {
       Logger.warn('[ativarAdministrador] Administrador não encontrado', { uuid });
       throw new Error(MENSAGENS_ERRO.ADMINISTRADOR_NAO_ENCONTRADO);
     }
-    
-    const temPapelAdmin = admin.papeis.some(p => p.id === PAPEL_ADMIN.id);
+
+    const temPapelAdmin = admin.papeis.some(p => p.descricao === PAPEL_ADMIN.descricao);
     if (!temPapelAdmin) {
       Logger.warn('[ativarAdministrador] Usuário não tem papel admin', { uuid, papeis: admin.papeis.map(p => p.descricao) });
       throw new Error(MENSAGENS_ERRO.ADMINISTRADOR_NAO_ENCONTRADO);

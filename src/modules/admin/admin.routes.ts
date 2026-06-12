@@ -195,4 +195,11 @@ export function registrarRotasAdmin(app: IRouter): void {
     adminOnlyMiddleware,
     controladorEstoque.registrarEntrada,
   );
+
+  app.patch(
+    '/admin/estoque/atualizar',
+    autenticacaoMiddleware,
+    adminOnlyMiddleware,
+    controladorEstoque.atualizarEstoque,
+  );
 }

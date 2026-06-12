@@ -83,7 +83,7 @@ export async function autenticacaoMiddleware(
     // Desabilitado em desenvolvimento para facilitar automação de testes
     const ipAddress = req.ip || req.socket.remoteAddress;
     const userAgent = req.headers['user-agent'] as string | undefined;
-    const fingerprint = userAgent ? require('crypto').createHash('sha256').update(userAgent).digest('hex') : undefined;
+    const fingerprint = userAgent ? crypto.createHash('sha256').update(userAgent).digest('hex') : undefined;
 
     if (process.env.NODE_ENV !== 'development' && decodificado.ip && ipAddress && decodificado.ip !== ipAddress) {
       Logger.warn(`[auth] IP mismatch. Esperado: ${decodificado.ip}, Recebido: ${ipAddress}`);
