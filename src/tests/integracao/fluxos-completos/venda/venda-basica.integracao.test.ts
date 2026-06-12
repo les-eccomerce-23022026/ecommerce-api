@@ -58,7 +58,7 @@ describe('E2E - Vendas (Rotas HTTP)', () => {
       // Isso é esperado em testes E2E reais
       if (vendaRes.status === 201) {
         const vendaUuid = vendaRes.body.id;
-        expect(vendaRes.body.status).toBe('EM PROCESSAMENTO');
+        expect(vendaRes.body.status).toBe('EM_PROCESSAMENTO');
         expect(vendaRes.body.totalVenda).toBe(60);
 
         // Consultar venda via HTTP
@@ -68,7 +68,7 @@ describe('E2E - Vendas (Rotas HTTP)', () => {
 
         expect(consultaRes.status).toBe(200);
         expect(consultaRes.body.id).toBe(vendaUuid);
-        expect(consultaRes.body.status).toBe('EM PROCESSAMENTO');
+        expect(consultaRes.body.status).toBe('EM_PROCESSAMENTO');
 
         // Listar vendas do cliente via HTTP
         const listaRes = await request(app)

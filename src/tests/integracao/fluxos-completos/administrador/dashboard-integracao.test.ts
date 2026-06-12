@@ -85,7 +85,7 @@ describe('Integração — Painel administrativo (dashboard e pedidos)', () => {
         .get(`/api/vendas/${vendaUuid}`)
         .set('Authorization', `Bearer ${tokenCliente}`);
 
-      expect(resVenda.body.status).toBe('EM TRÂNSITO');
+      expect(resVenda.body.status).toBe('EM_TRANSITO');
 
       const resEnt = await request(app)
         .patch(`/api/admin/pedidos/${vendaUuid}/entrega`)

@@ -47,7 +47,7 @@ describe('Integração — Vendas / pedido do cliente', () => {
           .send(body);
 
         expect(res.status).toBe(201);
-        expect(res.body.status).toBe('EM PROCESSAMENTO');
+        expect(res.body.status).toBe('EM_PROCESSAMENTO');
         expect(res.body.totalVenda).toBe(60);
         expect(typeof res.body.id).toBe('string');
         expect(res.body.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
@@ -69,7 +69,7 @@ describe('Integração — Vendas / pedido do cliente', () => {
 
         expect(det.status).toBe(200);
         expect(det.body.id).toBe(vendaUuid);
-        expect(det.body.status).toBe('EM PROCESSAMENTO');
+        expect(det.body.status).toBe('EM_PROCESSAMENTO');
       });
     });
 

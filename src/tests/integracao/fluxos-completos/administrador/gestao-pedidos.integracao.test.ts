@@ -100,7 +100,7 @@ describe('Integração — Vendas / fluxo administrativo', () => {
           .set('Authorization', `Bearer ${tokenCliente}`));
 
         expect(resVenda.status).toBe(200);
-        expect(resVenda.body.status).toBe('EM TRÂNSITO');
+        expect(resVenda.body.status).toBe('EM_TRANSITO');
       });
 
       it('administrador comum pode agendar entrega (mesma regra de autenticação)', async () => {
@@ -121,7 +121,7 @@ describe('Integração — Vendas / fluxo administrativo', () => {
           .get(`/api/vendas/${vendaUuid}`)
           .set('Authorization', `Bearer ${tokenCliente}`));
 
-        expect(resVenda.body.status).toBe('EM TRÂNSITO');
+        expect(resVenda.body.status).toBe('EM_TRANSITO');
       });
 
       it('fluxo completo: pedido, pagamento aprovado, admin agenda entrega e consulta entregas', async () => {

@@ -49,7 +49,7 @@ describe('Integração — Checkout: cotação de frete + cupons + cartões', ()
 
       expect(resVenda.status).toBe(201);
       const vendaUuid = resVenda.body.id as string;
-      expect(resVenda.body.status).toBe('EM PROCESSAMENTO');
+      expect(resVenda.body.status).toBe('EM_PROCESSAMENTO');
       expect(resVenda.body.frete).toBe(cot.valorFrete);
 
       // Garantir cupom de troca no banco usando a rota API de teste
@@ -153,7 +153,7 @@ describe('Integração — Checkout: cotação de frete + cupons + cartões', ()
         .get(`/api/vendas/${vendaUuid}`)
         .set('Authorization', `Bearer ${token}`);
       expect(det.status).toBe(200);
-      expect(det.body.status).toBe('EM TRÂNSITO');
+      expect(det.body.status).toBe('EM_TRANSITO');
 
       const minhas = await request(app)
         .get('/api/minhas-vendas')

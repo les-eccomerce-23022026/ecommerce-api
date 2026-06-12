@@ -88,7 +88,7 @@ describe('Integração - Fluxo de Falha e Reagendamento de Entrega (Sprint 3)', 
     const resVendaFalha = await request(contexto.app)
       .get(`/api/vendas/${vendaUuid}`)
       .set('Authorization', `Bearer ${token}`);
-    expect(resVendaFalha.body.status).toBe('FALHA NA ENTREGA');
+    expect(resVendaFalha.body.status).toBe('FALHA_NA_ENTREGA');
 
     // 3. Reagendar com novo endereço (Cliente)
     const novoEndereco = { logradouro: 'Endereco Corrigido', numero: '99' };
@@ -103,7 +103,7 @@ describe('Integração - Fluxo de Falha e Reagendamento de Entrega (Sprint 3)', 
     const resVendaReagendada = await request(contexto.app)
       .get(`/api/vendas/${vendaUuid}`)
       .set('Authorization', `Bearer ${token}`);
-    expect(resVendaReagendada.body.status).toBe('EM PROCESSAMENTO');
+    expect(resVendaReagendada.body.status).toBe('EM_PROCESSAMENTO');
 
     const resEntregaAtualizada = await request(contexto.app)
       .get(`/api/entregas/${entregaUuid}`)

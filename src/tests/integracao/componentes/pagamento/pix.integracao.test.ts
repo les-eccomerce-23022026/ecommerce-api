@@ -185,7 +185,7 @@ describe('Integração - Pagamentos (PIX e Seleção)', () => {
       .set('Authorization', `Bearer ${token}`);
     expect(resAntes.status).toBe(200);
     expect(resAntes.body.aguardandoPix).toBe(true);
-    expect(resAntes.body.vendaStatus).toBe('AGUARDANDO PAGAMENTO');
+    expect(resAntes.body.vendaStatus).toBe('AGUARDANDO_PAGAMENTO');
 
     const wh = await request(contexto.app)
       .post('/api/webhooks/pagamento-pix-simulado')

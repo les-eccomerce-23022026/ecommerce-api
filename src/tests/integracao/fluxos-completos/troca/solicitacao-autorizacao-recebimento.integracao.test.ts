@@ -65,7 +65,7 @@ describe('Integração - Troca e Devolução (Sprint 2)', () => {
       });
 
     expect(resTroca.status).toBe(200);
-    expect(resTroca.body.status).toBe('EM TROCA');
+    expect(resTroca.body.status).toBe('EM_TROCA');
     expect(resTroca.body.itens[0].emTroca).toBe(true);
     expect(resTroca.body.motivoTroca).toBe('Livro veio com páginas em branco');
   });
@@ -89,7 +89,7 @@ describe('Integração - Troca e Devolução (Sprint 2)', () => {
       .set('Authorization', `Bearer ${tokenAdminSistema}`);
 
     expect(resAutorizar.status).toBe(200);
-    expect(resAutorizar.body.status).toBe('TROCA AUTORIZADA');
+    expect(resAutorizar.body.status).toBe('TROCA_AUTORIZADA');
   });
 
   it('S2-A-EXT: Admin Comum pode autorizar troca da sua loja', async () => {
@@ -111,7 +111,7 @@ describe('Integração - Troca e Devolução (Sprint 2)', () => {
       .set('Authorization', `Bearer ${tokenAdminComum}`);
 
     expect(resAutorizar.status).toBe(200);
-    expect(resAutorizar.body.status).toBe('TROCA AUTORIZADA');
+    expect(resAutorizar.body.status).toBe('TROCA_AUTORIZADA');
   });
 
   it('S2-B: Aprovação, recebimento e geração de cupom', async () => {
@@ -133,7 +133,7 @@ describe('Integração - Troca e Devolução (Sprint 2)', () => {
       .set('Authorization', `Bearer ${tokenAdminSistema}`);
     
     expect(resAutorizar.status).toBe(200);
-    expect(resAutorizar.body.status).toBe('TROCA AUTORIZADA');
+    expect(resAutorizar.body.status).toBe('TROCA_AUTORIZADA');
 
     // 3. Admin Sistema Confirma Recebimento
     const resConfirmar = await request(contexto.app)
@@ -142,7 +142,7 @@ describe('Integração - Troca e Devolução (Sprint 2)', () => {
       .send({ retornarEstoque: true });
 
     expect(resConfirmar.status).toBe(200);
-    expect(resConfirmar.body.pedido.status).toBe('CONCLUÍDA');
+    expect(resConfirmar.body.pedido.status).toBe('CONCLUIDA');
     
     // Obter preço dinâmico do catálogo para validação
     const precoItem = await obterPrecoCatalogo(contexto.db!, LIVRO_UUID_TESTE);
@@ -178,7 +178,7 @@ describe('Integração - Troca e Devolução (Sprint 2)', () => {
       .set('Authorization', `Bearer ${tokenAdminComum}`);
     
     expect(resAutorizar.status).toBe(200);
-    expect(resAutorizar.body.status).toBe('TROCA AUTORIZADA');
+    expect(resAutorizar.body.status).toBe('TROCA_AUTORIZADA');
 
     // 3. Admin Comum Confirma Recebimento
     const resConfirmar = await request(contexto.app)
@@ -187,7 +187,7 @@ describe('Integração - Troca e Devolução (Sprint 2)', () => {
       .send({ retornarEstoque: true });
 
     expect(resConfirmar.status).toBe(200);
-    expect(resConfirmar.body.pedido.status).toBe('CONCLUÍDA');
+    expect(resConfirmar.body.pedido.status).toBe('CONCLUIDA');
     
     const precoItem = await obterPrecoCatalogo(contexto.db!, LIVRO_UUID_TESTE);
     expect(resConfirmar.body.cupomGerado.valor).toBe(precoItem);
@@ -214,7 +214,7 @@ describe('Integração - Troca e Devolução (Sprint 2)', () => {
       .send({ motivo: 'Motivo inválido' });
 
     expect(resRejeitar.status).toBe(200);
-    expect(resRejeitar.body.status).toBe('TROCA REJEITADA');
+    expect(resRejeitar.body.status).toBe('TROCA_REJEITADA');
   });
 
   it('S2-C-EXT: Admin Comum pode rejeitar troca', async () => {
@@ -237,7 +237,7 @@ describe('Integração - Troca e Devolução (Sprint 2)', () => {
       .send({ motivo: 'Motivo inválido' });
 
     expect(resRejeitar.status).toBe(200);
-    expect(resRejeitar.body.status).toBe('TROCA REJEITADA');
+    expect(resRejeitar.body.status).toBe('TROCA_REJEITADA');
   });
 
   it('S2-D: Prazo de arrependimento (7 dias) — bloqueio após janela de entrega expirada', async () => {

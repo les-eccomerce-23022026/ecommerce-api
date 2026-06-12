@@ -58,7 +58,7 @@ describe('E2E - Pagamentos (Rotas HTTP)', () => {
       // Isso é esperado em testes E2E reais
       if (vendaRes.status === 201) {
         vendaUuid = vendaRes.body.id;
-        expect(vendaRes.body.status).toBe('EM PROCESSAMENTO');
+        expect(vendaRes.body.status).toBe('EM_PROCESSAMENTO');
         expect(vendaRes.body.totalVenda).toBe(60);
 
         // Criar intenção de pagamento via HTTP

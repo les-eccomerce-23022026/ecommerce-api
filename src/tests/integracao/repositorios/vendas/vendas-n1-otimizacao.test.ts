@@ -51,7 +51,7 @@ describe('Integração - RepositorioVendasPostgres - Correção N+1 Queries', ()
 
       // Setup: Criar status de venda
       await contexto.db!.executar(
-        "INSERT INTO livraria_comercial.status_venda (stv_descricao) VALUES ('EM PROCESSAMENTO'), ('APROVADA') ON CONFLICT DO NOTHING"
+        "INSERT INTO livraria_comercial.status_venda (stv_descricao) VALUES ('EM_PROCESSAMENTO'), ('APROVADA') ON CONFLICT DO NOTHING"
       );
 
       // Setup: Criar livro
@@ -75,7 +75,7 @@ describe('Integração - RepositorioVendasPostgres - Correção N+1 Queries', ()
           `INSERT INTO livraria_comercial.vendas (usu_id, stv_id, ven_total_itens, ven_frete, ven_total_venda, loj_id)
            VALUES (
              (SELECT usu_id FROM livraria_gestao.usuarios WHERE usu_uuid = $1),
-             (SELECT stv_id FROM livraria_comercial.status_venda WHERE stv_descricao = 'EM PROCESSAMENTO'),
+             (SELECT stv_id FROM livraria_comercial.status_venda WHERE stv_descricao = 'EM_PROCESSAMENTO'),
              50.00, 10.00, 60.00, 1
            )
            RETURNING ven_uuid`,
@@ -106,7 +106,7 @@ describe('Integração - RepositorioVendasPostgres - Correção N+1 Queries', ()
         expect(venda.itens).toHaveLength(1);
         expect(venda.itens[0].livroUuid).toBe(livroUuid);
         expect(venda.usuarioUuid).toBe(usuarioUuid);
-        expect(venda.status).toBe('EM PROCESSAMENTO');
+        expect(venda.status).toBe('EM_PROCESSAMENTO');
       });
     });
 
@@ -137,7 +137,7 @@ describe('Integração - RepositorioVendasPostgres - Correção N+1 Queries', ()
 
       // Setup: Criar status de venda
       await contexto.db!.executar(
-        "INSERT INTO livraria_comercial.status_venda (stv_descricao) VALUES ('EM PROCESSAMENTO') ON CONFLICT DO NOTHING"
+        "INSERT INTO livraria_comercial.status_venda (stv_descricao) VALUES ('EM_PROCESSAMENTO') ON CONFLICT DO NOTHING"
       );
 
       // Setup: Criar 5 livros diferentes
@@ -167,7 +167,7 @@ describe('Integração - RepositorioVendasPostgres - Correção N+1 Queries', ()
         `INSERT INTO livraria_comercial.vendas (usu_id, stv_id, ven_total_itens, ven_frete, ven_total_venda, loj_id)
          VALUES (
            (SELECT usu_id FROM livraria_gestao.usuarios WHERE usu_uuid = $1),
-           (SELECT stv_id FROM livraria_comercial.status_venda WHERE stv_descricao = 'EM PROCESSAMENTO'),
+           (SELECT stv_id FROM livraria_comercial.status_venda WHERE stv_descricao = 'EM_PROCESSAMENTO'),
            250.00, 10.00, 260.00, 1
          )
          RETURNING ven_uuid`,
@@ -218,7 +218,7 @@ describe('Integração - RepositorioVendasPostgres - Correção N+1 Queries', ()
       // Setup: Criar múltiplos status
       await contexto.db!.executar(
         `INSERT INTO livraria_comercial.status_venda (stv_descricao) 
-         VALUES ('EM PROCESSAMENTO'), ('APROVADA'), ('CANCELADA'), ('ENTREGUE'), ('EM TROCA') 
+         VALUES ('EM_PROCESSAMENTO'), ('APROVADA'), ('CANCELADA'), ('ENTREGUE'), ('EM_TROCA')
          ON CONFLICT DO NOTHING`
       );
 
@@ -237,7 +237,7 @@ describe('Integração - RepositorioVendasPostgres - Correção N+1 Queries', ()
       );
 
       // Criar vendas com status diferentes
-      const statuses = ['EM PROCESSAMENTO', 'APROVADA', 'CANCELADA', 'ENTREGUE'];
+      const statuses = ['EM_PROCESSAMENTO', 'APROVADA', 'CANCELADA', 'ENTREGUE'];
       await Promise.all(
         statuses.map(async (status) => {
           const vendaRes = await contexto.db!.executar<{ ven_uuid: string }>(
@@ -269,7 +269,7 @@ describe('Integração - RepositorioVendasPostgres - Correção N+1 Queries', ()
       // Assert
       expect(vendas).toHaveLength(4);
       const statusesEncontrados = vendas.map(v => v.status);
-      expect(statusesEncontrados).toContain('EM PROCESSAMENTO');
+      expect(statusesEncontrados).toContain('EM_PROCESSAMENTO');
       expect(statusesEncontrados).toContain('APROVADA');
       expect(statusesEncontrados).toContain('CANCELADA');
       expect(statusesEncontrados).toContain('ENTREGUE');
@@ -294,7 +294,7 @@ describe('Integração - RepositorioVendasPostgres - Correção N+1 Queries', ()
 
       // Setup: Criar status
       await contexto.db!.executar(
-        "INSERT INTO livraria_comercial.status_venda (stv_descricao) VALUES ('EM PROCESSAMENTO') ON CONFLICT DO NOTHING"
+        "INSERT INTO livraria_comercial.status_venda (stv_descricao) VALUES ('EM_PROCESSAMENTO') ON CONFLICT DO NOTHING"
       );
 
       // Criar venda sem itens
@@ -302,7 +302,7 @@ describe('Integração - RepositorioVendasPostgres - Correção N+1 Queries', ()
         `INSERT INTO livraria_comercial.vendas (usu_id, stv_id, ven_total_itens, ven_frete, ven_total_venda, loj_id)
          VALUES (
            (SELECT usu_id FROM livraria_gestao.usuarios WHERE usu_uuid = $1),
-           (SELECT stv_id FROM livraria_comercial.status_venda WHERE stv_descricao = 'EM PROCESSAMENTO'),
+           (SELECT stv_id FROM livraria_comercial.status_venda WHERE stv_descricao = 'EM_PROCESSAMENTO'),
            0.00, 0.00, 0.00, 1
          )
          RETURNING ven_uuid`,
@@ -372,7 +372,7 @@ describe('Integração - RepositorioVendasPostgres - Correção N+1 Queries', ()
           `INSERT INTO livraria_comercial.vendas (usu_id, stv_id, ven_total_itens, ven_frete, ven_total_venda, loj_id)
            VALUES (
              (SELECT usu_id FROM livraria_gestao.usuarios WHERE usu_uuid = $1),
-             (SELECT stv_id FROM livraria_comercial.status_venda WHERE stv_descricao = 'EM PROCESSAMENTO'),
+             (SELECT stv_id FROM livraria_comercial.status_venda WHERE stv_descricao = 'EM_PROCESSAMENTO'),
              50.00, 10.00, 60.00, 1
            )
            RETURNING ven_uuid`,
@@ -406,7 +406,7 @@ describe('Integração - RepositorioVendasPostgres - Correção N+1 Queries', ()
         const venda = vendas.find(v => v.uuid === uuid);
         expect(venda).toBeDefined();
         expect(venda!.itens).toHaveLength(1);
-        expect(venda!.status).toBe('EM PROCESSAMENTO');
+        expect(venda!.status).toBe('EM_PROCESSAMENTO');
       });
     });
 
@@ -452,7 +452,7 @@ describe('Integração - RepositorioVendasPostgres - Correção N+1 Queries', ()
         `INSERT INTO livraria_comercial.vendas (usu_id, stv_id, ven_total_itens, ven_frete, ven_total_venda, loj_id)
          VALUES (
            (SELECT usu_id FROM livraria_gestao.usuarios WHERE usu_uuid = $1),
-           (SELECT stv_id FROM livraria_comercial.status_venda WHERE stv_descricao = 'EM PROCESSAMENTO'),
+           (SELECT stv_id FROM livraria_comercial.status_venda WHERE stv_descricao = 'EM_PROCESSAMENTO'),
            50.00, 10.00, 60.00, 1
          )
          RETURNING ven_uuid`,

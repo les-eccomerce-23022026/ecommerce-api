@@ -117,23 +117,23 @@ describe('Integração - Seed 008 Cenários de Pagamentos', () => {
   });
 
   describe('Cenários de Troca', () => {
-    it('deve listar vendas com status TROCA CONCLUÍDA', async () => {
+    it('deve listar vendas com status TROCA_CONCLUIDA', async () => {
       const res = await request(app)
-        .get('/api/admin/vendas?status=TROCA%20CONCLUÍDA')
+        .get('/api/admin/vendas?status=TROCA_CONCLUIDA')
         .set('Authorization', `Bearer ${tokenAdmin}`);
       
-      // O seed 008 cria vendas com status TROCA CONCLUÍDA
+      // O seed 008 cria vendas com status TROCA_CONCLUIDA
       if (res.status === 200) {
         expect(Array.isArray(res.body)).toBe(true);
       }
     });
 
-    it('deve listar vendas com status TROCA REJEITADA', async () => {
+    it('deve listar vendas com status TROCA_REJEITADA', async () => {
       const res = await request(app)
-        .get('/api/admin/vendas?status=TROCA%20REJEITADA')
+        .get('/api/admin/vendas?status=TROCA_REJEITADA')
         .set('Authorization', `Bearer ${tokenAdmin}`);
       
-      // O seed 008 cria vendas com status TROCA REJEITADA
+      // O seed 008 cria vendas com status TROCA_REJEITADA
       if (res.status === 200) {
         expect(Array.isArray(res.body)).toBe(true);
       }

@@ -52,7 +52,7 @@ describe('Integração - RepositorioPagamentosPostgres - Correção N+1 Query', 
         `INSERT INTO livraria_comercial.vendas (usu_id, stv_id, ven_total_itens, ven_frete, ven_total_venda, loj_id)
          VALUES (
            (SELECT usu_id FROM livraria_gestao.usuarios WHERE usu_uuid = $1),
-           (SELECT stv_id FROM livraria_comercial.status_venda WHERE stv_descricao = 'EM PROCESSAMENTO'),
+           (SELECT stv_id FROM livraria_comercial.status_venda WHERE stv_descricao = 'EM_PROCESSAMENTO'),
            100.00, 10.00, 110.00, 1
          )
          RETURNING ven_uuid`,
@@ -135,7 +135,7 @@ describe('Integração - RepositorioPagamentosPostgres - Correção N+1 Query', 
         `INSERT INTO livraria_comercial.vendas (usu_id, stv_id, ven_total_itens, ven_frete, ven_total_venda, loj_id)
          VALUES (
            (SELECT usu_id FROM livraria_gestao.usuarios WHERE usu_uuid = $1),
-           (SELECT stv_id FROM livraria_comercial.status_venda WHERE stv_descricao = 'EM PROCESSAMENTO'),
+           (SELECT stv_id FROM livraria_comercial.status_venda WHERE stv_descricao = 'EM_PROCESSAMENTO'),
            100.00, 10.00, 110.00, 1
          )
          RETURNING ven_uuid`,
@@ -171,7 +171,7 @@ describe('Integração - RepositorioPagamentosPostgres - Correção N+1 Query', 
         `INSERT INTO livraria_comercial.vendas (usu_id, stv_id, ven_total_itens, ven_frete, ven_total_venda, loj_id)
          VALUES (
            (SELECT usu_id FROM livraria_gestao.usuarios WHERE usu_uuid = $1),
-           (SELECT stv_id FROM livraria_comercial.status_venda WHERE stv_descricao = 'EM PROCESSAMENTO'),
+           (SELECT stv_id FROM livraria_comercial.status_venda WHERE stv_descricao = 'EM_PROCESSAMENTO'),
            50.00, 0.00, 50.00, 1
          )
          RETURNING ven_uuid`,
@@ -221,7 +221,7 @@ describe('Integração - RepositorioPagamentosPostgres - Correção N+1 Query', 
         `INSERT INTO livraria_comercial.vendas (usu_id, stv_id, ven_total_itens, ven_frete, ven_total_venda, loj_id)
          VALUES (
            (SELECT usu_id FROM livraria_gestao.usuarios WHERE usu_uuid = $1),
-           (SELECT stv_id FROM livraria_comercial.status_venda WHERE stv_descricao = 'EM PROCESSAMENTO'),
+           (SELECT stv_id FROM livraria_comercial.status_venda WHERE stv_descricao = 'EM_PROCESSAMENTO'),
            200.00, 0.00, 200.00, 1
          )
          RETURNING ven_uuid`,

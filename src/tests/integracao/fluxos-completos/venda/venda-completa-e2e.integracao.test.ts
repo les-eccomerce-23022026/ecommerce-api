@@ -58,7 +58,7 @@ describe('Integração - Venda Completa E2E (Entrega 7)', () => {
       .set('Authorization', `Bearer ${tokenCliente}`);
 
     expect(resStatus.status).toBe(200);
-    expect(resStatus.body.status).toBe('EM PROCESSAMENTO');
+    expect(resStatus.body.status).toBe('EM_PROCESSAMENTO');
   });
 
   /**
