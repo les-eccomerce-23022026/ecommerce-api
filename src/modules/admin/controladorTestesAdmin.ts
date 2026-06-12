@@ -186,7 +186,7 @@ export class ControladorTestesAdmin {
 
       // Inserir status de venda AGUARDANDO PAGAMENTO
       await db.executar(
-        `INSERT INTO livraria_comercial.status_venda (stv_descricao) VALUES ('AGUARDANDO PAGAMENTO') ON CONFLICT (stv_descricao) DO NOTHING`,
+        `INSERT INTO livraria_comercial.status_venda (stv_descricao) VALUES ('AGUARDANDO_PAGAMENTO') ON CONFLICT (stv_descricao) DO NOTHING`,
       );
 
       // Preparar tabela de PIX simulado

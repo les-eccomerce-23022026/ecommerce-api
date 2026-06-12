@@ -51,7 +51,7 @@ export class DashboardAdminConsultas {
     return rows[0]?.c ?? 0;
   }
 
-  public async obterAtividadesRecentes(): Promise<Record<string, unknown>[]> {
+  public async obterAtividadesRecentes(limite: number = 5): Promise<Record<string, unknown>[]> {
     const rows = await this.db.executar<{
       ven_uuid: string;
       ven_total_venda: string;
@@ -60,11 +60,10 @@ export class DashboardAdminConsultas {
       `SELECT ven_uuid, ven_total_venda::text, ven_criado_em::text
        FROM livraria_comercial.vendas
        ORDER BY ven_criado_em DESC
-       LIMIT 5`,
-      [],
+       LIMIT $1`,
+      [limite] as DbParametro[],
     );
     return rows.map((r) => {
-      // Extrair segunda parte do UUID (após primeiro hífen) com segurança
       const partes = r.ven_uuid?.split('-') ?? [];
       const part = partes.length > 1 ? partes[1] : r.ven_uuid;
       const total = Number(r.ven_total_venda);
