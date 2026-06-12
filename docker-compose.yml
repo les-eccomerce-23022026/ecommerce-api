@@ -19,6 +19,16 @@ services:
     image: postgres:16-alpine
     container_name: ecm_postgres
     restart: unless-stopped
+    # Tuning de performance: valores calibrados para container com 1G de RAM
+    command: >
+      postgres
+      -c shared_buffers=256MB
+      -c effective_cache_size=768MB
+      -c work_mem=16MB
+      -c max_connections=100
+      -c checkpoint_completion_target=0.9
+      -c wal_buffers=16MB
+      -c random_page_cost=1.1
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-ecm_livraria}
       POSTGRES_USER: ${POSTGRES_USER:-ecm_user}
@@ -53,9 +63,9 @@ services:
     # Roda tini como PID 1: sem um init, o ts-node-dev vira PID 1 e não consegue
     # matar/reapear o processo filho, travando o respawn (hot-reload) no restart.
     init: true
-    # Hot-reload sob bind mount: inotify não propaga eventos host→container, e o
-    # respawn do ts-node-dev é instável nesse cenário. Usamos nodemon com
-    # --legacy-watch (polling incondicional), que reinicia de forma confiável.
+    # Hot-reload sob bind mount: inotify não propaga eventos host→container, então
+    # o watcher do ts-node-dev nunca recebe os eventos de mudança. Usamos nodemon
+    # com --legacy-watch (polling via stat periódico), que funciona através do bind mount.
     command: npm run dev:docker
     ports:
       # host:container — valores em .env (PORTA_HTTP_EXTERNA / PORTA_HTTP)
@@ -95,11 +105,11 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '1.0'
-          memory: 512M
+          cpus: '2.0'
+          memory: 1G
         reservations:
           cpus: '0.5'
-          memory: 256M
+          memory: 512M
     networks:
       - ecm_network
 

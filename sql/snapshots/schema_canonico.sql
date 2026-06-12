@@ -1,4 +1,4 @@
--- Gerado em: 2026-06-01 13:37:03
+-- Gerado em: 2026-06-12 10:26:33
 -- Fonte: ecm_postgres / ecm_livraria
 -- Comando: npm run db:snapshot
 
@@ -285,6 +285,24 @@ BEGIN
     DELETE FROM livraria_gestao.refresh_tokens
     WHERE rft_expira_em < NOW()
     AND rft_revocado_em IS NULL;
+END;
+$$;
+
+
+--
+-- Name: fn_atualizar_timestamp(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.fn_atualizar_timestamp() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    IF TG_TABLE_NAME = 'usuarios' THEN NEW.usu_atualizado_em := NOW(); END IF;
+    IF TG_TABLE_NAME = 'clientes' THEN NEW.cli_atualizado_em := NOW(); END IF;
+    IF TG_TABLE_NAME = 'telefones' THEN NEW.tel_atualizado_em := NOW(); END IF;
+    IF TG_TABLE_NAME = 'enderecos' THEN NEW.end_atualizado_em := NOW(); END IF;
+    IF TG_TABLE_NAME = 'cartoes'   THEN NEW.crt_atualizado_em := NOW(); END IF;
+    RETURN NEW;
 END;
 $$;
 
@@ -712,6 +730,7 @@ CREATE TABLE livraria_comercial.cupom (
     cup_ativo boolean DEFAULT true,
     cup_criado_em timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
     cup_atualizado_em timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    loj_id bigint,
     CONSTRAINT cupom_cup_tipo_check CHECK (((cup_tipo)::text = ANY (ARRAY[('promocional'::character varying)::text, ('troca'::character varying)::text]))),
     CONSTRAINT cupom_cup_valor_desconto_check CHECK ((cup_valor_desconto > (0)::numeric)),
     CONSTRAINT cupom_cup_valor_minimo_check CHECK ((cup_valor_minimo >= (0)::numeric))
@@ -817,6 +836,13 @@ COMMENT ON COLUMN livraria_comercial.cupom.cup_atualizado_em IS 'Timestamp da ú
 
 
 --
+-- Name: COLUMN cupom.loj_id; Type: COMMENT; Schema: livraria_comercial; Owner: -
+--
+
+COMMENT ON COLUMN livraria_comercial.cupom.loj_id IS 'ID da loja que criou o cupom (NULL = cupom global do admin_sistema)';
+
+
+--
 -- Name: cupom_cup_id_seq; Type: SEQUENCE; Schema: livraria_comercial; Owner: -
 --
 
@@ -849,6 +875,7 @@ CREATE TABLE livraria_comercial.cupons_troca (
     cpt_status character varying(20) DEFAULT 'DISPONIVEL'::character varying NOT NULL,
     cpt_valido_ate date NOT NULL,
     cpt_criado_em timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    loj_id bigint,
     CONSTRAINT cupons_troca_cpt_status_check CHECK (((cpt_status)::text = ANY (ARRAY[('DISPONIVEL'::character varying)::text, ('UTILIZADO'::character varying)::text, ('EXPIRADO'::character varying)::text]))),
     CONSTRAINT cupons_troca_cpt_valor_check CHECK ((cpt_valor > (0)::numeric))
 );
@@ -887,6 +914,13 @@ COMMENT ON COLUMN livraria_comercial.cupons_troca.cpt_cliente_id IS 'ID do clien
 --
 
 COMMENT ON COLUMN livraria_comercial.cupons_troca.cpt_status IS 'Status do cupom (DISPONIVEL, UTILIZADO, EXPIRADO).';
+
+
+--
+-- Name: COLUMN cupons_troca.loj_id; Type: COMMENT; Schema: livraria_comercial; Owner: -
+--
+
+COMMENT ON COLUMN livraria_comercial.cupons_troca.loj_id IS 'ID da loja que criou o cupom (NULL = cupom global do admin_sistema)';
 
 
 --
@@ -1007,7 +1041,8 @@ CREATE TABLE livraria_comercial.vendas (
     ven_motivo_troca text,
     loj_id bigint NOT NULL,
     cfr_id bigint,
-    ven_data_hora_entrega timestamp with time zone
+    ven_data_hora_entrega timestamp with time zone,
+    ven_data_prevista_entrega timestamp with time zone
 );
 
 
@@ -1037,6 +1072,13 @@ COMMENT ON COLUMN livraria_comercial.vendas.cfr_id IS 'Cotação de frete escolh
 --
 
 COMMENT ON COLUMN livraria_comercial.vendas.ven_data_hora_entrega IS 'Data e hora em que a entrega foi confirmada. Usada para calcular o prazo de 7 dias para solicitação de troca (RN0043).';
+
+
+--
+-- Name: COLUMN vendas.ven_data_prevista_entrega; Type: COMMENT; Schema: livraria_comercial; Owner: -
+--
+
+COMMENT ON COLUMN livraria_comercial.vendas.ven_data_prevista_entrega IS 'Data prevista de entrega calculada no despacho. Usada pelo job de auto-confirmação quando o cliente não confirmar o recebimento.';
 
 
 --
@@ -2060,6 +2102,79 @@ COMMENT ON COLUMN livraria_comercial.notificacoes.not_criado_em IS 'Data de cria
 --
 
 COMMENT ON COLUMN livraria_comercial.notificacoes.not_atualizado_em IS 'Data da última atualização';
+
+
+--
+-- Name: padroes_validacao_ia; Type: TABLE; Schema: livraria_comercial; Owner: -
+--
+
+CREATE TABLE livraria_comercial.padroes_validacao_ia (
+    pai_id bigint NOT NULL,
+    pai_uuid uuid DEFAULT gen_random_uuid() NOT NULL,
+    pai_padrao character varying(500) NOT NULL,
+    pai_tipo character varying(50) NOT NULL,
+    pai_origem character varying(50) DEFAULT 'estatico'::character varying NOT NULL,
+    pai_ocorrencias integer DEFAULT 1 NOT NULL,
+    pai_ativo boolean DEFAULT true NOT NULL,
+    pai_criado_em timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    pai_atualizado_em timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT ck_padroes_validacao_ia_origem CHECK (((pai_origem)::text = ANY ((ARRAY['estatico'::character varying, 'llm_aprendizado'::character varying, 'manual'::character varying])::text[]))),
+    CONSTRAINT ck_padroes_validacao_ia_tipo CHECK (((pai_tipo)::text = ANY ((ARRAY['blacklist'::character varying, 'impossivel'::character varying])::text[])))
+);
+
+
+--
+-- Name: TABLE padroes_validacao_ia; Type: COMMENT; Schema: livraria_comercial; Owner: -
+--
+
+COMMENT ON TABLE livraria_comercial.padroes_validacao_ia IS 'Padrões determinísticos de bloqueio da validação de segurança da IA. Inclui seed estático e padrões aprendidos automaticamente pelo classificador LLM.';
+
+
+--
+-- Name: COLUMN padroes_validacao_ia.pai_padrao; Type: COMMENT; Schema: livraria_comercial; Owner: -
+--
+
+COMMENT ON COLUMN livraria_comercial.padroes_validacao_ia.pai_padrao IS 'Texto do padrão em minúsculas, comparado por substring na query do usuário.';
+
+
+--
+-- Name: COLUMN padroes_validacao_ia.pai_tipo; Type: COMMENT; Schema: livraria_comercial; Owner: -
+--
+
+COMMENT ON COLUMN livraria_comercial.padroes_validacao_ia.pai_tipo IS 'blacklist = injeção de prompt / bypass; impossivel = contexto absurdo/fora do domínio.';
+
+
+--
+-- Name: COLUMN padroes_validacao_ia.pai_origem; Type: COMMENT; Schema: livraria_comercial; Owner: -
+--
+
+COMMENT ON COLUMN livraria_comercial.padroes_validacao_ia.pai_origem IS 'estatico = seed inicial do código; llm_aprendizado = detectado pelo Gemini; manual = inserido por admin.';
+
+
+--
+-- Name: COLUMN padroes_validacao_ia.pai_ocorrencias; Type: COMMENT; Schema: livraria_comercial; Owner: -
+--
+
+COMMENT ON COLUMN livraria_comercial.padroes_validacao_ia.pai_ocorrencias IS 'Contador de vezes que este padrão foi detectado em queries reais.';
+
+
+--
+-- Name: padroes_validacao_ia_pai_id_seq; Type: SEQUENCE; Schema: livraria_comercial; Owner: -
+--
+
+CREATE SEQUENCE livraria_comercial.padroes_validacao_ia_pai_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: padroes_validacao_ia_pai_id_seq; Type: SEQUENCE OWNED BY; Schema: livraria_comercial; Owner: -
+--
+
+ALTER SEQUENCE livraria_comercial.padroes_validacao_ia_pai_id_seq OWNED BY livraria_comercial.padroes_validacao_ia.pai_id;
 
 
 --
@@ -3621,7 +3736,7 @@ COMMENT ON COLUMN livraria_gestao.telefones.tel_atualizado_em IS 'Timestamp da �
 -- Name: COLUMN telefones.tel_numero; Type: COMMENT; Schema: livraria_gestao; Owner: -
 --
 
-COMMENT ON COLUMN livraria_gestao.telefones.tel_numero IS 'Número completo do telefone (DDD + número), 10 ou 11 dígitos numéricos';
+COMMENT ON COLUMN livraria_gestao.telefones.tel_numero IS 'Número completo do telefone (DDD + número), 10 ou 11 dígitos numéricos.';
 
 
 --
@@ -4655,6 +4770,13 @@ ALTER TABLE ONLY livraria_comercial.metricas_recomendacao ALTER COLUMN id SET DE
 
 
 --
+-- Name: padroes_validacao_ia pai_id; Type: DEFAULT; Schema: livraria_comercial; Owner: -
+--
+
+ALTER TABLE ONLY livraria_comercial.padroes_validacao_ia ALTER COLUMN pai_id SET DEFAULT nextval('livraria_comercial.padroes_validacao_ia_pai_id_seq'::regclass);
+
+
+--
 -- Name: papeis pap_id; Type: DEFAULT; Schema: livraria_comercial; Owner: -
 --
 
@@ -5230,6 +5352,22 @@ ALTER TABLE ONLY livraria_comercial.notificacoes
 
 
 --
+-- Name: padroes_validacao_ia padroes_validacao_ia_pai_uuid_key; Type: CONSTRAINT; Schema: livraria_comercial; Owner: -
+--
+
+ALTER TABLE ONLY livraria_comercial.padroes_validacao_ia
+    ADD CONSTRAINT padroes_validacao_ia_pai_uuid_key UNIQUE (pai_uuid);
+
+
+--
+-- Name: padroes_validacao_ia padroes_validacao_ia_pkey; Type: CONSTRAINT; Schema: livraria_comercial; Owner: -
+--
+
+ALTER TABLE ONLY livraria_comercial.padroes_validacao_ia
+    ADD CONSTRAINT padroes_validacao_ia_pkey PRIMARY KEY (pai_id);
+
+
+--
 -- Name: papeis papeis_pkey; Type: CONSTRAINT; Schema: livraria_comercial; Owner: -
 --
 
@@ -5267,6 +5405,14 @@ ALTER TABLE ONLY livraria_comercial.carrinho_itens
 
 ALTER TABLE ONLY livraria_comercial.livro_categorias
     ADD CONSTRAINT uq_livro_categoria UNIQUE (liv_id, cat_id);
+
+
+--
+-- Name: padroes_validacao_ia uq_padroes_validacao_ia_padrao; Type: CONSTRAINT; Schema: livraria_comercial; Owner: -
+--
+
+ALTER TABLE ONLY livraria_comercial.padroes_validacao_ia
+    ADD CONSTRAINT uq_padroes_validacao_ia_padrao UNIQUE (pai_padrao);
 
 
 --
@@ -5870,6 +6016,13 @@ ALTER TABLE ONLY livraria_ref.tipos_telefones
 
 
 --
+-- Name: idx_autores_nome_norm; Type: INDEX; Schema: livraria_comercial; Owner: -
+--
+
+CREATE INDEX idx_autores_nome_norm ON livraria_comercial.autores USING gin (aut_nome_norm livraria_comercial.gin_trgm_ops);
+
+
+--
 -- Name: idx_avaliacoes_aprovado; Type: INDEX; Schema: livraria_comercial; Owner: -
 --
 
@@ -5909,6 +6062,13 @@ CREATE INDEX idx_carrinho_itens_loj_id ON livraria_comercial.carrinho_itens USIN
 --
 
 CREATE INDEX idx_carrinho_itens_usuario ON livraria_comercial.carrinho_itens USING btree (usu_id);
+
+
+--
+-- Name: idx_categorias_nome_norm; Type: INDEX; Schema: livraria_comercial; Owner: -
+--
+
+CREATE INDEX idx_categorias_nome_norm ON livraria_comercial.categorias USING gin (cat_nome_norm livraria_comercial.gin_trgm_ops);
 
 
 --
@@ -5954,6 +6114,13 @@ CREATE INDEX idx_cupom_codigo ON livraria_comercial.cupom USING btree (cup_codig
 
 
 --
+-- Name: idx_cupom_loj_id; Type: INDEX; Schema: livraria_comercial; Owner: -
+--
+
+CREATE INDEX idx_cupom_loj_id ON livraria_comercial.cupom USING btree (loj_id);
+
+
+--
 -- Name: idx_cupom_tipo; Type: INDEX; Schema: livraria_comercial; Owner: -
 --
 
@@ -5975,10 +6142,24 @@ CREATE INDEX idx_cupons_troca_codigo ON livraria_comercial.cupons_troca USING bt
 
 
 --
+-- Name: idx_cupons_troca_loj_id; Type: INDEX; Schema: livraria_comercial; Owner: -
+--
+
+CREATE INDEX idx_cupons_troca_loj_id ON livraria_comercial.cupons_troca USING btree (loj_id);
+
+
+--
 -- Name: idx_cupons_troca_usuario; Type: INDEX; Schema: livraria_comercial; Owner: -
 --
 
 CREATE INDEX idx_cupons_troca_usuario ON livraria_comercial.cupons_troca USING btree (cpt_cliente_id);
+
+
+--
+-- Name: idx_editoras_nome_norm; Type: INDEX; Schema: livraria_comercial; Owner: -
+--
+
+CREATE INDEX idx_editoras_nome_norm ON livraria_comercial.editoras USING gin (edi_nome_norm livraria_comercial.gin_trgm_ops);
 
 
 --
@@ -6024,10 +6205,24 @@ CREATE INDEX idx_estoques_loj_id ON livraria_comercial.estoques USING btree (loj
 
 
 --
+-- Name: idx_estoques_quantidade_disponivel; Type: INDEX; Schema: livraria_comercial; Owner: -
+--
+
+CREATE INDEX idx_estoques_quantidade_disponivel ON livraria_comercial.estoques USING btree (etq_quantidade_disponivel) WHERE ((etq_ativo = true) AND (etq_quantidade_disponivel <= 5));
+
+
+--
 -- Name: idx_fornecedores_loj_id; Type: INDEX; Schema: livraria_comercial; Owner: -
 --
 
 CREATE INDEX idx_fornecedores_loj_id ON livraria_comercial.fornecedores USING btree (loj_id);
+
+
+--
+-- Name: idx_fornecedores_nome_norm; Type: INDEX; Schema: livraria_comercial; Owner: -
+--
+
+CREATE INDEX idx_fornecedores_nome_norm ON livraria_comercial.fornecedores USING gin (for_nome_norm livraria_comercial.gin_trgm_ops);
 
 
 --
@@ -6066,6 +6261,27 @@ CREATE INDEX idx_item_venda_venda ON livraria_comercial.itens_venda USING btree 
 
 
 --
+-- Name: idx_itens_venda_livro; Type: INDEX; Schema: livraria_comercial; Owner: -
+--
+
+CREATE INDEX idx_itens_venda_livro ON livraria_comercial.itens_venda USING btree (liv_uuid);
+
+
+--
+-- Name: idx_itens_venda_livro_uuid; Type: INDEX; Schema: livraria_comercial; Owner: -
+--
+
+CREATE INDEX idx_itens_venda_livro_uuid ON livraria_comercial.itens_venda USING btree (liv_uuid);
+
+
+--
+-- Name: INDEX idx_itens_venda_livro_uuid; Type: COMMENT; Schema: livraria_comercial; Owner: -
+--
+
+COMMENT ON INDEX livraria_comercial.idx_itens_venda_livro_uuid IS 'Índice para otimizar join itens_venda → livros via UUID';
+
+
+--
 -- Name: idx_itens_venda_loj_id; Type: INDEX; Schema: livraria_comercial; Owner: -
 --
 
@@ -6084,6 +6300,13 @@ CREATE INDEX idx_livro_categorias_categoria ON livraria_comercial.livro_categori
 --
 
 CREATE INDEX idx_livro_categorias_livro ON livraria_comercial.livro_categorias USING btree (liv_id);
+
+
+--
+-- Name: INDEX idx_livro_categorias_livro; Type: COMMENT; Schema: livraria_comercial; Owner: -
+--
+
+COMMENT ON INDEX livraria_comercial.idx_livro_categorias_livro IS 'Índice para otimizar join livros → livro_categorias via liv_id';
 
 
 --
@@ -6112,6 +6335,13 @@ CREATE INDEX idx_livros_grupo_precificacao ON livraria_comercial.livros USING bt
 --
 
 CREATE INDEX idx_livros_isbn ON livraria_comercial.livros USING btree (liv_isbn);
+
+
+--
+-- Name: idx_livros_titulo_norm; Type: INDEX; Schema: livraria_comercial; Owner: -
+--
+
+CREATE INDEX idx_livros_titulo_norm ON livraria_comercial.livros USING gin (liv_titulo_norm livraria_comercial.gin_trgm_ops);
 
 
 --
@@ -6171,6 +6401,34 @@ CREATE INDEX idx_notificacoes_usuario_uuid ON livraria_comercial.notificacoes US
 
 
 --
+-- Name: idx_padroes_validacao_ia_ativo; Type: INDEX; Schema: livraria_comercial; Owner: -
+--
+
+CREATE INDEX idx_padroes_validacao_ia_ativo ON livraria_comercial.padroes_validacao_ia USING btree (pai_ativo);
+
+
+--
+-- Name: idx_padroes_validacao_ia_origem; Type: INDEX; Schema: livraria_comercial; Owner: -
+--
+
+CREATE INDEX idx_padroes_validacao_ia_origem ON livraria_comercial.padroes_validacao_ia USING btree (pai_origem);
+
+
+--
+-- Name: idx_padroes_validacao_ia_tipo; Type: INDEX; Schema: livraria_comercial; Owner: -
+--
+
+CREATE INDEX idx_padroes_validacao_ia_tipo ON livraria_comercial.padroes_validacao_ia USING btree (pai_tipo);
+
+
+--
+-- Name: idx_status_venda_descricao; Type: INDEX; Schema: livraria_comercial; Owner: -
+--
+
+CREATE INDEX idx_status_venda_descricao ON livraria_comercial.status_venda USING btree (stv_descricao);
+
+
+--
 -- Name: idx_venda_status; Type: INDEX; Schema: livraria_comercial; Owner: -
 --
 
@@ -6192,10 +6450,52 @@ CREATE INDEX idx_vendas_cfr ON livraria_comercial.vendas USING btree (cfr_id);
 
 
 --
+-- Name: idx_vendas_criado_em; Type: INDEX; Schema: livraria_comercial; Owner: -
+--
+
+CREATE INDEX idx_vendas_criado_em ON livraria_comercial.vendas USING btree (ven_criado_em DESC);
+
+
+--
+-- Name: idx_vendas_criado_em_loj; Type: INDEX; Schema: livraria_comercial; Owner: -
+--
+
+CREATE INDEX idx_vendas_criado_em_loj ON livraria_comercial.vendas USING btree (ven_criado_em DESC, loj_id);
+
+
+--
+-- Name: INDEX idx_vendas_criado_em_loj; Type: COMMENT; Schema: livraria_comercial; Owner: -
+--
+
+COMMENT ON INDEX livraria_comercial.idx_vendas_criado_em_loj IS 'Índice composto para queries de análise por período e loja (ordem descendente para dados recentes)';
+
+
+--
 -- Name: idx_vendas_loj_id; Type: INDEX; Schema: livraria_comercial; Owner: -
 --
 
 CREATE INDEX idx_vendas_loj_id ON livraria_comercial.vendas USING btree (loj_id);
+
+
+--
+-- Name: idx_vendas_periodo_loj; Type: INDEX; Schema: livraria_comercial; Owner: -
+--
+
+CREATE INDEX idx_vendas_periodo_loj ON livraria_comercial.vendas USING btree (ven_criado_em, loj_id);
+
+
+--
+-- Name: INDEX idx_vendas_periodo_loj; Type: COMMENT; Schema: livraria_comercial; Owner: -
+--
+
+COMMENT ON INDEX livraria_comercial.idx_vendas_periodo_loj IS 'Índice composto para queries de análise por período e loja';
+
+
+--
+-- Name: idx_vendas_status_criado_em; Type: INDEX; Schema: livraria_comercial; Owner: -
+--
+
+CREATE INDEX idx_vendas_status_criado_em ON livraria_comercial.vendas USING btree (stv_id, ven_criado_em DESC);
 
 
 --
@@ -6500,6 +6800,20 @@ CREATE INDEX idx_usuarios_loj_id ON livraria_gestao.usuarios USING btree (loj_id
 
 
 --
+-- Name: idx_usuarios_papel_ativo; Type: INDEX; Schema: livraria_gestao; Owner: -
+--
+
+CREATE INDEX idx_usuarios_papel_ativo ON livraria_gestao.usuarios USING btree (pap_id, usu_ativo) WHERE (usu_ativo = true);
+
+
+--
+-- Name: idx_usuarios_papel_criado_em; Type: INDEX; Schema: livraria_gestao; Owner: -
+--
+
+CREATE INDEX idx_usuarios_papel_criado_em ON livraria_gestao.usuarios USING btree (pap_id, usu_criado_em DESC);
+
+
+--
 -- Name: idx_evento_data; Type: INDEX; Schema: livraria_logistica; Owner: -
 --
 
@@ -6800,6 +7114,22 @@ ALTER TABLE ONLY livraria_comercial.carrinho_itens
 
 ALTER TABLE ONLY livraria_comercial.cotacao_frete
     ADD CONSTRAINT fk_cotacao_frete_loja FOREIGN KEY (loj_id) REFERENCES livraria_gestao.lojas(loj_id);
+
+
+--
+-- Name: cupom fk_cupom_loja; Type: FK CONSTRAINT; Schema: livraria_comercial; Owner: -
+--
+
+ALTER TABLE ONLY livraria_comercial.cupom
+    ADD CONSTRAINT fk_cupom_loja FOREIGN KEY (loj_id) REFERENCES livraria_gestao.lojas(loj_id) ON DELETE CASCADE;
+
+
+--
+-- Name: cupons_troca fk_cupons_troca_loja; Type: FK CONSTRAINT; Schema: livraria_comercial; Owner: -
+--
+
+ALTER TABLE ONLY livraria_comercial.cupons_troca
+    ADD CONSTRAINT fk_cupons_troca_loja FOREIGN KEY (loj_id) REFERENCES livraria_gestao.lojas(loj_id) ON DELETE CASCADE;
 
 
 --

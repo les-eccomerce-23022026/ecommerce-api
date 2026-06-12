@@ -32,8 +32,9 @@ RUN addgroup -g 1001 -S nodejs && \
 # Copiar arquivos de dependências
 COPY package*.json ./
 
-# Instalar apenas dependências de produção
+# Instalar apenas dependências de produção + PM2 para cluster mode
 RUN npm ci --only=production && \
+    npm install -g pm2 && \
     npm cache clean --force
 
 # Copiar código compilado do stage builder
@@ -49,8 +50,9 @@ USER nodejs
 # Expor porta da aplicação
 EXPOSE 3000
 
-# Comando para iniciar a aplicação
-CMD ["npm", "start"]
+# PM2 cluster mode: -i max usa todos os cores disponíveis no container
+# --max-old-space-size reserva 768MB para o heap do V8 (container tem 1G)
+CMD ["pm2-runtime", "dist/server.js", "-i", "max", "--node-args=--max-old-space-size=768"]
 
 # Stage 3: Development - Para desenvolvimento com hot reload
 FROM node:20-alpine AS development
