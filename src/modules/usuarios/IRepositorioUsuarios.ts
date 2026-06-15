@@ -42,4 +42,5 @@ export interface IRepositorioUsuarios {
   removerTodosPapeisUsuario(usuarioId: number): Promise<void>;
   verificarPapelUsuario(usuarioId: number, papelId: number): Promise<boolean>;
   buscarUsuariosPorPapel(descricaoPapel: string): Promise<IUsuario[]>;
+  atualizarStatusAtivo(uuid: string, ativo: boolean): Promise<void>;
 }

@@ -149,4 +149,40 @@ export class RepositorioEnderecoUsuarioPostgres implements IRepositorioEnderecoU
 
     await this.db.executar(query, parametros);
   }
+
+  public async buscarResumoPorIdUsuario(idUsuario: number): Promise<Array<{
+    apelido: string | null;
+    logradouro: string;
+    numero: string;
+    complemento: string | null;
+    bairro: string;
+    cidade: string;
+    estado: string;
+    cep: string;
+    principal: boolean;
+  }>> {
+    const query = `
+      SELECT
+        e.end_apelido AS "apelido",
+        COALESCE(tl.tlo_descricao || ' ', '') || l.log_nome AS "logradouro",
+        e.end_numero AS "numero",
+        e.end_complemento AS "complemento",
+        b.bai_nome AS "bairro",
+        c.cid_nome AS "cidade",
+        est.est_sigla AS "estado",
+        LPAD(cep.cep_numero::text, 8, '0') AS "cep",
+        e.end_principal AS "principal"
+      FROM livraria_gestao.enderecos e
+      LEFT JOIN livraria_ref.logradouros l ON l.log_id = e.log_id
+      LEFT JOIN livraria_ref.tipos_logradouros tl ON tl.tlo_id = l.tlo_id
+      LEFT JOIN livraria_ref.bairros b ON b.bai_id = e.bai_id
+      LEFT JOIN livraria_ref.cidades c ON c.cid_id = e.cid_id
+      LEFT JOIN livraria_ref.estados est ON est.est_id = c.est_id
+      LEFT JOIN livraria_ref.ceps cep ON cep.cep_numero = e.cep_id
+      WHERE e.usu_id = $1
+      ORDER BY e.end_principal DESC, e.end_criado_em DESC
+    `;
+
+    return this.db.executar(query, [idUsuario]);
+  }
 }

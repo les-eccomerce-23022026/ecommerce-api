@@ -595,4 +595,11 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
     
     return usuariosComPapeis;
   }
+
+  public async atualizarStatusAtivo(uuid: string, ativo: boolean): Promise<void> {
+    await this.db.executar(
+      'UPDATE livraria_gestao.usuarios SET usu_ativo = $1 WHERE usu_uuid = $2',
+      [ativo, uuid],
+    );
+  }
 }

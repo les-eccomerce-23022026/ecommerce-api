@@ -90,4 +90,10 @@ export interface IRepositorioVendas {
    * Usado pelo job de auto-confirmação de entrega.
    */
   listarVendasEmTransitoComPrazoVencido(): Promise<string[]>;
+
+  obterResumoPedidosPorUsuario(idUsuario: number): Promise<{
+    totalPedidos: number;
+    totalGasto: number;
+    ultimoPedidoEm: string | null;
+  }>;
 }

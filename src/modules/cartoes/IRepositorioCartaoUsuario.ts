@@ -12,6 +12,12 @@ export interface IRepositorioCartaoUsuario {
   atualizar(uuid: string, dados: Partial<Omit<ICartaoUsuario, 'id' | 'uuid' | 'idUsuario'>>): Promise<ICartaoUsuario| null>;
   excluir(uuid: string): Promise<boolean>;
   definirComoPrincipal(uuid: string, idUsuario: number): Promise<boolean>;
+  buscarResumoPorUsuario(idUsuario: number): Promise<Array<{
+    apelido: string | null;
+    bandeira: string;
+    ultimos4Digitos: string;
+    principal: boolean;
+  }>>;
 }
 
 export class RepositorioCartaoUsuario implements IRepositorioCartaoUsuario {
@@ -180,5 +186,26 @@ export class RepositorioCartaoUsuario implements IRepositorioCartaoUsuario {
     await this.pool.executar(query, [uuid, idUsuario]);
 
     return true;
+  }
+
+  async buscarResumoPorUsuario(idUsuario: number): Promise<Array<{
+    apelido: string | null;
+    bandeira: string;
+    ultimos4Digitos: string;
+    principal: boolean;
+  }>> {
+    const query = `
+      SELECT
+        NULL::text AS "apelido",
+        b.ban_descricao AS "bandeira",
+        c.crt_final AS "ultimos4Digitos",
+        c.crt_principal AS "principal"
+      FROM livraria_financeiro.cartoes c
+      JOIN livraria_financeiro.bandeiras_cartao b ON b.ban_id = c.ban_id
+      WHERE c.usu_id = $1
+      ORDER BY c.crt_principal DESC, c.crt_criado_em DESC
+    `;
+
+    return this.pool.executar(query, [idUsuario]);
   }
 }

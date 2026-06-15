@@ -1,6 +1,9 @@
-import { IRepositorioUsuarios } from '../usuarios/IRepositorioUsuarios';
-import { IConexaoBanco } from '@/shared/infrastructure/database/IConexaoBanco';
+import { IRepositorioEnderecoUsuario } from '@/shared/types/IRepositorioEnderecoUsuario';
+import { IRepositorioCartaoUsuario } from '@/modules/cartoes/IRepositorioCartaoUsuario';
+import { IRepositorioVendas } from '@/modules/vendas/repositories/IRepositorioVendas';
+
 import { mascararCpf, mascararEmail } from '@/modules/clientes/gestaoIdentidadeClienteTexto.util';
+import { IRepositorioUsuarios } from '../usuarios/IRepositorioUsuarios';
 
 export interface IFiltrosConsultaClientes {
   nome?: string;
@@ -44,7 +47,7 @@ export interface IDetalheClienteAdminDto {
   cnpj: string | undefined;
   tipoPessoa: string | undefined;
   ativo: boolean;
-  criadoEm: string;
+  criadoEm: string | null;
   enderecos: IEnderecoResumoDto[];
   cartoes: ICartaoResumoDto[];
   resumoPedidos: IResumoPedidosDto;
@@ -57,7 +60,7 @@ export interface IResultadoConsultaClientes {
     email: string;
     cpf?: string;
     ativo: boolean;
-    criadoEm: Date;
+    criadoEm: string | null;
   }>;
   total: number;
   pagina: number;
@@ -65,41 +68,29 @@ export interface IResultadoConsultaClientes {
   totalPaginas: number;
 }
 
-interface IRowEndereco {
-  apelido: string | null;
-  logradouro: string;
-  numero: string;
-  complemento: string | null;
-  bairro: string;
-  cidade: string;
-  estado: string;
-  cep: string;
-  principal: boolean;
-}
-
-interface IRowCartao {
-  apelido: string | null;
-  bandeira: string;
-  ultimos4Digitos: string;
-  principal: boolean;
-}
-
-interface IRowResumoPedidos {
-  totalPedidos: string;
-  totalGasto: string | null;
-  ultimoPedidoEm: string | null;
-}
 
 /**
  * Serviço responsável pela consulta administrativa de clientes.
  */
 export class ServicoConsultaClientes {
   private readonly repositorioUsuarios: IRepositorioUsuarios;
-  private readonly db: IConexaoBanco;
 
-  constructor(repositorioUsuarios: IRepositorioUsuarios, db: IConexaoBanco) {
+  private readonly repositorioEnderecos: IRepositorioEnderecoUsuario;
+
+  private readonly repositorioCartoes: IRepositorioCartaoUsuario;
+
+  private readonly repositorioVendas: IRepositorioVendas;
+
+  constructor(
+    repositorioUsuarios: IRepositorioUsuarios,
+    repositorioEnderecos: IRepositorioEnderecoUsuario,
+    repositorioCartoes: IRepositorioCartaoUsuario,
+    repositorioVendas: IRepositorioVendas,
+  ) {
     this.repositorioUsuarios = repositorioUsuarios;
-    this.db = db;
+    this.repositorioEnderecos = repositorioEnderecos;
+    this.repositorioCartoes = repositorioCartoes;
+    this.repositorioVendas = repositorioVendas;
   }
 
   /**
@@ -126,7 +117,7 @@ export class ServicoConsultaClientes {
       cnpj: cliente.cnpj,
       tipoPessoa: cliente.tipoPessoa,
       ativo: cliente.ativo,
-      criadoEm: (cliente.criadoEm ?? new Date()).toISOString(),
+      criadoEm: cliente.criadoEm ? cliente.criadoEm.toISOString() : null,
       enderecos,
       cartoes,
       resumoPedidos,
@@ -134,29 +125,7 @@ export class ServicoConsultaClientes {
   }
 
   private async buscarEnderecosDoCliente(idUsuario: number): Promise<IEnderecoResumoDto[]> {
-    const query = `
-      SELECT
-        e.end_apelido AS "apelido",
-        COALESCE(tl.tlo_descricao || ' ', '') || l.log_nome AS "logradouro",
-        e.end_numero AS "numero",
-        e.end_complemento AS "complemento",
-        b.bai_nome AS "bairro",
-        c.cid_nome AS "cidade",
-        est.est_sigla AS "estado",
-        LPAD(cep.cep_numero::text, 8, '0') AS "cep",
-        e.end_principal AS "principal"
-      FROM livraria_gestao.enderecos e
-      LEFT JOIN livraria_ref.logradouros l ON l.log_id = e.log_id
-      LEFT JOIN livraria_ref.tipos_logradouros tl ON tl.tlo_id = l.tlo_id
-      LEFT JOIN livraria_ref.bairros b ON b.bai_id = e.bai_id
-      LEFT JOIN livraria_ref.cidades c ON c.cid_id = e.cid_id
-      LEFT JOIN livraria_ref.estados est ON est.est_id = c.est_id
-      LEFT JOIN livraria_ref.ceps cep ON cep.cep_numero = e.cep_id
-      WHERE e.usu_id = $1
-      ORDER BY e.end_principal DESC, e.end_criado_em DESC
-    `;
-
-    const rows = await this.db.executar<IRowEndereco>(query, [idUsuario]);
+    const rows = await this.repositorioEnderecos.buscarResumoPorIdUsuario(idUsuario);
 
     return rows.map((row) => ({
       apelido: row.apelido ?? undefined,
@@ -172,19 +141,7 @@ export class ServicoConsultaClientes {
   }
 
   private async buscarCartoesDoCliente(idUsuario: number): Promise<ICartaoResumoDto[]> {
-    const query = `
-      SELECT
-        NULL::text AS "apelido",
-        b.ban_descricao AS "bandeira",
-        c.crt_final AS "ultimos4Digitos",
-        c.crt_principal AS "principal"
-      FROM livraria_financeiro.cartoes c
-      JOIN livraria_financeiro.bandeiras_cartao b ON b.ban_id = c.ban_id
-      WHERE c.usu_id = $1
-      ORDER BY c.crt_principal DESC, c.crt_criado_em DESC
-    `;
-
-    const rows = await this.db.executar<IRowCartao>(query, [idUsuario]);
+    const rows = await this.repositorioCartoes.buscarResumoPorUsuario(idUsuario);
 
     return rows.map((row) => ({
       apelido: row.apelido ?? undefined,
@@ -195,23 +152,7 @@ export class ServicoConsultaClientes {
   }
 
   private async buscarResumoPedidosDoCliente(idUsuario: number): Promise<IResumoPedidosDto> {
-    const query = `
-      SELECT
-        COUNT(*) AS "totalPedidos",
-        SUM(v.ven_total_venda)::text AS "totalGasto",
-        MAX(v.ven_criado_em)::text AS "ultimoPedidoEm"
-      FROM livraria_comercial.vendas v
-      WHERE v.usu_id = $1
-    `;
-
-    const rows = await this.db.executar<IRowResumoPedidos>(query, [idUsuario]);
-    const row = rows[0];
-
-    return {
-      totalPedidos: Number(row?.totalPedidos ?? 0),
-      totalGasto: row?.totalGasto ? parseFloat(row.totalGasto) : 0,
-      ultimoPedidoEm: row?.ultimoPedidoEm ?? null,
-    };
+    return this.repositorioVendas.obterResumoPedidosPorUsuario(idUsuario);
   }
 
   /**
@@ -220,14 +161,9 @@ export class ServicoConsultaClientes {
   async inativarCliente(uuid: string, ativo: boolean): Promise<{ uuid: string; ativo: boolean }> {
     const cliente = await this.repositorioUsuarios.buscarPorUuid(uuid);
 
-    if (!cliente) {
-      throw new Error('Cliente não encontrado.');
-    }
+    if (!cliente) throw new Error('Cliente não encontrado.');
 
-    await this.db.executar(
-      'UPDATE livraria_gestao.usuarios SET usu_ativo = $1 WHERE usu_uuid = $2',
-      [ativo, uuid],
-    );
+    await this.repositorioUsuarios.atualizarStatusAtivo(uuid, ativo);
 
     return { uuid, ativo };
   }
@@ -263,7 +199,7 @@ export class ServicoConsultaClientes {
         email: mascararEmail(cliente.email),
         cpf: cliente.cpf ? mascararCpf(cliente.cpf) : undefined,
         ativo: cliente.ativo,
-        criadoEm: cliente.criadoEm ?? new Date(),
+        criadoEm: cliente.criadoEm ? cliente.criadoEm.toISOString() : null,
       })),
       total,
       pagina: filtros.pagina,

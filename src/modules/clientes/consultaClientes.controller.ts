@@ -64,11 +64,10 @@ export class ControladorConsultaClientes {
   public static async inativarCliente(requisicao: Request, resposta: Response): Promise<Response> {
     try {
       const { uuid } = requisicao.params;
-      const { ativo } = requisicao.body as { ativo: boolean };
+      const { ativo } = requisicao.body;
 
-      if (typeof ativo !== 'boolean') {
-        return RespostaPadrao.enviarErro(resposta, 400, 'O campo "ativo" deve ser um booleano.');
-      }
+      if (ativo === undefined) return RespostaPadrao.enviarErro(resposta, 400, 'O campo "ativo" é obrigatório.');
+      if (typeof ativo !== 'boolean') return RespostaPadrao.enviarErro(resposta, 400, 'O campo "ativo" deve ser um booleano.');
 
       const resultado = await servicoConsultaClientes.inativarCliente(uuid, ativo);
 

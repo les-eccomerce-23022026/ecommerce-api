@@ -396,4 +396,36 @@ export class RepositorioVendasPostgres implements IRepositorioVendas {
       quantidade: parseInt(row.quantidade, 10),
     }));
   }
+
+  public async obterResumoPedidosPorUsuario(idUsuario: number): Promise<{
+    totalPedidos: number;
+    totalGasto: number;
+    ultimoPedidoEm: string | null;
+  }> {
+    const query = `
+      SELECT
+        COUNT(*) AS "totalPedidos",
+        SUM(v.ven_total_venda)::text AS "totalGasto",
+        MAX(v.ven_criado_em)::text AS "ultimoPedidoEm"
+      FROM livraria_comercial.vendas v
+      WHERE v.usu_id = $1
+    `;
+
+    const rows = await this.db.executar<{
+      totalPedidos: string;
+      totalGasto: string | null;
+      ultimoPedidoEm: string | null;
+    }>(query, [idUsuario]);
+
+    if (rows.length === 0) {
+      return { totalPedidos: 0, totalGasto: 0, ultimoPedidoEm: null };
+    }
+
+    const row = rows[0];
+    return {
+      totalPedidos: Number(row.totalPedidos),
+      totalGasto: row.totalGasto ? parseFloat(row.totalGasto) : 0,
+      ultimoPedidoEm: row.ultimoPedidoEm,
+    };
+  }
 }
