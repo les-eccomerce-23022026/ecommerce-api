@@ -525,6 +525,7 @@ export class RepositorioPagamentosPostgres implements IRepositorioPagamentos {
       WHERE cup_tipo = 'promocional'
         AND cup_ativo = true
         AND (loj_id IS NULL OR $1::integer IS NULL OR loj_id = $1::integer)
+      ORDER BY cup_id DESC
     `;
     return this.db.executar<{
       uuid: string;
