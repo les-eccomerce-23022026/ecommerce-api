@@ -35,6 +35,7 @@ exports
 .github
 scripts
 .agents
+.devin
 .windsurf
 .cursor
 .gemini
