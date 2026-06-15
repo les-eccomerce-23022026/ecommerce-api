@@ -1,4 +1,5 @@
 import bcrypt from 'bcryptjs';
+import { IConexaoBanco } from '@/shared/infrastructure/database/IConexaoBanco';
 import { IRepositorioUsuarios } from '@/modules/usuarios/IRepositorioUsuarios';
 import { IRepositorioVendas } from '@/modules/vendas/repositories/IRepositorioVendas';
 import { ICriarAdminDto, IListaAdminDto, IRespostaAdminCriadoDto } from '@/modules/admin/Iadmin.dto';
@@ -284,14 +285,33 @@ export class ServicoAdmin {
 
       // Vincular à loja padrão por segurança se ele ainda não tiver lojas
       try {
-        const defaultLojaId = process.env.DEFAULT_LOJA_ID ? parseInt(process.env.DEFAULT_LOJA_ID) : 1;
-        const sqlLink = `
-          INSERT INTO livraria_gestao.admin_lojas (usu_id, loj_id, adl_papel, adl_ativo, adl_escopo)
-          VALUES ($1, $2, 'admin_loja', TRUE, 'LOJA')
-          ON CONFLICT (usu_id, loj_id) DO NOTHING
-        `;
-        await (this.repositorioUsuarios as any).db.executar(sqlLink, [existenteClientePorEmail.id, defaultLojaId]);
-        Logger.info('[registrarNovoAdministrador] Administrador promovido vinculado à loja padrão com sucesso', { usuarioId: existenteClientePorEmail.id, lojaId: defaultLojaId });
+        const db = (this.repositorioUsuarios as any).db as IConexaoBanco;
+        const configLojaId = process.env.DEFAULT_LOJA_ID ? parseInt(process.env.DEFAULT_LOJA_ID) : 1;
+
+        const lojaExiste = (await db.executar(
+          'SELECT loj_id FROM livraria_gestao.lojas WHERE loj_id = $1 LIMIT 1',
+          [configLojaId],
+        )) as Array<{ loj_id: number }>;
+
+        const lojaFallback = lojaExiste.length > 0
+          ? lojaExiste
+          : (await db.executar(
+              'SELECT loj_id FROM livraria_gestao.lojas ORDER BY loj_id LIMIT 1',
+            ) as Array<{ loj_id: number }>);
+
+        if (lojaFallback.length === 0) {
+          throw new Error('Nenhuma loja disponível no banco de dados.');
+        }
+
+        const lojaId = lojaFallback[0].loj_id;
+
+        await db.executar(
+          `INSERT INTO livraria_gestao.admin_lojas (usu_id, loj_id, adl_papel, adl_ativo, adl_escopo)
+           VALUES ($1, $2, 'admin_loja', TRUE, 'LOJA')
+           ON CONFLICT (usu_id, loj_id) DO NOTHING`,
+          [existenteClientePorEmail.id, lojaId],
+        );
+        Logger.info('[registrarNovoAdministrador] Administrador promovido vinculado à loja padrão com sucesso', { usuarioId: existenteClientePorEmail.id, lojaId });
       } catch (erro) {
         Logger.warn('[registrarNovoAdministrador] Falha ao vincular admin promovido à loja padrão', {
           erro: erro instanceof Error ? erro.message : String(erro),
@@ -322,17 +342,35 @@ export class ServicoAdmin {
 
     // Vincular à loja padrão por segurança (especialmente para os testes onde o admin é criado sem loja específica)
     try {
-      const defaultLojaId = process.env.DEFAULT_LOJA_ID ? parseInt(process.env.DEFAULT_LOJA_ID) : 1;
-      const sqlLink = `
-        INSERT INTO livraria_gestao.admin_lojas (usu_id, loj_id, adl_papel, adl_ativo, adl_escopo)
-        VALUES ($1, $2, 'admin_loja', TRUE, 'LOJA')
-        ON CONFLICT (usu_id, loj_id) DO NOTHING
-      `;
-      // Executa consulta SQL direta usando o db injetado ou no repositorio
-      await (this.repositorioUsuarios as any).db.executar(sqlLink, [usuario.id, defaultLojaId]);
-      Logger.info('[registrarNovoAdministrador] Administrador vinculado à loja padrão com sucesso', { usuarioId: usuario.id, lojaId: defaultLojaId });
+      const db = (this.repositorioUsuarios as any).db as IConexaoBanco;
+      const configLojaId = process.env.DEFAULT_LOJA_ID ? parseInt(process.env.DEFAULT_LOJA_ID) : 1;
+
+      const lojaExiste = (await db.executar(
+        'SELECT loj_id FROM livraria_gestao.lojas WHERE loj_id = $1 LIMIT 1',
+        [configLojaId],
+      )) as Array<{ loj_id: number }>;
+
+      const lojaFallback = lojaExiste.length > 0
+        ? lojaExiste
+        : (await db.executar(
+            'SELECT loj_id FROM livraria_gestao.lojas ORDER BY loj_id LIMIT 1',
+          ) as Array<{ loj_id: number }>);
+
+      if (lojaFallback.length === 0) {
+        throw new Error('Nenhuma loja disponível no banco de dados.');
+      }
+
+      const lojaId = lojaFallback[0].loj_id;
+
+      await db.executar(
+        `INSERT INTO livraria_gestao.admin_lojas (usu_id, loj_id, adl_papel, adl_ativo, adl_escopo)
+         VALUES ($1, $2, 'admin_loja', TRUE, 'LOJA')
+         ON CONFLICT (usu_id, loj_id) DO NOTHING`,
+        [usuario.id, lojaId],
+      );
+      Logger.info('[registrarNovoAdministrador] Administrador vinculado à loja padrão com sucesso', { usuarioId: usuario.id, lojaId });
     } catch (erro) {
-      Logger.warn('[registrarNovoAdministrador] Falha ao vincular administrador à loja padrão (pode ser esperado se tabela ou loja não existir ainda)', {
+      Logger.warn('[registrarNovoAdministrador] Falha ao vincular administrador à loja padrão', {
         erro: erro instanceof Error ? erro.message : String(erro),
       });
     }
