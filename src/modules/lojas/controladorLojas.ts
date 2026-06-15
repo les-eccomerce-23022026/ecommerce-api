@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import { RespostaPadrao } from '@/shared/errors/Iresposta-padrao';
 import { Logger } from '@/shared/utils/Logger.util';
 import { RepositorioLojasPostgres } from './repositorioLojasPostgres';
-import { ServicoLojas, LojaNaoEncontradaError } from './servicoLojas';
+import { ServicoLojas, LojaNaoEncontradaError, SlugDuplicadoError } from './servicoLojas';
 import { ConexaoPostgres } from '@/shared/infrastructure/database/ConexaoPostgres';
 import { IFiltrosListarLojasDto, IAtualizarLojaDto } from './Iloja.dto';
 
@@ -49,6 +49,11 @@ export class ControladorLojas {
       Logger.error('[criarLoja] Erro ao criar loja', {
         erro: erro instanceof Error ? erro.message : String(erro),
       });
+
+      if (erro instanceof SlugDuplicadoError) {
+        return RespostaPadrao.enviarErro(resposta, 409, erro.message);
+      }
+
       const mensagem = RespostaPadrao.obterMensagemErro(erro, 'Erro ao criar loja.');
       return RespostaPadrao.enviarErro(resposta, 400, mensagem);
     }
@@ -75,6 +80,9 @@ export class ControladorLojas {
       }
 
       if (typeof ativo === 'string') {
+        if (ativo !== 'true' && ativo !== 'false') {
+          return RespostaPadrao.enviarErro(resposta, 400, 'Campo "ativo" deve ser "true" ou "false".');
+        }
         filtros.ativo = ativo === 'true';
       }
 
@@ -154,7 +162,7 @@ export class ControladorLojas {
       }
 
       if (cnpj !== undefined) {
-        if (typeof cnpj !== 'string') {
+        if (typeof cnpj !== 'string' || !cnpj.trim()) {
           return RespostaPadrao.enviarErro(resposta, 400, 'Campo "cnpj" inválido.');
         }
         dados.cnpj = cnpj.trim();
@@ -206,8 +214,12 @@ export class ControladorLojas {
 
       const { ativo } = requisicao.body ?? {};
 
+      if (ativo === undefined) {
+        return RespostaPadrao.enviarErro(resposta, 400, 'Campo "ativo" é obrigatório.');
+      }
+
       if (typeof ativo !== 'boolean') {
-        return RespostaPadrao.enviarErro(resposta, 400, 'Campo "ativo" é obrigatório e deve ser booleano.');
+        return RespostaPadrao.enviarErro(resposta, 400, 'Campo "ativo" deve ser booleano.');
       }
 
       Logger.info('[inativarLoja] Alterando status da loja no controlador', { uuid, ativo });

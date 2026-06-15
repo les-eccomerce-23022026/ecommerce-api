@@ -20,6 +20,16 @@ export class LojaNaoEncontradaError extends Error {
 }
 
 /**
+ * Exceção lançada quando slug já está em uso.
+ */
+export class SlugDuplicadoError extends Error {
+  constructor(slug: string) {
+    super(`Slug já está em uso: ${slug}`);
+    this.name = 'SlugDuplicadoError';
+  }
+}
+
+/**
  * Serviço responsável pela lógica de negócio de lojas.
  */
 export class ServicoLojas {
@@ -38,7 +48,7 @@ export class ServicoLojas {
     const lojaExistente = await this.repositorioLojas.buscarPorSlug(dados.slug);
     if (lojaExistente) {
       Logger.warn('[criarLoja] Slug já existe', { slug: dados.slug });
-      throw new Error('Slug já está em uso por outra loja.');
+      throw new SlugDuplicadoError(dados.slug);
     }
 
     const lojaCriada = await this.repositorioLojas.criarLoja(dados);
@@ -79,6 +89,16 @@ export class ServicoLojas {
     const lojaExistente = await this.repositorioLojas.buscarPorUuid(uuid);
     if (!lojaExistente) {
       throw new LojaNaoEncontradaError(uuid);
+    }
+
+    // Validar unicidade de CNPJ se estiver sendo atualizado
+    if (dados.cnpj !== undefined && dados.cnpj !== lojaExistente.cnpj) {
+      // Verificar se CNPJ já existe em outra loja
+      const todasLojas = await this.repositorioLojas.listarLojas({ cnpj: dados.cnpj, limite: 2 });
+      if (todasLojas.total > 0 && todasLojas.lojas[0].uuid !== uuid) {
+        Logger.warn('[atualizarLoja] CNPJ já está em uso por outra loja', { cnpj: dados.cnpj });
+        throw new Error('CNPJ já está em uso por outra loja.');
+      }
     }
 
     return await this.repositorioLojas.atualizarLoja(uuid, dados);

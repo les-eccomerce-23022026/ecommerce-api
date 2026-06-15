@@ -144,6 +144,17 @@ export class RepositorioLojasPostgres {
   public async atualizarLoja(uuid: string, dados: IAtualizarLojaDto): Promise<IListaLojaDto> {
     Logger.info('[atualizarLoja] Atualizando loja', { uuid });
 
+    // Validação de segurança: apenas campos permitidos
+    const camposPermitidos: (keyof IAtualizarLojaDto)[] = ['nome', 'cnpj', 'ativo'];
+    const camposInvalidos = Object.keys(dados).filter(
+      campo => !camposPermitidos.includes(campo as keyof IAtualizarLojaDto)
+    );
+
+    if (camposInvalidos.length > 0) {
+      Logger.warn('[atualizarLoja] Campos não permitidos', { camposInvalidos });
+      throw new Error(`Campos não permitidos: ${camposInvalidos.join(', ')}`);
+    }
+
     const sets: string[] = [];
     const valores: (string | boolean)[] = [];
     let idx = 1;
@@ -175,6 +186,12 @@ export class RepositorioLojasPostgres {
     `;
 
     const rows = await this.db.executar(sql, valores);
+    
+    if (rows.length === 0) {
+      Logger.warn('[atualizarLoja] Loja não encontrada para atualização', { uuid });
+      throw new Error('Loja não encontrada para atualização');
+    }
+    
     Logger.info('[atualizarLoja] Loja atualizada com sucesso', { uuid });
     return rows[0] as IListaLojaDto;
   }
@@ -194,6 +211,12 @@ export class RepositorioLojasPostgres {
     `;
 
     const rows = await this.db.executar(sql, [ativo, uuid]);
+    
+    if (rows.length === 0) {
+      Logger.warn('[inativarLoja] Loja não encontrada para alteração de status', { uuid });
+      throw new Error('Loja não encontrada para alteração de status');
+    }
+    
     Logger.info('[inativarLoja] Status da loja alterado com sucesso', { uuid, ativo });
     return rows[0] as IListaLojaDto;
   }
