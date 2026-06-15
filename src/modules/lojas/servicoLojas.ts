@@ -1,6 +1,23 @@
 import { RepositorioLojasPostgres } from './repositorioLojasPostgres';
-import { ICriarLojaDto, IRespostaLojaCriadaDto, IListaLojaDto } from './Iloja.dto';
+import {
+  ICriarLojaDto,
+  IAtualizarLojaDto,
+  IRespostaLojaCriadaDto,
+  IListaLojaDto,
+  IFiltrosListarLojasDto,
+  IRespostaListarLojasPaginadoDto,
+} from './Iloja.dto';
 import { Logger } from '@/shared/utils/Logger.util';
+
+/**
+ * Exceção lançada quando loja não é encontrada.
+ */
+export class LojaNaoEncontradaError extends Error {
+  constructor(uuid: string) {
+    super(`Loja não encontrada: ${uuid}`);
+    this.name = 'LojaNaoEncontradaError';
+  }
+}
 
 /**
  * Serviço responsável pela lógica de negócio de lojas.
@@ -18,7 +35,6 @@ export class ServicoLojas {
   public async criarLoja(dados: ICriarLojaDto): Promise<IRespostaLojaCriadaDto> {
     Logger.info('[criarLoja] Iniciando criação de loja no serviço', { nome: dados.nome, slug: dados.slug });
 
-    // Validar slug (deve ser único)
     const lojaExistente = await this.repositorioLojas.buscarPorSlug(dados.slug);
     if (lojaExistente) {
       Logger.warn('[criarLoja] Slug já existe', { slug: dados.slug });
@@ -28,7 +44,7 @@ export class ServicoLojas {
     const lojaCriada = await this.repositorioLojas.criarLoja(dados);
 
     Logger.info('[criarLoja] Loja criada com sucesso no serviço', { uuid: lojaCriada.uuid });
-    
+
     return {
       uuid: lojaCriada.uuid,
       nome: lojaCriada.nome,
@@ -39,11 +55,11 @@ export class ServicoLojas {
   }
 
   /**
-   * Lista todas as lojas.
+   * Lista lojas com filtros e paginação opcionais.
    */
-  public async listarLojas(): Promise<IListaLojaDto[]> {
-    Logger.info('[listarLojas] Listando todas as lojas');
-    return await this.repositorioLojas.listarLojas();
+  public async listarLojas(filtros?: IFiltrosListarLojasDto): Promise<IRespostaListarLojasPaginadoDto> {
+    Logger.info('[listarLojas] Listando lojas', { filtros });
+    return await this.repositorioLojas.listarLojas(filtros);
   }
 
   /**
@@ -52,6 +68,34 @@ export class ServicoLojas {
   public async obterPorUuid(loj_uuid: string): Promise<IListaLojaDto | null> {
     Logger.info('[obterPorUuid] Buscando loja por UUID', { loj_uuid });
     return await this.repositorioLojas.obterPorUuid(loj_uuid);
+  }
+
+  /**
+   * Atualiza campos da loja (partial update).
+   */
+  public async atualizarLoja(uuid: string, dados: IAtualizarLojaDto): Promise<IListaLojaDto> {
+    Logger.info('[atualizarLoja] Atualizando loja no serviço', { uuid });
+
+    const lojaExistente = await this.repositorioLojas.buscarPorUuid(uuid);
+    if (!lojaExistente) {
+      throw new LojaNaoEncontradaError(uuid);
+    }
+
+    return await this.repositorioLojas.atualizarLoja(uuid, dados);
+  }
+
+  /**
+   * Inativa ou reativa uma loja.
+   */
+  public async inativarLoja(uuid: string, ativo: boolean): Promise<IListaLojaDto> {
+    Logger.info('[inativarLoja] Alterando status da loja no serviço', { uuid, ativo });
+
+    const lojaExistente = await this.repositorioLojas.buscarPorUuid(uuid);
+    if (!lojaExistente) {
+      throw new LojaNaoEncontradaError(uuid);
+    }
+
+    return await this.repositorioLojas.inativarLoja(uuid, ativo);
   }
 
   /**

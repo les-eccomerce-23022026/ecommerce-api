@@ -1,5 +1,5 @@
 import { IConexaoBanco } from '@/shared/infrastructure/database/IConexaoBanco';
-import { ICriarLojaDto, IListaLojaDto } from './Iloja.dto';
+import { ICriarLojaDto, IAtualizarLojaDto, IListaLojaDto, IFiltrosListarLojasDto, IRespostaListarLojasPaginadoDto } from './Iloja.dto';
 import { Logger } from '@/shared/utils/Logger.util';
 
 /**
@@ -21,30 +21,68 @@ export class RepositorioLojasPostgres {
     const sql = `
       INSERT INTO livraria_gestao.lojas (loj_nome, loj_slug, loj_cnpj)
       VALUES ($1, $2, $3)
-      RETURNING loj_uuid AS "uuid", loj_nome AS "nome", loj_slug AS "slug", 
+      RETURNING loj_uuid AS "uuid", loj_nome AS "nome", loj_slug AS "slug",
              COALESCE(TRIM(loj_cnpj), '') AS "cnpj", loj_ativo AS "ativo"
     `;
 
     const values = [dados.nome, dados.slug, dados.cnpj];
     const rows = await this.db.executar(sql, values);
 
-    Logger.info('[criarLoja] Loja criada com sucesso', { uuid: (rows[0] as any).uuid });
+    Logger.info('[criarLoja] Loja criada com sucesso', { uuid: (rows[0] as IListaLojaDto).uuid });
     return rows[0] as IListaLojaDto;
   }
 
   /**
-   * Lista todas as lojas.
+   * Lista lojas com filtros opcionais e paginação.
    */
-  public async listarLojas(): Promise<IListaLojaDto[]> {
-    const sql = `
-      SELECT loj_uuid AS "uuid", loj_nome AS "nome", loj_slug AS "slug", 
+  public async listarLojas(filtros?: IFiltrosListarLojasDto): Promise<IRespostaListarLojasPaginadoDto> {
+    const pagina = Math.max(1, filtros?.pagina ?? 1);
+    const limite = Math.min(100, Math.max(1, filtros?.limite ?? 20));
+    const offset = (pagina - 1) * limite;
+
+    const condicoes: string[] = [];
+    const valores: (string | boolean | number)[] = [];
+    let idx = 1;
+
+    if (filtros?.nome) {
+      condicoes.push(`loj_nome ILIKE $${idx++}`);
+      valores.push(`%${filtros.nome}%`);
+    }
+
+    if (filtros?.cnpj) {
+      condicoes.push(`TRIM(loj_cnpj) = $${idx++}`);
+      valores.push(filtros.cnpj.trim());
+    }
+
+    if (filtros?.ativo !== undefined) {
+      condicoes.push(`loj_ativo = $${idx++}`);
+      valores.push(filtros.ativo);
+    }
+
+    const where = condicoes.length > 0 ? `WHERE ${condicoes.join(' AND ')}` : '';
+
+    const sqlCount = `SELECT COUNT(*)::int AS total FROM livraria_gestao.lojas ${where}`;
+    const rowsCount = await this.db.executar<{ total: number }>(sqlCount, valores);
+    const total = rowsCount[0].total;
+
+    const sqlData = `
+      SELECT loj_uuid AS "uuid", loj_nome AS "nome", loj_slug AS "slug",
              COALESCE(TRIM(loj_cnpj), '') AS "cnpj", loj_ativo AS "ativo"
       FROM livraria_gestao.lojas
+      ${where}
       ORDER BY loj_nome
+      LIMIT $${idx++} OFFSET $${idx++}
     `;
+    const valoresData = [...valores, limite, offset];
+    const rows = await this.db.executar(sqlData, valoresData);
 
-    const rows = await this.db.executar(sql, []);
-    return rows as IListaLojaDto[];
+    return {
+      lojas: rows as IListaLojaDto[],
+      total,
+      pagina,
+      limite,
+      totalPaginas: Math.ceil(total / limite),
+    };
   }
 
   /**
@@ -52,7 +90,7 @@ export class RepositorioLojasPostgres {
    */
   public async buscarPorUuid(uuid: string): Promise<IListaLojaDto | undefined> {
     const sql = `
-      SELECT loj_uuid AS "uuid", loj_nome AS "nome", loj_slug AS "slug", 
+      SELECT loj_uuid AS "uuid", loj_nome AS "nome", loj_slug AS "slug",
              COALESCE(TRIM(loj_cnpj), '') AS "cnpj", loj_ativo AS "ativo"
       FROM livraria_gestao.lojas
       WHERE loj_uuid = $1
@@ -76,7 +114,7 @@ export class RepositorioLojasPostgres {
    */
   public async buscarPorSlug(slug: string): Promise<IListaLojaDto | undefined> {
     const sql = `
-      SELECT loj_uuid AS "uuid", loj_nome AS "nome", loj_slug AS "slug", 
+      SELECT loj_uuid AS "uuid", loj_nome AS "nome", loj_slug AS "slug",
              COALESCE(TRIM(loj_cnpj), '') AS "cnpj", loj_ativo AS "ativo"
       FROM livraria_gestao.lojas
       WHERE loj_slug = $1
@@ -101,6 +139,66 @@ export class RepositorioLojasPostgres {
   }
 
   /**
+   * Atualiza campos da loja (partial update).
+   */
+  public async atualizarLoja(uuid: string, dados: IAtualizarLojaDto): Promise<IListaLojaDto> {
+    Logger.info('[atualizarLoja] Atualizando loja', { uuid });
+
+    const sets: string[] = [];
+    const valores: (string | boolean)[] = [];
+    let idx = 1;
+
+    if (dados.nome !== undefined) {
+      sets.push(`loj_nome = $${idx++}`);
+      valores.push(dados.nome);
+    }
+
+    if (dados.cnpj !== undefined) {
+      sets.push(`loj_cnpj = $${idx++}`);
+      valores.push(dados.cnpj);
+    }
+
+    if (dados.ativo !== undefined) {
+      sets.push(`loj_ativo = $${idx++}`);
+      valores.push(dados.ativo);
+    }
+
+    sets.push(`loj_atualizado_em = NOW()`);
+    valores.push(uuid);
+
+    const sql = `
+      UPDATE livraria_gestao.lojas
+      SET ${sets.join(', ')}
+      WHERE loj_uuid = $${idx}
+      RETURNING loj_uuid AS "uuid", loj_nome AS "nome", loj_slug AS "slug",
+                COALESCE(TRIM(loj_cnpj), '') AS "cnpj", loj_ativo AS "ativo"
+    `;
+
+    const rows = await this.db.executar(sql, valores);
+    Logger.info('[atualizarLoja] Loja atualizada com sucesso', { uuid });
+    return rows[0] as IListaLojaDto;
+  }
+
+  /**
+   * Inativa ou reativa uma loja.
+   */
+  public async inativarLoja(uuid: string, ativo: boolean): Promise<IListaLojaDto> {
+    Logger.info('[inativarLoja] Alterando status da loja', { uuid, ativo });
+
+    const sql = `
+      UPDATE livraria_gestao.lojas
+      SET loj_ativo = $1, loj_atualizado_em = NOW()
+      WHERE loj_uuid = $2
+      RETURNING loj_uuid AS "uuid", loj_nome AS "nome", loj_slug AS "slug",
+                COALESCE(TRIM(loj_cnpj), '') AS "cnpj", loj_ativo AS "ativo"
+    `;
+
+    const rows = await this.db.executar(sql, [ativo, uuid]);
+    Logger.info('[inativarLoja] Status da loja alterado com sucesso', { uuid, ativo });
+    return rows[0] as IListaLojaDto;
+  }
+
+  /**
    * Associa administrador a loja.
    */
   public async associarAdminALoja(usuarioId: number, lojaId: number, papel: string = 'admin'): Promise<void> {
@@ -121,7 +219,7 @@ export class RepositorioLojasPostgres {
    */
   public async buscarLojasDoAdmin(usuarioId: number): Promise<IListaLojaDto[]> {
     const sql = `
-      SELECT l.loj_uuid AS "uuid", l.loj_nome AS "nome", l.loj_slug AS "slug", 
+      SELECT l.loj_uuid AS "uuid", l.loj_nome AS "nome", l.loj_slug AS "slug",
              COALESCE(TRIM(l.loj_cnpj), '') AS "cnpj", l.loj_ativo AS "ativo"
       FROM livraria_gestao.lojas l
       INNER JOIN livraria_gestao.admin_lojas al ON l.loj_id = al.loj_id
