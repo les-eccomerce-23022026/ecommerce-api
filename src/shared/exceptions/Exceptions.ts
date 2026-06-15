@@ -84,3 +84,33 @@ export class OperacaoNaoPermitidaError extends Error {
     this.name = 'OperacaoNaoPermitidaError';
   }
 }
+
+/**
+ * Exceção lançada quando uma reserva de estoque não é encontrada
+ */
+export class ReservaNaoEncontradaError extends Error {
+  constructor(uuid: string) {
+    super(`Reserva ${uuid} não encontrada`);
+    this.name = 'ReservaNaoEncontradaError';
+  }
+}
+
+/**
+ * Exceção lançada quando o estoque é insuficiente para uma reserva
+ */
+export class EstoqueInsuficienteError extends Error {
+  constructor(livroUuid: string) {
+    super(`Estoque insuficiente para o livro ${livroUuid}`);
+    this.name = 'EstoqueInsuficienteError';
+  }
+}
+
+/**
+ * Exceção lançada quando uma reserva já expirou
+ */
+export class ReservaExpiradaError extends Error {
+  constructor(uuid: string) {
+    super(`Reserva ${uuid} já expirou`);
+    this.name = 'ReservaExpiradaError';
+  }
+}

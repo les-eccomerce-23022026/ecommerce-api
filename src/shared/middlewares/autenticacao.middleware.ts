@@ -175,10 +175,16 @@ export async function autenticacaoMiddleware(
       // CORREÇÃO: Atualizar o contexto existente (criado pelo contextoLojaMiddleware) com informações de autenticação
       // em vez de sobrescrever com run()
       const contextoExistente = ContextoRequisicao.obterContexto();
+      const loj_uuid_atual = req.usuario.lojas?.find((l) => l.loj_id === loj_id_atual)?.loj_uuid
+        || decodificado.loja_uuid_principal
+        || contextoExistente?.loj_uuid;
+
       if (contextoExistente) {
-        // Contexto já existe (criado por contextoLojaMiddleware), apenas atualiza
+        // Contexto já existe (criado por contextoLojaMiddleware), atualiza loj_id e loj_uuid do usuário autenticado
         ContextoRequisicao.definirContexto({
           ...contextoExistente,
+          loj_id: loj_id_atual,
+          loj_uuid: loj_uuid_atual,
           usu_id: usuario.id,
           usu_uuid: usuario.uuid,
           papeis: req.usuario.papeis,
