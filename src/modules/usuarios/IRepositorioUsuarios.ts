@@ -8,6 +8,7 @@ export interface IFiltrosConsultaClientes {
   nome?: string;
   cpf?: string;
   email?: string;
+  ativo?: boolean;
   idPapel?: number;
   offset: number;
   limite: number;

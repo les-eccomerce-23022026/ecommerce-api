@@ -6,7 +6,7 @@ import { montarClausulasAtualizacaoUsuario } from '@/modules/usuarios/usuario-re
 import { IConexaoBanco, DbParametro } from '@/shared/infrastructure/database/IConexaoBanco';
 import { Logger } from '@/shared/utils/Logger.util';
 import { ContextoRequisicao } from '@/shared/infrastructure/contexto/ContextoRequisicao';
-import { PAPEL_CLIENTE } from '@/shared/types/papeis';
+import { PAPEL_ADMIN_SISTEMA, PAPEL_CLIENTE } from '@/shared/types/papeis';
 import { IPapelUsuario } from '@/shared/types/Ipapel-usuario';
 import { obterTipoBancoAtual, obterTransacaoAtual } from '@/shared/infrastructure/database/ContextoBanco';
 import { limparDocumento } from '@/shared/validators/validadorDocumento';
@@ -28,6 +28,11 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
    */
   private obterLojId(): number | undefined {
     return ContextoRequisicao.obterLojId();
+  }
+
+  private ehAdminSistema(): boolean {
+    const contexto = ContextoRequisicao.obterContexto();
+    return contexto?.papeis?.includes(PAPEL_ADMIN_SISTEMA.descricao) ?? false;
   }
 
   /** Resolve pap_id real por descrição (evita FK quando serial do BD ≠ IDs simbólicos em papeis.ts). */
@@ -293,9 +298,9 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
   }
 
   public async buscarClientesComFiltros(filtros: IFiltrosConsultaClientes): Promise<IUsuario[]> {
-    const { nome, cpf, email, idPapel, offset, limite } = filtros;
-    const papelBusca = idPapel ?? PAPEL_CLIENTE.id;
-    const loj_id = this.obterLojId();
+    const { nome, cpf, email, ativo, idPapel, offset, limite } = filtros;
+    const papelBusca = idPapel ?? (await this.resolverPapelId(PAPEL_CLIENTE));
+    const loj_id = this.ehAdminSistema() ? undefined : this.obterLojId();
     const valores: DbParametro[] = [papelBusca];
     let query = `${USUARIO_QUERIES.SELECT_BASE} WHERE u.pap_id = $1`;
     let contador = 2;
@@ -309,10 +314,16 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
       }
     });
 
+    if (ativo !== undefined) {
+      query += ` AND u.usu_ativo = $${contador}`;
+      contador += 1;
+      valores.push(ativo);
+    }
+
     // Se multi-tenancy estiver habilitado, filtrar por loj_id via tabela clientes
     if (loj_id) {
       query += ` AND EXISTS (
-        SELECT 1 FROM livraria_gestao.clientes c 
+        SELECT 1 FROM livraria_gestao.clientes c
         WHERE c.usu_id = u.usu_id AND c.loj_id = $${contador}
       )`;
       contador += 1;
@@ -343,9 +354,10 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
   }
 
   public async contarClientesComFiltros(filtros: Omit<IFiltrosConsultaClientes, 'offset' | 'limite'>): Promise<number> {
-    const { nome, cpf, email } = filtros;
-    const loj_id = this.obterLojId();
-    const valores: DbParametro[] = [PAPEL_CLIENTE.id];
+    const { nome, cpf, email, ativo } = filtros;
+    const papelBusca = await this.resolverPapelId(PAPEL_CLIENTE);
+    const loj_id = this.ehAdminSistema() ? undefined : this.obterLojId();
+    const valores: DbParametro[] = [papelBusca];
     let query = 'SELECT COUNT(*) as total FROM livraria_gestao.usuarios u WHERE pap_id = $1';
     let contador = 2;
 
@@ -358,10 +370,16 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
       }
     });
 
+    if (ativo !== undefined) {
+      query += ` AND u.usu_ativo = $${contador}`;
+      contador += 1;
+      valores.push(ativo);
+    }
+
     // Se multi-tenancy estiver habilitado, filtrar por loj_id via tabela clientes
     if (loj_id) {
       query += ` AND EXISTS (
-        SELECT 1 FROM livraria_gestao.clientes c 
+        SELECT 1 FROM livraria_gestao.clientes c
         WHERE c.usu_id = u.usu_id AND c.loj_id = $${contador}
       )`;
       contador += 1;
