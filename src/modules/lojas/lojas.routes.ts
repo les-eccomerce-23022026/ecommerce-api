@@ -43,4 +43,20 @@ export function registrarRotasLojas(app: IRouter): void {
     adminOnlyMiddleware,
     (requisicao, resposta) => ControladorLojas.obterMinhasLojas(requisicao, resposta),
   );
+
+  // Atualizar loja (partial update) — apenas admin sistema
+  app.patch(
+    '/admin/lojas/:uuid',
+    autenticacaoMiddleware,
+    adminSistemaOnlyMiddleware,
+    (requisicao, resposta) => ControladorLojas.atualizarLoja(requisicao, resposta),
+  );
+
+  // Inativar/reativar loja — apenas admin sistema
+  app.patch(
+    '/admin/lojas/:uuid/inativar',
+    autenticacaoMiddleware,
+    adminSistemaOnlyMiddleware,
+    (requisicao, resposta) => ControladorLojas.inativarLoja(requisicao, resposta),
+  );
 }
