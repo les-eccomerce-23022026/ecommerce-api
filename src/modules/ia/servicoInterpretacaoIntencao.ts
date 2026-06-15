@@ -7,11 +7,42 @@ import { ajustarPrecisaEsclarecer } from './ajustarIntencaoRecomendacao';
 import { MensagemChatDTO } from './IRecomendacao.dto';
 import { Logger } from '@/shared/utils/Logger.util';
 
+const CACHE_INTENCAO_TTL_MS = 10 * 60 * 1000;
+
+interface EntradaCacheIntencao {
+  intencao: IntencaoRecomendacao;
+  expiraEm: number;
+}
+
 /**
  * Extrai intenção estruturada da mensagem via Gemini (JSON).
  */
 export class ServicoInterpretacaoIntencao {
+  private readonly cacheIntencao = new Map<string, EntradaCacheIntencao>();
+
   constructor(private adapterGemini: AdapterLangChainGemini) {}
+
+  private chaveCache(mensagem: string, historico: MensagemChatDTO[] | undefined): string {
+    const historicoResumo = historico?.slice(-2).map(m => `${m.remetente}:${m.conteudo.substring(0, 40)}`).join('|') ?? '';
+    return `${mensagem.substring(0, 100)}||${historicoResumo}`;
+  }
+
+  private obterDoCache(chave: string): IntencaoRecomendacao | null {
+    const entrada = this.cacheIntencao.get(chave);
+    if (!entrada || Date.now() > entrada.expiraEm) {
+      this.cacheIntencao.delete(chave);
+      return null;
+    }
+    return entrada.intencao;
+  }
+
+  private salvarNoCache(chave: string, intencao: IntencaoRecomendacao): void {
+    if (this.cacheIntencao.size > 500) {
+      const primeiraChave = this.cacheIntencao.keys().next().value;
+      if (primeiraChave) this.cacheIntencao.delete(primeiraChave);
+    }
+    this.cacheIntencao.set(chave, { intencao, expiraEm: Date.now() + CACHE_INTENCAO_TTL_MS });
+  }
 
   async interpretar(
     mensagem: string,
@@ -23,16 +54,25 @@ export class ServicoInterpretacaoIntencao {
     // ao Gemini (~3-8s). Princípio: tiered classification — use o classificador
     // mais barato que resolve o caso. Confiança >= 0.75 indica sinal suficiente.
     const heuristica = this.intencaoHeuristica(mensagem);
-    if (heuristica.confianca >= 0.75 && !historico?.length) {
+    if (heuristica.confianca >= 0.75 && (historico?.length ?? 0) <= 1) {
       Logger.debug(
         `[ServicoInterpretacaoIntencao] Fast-path heurístico (confiança=${heuristica.confianca}, tipo=${heuristica.tipo}) — Gemini ignorado`
       );
       return ajustarPrecisaEsclarecer(heuristica);
     }
 
+    const chave = this.chaveCache(mensagem, historico);
+    const cached = this.obterDoCache(chave);
+    if (cached) {
+      Logger.debug(`[ServicoInterpretacaoIntencao] Cache hit — Gemini ignorado`);
+      return cached;
+    }
+
     try {
       const intencao = await this.adapterGemini.interpretarIntencao(mensagem, historico, contexto);
-      return ajustarPrecisaEsclarecer(intencao);
+      const resultado = ajustarPrecisaEsclarecer(intencao);
+      this.salvarNoCache(chave, resultado);
+      return resultado;
     } catch (erro) {
       const msg = erro instanceof Error ? erro.message : String(erro);
       Logger.warn(`[ServicoInterpretacaoIntencao] Fallback heurístico: ${msg}`);
@@ -124,6 +164,25 @@ export class ServicoInterpretacaoIntencao {
     ['tecnologia', 'tecnologia'],
     ['programação', 'programacao'],
     ['programacao', 'programacao'],
+    ['python', 'programacao'],
+    ['javascript', 'programacao'],
+    ['typescript', 'programacao'],
+    ['java', 'programacao'],
+    ['desenvolvimento', 'programacao'],
+    ['software', 'programacao'],
+    ['aventura', 'aventura'],
+    ['classico', 'classico'],
+    ['clássico', 'classico'],
+    ['biografia', 'biografia'],
+    ['autoajuda', 'autoajuda'],
+    ['auto-ajuda', 'autoajuda'],
+    ['negócios', 'negocios'],
+    ['negocios', 'negocios'],
+    ['policial', 'policial'],
+    ['historico', 'historico'],
+    ['histórico', 'historico'],
+    ['filosofia', 'filosofia'],
+    ['psicologia', 'psicologia'],
   ];
 
   private intencaoHeuristica(mensagem: string): IntencaoRecomendacao {

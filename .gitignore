@@ -25,6 +25,9 @@ Thumbs.db
 .idea
 .claude/
 
+# Clinic.js profiling
+.clinic/
+
 # Ferramentas
 *.tsbuildinfo
 tmp

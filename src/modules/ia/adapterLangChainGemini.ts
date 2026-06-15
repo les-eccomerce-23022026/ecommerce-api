@@ -101,6 +101,8 @@ export class AdapterLangChainGemini implements IAdapterEmbedding {
   private modeloAtual: string | null = null;
   private provedorAtual: 'gemini' | 'groq' | null = null;
   private fallbackChat: IAdapterLLMChat | null = null;
+  private readonly cacheEmbedding = new Map<string, { embedding: number[]; expiraEm: number }>();
+  private static readonly CACHE_EMBEDDING_TTL_MS = 10 * 60 * 1000;
 
   constructor() {
     if (!process.env.GEMINI_API_KEY && !process.env.GROQ_API_KEY) {
@@ -196,10 +198,33 @@ export class AdapterLangChainGemini implements IAdapterEmbedding {
     return this.genAI;
   }
 
+  private obterDoCacheEmbedding(texto: string): number[] | null {
+    const entrada = this.cacheEmbedding.get(texto);
+    if (!entrada || Date.now() > entrada.expiraEm) {
+      this.cacheEmbedding.delete(texto);
+      return null;
+    }
+    return entrada.embedding;
+  }
+
+  private salvarNoCacheEmbedding(texto: string, embedding: number[]): void {
+    if (this.cacheEmbedding.size > 1000) {
+      const primeiraChave = this.cacheEmbedding.keys().next().value;
+      if (primeiraChave) this.cacheEmbedding.delete(primeiraChave);
+    }
+    this.cacheEmbedding.set(texto, { embedding, expiraEm: Date.now() + AdapterLangChainGemini.CACHE_EMBEDDING_TTL_MS });
+  }
+
   /**
    * Gera embedding para um texto
    */
   async gerarEmbedding(texto: string): Promise<number[]> {
+    const cached = this.obterDoCacheEmbedding(texto);
+    if (cached) {
+      Logger.debug('[AdapterLangChainGemini] Cache hit embedding');
+      return cached;
+    }
+
     try {
       const embeddings = await this.inicializarEmbeddings();
       const resultado = await embeddings.embedQuery(texto);
@@ -208,6 +233,7 @@ export class AdapterLangChainGemini implements IAdapterEmbedding {
         throw new Error('Embedding inválido retornado pelo Gemini');
       }
 
+      this.salvarNoCacheEmbedding(texto, resultado);
       return resultado;
     } catch (erro) {
       const mensagem = erro instanceof Error ? erro.message : String(erro);
