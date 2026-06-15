@@ -380,4 +380,101 @@ export class RepositorioEstoque {
     const result = await this.db.executar<{ total: string }>(sql, params);
     return Number(result[0].total);
   }
+
+  /**
+   * Incrementa a quantidade reservada e decrementa a disponível
+   * Usado ao criar uma reserva de estoque
+   */
+  async reservarQuantidade(livId: number, quantidade: number, lojId: number): Promise<void> {
+    const sql = `
+      UPDATE estoques
+      SET 
+        etq_quantidade_disponivel = etq_quantidade_disponivel - $1,
+        etq_quantidade_reservada = etq_quantidade_reservada + $1,
+        etq_atualizado_em = CURRENT_TIMESTAMP
+      WHERE liv_id = $2
+        AND loj_id = $3
+        AND etq_ativo = TRUE
+        AND etq_quantidade_disponivel >= $1
+      RETURNING etq_uuid
+    `;
+
+    const result = await this.db.executar<{ etq_uuid: string }>(sql, [quantidade, livId, lojId]);
+
+    if (result.length === 0) {
+      throw new Error('Estoque insuficiente ou não encontrado');
+    }
+  }
+
+  /**
+   * Decrementa a quantidade reservada e incrementa a disponível
+   * Usado ao cancelar ou expirar uma reserva
+   */
+  async liberarQuantidadeReservada(livId: number, quantidade: number, lojId: number): Promise<void> {
+    const sql = `
+      UPDATE estoques
+      SET 
+        etq_quantidade_disponivel = etq_quantidade_disponivel + $1,
+        etq_quantidade_reservada = etq_quantidade_reservada - $1,
+        etq_atualizado_em = CURRENT_TIMESTAMP
+      WHERE liv_id = $2
+        AND loj_id = $3
+        AND etq_ativo = TRUE
+        AND etq_quantidade_reservada >= $1
+      RETURNING etq_uuid
+    `;
+
+    const result = await this.db.executar<{ etq_uuid: string }>(sql, [quantidade, livId, lojId]);
+
+    if (result.length === 0) {
+      throw new Error('Reserva insuficiente ou estoque não encontrado');
+    }
+  }
+
+  /**
+   * Converte quantidade reservada em baixa definitiva (venda confirmada)
+   * Usado ao consumir uma reserva em uma venda
+   */
+  async consumirQuantidadeReservada(livId: number, quantidade: number, lojId: number): Promise<void> {
+    const sql = `
+      UPDATE estoques
+      SET 
+        etq_quantidade_reservada = etq_quantidade_reservada - $1,
+        etq_atualizado_em = CURRENT_TIMESTAMP
+      WHERE liv_id = $2
+        AND loj_id = $3
+        AND etq_ativo = TRUE
+        AND etq_quantidade_reservada >= $1
+      RETURNING etq_uuid
+    `;
+
+    const result = await this.db.executar<{ etq_uuid: string }>(sql, [quantidade, livId, lojId]);
+
+    if (result.length === 0) {
+      throw new Error('Reserva insuficiente ou estoque não encontrado');
+    }
+  }
+
+  /**
+   * Obtém o estoque disponível por liv_id
+   */
+  async obterEstoqueDisponivelPorLivId(livId: number): Promise<number | null> {
+    const lojId = this.obterLojId();
+
+    let sql = `
+      SELECT etq_quantidade_disponivel
+      FROM estoques
+      WHERE liv_id = $1 AND etq_ativo = TRUE
+    `;
+
+    const params: any[] = [livId];
+
+    if (lojId) {
+      sql += ` AND loj_id = $${params.length + 1}`;
+      params.push(lojId);
+    }
+
+    const result = await this.db.executar<{ etq_quantidade_disponivel: string }>(sql, params);
+    return result.length > 0 ? Number(result[0].etq_quantidade_disponivel) : null;
+  }
 }
