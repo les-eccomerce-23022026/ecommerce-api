@@ -81,11 +81,11 @@ export class ServicoCarrinho {
     return this.montarResposta(usuUuid);
   }
 
-  async limpar(usuUuid: string): Promise<ICarrinhoResposta> {
+  async limpar(usuUuid: string, lojIdContexto?: number): Promise<ICarrinhoResposta> {
     const usuId = await this.repo.obterUsuIdPorUuid(usuUuid);
     if (!usuId) throw new Error('Usuário não encontrado');
 
-    const lojId = 1; // TODO: obter do contexto
+    const lojId = lojIdContexto ?? 1;
 
     // Cancelar todas as reservas do usuário
     try {
