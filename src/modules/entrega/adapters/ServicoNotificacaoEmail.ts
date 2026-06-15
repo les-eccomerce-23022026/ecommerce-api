@@ -36,6 +36,20 @@ export class ServicoNotificacaoEmail implements IServicoNotificacao {
     await this.persistirNotificacaoReconfirmacaoEndereco(email, vendaUuid);
   }
 
+  public async enviarNotificacaoExpiracaoReserva(
+    usuarioUuid: string,
+    livroTitulo: string,
+    tempoRestante: number
+  ): Promise<void> {
+    const ctx = this.constructor.name;
+    Logger.info(
+      `[NOTIFICAÇÃO] E-mail simulado (${ctx}) para usuário ${usuarioUuid}: reserva do livro "${livroTitulo}" expirando em ${tempoRestante} minutos`,
+    );
+
+    // Persistir notificação no banco
+    await this.persistirNotificacaoExpiracaoReserva(usuarioUuid, livroTitulo, tempoRestante);
+  }
+
   private async persistirNotificacaoRastreio(
     email: string,
     codigoRastreio: string,
@@ -78,6 +92,23 @@ export class ServicoNotificacaoEmail implements IServicoNotificacao {
       tipo: 'RECONFIRMACAO_ENDERECO',
       titulo: 'Solicitação de Reconfirmação de Endereço',
       mensagem: 'Houve uma falha na entrega. Por favor, confirme seu endereço para redespacho.',
+      lida: false,
+    };
+
+    await this.repositorioNotificacoes.criar(notificacao);
+  }
+
+  private async persistirNotificacaoExpiracaoReserva(
+    usuarioUuid: string,
+    livroTitulo: string,
+    tempoRestante: number
+  ): Promise<void> {
+    const notificacao: INotificacao = {
+      usuarioUuid,
+      vendaUuid: undefined,
+      tipo: 'EXPIRACAO_RESERVA',
+      titulo: 'Reserva do Carrinho Expirando',
+      mensagem: `O livro "${livroTitulo}" em seu carrinho expirará em ${tempoRestante} minutos. Finalize a compra para garantir o estoque.`,
       lida: false,
     };
 
