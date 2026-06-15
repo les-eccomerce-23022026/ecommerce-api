@@ -70,8 +70,8 @@ export class ServicoContextoLoja {
    * Obtém a loja padrão (primeira loja ativa).
    */
   private async obterLojaPadrao(): Promise<{ loj_uuid: string; loj_id: number }> {
-    const lojas = await this.repoLojas.listarLojas();
-    const lojaAtiva = lojas.find(l => l.ativo);
+    const resultado = await this.repoLojas.listarLojas({ ativo: true, limite: 1 });
+    const lojaAtiva = resultado.lojas[0];
     
     if (!lojaAtiva) {
       throw new Error('Nenhuma loja ativa encontrada');
