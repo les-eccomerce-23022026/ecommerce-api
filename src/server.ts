@@ -11,6 +11,11 @@ import { RepositorioEntregaPostgres } from '@/modules/entrega/RepositorioEntrega
 import { ServicoEntrega } from '@/modules/entrega/ServicoEntrega';
 import { ServicoNotificacaoBanco } from '@/modules/entrega/adapters/ServicoNotificacaoBanco';
 import { RepositorioNotificacoes } from '@/modules/entrega/RepositorioNotificacoes';
+import { JobExpiracaoReservas } from '@/modules/estoque/jobs/JobExpiracaoReservas';
+import { RepositorioReservasPostgres } from '@/modules/estoque/repositorioReservas';
+import { RepositorioEstoque } from '@/modules/estoque/repositorioEstoque';
+import { RepositorioLivrosPostgres } from '@/modules/livros/repositorioLivrosPostgres';
+import { RepositorioUsuarios } from '@/modules/usuarios/usuario.repository';
 
 dotenv.config();
 
@@ -94,6 +99,33 @@ try {
 } catch (erro) {
   const msg = erro instanceof Error ? erro.message : String(erro);
   Logger.warn(`[Server] Job de auto-confirmação fora do ar. Causa: ${msg}`);
+}
+
+// Job de expiração de reservas de estoque
+try {
+  const db = ConexaoPostgres.obterInstancia();
+  const repoReservasJob = new RepositorioReservasPostgres(db);
+  const repoEstoqueJob = new RepositorioEstoque(db);
+  const repoNotificacoesJob = new RepositorioNotificacoes(db);
+  const servicoNotificacaoJob = new ServicoNotificacaoBanco(repoNotificacoesJob);
+  const repoLivrosJob = new RepositorioLivrosPostgres(db);
+  const repoUsuariosJob = new RepositorioUsuarios(db);
+
+  const jobExpiracaoReservas = new JobExpiracaoReservas(
+    repoReservasJob,
+    repoEstoqueJob,
+    servicoNotificacaoJob,
+    repoLivrosJob,
+    repoUsuariosJob,
+    10, // 10 minutos
+  );
+  jobExpiracaoReservas.iniciar();
+
+  process.on('SIGTERM', () => jobExpiracaoReservas.parar());
+  process.on('SIGINT', () => jobExpiracaoReservas.parar());
+} catch (erro) {
+  const msg = erro instanceof Error ? erro.message : String(erro);
+  Logger.warn(`[Server] Job de expiração de reservas fora do ar. Causa: ${msg}`);
 }
 
 // Parar simulador ao encerrar o servidor (temporariamente desabilitado)
