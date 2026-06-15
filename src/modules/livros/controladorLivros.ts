@@ -1,6 +1,8 @@
 import { Request, Response } from 'express';
 import type { OrdenacaoCatalogo } from '@/modules/livros/ICatalogoLivros.dto';
 import { ServicoLivros } from '@/modules/livros/servicoLivros';
+import { AprovacaoPrecoNecessariaError } from '@/modules/livros/servicoLivros';
+import type { IAprovacaoPrecoLivro } from '@/modules/livros/domain/IAprovacaoPrecoLivro';
 import { Logger } from '@/shared/utils/Logger.util';
 import { usuarioTemPapelAdmin } from '@/shared/middlewares/autorizacao.middleware';
 import { RespostaPadrao } from '@/shared/errors/Iresposta-padrao';
@@ -85,7 +87,11 @@ function validarDadosLivro(dados: any, isCriacao: boolean = true): { valido: boo
   if (ano !== undefined && (typeof ano !== 'number' || ano < 1900 || ano > 2100)) {
     return { valido: false, erro: 'Ano deve estar entre 1900 e 2100.' };
   }
-  
+
+  if (isCriacao && !dados.categoriaNome && !dados.categoria) {
+    return { valido: false, erro: 'Categoria é obrigatória.' };
+  }
+
   return { valido: true };
 }
 
@@ -261,6 +267,14 @@ export class ControladorLivros {
       const livroAtualizado = await this.servico.atualizarLivroParcial(uuid, dados);
       RespostaPadrao.enviarSucesso(res, 200, livroAtualizado);
     } catch (err: unknown) {
+      if (err instanceof AprovacaoPrecoNecessariaError) {
+        res.status(202).json({
+          sucesso: false,
+          aprovacaoNecessaria: true,
+          mensagem: err.message,
+        });
+        return;
+      }
       const msg = RespostaPadrao.obterMensagemErro(err, 'Erro ao atualizar livro');
       Logger.error(`[ControladorLivros.atualizarLivro] Erro: ${msg}`, err instanceof Error ? err.stack : String(err));
       RespostaPadrao.enviarErro(res, 500, msg);
@@ -317,6 +331,66 @@ export class ControladorLivros {
     } catch (err: unknown) {
       const msg = RespostaPadrao.obterMensagemErro(err, 'Erro ao obter livro');
       Logger.error(`[ControladorLivros.detalhesAdmin] Erro: ${msg}`, err instanceof Error ? err.stack : String(err));
+      RespostaPadrao.enviarErro(res, 500, msg);
+    }
+  };
+
+  inativacaoAutomatica = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const relatorio = await this.servico.executarInativacaoAutomatica();
+      RespostaPadrao.enviarSucesso(res, 200, relatorio);
+    } catch (err: unknown) {
+      const msg = RespostaPadrao.obterMensagemErro(err, 'Erro ao executar inativação automática');
+      Logger.error(`[ControladorLivros.inativacaoAutomatica] ${msg}`);
+      RespostaPadrao.enviarErro(res, 500, msg);
+    }
+  };
+
+  listarAprovacoesPendentes = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const lojaUuid = typeof req.query.lojaUuid === 'string' ? req.query.lojaUuid : undefined;
+      const lista = await this.servico.listarAprovacoesPendentes(lojaUuid);
+      RespostaPadrao.enviarSucesso(res, 200, lista);
+    } catch (err: unknown) {
+      const msg = RespostaPadrao.obterMensagemErro(err, 'Erro ao listar aprovações pendentes');
+      RespostaPadrao.enviarErro(res, 500, msg);
+    }
+  };
+
+  aprovarPreco = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { uuid } = req.params;
+      const aprovadorUuid = req.usuario?.uuid;
+      if (!aprovadorUuid) {
+        RespostaPadrao.enviarErro(res, 401, 'Usuário não autenticado.');
+        return;
+      }
+      const { observacao } = req.body;
+      await this.servico.aprovarPreco(uuid, aprovadorUuid, observacao);
+      RespostaPadrao.enviarSucesso(res, 200, { mensagem: 'Preço aprovado com sucesso.' });
+    } catch (err: unknown) {
+      const msg = RespostaPadrao.obterMensagemErro(err, 'Erro ao aprovar preço');
+      RespostaPadrao.enviarErro(res, 500, msg);
+    }
+  };
+
+  rejeitarPreco = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { uuid } = req.params;
+      const aprovadorUuid = req.usuario?.uuid;
+      if (!aprovadorUuid) {
+        RespostaPadrao.enviarErro(res, 401, 'Usuário não autenticado.');
+        return;
+      }
+      const { motivo } = req.body;
+      if (!motivo) {
+        RespostaPadrao.enviarErro(res, 400, 'Motivo da rejeição é obrigatório.');
+        return;
+      }
+      await this.servico.rejeitarPreco(uuid, aprovadorUuid, motivo);
+      RespostaPadrao.enviarSucesso(res, 200, { mensagem: 'Preço rejeitado.' });
+    } catch (err: unknown) {
+      const msg = RespostaPadrao.obterMensagemErro(err, 'Erro ao rejeitar preço');
       RespostaPadrao.enviarErro(res, 500, msg);
     }
   };

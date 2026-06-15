@@ -20,4 +20,5 @@ export interface ILivroCatalogoDto {
   anoPublicacao?: number;
   idioma?: string;
   tags?: string[];
+  statusMercado?: 'ATIVO' | 'INATIVO_MANUAL' | 'FORA_DE_MERCADO';
 }

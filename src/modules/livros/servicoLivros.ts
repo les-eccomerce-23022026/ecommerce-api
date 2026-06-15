@@ -6,12 +6,25 @@ import { CacheDisco } from '@/shared/infrastructure/cache/CacheDisco';
 import { GeradorChaveCache } from '@/shared/infrastructure/cache/geradorChaveCache';
 import { ContextoRequisicao } from '@/shared/infrastructure/contexto/ContextoRequisicao';
 import { MENSAGENS_ERRO } from '@/shared/constants/mensagens-erro.constants';
+import { ServicoInativacaoAutomaticaLivros } from '@/modules/livros/application/ServicoInativacaoAutomaticaLivros';
+import { ServicoAprovacaoPreco } from '@/modules/livros/application/ServicoAprovacaoPreco';
+import type { IAprovacaoPrecoLivro } from '@/modules/livros/domain/IAprovacaoPrecoLivro';
+import type { IRelatorioInativacaoAutomatica } from '@/modules/livros/domain/IRelatorioInativacaoAutomatica';
+
+export class AprovacaoPrecoNecessariaError extends Error {
+  constructor(mensagem: string) {
+    super(mensagem);
+    this.name = 'AprovacaoPrecoNecessariaError';
+  }
+}
 
 export class ServicoLivros {
   constructor(
     private readonly repo: RepositorioLivrosPostgres,
     private readonly bulkInsert: RepositorioLivrosBulkInsert,
     private readonly cache: CacheDisco = new CacheDisco(),
+    private readonly servicoInativacao?: ServicoInativacaoAutomaticaLivros,
+    private readonly servicoAprovacao?: ServicoAprovacaoPreco,
   ) {}
 
   async listarCatalogo(opcoes: {
@@ -114,6 +127,10 @@ export class ServicoLivros {
 
     const mapaCategorias = await this.bulkInsert.buscarIdsPorNomes('categorias', 'cat_nome', 'cat_id', [dados.categoriaNome]);
     const categoriaId = mapaCategorias.get(dados.categoriaNome);
+
+    if (!categoriaId) {
+      throw new Error(`Categoria "${dados.categoriaNome}" não encontrada. Categoria é obrigatória para cadastro de livro.`);
+    }
 
     const lojaUuid = ContextoRequisicao.obterLojUuid();
 
@@ -344,6 +361,22 @@ export class ServicoLivros {
       throw new Error('Ano deve estar entre 1900 e 2100.');
     }
 
+    if (dados.precoVenda !== undefined && this.servicoAprovacao) {
+      const grupo = await this.repo.obterGrupoPrecificacaoPorLivroUuid(uuid);
+      const custoAtual = await this.repo.obterValorCustoAtualPorLivroUuid(uuid);
+      if (grupo && custoAtual !== null) {
+        const custoEfetivo = dados.valorCusto ?? custoAtual;
+        const margemCalculada = custoEfetivo > 0
+          ? ((dados.precoVenda - custoEfetivo) / custoEfetivo) * 100
+          : 0;
+        if (margemCalculada < grupo.margemLucroPercentual) {
+          throw new AprovacaoPrecoNecessariaError(
+            `Preço abaixo da margem mínima do grupo (${grupo.margemLucroPercentual}%). Solicite aprovação gerencial.`,
+          );
+        }
+      }
+    }
+
     const resultado = await this.repo.atualizarLivroParcial(uuid, dados);
 
     // Invalidar cache do catálogo
@@ -354,5 +387,37 @@ export class ServicoLivros {
     }
 
     return resultado;
+  }
+
+  async executarInativacaoAutomatica(): Promise<IRelatorioInativacaoAutomatica> {
+    if (!this.servicoInativacao) {
+      throw new Error('Serviço de inativação automática não configurado.');
+    }
+    const relatorio = await this.servicoInativacao.executarVerificacaoAutomatica();
+    try {
+      await this.cache.invalidar('catalogo:*');
+    } catch (erro) {
+      console.error('[ServicoLivros.executarInativacaoAutomatica] Erro ao invalidar cache:', erro);
+    }
+    return relatorio;
+  }
+
+  async listarAprovacoesPendentes(lojaUuid?: string): Promise<IAprovacaoPrecoLivro[]> {
+    if (!this.servicoAprovacao) return [];
+    return this.servicoAprovacao.listarPendentes(lojaUuid);
+  }
+
+  async aprovarPreco(uuid: string, aprovadorUuid: string, observacao?: string): Promise<void> {
+    if (!this.servicoAprovacao) {
+      throw new Error('Serviço de aprovação não configurado.');
+    }
+    await this.servicoAprovacao.aprovarSolicitacao(uuid, aprovadorUuid, observacao);
+  }
+
+  async rejeitarPreco(uuid: string, aprovadorUuid: string, motivo: string): Promise<void> {
+    if (!this.servicoAprovacao) {
+      throw new Error('Serviço de aprovação não configurado.');
+    }
+    await this.servicoAprovacao.rejeitarSolicitacao(uuid, aprovadorUuid, motivo);
   }
 }

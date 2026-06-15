@@ -395,7 +395,7 @@ export class RepositorioLivrosPostgres {
       valoresEstoque.push(dados.precoVenda);
     }
     if (dados.valorCusto !== undefined) {
-      camposEstoque.push(`etq_valor_custo = $${contadorEstoque++}`);
+      camposEstoque.push(`etq_valor_custo_atual = $${contadorEstoque++}`);
       valoresEstoque.push(dados.valorCusto);
     }
 
@@ -429,12 +429,23 @@ export class RepositorioLivrosPostgres {
       }
     }
 
-    // Retornar livro atualizado
-    const livroAtualizado = await this.obterPorUuid(livUuid);
-    if (!livroAtualizado) {
+    // Retornar livro atualizado sem filtro de loja (contexto interno de escrita)
+    const sqlRetorno = `
+      SELECT
+        l.liv_uuid, l.liv_titulo, l.liv_isbn, l.liv_sinopse, l.liv_imagem_url,
+        a.aut_nome, e.etq_preco_venda, e.etq_quantidade_disponivel, l.liv_ativo
+      FROM livraria_comercial.livros l
+      INNER JOIN livraria_comercial.autores a ON l.aut_id = a.aut_id
+      INNER JOIN livraria_comercial.estoques e ON e.liv_id = l.liv_id AND e.etq_ativo = TRUE
+      WHERE l.liv_uuid = $1
+      ORDER BY e.loj_id DESC
+      LIMIT 1
+    `;
+    const rows = await this.db.executar<RowLivro>(sqlRetorno, [livUuid] as DbParametro[]);
+    if (!rows.length) {
       throw new Error('Erro ao carregar livro atualizado.');
     }
-    return livroAtualizado;
+    return mapRow(rows[0]);
   }
 
   async inativarLivro(uuid: string): Promise<void> {
@@ -453,5 +464,67 @@ export class RepositorioLivrosPostgres {
       WHERE liv_uuid = $1
     `;
     await this.db.executar(sql, [uuid]);
+  }
+
+  async listarLivrosSemEstoqueAbaixoValorMinimo(
+    valorMinimo: number,
+  ): Promise<Array<{ uuid: string; titulo: string; preco: number }>> {
+    const sql = `
+      SELECT l.liv_uuid AS uuid, l.liv_titulo AS titulo, e.etq_preco_venda AS preco
+      FROM livraria_comercial.livros l
+      INNER JOIN livraria_comercial.estoques e ON e.liv_id = l.liv_id AND e.etq_ativo = TRUE
+      WHERE l.liv_ativo = TRUE
+        AND l.liv_status_mercado = 'ATIVO'
+        AND e.etq_quantidade_disponivel = 0
+        AND e.etq_preco_venda < $1
+    `;
+    const rows = await this.db.executar<{ uuid: string; titulo: string; preco: number }>(sql, [valorMinimo] as DbParametro[]);
+    return rows.map((r) => ({ uuid: r.uuid, titulo: r.titulo, preco: Number(r.preco) }));
+  }
+
+  async marcarForaDeMercado(uuids: string[]): Promise<number> {
+    if (uuids.length === 0) return 0;
+    const sql = `
+      UPDATE livraria_comercial.livros
+      SET liv_ativo = FALSE,
+          liv_status_mercado = 'FORA_DE_MERCADO',
+          liv_atualizado_em = CURRENT_TIMESTAMP
+      WHERE liv_uuid = ANY($1::uuid[])
+    `;
+    await this.db.executar(sql, [uuids] as DbParametro[]);
+    return uuids.length;
+  }
+
+  async obterGrupoPrecificacaoPorLivroUuid(
+    livUuid: string,
+  ): Promise<{ margemLucroPercentual: number; descricao: string } | null> {
+    const sql = `
+      SELECT gpr.gpr_margem_lucro_percentual AS margem, gpr.gpr_descricao AS descricao
+      FROM livraria_comercial.livros l
+      INNER JOIN livraria_comercial.grupos_precificacao gpr ON l.gpr_id = gpr.gpr_id
+      WHERE l.liv_uuid = $1
+    `;
+    const rows = await this.db.executar<{ margem: number; descricao: string }>(sql, [livUuid] as DbParametro[]);
+    if (!rows.length) return null;
+    return { margemLucroPercentual: Number(rows[0].margem), descricao: rows[0].descricao };
+  }
+
+  async obterValorCustoAtualPorLivroUuid(livUuid: string): Promise<number | null> {
+    const lojaUuid = this.obterLojaUuid();
+    let sql = `
+      SELECT e.etq_valor_custo_atual
+      FROM livraria_comercial.livros l
+      INNER JOIN livraria_comercial.estoques e ON e.liv_id = l.liv_id AND e.etq_ativo = TRUE
+      INNER JOIN livraria_gestao.lojas lj ON e.loj_id = lj.loj_id
+      WHERE l.liv_uuid = $1
+    `;
+    const params: DbParametro[] = [livUuid];
+    if (lojaUuid) {
+      sql += ` AND lj.loj_uuid = $2`;
+      params.push(lojaUuid);
+    }
+    sql += ` LIMIT 1`;
+    const rows = await this.db.executar<{ etq_valor_custo_atual: number }>(sql, params);
+    return rows.length ? Number(rows[0].etq_valor_custo_atual) : null;
   }
 }
