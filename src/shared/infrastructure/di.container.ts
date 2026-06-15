@@ -63,7 +63,7 @@ class ContainerDI {
     ContainerDI.servicoLojas,
   );
 
-  public static readonly servicoConsultaClientes = new ServicoConsultaClientes(ContainerDI.repoUsuarios);
+  public static readonly servicoConsultaClientes = new ServicoConsultaClientes(ContainerDI.repoUsuarios, ContainerDI.db);
 
   public static readonly servicoCartoes = new ServicoCartoes(ContainerDI.repoCartoes);
 

@@ -293,7 +293,7 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
   }
 
   public async buscarClientesComFiltros(filtros: IFiltrosConsultaClientes): Promise<IUsuario[]> {
-    const { nome, cpf, email, idPapel, offset, limite } = filtros;
+    const { nome, cpf, email, ativo, idPapel, offset, limite } = filtros;
     const papelBusca = idPapel ?? PAPEL_CLIENTE.id;
     const loj_id = this.obterLojId();
     const valores: DbParametro[] = [papelBusca];
@@ -309,10 +309,16 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
       }
     });
 
+    if (ativo !== undefined) {
+      query += ` AND u.usu_ativo = $${contador}`;
+      contador += 1;
+      valores.push(ativo);
+    }
+
     // Se multi-tenancy estiver habilitado, filtrar por loj_id via tabela clientes
     if (loj_id) {
       query += ` AND EXISTS (
-        SELECT 1 FROM livraria_gestao.clientes c 
+        SELECT 1 FROM livraria_gestao.clientes c
         WHERE c.usu_id = u.usu_id AND c.loj_id = $${contador}
       )`;
       contador += 1;
@@ -343,7 +349,7 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
   }
 
   public async contarClientesComFiltros(filtros: Omit<IFiltrosConsultaClientes, 'offset' | 'limite'>): Promise<number> {
-    const { nome, cpf, email } = filtros;
+    const { nome, cpf, email, ativo } = filtros;
     const loj_id = this.obterLojId();
     const valores: DbParametro[] = [PAPEL_CLIENTE.id];
     let query = 'SELECT COUNT(*) as total FROM livraria_gestao.usuarios u WHERE pap_id = $1';
@@ -358,10 +364,16 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
       }
     });
 
+    if (ativo !== undefined) {
+      query += ` AND u.usu_ativo = $${contador}`;
+      contador += 1;
+      valores.push(ativo);
+    }
+
     // Se multi-tenancy estiver habilitado, filtrar por loj_id via tabela clientes
     if (loj_id) {
       query += ` AND EXISTS (
-        SELECT 1 FROM livraria_gestao.clientes c 
+        SELECT 1 FROM livraria_gestao.clientes c
         WHERE c.usu_id = u.usu_id AND c.loj_id = $${contador}
       )`;
       contador += 1;
