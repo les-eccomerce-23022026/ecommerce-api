@@ -226,6 +226,87 @@ As seeds são responsáveis por criar dados iniciais para desenvolvimento e test
 
 ---
 
+### 9. 009_seed_cidades_bairros.sql
+**Descrição:** Popula cidades (capitais) e bairros principais do Brasil
+**Dependências:** `001_seeds_tipos_referencia.sql` (estados)
+**Entidades criadas:**
+- **26 Capitais + DF:** Todas as capitais estaduais e Distrito Federal
+- **Bairros principais:** 5-10 bairros por capital (Centro, bairros comerciais e residenciais)
+
+**Cidades incluídas:**
+- São Paulo, Rio de Janeiro, Belo Horizonte, Porto Alegre, Curitiba, Florianópolis
+- Salvador, Brasília, Recife, Fortaleza, Goiânia, Manaus, Vitória
+- Cuiabá, Belém, Campo Grande, e demais capitais
+
+**Observações:**
+- ✅ Idempotente (ON CONFLICT DO NOTHING)
+- ✅ Nomes normalizados para busca case-insensitive
+- ✅ Bairros realistas de cada capital
+
+---
+
+### 10. 010_seed_motivos_troca_devolucao.sql
+**Descrição:** Popula motivos de troca e devolução de produtos
+**Dependências:** `012_criar_tabelas_motivos_troca_devolucao.sql`
+**Entidades criadas:**
+- **Motivos de Troca (8):** Defeito, tamanho errado, cor errada, produto diferente, não gostei, danificado no transporte, incompleto, erro no pedido
+- **Motivos de Devolução (6):** Defeito, arrependimento, produto diferente, danificado no transporte, incompleto, erro no pedido
+
+**Observações:**
+- ✅ Idempotente (ON CONFLICT DO NOTHING)
+- ✅ Todos os motivos marcados como ativos por padrão
+
+---
+
+### 11. 011_seed_transportadoras.sql
+**Descrição:** Popula transportadoras disponíveis para entrega
+**Dependências:** `013_criar_tabela_transportadoras.sql`
+**Entidades criadas:**
+- **Transportadoras (7):** Correios, Sedex, Loggi, JadLog, Braspress, Total Express, Direct
+
+**Observações:**
+- ✅ Idempotente (ON CONFLICT DO NOTHING)
+- ✅ Códigos internos para integração (COR, SED, LOG, JAD, BRA, TOT, DIR)
+
+---
+
+### 12. 012_seed_status_rastreamento.sql
+**Descrição:** Popula status de rastreamento de entregas
+**Dependências:** `014_criar_tabela_status_rastreamento.sql`
+**Entidades criadas:**
+- **Status de Rastreamento (7):** Postado, Em trânsito, Em rota de entrega, Entregue, Falha na entrega, Devolvido, Cancelado
+
+**Observações:**
+- ✅ Idempotente (ON CONFLICT DO NOTHING)
+- ✅ Ordenados por timeline (campo sra_ordem)
+- ✅ Segue fluxo real de entregas
+
+---
+
+### 13. 013_seed_tipos_cupom.sql
+**Descrição:** Popula tipos de cupom disponíveis no sistema
+**Dependências:** `015_criar_tabela_tipos_cupom.sql`
+**Entidades criadas:**
+- **Tipos de Cupom (3):** Percentual, Valor fixo, Frete grátis
+
+**Observações:**
+- ✅ Idempotente (ON CONFLICT DO NOTHING)
+- ✅ Códigos: PERCENTUAL, FIXO, FRETE_GRATIS
+
+---
+
+### 14. 014_seed_status_cupom.sql
+**Descrição:** Popula status possíveis para cupons de desconto
+**Dependências:** `016_criar_tabela_status_cupom.sql`
+**Entidades criadas:**
+- **Status de Cupom (4):** Ativo, Expirado, Usado, Cancelado
+
+**Observações:**
+- ✅ Idempotente (ON CONFLICT DO NOTHING)
+- ✅ Códigos: ATIVO, EXPIRADO, USADO, CANCELADO
+
+---
+
 ### 8. 008_seed_dados_teste_bdd.sql.old
 **Descrição:** ⚠️ **ARQUIVO ANTIGO** - Dados de teste BDD
 **Status:** Descontinuado (sufixo .old)

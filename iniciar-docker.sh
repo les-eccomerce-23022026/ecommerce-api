@@ -17,6 +17,14 @@ echo "INICIANDO AMBIENTE DE DESENVOLVIMENTO"
 echo "=========================================="
 echo ""
 
+# Liberar porta externa se já estiver em uso
+if lsof -Pi :"$PORTA_EXTERNA" -sTCP:LISTEN -t >/dev/null 2>&1; then
+  echo "Porta $PORTA_EXTERNA está ocupada. Liberando..."
+  fuser -k "${PORTA_EXTERNA}/tcp" 2>/dev/null || true
+  sleep 2
+  echo "Porta $PORTA_EXTERNA liberada."
+fi
+
 # Subir docker compose
 echo "Subindo containers Docker..."
 docker compose up -d

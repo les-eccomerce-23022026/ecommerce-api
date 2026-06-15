@@ -32,6 +32,37 @@ docker compose -f docker-compose.test.yml up -d
 
 Configure no `.env` os hosts/portas de teste (`POSTGRES_HOST_TEST`, etc.) conforme [`.env.example`](.env.example).
 
+### Instalação em Novo Ambiente
+
+Para configurar o sistema completo em um novo ambiente (desenvolvimento ou teste), use o script de implantação consolidado:
+
+```bash
+# Ambiente de desenvolvimento
+./scripts/implantar-sistema-completo.sh --env dev
+
+# Ambiente de testes
+./scripts/implantar-sistema-completo.sh --env test
+```
+
+**O que o script faz:**
+1. **FASE 1 - DDLs:** Aplica todos os scripts de estrutura de tabelas em ordem correta
+2. **FASE 2 - DMLs:** Executa todos os seeds de dados iniciais (cidades, bairros, motivos, transportadoras, etc.)
+3. **FASE 3 - Migrations:** Aplica migrations para alterações em banco existente
+4. **FASE 4 - Verificação:** Valida integridade das tabelas críticas
+
+**Scripts incluídos:**
+- DDLs (012-016): Tabelas de motivos de troca/devolução, transportadoras, status de rastreamento, tipos e status de cupom
+- DMLs (009-014): Seeds de cidades/bairros (capitais + bairros principais), motivos de troca/devolução, transportadoras, status de rastreamento, tipos e status de cupom
+
+**Logs de execução:**
+- Salvo em `logs/implantar-sistema-completo-[env]-[timestamp].log`
+- Inclui validação de sucesso/erro em cada fase
+
+**Credenciais após instalação:**
+- Cliente: `clientetest@email.com` / `123456`
+- Admin: `admintest@email.com` / `123456`
+- DB: `ecm_user` / `ecm_senha`
+
 ### Migração de cotação de frete
 
 Execute no Postgres de dev/teste o script [`sql/migrations/020_cotacao_frete_transportadora.sql`](sql/migrations/020_cotacao_frete_transportadora.sql) (tabelas `cotacao_frete`, `cotacao_frete_simulada`, coluna `vendas.cfr_id`).
@@ -170,9 +201,12 @@ Usuários criados pelos seeds em `sql/modelagem-dados/dml/` e migrations. Após 
 | **Admin Teste** | `admintest@email.com` | `123456` | `admin` | LOJA (loja atribuída) | `005_seed_usuarios_teste.sql` |
 | **Admin Livraria** | `admin_loja@livraria.com.br` | `123456` | `admin` | LOJA (livraria-padrao) | `095_seed_desenvolvimento_minimo_corrigido.sql` |
 
-### Administrador de Sistema (0 cadastrados)
+### Administradores de Sistema (2 cadastrados)
 
-Atualmente não há nenhum usuário com papel `admin_sistema` no banco de desenvolvimento. Para criar um, execute a migration `083_seed_admin_teste_fixo.sql` se necessário.
+| Nome | E-mail | Senha | Papel | Escopo | Origem |
+|------|--------|-------|-------|--------|--------|
+| **Administrador do Sistema** | `admin.sistema@livraria.com.br` | `Admin@123` | `admin_sistema` | SISTEMA (acesso global) | Seed existente no banco |
+| **Admin Livraria** | `admin@livraria.com.br` | (senha não definida) | `admin_sistema` | SISTEMA (acesso global) | Seed existente no banco |
 
 ### Seed de Vendas Históricas (Análise de Vendas)
 
@@ -211,6 +245,11 @@ curl -s -X POST http://localhost:3002/api/auth/login \
 curl -s -X POST http://localhost:3002/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email":"admintest@email.com","senha":"123456"}'
+
+# Administrador de Sistema
+curl -s -X POST http://localhost:3002/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin.sistema@livraria.com.br","senha":"Admin@123"}'
 ```
 
 Sem Docker, troque `3002` por `3000` (ou o valor de `PORTA_HTTP` no `.env`).

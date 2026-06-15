@@ -1,4 +1,4 @@
--- Gerado em: 2026-06-12 10:26:33
+-- Gerado em: 2026-06-14 16:56:20
 -- Fonte: ecm_postgres / ecm_livraria
 -- Comando: npm run db:snapshot
 
@@ -308,6 +308,56 @@ $$;
 
 
 SET default_table_access_method = heap;
+
+--
+-- Name: aprovacoes_preco_livro; Type: TABLE; Schema: livraria_comercial; Owner: -
+--
+
+CREATE TABLE livraria_comercial.aprovacoes_preco_livro (
+    apr_id bigint NOT NULL,
+    apr_uuid uuid DEFAULT gen_random_uuid() NOT NULL,
+    liv_id bigint NOT NULL,
+    loj_id integer NOT NULL,
+    usu_id_solicitante bigint NOT NULL,
+    usu_id_aprovador bigint,
+    apr_preco_atual numeric(10,2) NOT NULL,
+    apr_preco_solicitado numeric(10,2) NOT NULL,
+    apr_margem_grupo numeric(5,2) NOT NULL,
+    apr_margem_calculada numeric(5,2) NOT NULL,
+    apr_status character varying(20) DEFAULT 'PENDENTE'::character varying NOT NULL,
+    apr_justificativa text,
+    apr_observacao_aprovador text,
+    apr_criado_em timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    apr_atualizado_em timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT aprovacoes_preco_livro_apr_status_check CHECK (((apr_status)::text = ANY ((ARRAY['PENDENTE'::character varying, 'APROVADO'::character varying, 'REJEITADO'::character varying, 'CANCELADO'::character varying])::text[])))
+);
+
+
+--
+-- Name: TABLE aprovacoes_preco_livro; Type: COMMENT; Schema: livraria_comercial; Owner: -
+--
+
+COMMENT ON TABLE livraria_comercial.aprovacoes_preco_livro IS 'Fila de aprovação para alterações de preço abaixo da margem mínima do grupo (RN0014).';
+
+
+--
+-- Name: aprovacoes_preco_livro_apr_id_seq; Type: SEQUENCE; Schema: livraria_comercial; Owner: -
+--
+
+CREATE SEQUENCE livraria_comercial.aprovacoes_preco_livro_apr_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: aprovacoes_preco_livro_apr_id_seq; Type: SEQUENCE OWNED BY; Schema: livraria_comercial; Owner: -
+--
+
+ALTER SEQUENCE livraria_comercial.aprovacoes_preco_livro_apr_id_seq OWNED BY livraria_comercial.aprovacoes_preco_livro.apr_id;
+
 
 --
 -- Name: autores; Type: TABLE; Schema: livraria_comercial; Owner: -
@@ -1740,12 +1790,14 @@ CREATE TABLE livraria_comercial.livros (
     liv_imagem_url character varying(500),
     liv_criado_em timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
     liv_atualizado_em timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    liv_status_mercado character varying(30) DEFAULT 'ATIVO'::character varying NOT NULL,
     CONSTRAINT livros_liv_altura_check CHECK ((liv_altura > (0)::numeric)),
     CONSTRAINT livros_liv_ano_check CHECK (((liv_ano >= 1900) AND ((liv_ano)::numeric <= (EXTRACT(year FROM CURRENT_DATE) + (1)::numeric)))),
     CONSTRAINT livros_liv_largura_check CHECK ((liv_largura > (0)::numeric)),
     CONSTRAINT livros_liv_numero_paginas_check CHECK ((liv_numero_paginas > 0)),
     CONSTRAINT livros_liv_peso_check CHECK ((liv_peso > (0)::numeric)),
-    CONSTRAINT livros_liv_profundidade_check CHECK ((liv_profundidade > (0)::numeric))
+    CONSTRAINT livros_liv_profundidade_check CHECK ((liv_profundidade > (0)::numeric)),
+    CONSTRAINT livros_liv_status_mercado_check CHECK (((liv_status_mercado)::text = ANY ((ARRAY['ATIVO'::character varying, 'INATIVO_MANUAL'::character varying, 'FORA_DE_MERCADO'::character varying])::text[])))
 );
 
 
@@ -2227,6 +2279,156 @@ CREATE SEQUENCE livraria_comercial.papeis_pap_id_seq
 --
 
 ALTER SEQUENCE livraria_comercial.papeis_pap_id_seq OWNED BY livraria_comercial.papeis.pap_id;
+
+
+--
+-- Name: parametros_inativacao_livro; Type: TABLE; Schema: livraria_comercial; Owner: -
+--
+
+CREATE TABLE livraria_comercial.parametros_inativacao_livro (
+    pai_id integer NOT NULL,
+    pai_uuid uuid DEFAULT gen_random_uuid() NOT NULL,
+    pai_valor_minimo_catalogo numeric(10,2) DEFAULT 10.00 NOT NULL,
+    pai_ativo boolean DEFAULT true NOT NULL,
+    pai_criado_em timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    pai_atualizado_em timestamp with time zone DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT parametros_inativacao_livro_pai_valor_minimo_catalogo_check CHECK ((pai_valor_minimo_catalogo >= (0)::numeric))
+);
+
+
+--
+-- Name: TABLE parametros_inativacao_livro; Type: COMMENT; Schema: livraria_comercial; Owner: -
+--
+
+COMMENT ON TABLE livraria_comercial.parametros_inativacao_livro IS 'Parâmetros configuráveis para inativação automática de livros (RF0013/RN0016).';
+
+
+--
+-- Name: COLUMN parametros_inativacao_livro.pai_valor_minimo_catalogo; Type: COMMENT; Schema: livraria_comercial; Owner: -
+--
+
+COMMENT ON COLUMN livraria_comercial.parametros_inativacao_livro.pai_valor_minimo_catalogo IS 'Valor mínimo de preço de venda abaixo do qual livro sem estoque é marcado FORA_DE_MERCADO.';
+
+
+--
+-- Name: parametros_inativacao_livro_pai_id_seq; Type: SEQUENCE; Schema: livraria_comercial; Owner: -
+--
+
+CREATE SEQUENCE livraria_comercial.parametros_inativacao_livro_pai_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: parametros_inativacao_livro_pai_id_seq; Type: SEQUENCE OWNED BY; Schema: livraria_comercial; Owner: -
+--
+
+ALTER SEQUENCE livraria_comercial.parametros_inativacao_livro_pai_id_seq OWNED BY livraria_comercial.parametros_inativacao_livro.pai_id;
+
+
+--
+-- Name: reservas_estoque; Type: TABLE; Schema: livraria_comercial; Owner: -
+--
+
+CREATE TABLE livraria_comercial.reservas_estoque (
+    rse_id bigint NOT NULL,
+    rse_uuid uuid DEFAULT gen_random_uuid() NOT NULL,
+    usu_id bigint NOT NULL,
+    liv_id bigint NOT NULL,
+    rse_quantidade integer NOT NULL,
+    rse_criado_em timestamp with time zone DEFAULT now() NOT NULL,
+    rse_expira_em timestamp with time zone NOT NULL,
+    rse_status character varying(20) DEFAULT 'ATIVA'::character varying NOT NULL,
+    loj_id bigint NOT NULL,
+    CONSTRAINT reservas_estoque_rse_quantidade_check CHECK ((rse_quantidade > 0)),
+    CONSTRAINT reservas_estoque_rse_status_check CHECK (((rse_status)::text = ANY ((ARRAY['ATIVA'::character varying, 'EXPIRADA'::character varying, 'CONSUMIDA'::character varying, 'CANCELADA'::character varying])::text[])))
+);
+
+
+--
+-- Name: TABLE reservas_estoque; Type: COMMENT; Schema: livraria_comercial; Owner: -
+--
+
+COMMENT ON TABLE livraria_comercial.reservas_estoque IS 'Tabela de reservas temporárias de estoque para itens no carrinho de compras';
+
+
+--
+-- Name: COLUMN reservas_estoque.rse_uuid; Type: COMMENT; Schema: livraria_comercial; Owner: -
+--
+
+COMMENT ON COLUMN livraria_comercial.reservas_estoque.rse_uuid IS 'UUID público da reserva';
+
+
+--
+-- Name: COLUMN reservas_estoque.usu_id; Type: COMMENT; Schema: livraria_comercial; Owner: -
+--
+
+COMMENT ON COLUMN livraria_comercial.reservas_estoque.usu_id IS 'ID do usuário que fez a reserva';
+
+
+--
+-- Name: COLUMN reservas_estoque.liv_id; Type: COMMENT; Schema: livraria_comercial; Owner: -
+--
+
+COMMENT ON COLUMN livraria_comercial.reservas_estoque.liv_id IS 'ID do livro reservado';
+
+
+--
+-- Name: COLUMN reservas_estoque.rse_quantidade; Type: COMMENT; Schema: livraria_comercial; Owner: -
+--
+
+COMMENT ON COLUMN livraria_comercial.reservas_estoque.rse_quantidade IS 'Quantidade de itens reservados';
+
+
+--
+-- Name: COLUMN reservas_estoque.rse_criado_em; Type: COMMENT; Schema: livraria_comercial; Owner: -
+--
+
+COMMENT ON COLUMN livraria_comercial.reservas_estoque.rse_criado_em IS 'Data e hora de criação da reserva';
+
+
+--
+-- Name: COLUMN reservas_estoque.rse_expira_em; Type: COMMENT; Schema: livraria_comercial; Owner: -
+--
+
+COMMENT ON COLUMN livraria_comercial.reservas_estoque.rse_expira_em IS 'Data e hora de expiração da reserva';
+
+
+--
+-- Name: COLUMN reservas_estoque.rse_status; Type: COMMENT; Schema: livraria_comercial; Owner: -
+--
+
+COMMENT ON COLUMN livraria_comercial.reservas_estoque.rse_status IS 'Status da reserva: ATIVA, EXPIRADA, CONSUMIDA, CANCELADA';
+
+
+--
+-- Name: COLUMN reservas_estoque.loj_id; Type: COMMENT; Schema: livraria_comercial; Owner: -
+--
+
+COMMENT ON COLUMN livraria_comercial.reservas_estoque.loj_id IS 'ID da loja (multi-tenancy)';
+
+
+--
+-- Name: reservas_estoque_rse_id_seq; Type: SEQUENCE; Schema: livraria_comercial; Owner: -
+--
+
+CREATE SEQUENCE livraria_comercial.reservas_estoque_rse_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: reservas_estoque_rse_id_seq; Type: SEQUENCE OWNED BY; Schema: livraria_comercial; Owner: -
+--
+
+ALTER SEQUENCE livraria_comercial.reservas_estoque_rse_id_seq OWNED BY livraria_comercial.reservas_estoque.rse_id;
 
 
 --
@@ -4651,6 +4853,13 @@ ALTER SEQUENCE livraria_ref.tipos_telefones_ttp_id_seq OWNED BY livraria_ref.tip
 
 
 --
+-- Name: aprovacoes_preco_livro apr_id; Type: DEFAULT; Schema: livraria_comercial; Owner: -
+--
+
+ALTER TABLE ONLY livraria_comercial.aprovacoes_preco_livro ALTER COLUMN apr_id SET DEFAULT nextval('livraria_comercial.aprovacoes_preco_livro_apr_id_seq'::regclass);
+
+
+--
 -- Name: autores aut_id; Type: DEFAULT; Schema: livraria_comercial; Owner: -
 --
 
@@ -4781,6 +4990,20 @@ ALTER TABLE ONLY livraria_comercial.padroes_validacao_ia ALTER COLUMN pai_id SET
 --
 
 ALTER TABLE ONLY livraria_comercial.papeis ALTER COLUMN pap_id SET DEFAULT nextval('livraria_comercial.papeis_pap_id_seq'::regclass);
+
+
+--
+-- Name: parametros_inativacao_livro pai_id; Type: DEFAULT; Schema: livraria_comercial; Owner: -
+--
+
+ALTER TABLE ONLY livraria_comercial.parametros_inativacao_livro ALTER COLUMN pai_id SET DEFAULT nextval('livraria_comercial.parametros_inativacao_livro_pai_id_seq'::regclass);
+
+
+--
+-- Name: reservas_estoque rse_id; Type: DEFAULT; Schema: livraria_comercial; Owner: -
+--
+
+ALTER TABLE ONLY livraria_comercial.reservas_estoque ALTER COLUMN rse_id SET DEFAULT nextval('livraria_comercial.reservas_estoque_rse_id_seq'::regclass);
 
 
 --
@@ -5005,6 +5228,22 @@ ALTER TABLE ONLY livraria_ref.tipos_residencias ALTER COLUMN tre_id SET DEFAULT 
 --
 
 ALTER TABLE ONLY livraria_ref.tipos_telefones ALTER COLUMN ttp_id SET DEFAULT nextval('livraria_ref.tipos_telefones_ttp_id_seq'::regclass);
+
+
+--
+-- Name: aprovacoes_preco_livro aprovacoes_preco_livro_apr_uuid_key; Type: CONSTRAINT; Schema: livraria_comercial; Owner: -
+--
+
+ALTER TABLE ONLY livraria_comercial.aprovacoes_preco_livro
+    ADD CONSTRAINT aprovacoes_preco_livro_apr_uuid_key UNIQUE (apr_uuid);
+
+
+--
+-- Name: aprovacoes_preco_livro aprovacoes_preco_livro_pkey; Type: CONSTRAINT; Schema: livraria_comercial; Owner: -
+--
+
+ALTER TABLE ONLY livraria_comercial.aprovacoes_preco_livro
+    ADD CONSTRAINT aprovacoes_preco_livro_pkey PRIMARY KEY (apr_id);
 
 
 --
@@ -5373,6 +5612,38 @@ ALTER TABLE ONLY livraria_comercial.padroes_validacao_ia
 
 ALTER TABLE ONLY livraria_comercial.papeis
     ADD CONSTRAINT papeis_pkey PRIMARY KEY (pap_id);
+
+
+--
+-- Name: parametros_inativacao_livro parametros_inativacao_livro_pai_uuid_key; Type: CONSTRAINT; Schema: livraria_comercial; Owner: -
+--
+
+ALTER TABLE ONLY livraria_comercial.parametros_inativacao_livro
+    ADD CONSTRAINT parametros_inativacao_livro_pai_uuid_key UNIQUE (pai_uuid);
+
+
+--
+-- Name: parametros_inativacao_livro parametros_inativacao_livro_pkey; Type: CONSTRAINT; Schema: livraria_comercial; Owner: -
+--
+
+ALTER TABLE ONLY livraria_comercial.parametros_inativacao_livro
+    ADD CONSTRAINT parametros_inativacao_livro_pkey PRIMARY KEY (pai_id);
+
+
+--
+-- Name: reservas_estoque reservas_estoque_pkey; Type: CONSTRAINT; Schema: livraria_comercial; Owner: -
+--
+
+ALTER TABLE ONLY livraria_comercial.reservas_estoque
+    ADD CONSTRAINT reservas_estoque_pkey PRIMARY KEY (rse_id);
+
+
+--
+-- Name: reservas_estoque reservas_estoque_rse_uuid_key; Type: CONSTRAINT; Schema: livraria_comercial; Owner: -
+--
+
+ALTER TABLE ONLY livraria_comercial.reservas_estoque
+    ADD CONSTRAINT reservas_estoque_rse_uuid_key UNIQUE (rse_uuid);
 
 
 --
@@ -6016,6 +6287,27 @@ ALTER TABLE ONLY livraria_ref.tipos_telefones
 
 
 --
+-- Name: idx_aprovacoes_livro; Type: INDEX; Schema: livraria_comercial; Owner: -
+--
+
+CREATE INDEX idx_aprovacoes_livro ON livraria_comercial.aprovacoes_preco_livro USING btree (liv_id);
+
+
+--
+-- Name: idx_aprovacoes_solicitante; Type: INDEX; Schema: livraria_comercial; Owner: -
+--
+
+CREATE INDEX idx_aprovacoes_solicitante ON livraria_comercial.aprovacoes_preco_livro USING btree (usu_id_solicitante);
+
+
+--
+-- Name: idx_aprovacoes_status; Type: INDEX; Schema: livraria_comercial; Owner: -
+--
+
+CREATE INDEX idx_aprovacoes_status ON livraria_comercial.aprovacoes_preco_livro USING btree (apr_status);
+
+
+--
 -- Name: idx_autores_nome_norm; Type: INDEX; Schema: livraria_comercial; Owner: -
 --
 
@@ -6422,6 +6714,48 @@ CREATE INDEX idx_padroes_validacao_ia_tipo ON livraria_comercial.padroes_validac
 
 
 --
+-- Name: idx_reservas_estoque_expira_em; Type: INDEX; Schema: livraria_comercial; Owner: -
+--
+
+CREATE INDEX idx_reservas_estoque_expira_em ON livraria_comercial.reservas_estoque USING btree (rse_expira_em);
+
+
+--
+-- Name: idx_reservas_estoque_expiradas; Type: INDEX; Schema: livraria_comercial; Owner: -
+--
+
+CREATE INDEX idx_reservas_estoque_expiradas ON livraria_comercial.reservas_estoque USING btree (rse_status, rse_expira_em) WHERE ((rse_status)::text = 'ATIVA'::text);
+
+
+--
+-- Name: idx_reservas_estoque_liv_id; Type: INDEX; Schema: livraria_comercial; Owner: -
+--
+
+CREATE INDEX idx_reservas_estoque_liv_id ON livraria_comercial.reservas_estoque USING btree (liv_id);
+
+
+--
+-- Name: idx_reservas_estoque_loj_id; Type: INDEX; Schema: livraria_comercial; Owner: -
+--
+
+CREATE INDEX idx_reservas_estoque_loj_id ON livraria_comercial.reservas_estoque USING btree (loj_id);
+
+
+--
+-- Name: idx_reservas_estoque_status; Type: INDEX; Schema: livraria_comercial; Owner: -
+--
+
+CREATE INDEX idx_reservas_estoque_status ON livraria_comercial.reservas_estoque USING btree (rse_status);
+
+
+--
+-- Name: idx_reservas_estoque_usu_id; Type: INDEX; Schema: livraria_comercial; Owner: -
+--
+
+CREATE INDEX idx_reservas_estoque_usu_id ON livraria_comercial.reservas_estoque USING btree (usu_id);
+
+
+--
 -- Name: idx_status_venda_descricao; Type: INDEX; Schema: livraria_comercial; Owner: -
 --
 
@@ -6503,6 +6837,13 @@ CREATE INDEX idx_vendas_status_criado_em ON livraria_comercial.vendas USING btre
 --
 
 CREATE UNIQUE INDEX uq_categorias_cat_slug ON livraria_comercial.categorias USING btree (cat_slug) WHERE (cat_slug IS NOT NULL);
+
+
+--
+-- Name: uq_reserva_usuario_livro_ativa; Type: INDEX; Schema: livraria_comercial; Owner: -
+--
+
+CREATE UNIQUE INDEX uq_reserva_usuario_livro_ativa ON livraria_comercial.reservas_estoque USING btree (usu_id, liv_id) WHERE ((rse_status)::text = 'ATIVA'::text);
 
 
 --
@@ -6989,6 +7330,38 @@ CREATE TRIGGER tg_usuarios_atualizado_em BEFORE UPDATE ON livraria_gestao.usuari
 
 
 --
+-- Name: aprovacoes_preco_livro aprovacoes_preco_livro_liv_id_fkey; Type: FK CONSTRAINT; Schema: livraria_comercial; Owner: -
+--
+
+ALTER TABLE ONLY livraria_comercial.aprovacoes_preco_livro
+    ADD CONSTRAINT aprovacoes_preco_livro_liv_id_fkey FOREIGN KEY (liv_id) REFERENCES livraria_comercial.livros(liv_id);
+
+
+--
+-- Name: aprovacoes_preco_livro aprovacoes_preco_livro_loj_id_fkey; Type: FK CONSTRAINT; Schema: livraria_comercial; Owner: -
+--
+
+ALTER TABLE ONLY livraria_comercial.aprovacoes_preco_livro
+    ADD CONSTRAINT aprovacoes_preco_livro_loj_id_fkey FOREIGN KEY (loj_id) REFERENCES livraria_gestao.lojas(loj_id);
+
+
+--
+-- Name: aprovacoes_preco_livro aprovacoes_preco_livro_usu_id_aprovador_fkey; Type: FK CONSTRAINT; Schema: livraria_comercial; Owner: -
+--
+
+ALTER TABLE ONLY livraria_comercial.aprovacoes_preco_livro
+    ADD CONSTRAINT aprovacoes_preco_livro_usu_id_aprovador_fkey FOREIGN KEY (usu_id_aprovador) REFERENCES livraria_gestao.usuarios(usu_id);
+
+
+--
+-- Name: aprovacoes_preco_livro aprovacoes_preco_livro_usu_id_solicitante_fkey; Type: FK CONSTRAINT; Schema: livraria_comercial; Owner: -
+--
+
+ALTER TABLE ONLY livraria_comercial.aprovacoes_preco_livro
+    ADD CONSTRAINT aprovacoes_preco_livro_usu_id_solicitante_fkey FOREIGN KEY (usu_id_solicitante) REFERENCES livraria_gestao.usuarios(usu_id);
+
+
+--
 -- Name: avaliacoes_livro avaliacoes_livro_liv_id_fkey; Type: FK CONSTRAINT; Schema: livraria_comercial; Owner: -
 --
 
@@ -7266,6 +7639,22 @@ ALTER TABLE ONLY livraria_comercial.notificacoes
 
 ALTER TABLE ONLY livraria_comercial.notificacoes
     ADD CONSTRAINT notificacoes_not_venda_uuid_fkey FOREIGN KEY (not_venda_uuid) REFERENCES livraria_comercial.vendas(ven_uuid) ON DELETE SET NULL;
+
+
+--
+-- Name: reservas_estoque reservas_estoque_liv_id_fkey; Type: FK CONSTRAINT; Schema: livraria_comercial; Owner: -
+--
+
+ALTER TABLE ONLY livraria_comercial.reservas_estoque
+    ADD CONSTRAINT reservas_estoque_liv_id_fkey FOREIGN KEY (liv_id) REFERENCES livraria_comercial.livros(liv_id) ON DELETE CASCADE;
+
+
+--
+-- Name: reservas_estoque reservas_estoque_usu_id_fkey; Type: FK CONSTRAINT; Schema: livraria_comercial; Owner: -
+--
+
+ALTER TABLE ONLY livraria_comercial.reservas_estoque
+    ADD CONSTRAINT reservas_estoque_usu_id_fkey FOREIGN KEY (usu_id) REFERENCES livraria_gestao.usuarios(usu_id) ON DELETE CASCADE;
 
 
 --

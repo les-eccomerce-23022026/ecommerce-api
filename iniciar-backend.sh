@@ -3,7 +3,7 @@
 # Script para iniciar o backend automaticamente
 # Verifica se a porta 3000 está ocupada e mata o processo se necessário
 
-PORTA=3000
+PORTA=5001
 VERDE='\033[0;32m'
 AMARELO='\033[1;33m'
 VERMELHO='\033[0;31m'

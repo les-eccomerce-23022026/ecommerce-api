@@ -94,7 +94,7 @@ services:
         condition: service_started
     environment:
       - NODE_ENV=development
-      - DEFAULT_LOJA_ID=1
+      - DEFAULT_LOJA_ID=32
       - MULTI_TENANCY_ENABLED=true
       - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432

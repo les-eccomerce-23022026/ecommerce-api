@@ -1,6 +1,6 @@
 -- Migration 091: Seed do usuário admin@livraria.com.br para testes E2E Cypress
 -- Email: admin@livraria.com.br | Senha: password123
--- Hash bcrypt para "password123" (rounds=10): $2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi
+-- Hash bcrypt para "password123" (rounds=10): $2a$10$P8BIZKF3UGH02X3qbStf/ehMFsouDvXQwu4Tkb6l2tKi46oWgD8EC
 -- Este usuário é necessário para os cenários 5-10 dos testes E2E da Entrega 7
 
 BEGIN;
@@ -69,7 +69,7 @@ BEGIN
         'Admin Livraria',
         'admin@livraria.com.br',
         '123.456.789-00',
-        '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', -- Senha: password123
+        '$2a$10$P8BIZKF3UGH02X3qbStf/ehMFsouDvXQwu4Tkb6l2tKi46oWgD8EC', -- Senha: password123
         v_papel_admin_sistema_id,
         TRUE,
         v_loja_padrao_id,
