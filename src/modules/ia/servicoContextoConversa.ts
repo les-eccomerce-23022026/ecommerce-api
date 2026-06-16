@@ -81,9 +81,10 @@ export class ServicoContextoConversa {
 
     const resumoConversa = mensagens
       .slice(-6)
+      .filter((m) => (m.conteudo ?? '').trim().length > 0)
       .map((m) => {
         const autor = this.ehUsuario(m) ? 'Cliente' : 'Assistente';
-        const texto = m.conteudo.length > 220 ? `${m.conteudo.slice(0, 220)}…` : m.conteudo;
+        const texto = (m.conteudo ?? '').length > 220 ? `${(m.conteudo ?? '').slice(0, 220)}…` : (m.conteudo ?? '');
         return `${autor}: ${texto}`;
       })
       .join('\n');

@@ -118,7 +118,7 @@ export async function confirmarPagamentoPixWebhookServico(
   pagamentoUuid: string,
   segredoConfirmacao: string,
 ): Promise<IPagamento> {
-  const pagamento = await repositorioPagamentos.obterPorUuid(pagamentoUuid);
+  const pagamento = await repositorioPagamentos.obterPorUuidSemTenant(pagamentoUuid);
   if (!pagamento || pagamento.formaPagamento.getTipo() !== TipoPagamento.PIX) {
     throw new Error('Pagamento não encontrado ou não é PIX');
   }

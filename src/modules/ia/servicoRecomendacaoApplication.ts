@@ -79,6 +79,7 @@ export interface ISaudeIaResultado {
   dependencias: {
     chromadb: ISaudeIaDependencia;
     gemini: ISaudeIaDependencia;
+    groq: ISaudeIaDependencia;
   };
 }
 
@@ -1168,7 +1169,7 @@ export class ServicoRecomendacaoApplication {
     }
 
     return historico.map((msg) => ({
-      conteudo: msg.conteudo,
+      conteudo: msg.conteudo ?? '',
       papel: this.normalizarPapelMensagem(msg),
       timestamp: msg.timestamp,
       produtosMencionados: msg.produtosMencionados,
@@ -1216,7 +1217,7 @@ export class ServicoRecomendacaoApplication {
         return true;
       }
       const ehUsuario = this.normalizarPapelMensagem(msg) === 'user';
-      return !(ehUsuario && msg.conteudo.trim() === mensagemAtualNorm);
+      return !(ehUsuario && (msg.conteudo ?? '').trim() === mensagemAtualNorm);
     });
 
     if (filtrado.length === 0) {
@@ -1495,29 +1496,76 @@ export class ServicoRecomendacaoApplication {
     }
   }
 
+  private async verificarGeminiHttp(): Promise<ISaudeIaDependencia> {
+    const chave = process.env.GEMINI_API_KEY;
+    const modelo = process.env.GEMINI_CHAT_MODEL ?? 'gemini-2.5-flash';
+    if (!chave) return { ok: false, mensagem: 'GEMINI_API_KEY não definida' };
+    try {
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent?key=${chave}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: 'ping' }] }],
+            generationConfig: { maxOutputTokens: 1 },
+          }),
+          signal: AbortSignal.timeout(5000),
+        },
+      );
+      return res.ok ? { ok: true } : { ok: false, mensagem: `HTTP ${res.status}` };
+    } catch (erro) {
+      return { ok: false, mensagem: erro instanceof Error ? erro.message : String(erro) };
+    }
+  }
+
+  private async verificarGroqHttp(): Promise<ISaudeIaDependencia> {
+    const chave = process.env.GROQ_API_KEY;
+    if (!chave) return { ok: false, mensagem: 'GROQ_API_KEY não definida' };
+    try {
+      const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${chave}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'llama-3.1-8b-instant',
+          messages: [{ role: 'user', content: 'ping' }],
+          max_tokens: 1,
+        }),
+        signal: AbortSignal.timeout(5000),
+      });
+      return res.ok ? { ok: true } : { ok: false, mensagem: `HTTP ${res.status}` };
+    } catch (erro) {
+      return { ok: false, mensagem: erro instanceof Error ? erro.message : String(erro) };
+    }
+  }
+
   async verificarSaude(): Promise<ISaudeIaResultado> {
-    const [chromadbOk, geminiOk] = await Promise.all([
+    const [chromadbOk, gemini, groq] = await Promise.all([
       this.repositorioEmbedding.verificarConexao(),
-      this.adapterLangChain.validarConexao(),
+      this.verificarGeminiHttp(),
+      this.verificarGroqHttp(),
     ]);
+
+    const algumLlmDisponivel = gemini.ok || groq.ok;
 
     const dependencias = {
       chromadb: chromadbOk
         ? { ok: true }
         : { ok: false, mensagem: 'Falha ao conectar com ChromaDB' },
-      gemini: geminiOk
-        ? { ok: true }
-        : { ok: false, mensagem: 'Falha ao conectar com Gemini API' },
+      gemini,
+      groq,
     };
 
-    let status: ISaudeIaResultado['status'];
-    if (chromadbOk && geminiOk) {
-      status = 'ok';
-    } else if (!chromadbOk && !geminiOk) {
-      status = 'down';
-    } else {
-      status = 'degraded';
-    }
+    const resolverStatus = (): ISaudeIaResultado['status'] => {
+      if (!chromadbOk && !algumLlmDisponivel) return 'down';
+      if (chromadbOk && gemini.ok && groq.ok) return 'ok';
+      return 'degraded';
+    };
+
+    const status = resolverStatus();
 
     return {
       status,

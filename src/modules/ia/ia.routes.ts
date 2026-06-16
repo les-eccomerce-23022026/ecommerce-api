@@ -180,6 +180,7 @@ router.get('/metricas', controladorRecomendacao.buscarMetricas);
 // Rota protegida: exige autenticação válida (autenticacaoMiddleware) para disparar
 // a reindexação do catálogo. Acessível por todos os papéis autenticados.
 router.post('/reindexar', autenticacaoMiddleware, autenticadoMiddleware, controladorRecomendacao.reindexar);
+router.post('/padroes/atualizar', autenticacaoMiddleware, adminOnlyMiddleware, controladorRecomendacao.atualizarPadroesValidacao);
 
 // ── Utilitários ────────────────────────────────────────────────────────────────
 router.get('/saude', controladorRecomendacao.saude);

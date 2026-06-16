@@ -12,6 +12,8 @@ export interface IRepositorioPagamentos {
   obterVenIdPorVendaUuid(vendaUuid: string): Promise<number | null>;
   obterPagIdInternoPorUuid(pagUuid: string): Promise<number | null>;
   obterPorUuid(uuid: string): Promise<IPagamento | null>;
+  /** Busca pagamento pelo UUID sem aplicar filtro de tenant — uso exclusivo de webhooks externos. */
+  obterPorUuidSemTenant(uuid: string): Promise<IPagamento | null>;
   atualizar(uuid: string, pagamento: IPagamento): Promise<IPagamento>;
   listarPorVenda(vendaUuid: string): Promise<IPagamento[]>;
   inserirPixSimulado(

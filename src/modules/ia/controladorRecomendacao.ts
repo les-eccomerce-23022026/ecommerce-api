@@ -11,6 +11,8 @@ import {
   IReindexarResponseDTO,
   ContextoRequisicaoIA,
   TipoContextoIA,
+  MensagemChatEntradaDTO,
+  normalizarMensagemEntrada,
 } from './IRecomendacao.dto';
 import { PeriodoMetrica } from './IRepositorioRecomendacao';
 import { ErroIa } from './erroIa.middleware';
@@ -237,7 +239,7 @@ export class ControladorRecomendacao {
         return;
       }
 
-      const dados: IChatRequestDTO = req.body;
+      const dados: Omit<IChatRequestDTO, 'historico'> & { historico?: MensagemChatEntradaDTO[] } = req.body;
 
       // Validações básicas
       if (!dados.mensagem || typeof dados.mensagem !== 'string' || dados.mensagem.trim().length === 0) {
@@ -290,8 +292,12 @@ export class ControladorRecomendacao {
         return;
       }
 
-      if (dados.historico && dados.historico.length > 0) {
-        const resultadoHistorico = await this.servicoValidacaoSeguranca.validarConteudoHistorico(dados.historico);
+      const historicoNormalizado = dados.historico && dados.historico.length > 0
+        ? dados.historico.map(normalizarMensagemEntrada)
+        : undefined;
+
+      if (historicoNormalizado && historicoNormalizado.length > 0) {
+        const resultadoHistorico = await this.servicoValidacaoSeguranca.validarConteudoHistorico(historicoNormalizado);
         if (!resultadoHistorico.seguro) {
           Logger.warn(`[ControladorRecomendacao.chat] Histórico bloqueado na mensagem ${resultadoHistorico.indice} (${resultadoHistorico.papel})`);
           RespostaPadrao.enviarErro(res, 400, ServicoValidacaoSegurancaIA.gerarMensagemRejeicao(resultadoHistorico));
@@ -313,6 +319,7 @@ export class ControladorRecomendacao {
         ...dados,
         mensagem: mensagemSanitizada,
         clienteUuid,
+        historico: historicoNormalizado,
         incluirMetricas: dados.incluirMetricas ?? false,
         contextoIA, // Passa contexto para serviço de aplicação
       };
@@ -400,6 +407,29 @@ export class ControladorRecomendacao {
       const msg = this.obterMensagemErroApi(erro, 'Erro ao reindexar catálogo');
       Logger.error(`[ControladorRecomendacao.reindexar] Erro: ${msg}`, erro instanceof Error ? erro.stack : String(erro));
       RespostaPadrao.enviarErro(res, this.obterStatusHttpErro(erro, 500), msg);
+    }
+  };
+
+  /**
+   * Endpoint POST /api/ia/padroes/atualizar (Admin only)
+   *
+   * Força invalidação do cache de padrões de validação (memória + disco)
+   * e recarga imediata a partir do banco de dados.
+   * Query param: ?forcar=true (equivalente, sempre força)
+   */
+  atualizarPadroesValidacao = async (_req: Request, res: Response): Promise<void> => {
+    try {
+      if (!this.cachePadroesValidacao) {
+        RespostaPadrao.enviarErro(res, 503, 'Cache de padrões não disponível');
+        return;
+      }
+      this.cachePadroesValidacao.invalidar();
+      await this.cachePadroesValidacao.obterPadroes(true);
+      RespostaPadrao.enviarSucesso(res, 200, { mensagem: 'Cache de padrões atualizado com sucesso' });
+    } catch (erro) {
+      const msg = this.obterMensagemErroApi(erro, 'Erro ao atualizar padrões');
+      Logger.error(`[ControladorRecomendacao.atualizarPadroesValidacao] ${msg}`, erro instanceof Error ? erro.stack : String(erro));
+      RespostaPadrao.enviarErro(res, 500, msg);
     }
   };
 

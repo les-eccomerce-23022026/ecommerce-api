@@ -59,7 +59,7 @@ fi
 # Executar setup do banco
 echo ""
 echo "Configurando banco de dados..."
-../scripts/setup-db-unificado.sh --env dev
+./scripts/setup-banco-completo.sh --env dev
 
 echo ""
 echo "=========================================="

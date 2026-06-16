@@ -55,6 +55,29 @@ export interface ProdutoRecomendadoDTO {
   motivo: string;
 }
 
+/** Formato de entrada aceito pela API — suporta campos EN (role/content) e PT (papel/conteudo/remetente) */
+export interface MensagemChatEntradaDTO {
+  papel?: 'user' | 'assistant';
+  role?: 'user' | 'assistant';
+  remetente?: 'usuario' | 'assistente';
+  conteudo?: string;
+  content?: string;
+  timestamp?: Date;
+  produtosMencionados?: ProdutoMencionadoChatDTO[];
+}
+
+/** Converte MensagemChatEntradaDTO (suporta EN/PT) para MensagemChatDTO normalizado */
+export function normalizarMensagemEntrada(msg: MensagemChatEntradaDTO): MensagemChatDTO {
+  const papelResolvido = msg.papel ?? (msg.role === 'assistant' ? 'assistant' : msg.role === 'user' ? 'user' : undefined);
+  return {
+    conteudo: msg.conteudo ?? msg.content ?? '',
+    papel: papelResolvido,
+    remetente: msg.remetente,
+    timestamp: msg.timestamp,
+    produtosMencionados: msg.produtosMencionados,
+  };
+}
+
 export interface IChatRequestDTO {
   mensagem: string;
   clienteUuid?: string;
