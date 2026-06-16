@@ -122,23 +122,7 @@ export class AdapterGroq implements IAdapterLLMChat {
       return 'Para te ajudar melhor, pode me contar um pouco mais sobre o que você procura?';
     }
 
-    const tomPerfil = this.montarInstrucaoTomPerfil(opcoes?.perfil);
-
-    const regrasPosvenda = opcoes?.modoPosvenda
-      ? 'MODO PÓS-VENDA ativo: responda APENAS com base nos pedidos listados no contexto. Nunca invente status, datas ou rastreamentos.'
-      : '';
-
-    const system = [
-      'Você é o assistente de uma livraria brasileira, especialista em recomendação de livros e atendimento pós-venda.',
-      'Use APENAS os dados fornecidos no contexto.',
-      'Responda em português do Brasil, de forma acolhedora e objetiva.',
-      'Formate em tópicos curtos com "• " (3 a 5 tópicos, cada um com no máximo uma frase).',
-      regrasPosvenda,
-      tomPerfil,
-      'IMPORTANTE: retorne APENAS JSON válido no formato {"resposta":"texto aqui"}. Nenhum texto fora do JSON.',
-    ]
-      .filter(Boolean)
-      .join(' ');
+    const { system, userText } = this.montarPromptChat(pergunta, contexto, opcoes);
 
     const mensagens: { role: 'system' | 'user' | 'assistant'; content: string }[] = [
       { role: 'system', content: system },
@@ -153,17 +137,53 @@ export class AdapterGroq implements IAdapterLLMChat {
       }
     }
 
-    const rotuloContexto = opcoes?.modoPosvenda
-      ? 'Contexto de pedidos (única fonte de verdade)'
-      : 'Contexto (única fonte de verdade)';
-
-    mensagens.push({
-      role: 'user',
-      content: `${rotuloContexto}:\n${contexto}\n\nPergunta do cliente: ${pergunta}`,
-    });
+    mensagens.push({ role: 'user', content: userText });
 
     const texto = await this.chamarAPI(mensagens, opcoes?.maxTokens ?? 1024);
     return this.parsearRespostaChat(texto);
+  }
+
+  private montarPromptChat(
+    pergunta: string,
+    contexto: string,
+    opcoes?: { modoPosvenda?: boolean; perfil?: { idadeAnos?: number; estado?: string; nome?: string } }
+  ): { system: string; userText: string } {
+    const tomPerfil = this.montarInstrucaoTomPerfil(opcoes?.perfil);
+
+    const regrasPosvenda = opcoes?.modoPosvenda
+      ? [
+          'MODO PÓS-VENDA: responda APENAS com base nos pedidos listados no contexto.',
+          'Se o número do pedido mencionado NÃO aparecer no contexto, responda APENAS: "Não encontrei esse pedido em nosso sistema. Verifique o número ou acesse Meus Pedidos." NUNCA infira, assuma ou fabrique informações sobre pedidos não listados.',
+          'Nunca invente status, datas, rastreamentos ou qualquer detalhe de pedidos ausentes no contexto.',
+        ].join(' ')
+      : '';
+
+    const regrasRecomendacao = !opcoes?.modoPosvenda
+      ? [
+          'RECOMENDAÇÕES: sugira APENAS livros explicitamente listados no contexto acima.',
+          'Se o contexto não contiver livros relevantes, responda APENAS: "Não encontramos livros com essas características em nosso catálogo no momento."',
+          'NUNCA sugira, cite ou mencione livros que não estejam no contexto fornecido.',
+          'NUNCA adicione informações sobre políticas de troca, frete, prazo de entrega ou pedidos em respostas de recomendação.',
+        ].join(' ')
+      : '';
+
+    const system = [
+      'Você é o assistente de uma livraria brasileira, especialista em recomendação de livros e atendimento pós-venda.',
+      'Use APENAS os dados fornecidos no contexto — nunca use conhecimento externo.',
+      'Responda em português do Brasil, de forma acolhedora e objetiva.',
+      'Formate em tópicos curtos com "• " (3 a 5 tópicos, cada um com no máximo uma frase).',
+      regrasPosvenda,
+      regrasRecomendacao,
+      tomPerfil,
+      'IMPORTANTE: retorne APENAS JSON válido no formato {"resposta":"texto aqui"}. Nenhum texto fora do JSON.',
+    ]
+      .filter(Boolean)
+      .join(' ');
+
+    const rotuloContexto = opcoes?.modoPosvenda ? 'Contexto de pedidos (única fonte de verdade)' : 'Contexto (única fonte de verdade)';
+    const userText = `${rotuloContexto}:\n${contexto}\n\nPergunta do cliente: ${pergunta}`;
+
+    return { system, userText };
   }
 
   /**
@@ -194,22 +214,7 @@ export class AdapterGroq implements IAdapterLLMChat {
       return texto;
     }
 
-    const tomPerfil = this.montarInstrucaoTomPerfil(opcoes?.perfil);
-    const regrasPosvenda = opcoes?.modoPosvenda
-      ? 'MODO PÓS-VENDA ativo: responda APENAS com base nos pedidos listados no contexto. Nunca invente status, datas ou rastreamentos.'
-      : '';
-
-    const system = [
-      'Você é o assistente de uma livraria brasileira, especialista em recomendação de livros e atendimento pós-venda.',
-      'Use APENAS os dados fornecidos no contexto.',
-      'Responda em português do Brasil, de forma acolhedora e objetiva.',
-      'Formate em tópicos curtos com "• " (3 a 5 tópicos, cada um com no máximo uma frase).',
-      regrasPosvenda,
-      tomPerfil,
-      'IMPORTANTE: retorne APENAS JSON válido no formato {"resposta":"texto aqui"}. Nenhum texto fora do JSON.',
-    ]
-      .filter(Boolean)
-      .join(' ');
+    const { system, userText } = this.montarPromptChat(pergunta, contexto, opcoes);
 
     const mensagens: { role: 'system' | 'user' | 'assistant'; content: string }[] = [
       { role: 'system', content: system },
@@ -219,13 +224,7 @@ export class AdapterGroq implements IAdapterLLMChat {
         mensagens.push({ role: msg.papel === 'model' ? 'assistant' : 'user', content: msg.conteudo });
       }
     }
-    const rotuloContexto = opcoes?.modoPosvenda
-      ? 'Contexto de pedidos (única fonte de verdade)'
-      : 'Contexto (única fonte de verdade)';
-    mensagens.push({
-      role: 'user',
-      content: `${rotuloContexto}:\n${contexto}\n\nPergunta do cliente: ${pergunta}`,
-    });
+    mensagens.push({ role: 'user', content: userText });
 
     const textoBruto = await AdapterGroq.streamChatCompletion(
       this.apiKey,
