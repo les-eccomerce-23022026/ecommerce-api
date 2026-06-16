@@ -16,6 +16,9 @@ import { RepositorioReservasPostgres } from '@/modules/estoque/repositorioReserv
 import { RepositorioEstoque } from '@/modules/estoque/repositorioEstoque';
 import { RepositorioLivrosPostgres } from '@/modules/livros/repositorioLivrosPostgres';
 import { RepositorioUsuarios } from '@/modules/usuarios/usuario.repository';
+import { JobLimpezaTokensRevocados } from '@/modules/auth/jobs/JobLimpezaTokensRevocados';
+import { JobAutoIndexacaoChromaDB } from '@/modules/ia/jobs/JobAutoIndexacaoChromaDB';
+import { AdapterLangChainGemini } from '@/modules/ia/adapterLangChainGemini';
 
 dotenv.config();
 
@@ -74,6 +77,23 @@ if (process.env.NODE_ENV === 'development') {
 
 app.listen(Number(porta), () => {
   Logger.info(`Servidor iniciado na porta ${porta}`);
+
+  // Warm-up do LLM de chat (Task 2): dispara a seleção Groq/Gemini ainda no boot,
+  // de forma não-bloqueante, para que a primeira requisição real não pague a
+  // latência da verificação de disponibilidade. Falha não derruba o boot.
+  try {
+    const adapterChat = new AdapterLangChainGemini();
+    void adapterChat
+      .prewarmChat()
+      .then(() => Logger.info('[Server] Warm-up do LLM de chat concluído com sucesso'))
+      .catch((erro: unknown) => {
+        const msg = erro instanceof Error ? erro.message : String(erro);
+        Logger.warn(`[Server] Warm-up do LLM de chat falhou (seguindo sem warm-up). Causa: ${msg}`);
+      });
+  } catch (erro) {
+    const msg = erro instanceof Error ? erro.message : String(erro);
+    Logger.warn(`[Server] Não foi possível iniciar warm-up do LLM de chat. Causa: ${msg}`);
+  }
 });
 
 // Job de auto-confirmação de entregas com prazo vencido
@@ -128,6 +148,29 @@ try {
   Logger.warn(`[Server] Job de expiração de reservas fora do ar. Causa: ${msg}`);
 }
 
+// Job de limpeza de tokens revocados (diário)
+try {
+  const jobLimpezaTokens = new JobLimpezaTokensRevocados(24); // 24 horas
+  jobLimpezaTokens.iniciar();
+
+  process.on('SIGTERM', () => jobLimpezaTokens.parar());
+  process.on('SIGINT', () => jobLimpezaTokens.parar());
+} catch (erro) {
+  const msg = erro instanceof Error ? erro.message : String(erro);
+  Logger.warn(`[Server] Job de limpeza de tokens fora do ar. Causa: ${msg}`);
+}
+
+// Job de auto-indexacao do ChromaDB (assincrono no startup)
+try {
+  const jobAutoIndexacao = new JobAutoIndexacaoChromaDB();
+  jobAutoIndexacao.executarAssincrono();
+  Logger.info('[Server] Job de auto-indexacao do ChromaDB iniciado (assincrono)');
+} catch (erro) {
+  const msg = erro instanceof Error ? erro.message : String(erro);
+  Logger.warn(`[Server] Job de auto-indexacao do ChromaDB fora do ar. Causa: ${msg}`);
+}
+
+// 
 // Parar simulador ao encerrar o servidor (temporariamente desabilitado)
 /*
 process.on('SIGTERM', () => {

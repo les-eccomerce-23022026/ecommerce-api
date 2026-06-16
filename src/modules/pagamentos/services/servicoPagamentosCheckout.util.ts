@@ -29,6 +29,33 @@ export async function processarSaldosCuponsTroca(
   );
 }
 
+export async function gerarCupomTrocaExcedente(
+  repositorio: IRepositorioPagamentos,
+  vendaUuid: string,
+  valorTotalCupons: number,
+  valorTotalCompra: number,
+): Promise<{ codigo: string; valor: number } | null> {
+  if (valorTotalCupons <= valorTotalCompra) {
+    return null;
+  }
+
+  const excedente = valorTotalCupons - valorTotalCompra;
+  const usuarioUuid = await repositorio.obterUsuarioIdInternoPorUuid(vendaUuid);
+  
+  if (!usuarioUuid) {
+    throw new Error('Usuário não encontrado para gerar cupom de troca excedente');
+  }
+
+  const codigoCupom = `EXCEDENTE-${Date.now()}`;
+  await repositorio.criarCupomTroca({
+    usuarioId: usuarioUuid,
+    codigo: codigoCupom,
+    valor: excedente,
+  });
+
+  return { codigo: codigoCupom, valor: excedente };
+}
+
 export async function persistirPagamentosCheckoutAprovados(
   repositorio: IRepositorioPagamentos,
   dados: {

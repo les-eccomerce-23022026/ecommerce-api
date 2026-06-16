@@ -6,4 +6,6 @@
  */
 export interface IAdapterEmbedding {
   gerarEmbedding(texto: string): Promise<number[]>;
+  /** Opcional: processa múltiplos textos em lote (mais eficiente quando disponível) */
+  gerarEmbeddingsLote?(textos: string[]): Promise<number[][]>;
 }

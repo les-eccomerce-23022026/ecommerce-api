@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { ControladorRecomendacao } from './controladorRecomendacao';
 import { RepositorioEmbeddingChromaDB } from './repositorioEmbeddingChromaDB';
 import { AdapterLangChainGemini } from './adapterLangChainGemini';
+import { FactoryEmbedding } from './factoryEmbedding';
 import { ServicoGeracaoEmbedding } from './servicoGeracaoEmbedding';
 import { ServicoValidacaoProdutos } from './servicoValidacaoProdutos';
 import { ServicoCacheProdutos } from './servicoCacheProdutos';
@@ -81,7 +82,8 @@ function validarAcessoChatIA(req: Request, res: Response, next: NextFunction): v
 const conexaoPostgres = ConexaoPostgres.obterInstancia();
 const pool = conexaoPostgres['poolProducao']; // Acessa o pool interno
 const repositorioEmbedding = new RepositorioEmbeddingChromaDB();
-const adapterLangChain = new AdapterLangChainGemini();
+const adapterEmbedding = FactoryEmbedding.obterInstancia();
+const adapterChatLLM = new AdapterLangChainGemini();
 const servicoGeracaoEmbedding = new ServicoGeracaoEmbedding();
 const repositorioRecomendacao = new RepositorioRecomendacaoPostgres(pool);
 
@@ -107,11 +109,11 @@ const servicoRecomendacaoRAG = new ServicoRecomendacaoRAG(
 const servicoIndexacaoProdutos = new ServicoIndexacaoProdutos(
   servicoLivros,
   repositorioEmbedding,
-  adapterLangChain,
+  adapterEmbedding,
   servicoGeracaoEmbedding
 );
 
-const servicoInterpretacaoIntencao = new ServicoInterpretacaoIntencao(adapterLangChain);
+const servicoInterpretacaoIntencao = new ServicoInterpretacaoIntencao(adapterChatLLM);
 
 const servicoRecomendacao = new ServicoRecomendacaoApplication(
   repositorioEmbedding,
@@ -121,7 +123,7 @@ const servicoRecomendacao = new ServicoRecomendacaoApplication(
   servicoGeracaoEmbedding,
   servicoValidacaoProdutos,
   servicoRecomendacaoRAG,
-  adapterLangChain,
+  adapterChatLLM,
   servicoIndexacaoProdutos,
   servicoLivros,
   servicoInterpretacaoIntencao,
@@ -129,16 +131,16 @@ const servicoRecomendacao = new ServicoRecomendacaoApplication(
 
 const servicoHealthCheck = new ServicoHealthCheckIA(
   repositorioEmbedding,
-  adapterLangChain
+  adapterEmbedding
 );
 
-const classificadorDominio = new ClassificadorDominioIA(adapterLangChain);
+const classificadorDominio = new ClassificadorDominioIA(adapterChatLLM);
 
 const controladorRecomendacao = new ControladorRecomendacao(
   servicoRecomendacao,
   servicoHealthCheck,
-  adapterLangChain,
-  adapterLangChain,
+  adapterChatLLM,
+  adapterChatLLM,
   cachePadroesValidacao,
   classificadorDominio
 );

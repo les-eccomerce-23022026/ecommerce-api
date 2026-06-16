@@ -2,6 +2,7 @@ import { Request } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { IPerfilClienteDto } from '@/modules/clientes/Iclientes.dto';
 import type { IPagamento } from '../entities/IPagamento';
+import type { IRepositorioPagamentos } from '../repositories/IRepositorioPagamentos';
 
 export class PagamentosHelper {
   public static extrairParametros(req: Request) {
@@ -42,11 +43,8 @@ export class PagamentosHelper {
     }));
   }
 
-  public static obterCuponsSimulados() {
-    return [
-      { uuid: uuidv4(), codigo: 'DESCONTO10', tipo: 'promocional', valor: 10, descricao: '10% de desconto (simulado)' },
-      { uuid: uuidv4(), codigo: 'TROCA50', tipo: 'troca', valor: 50, descricao: 'Cupom de troca R$50 (simulado)' },
-    ];
+  public static async obterCuponsPromocionais(repoPagamentos: IRepositorioPagamentos, lojId?: number | null) {
+    return await repoPagamentos.listarCuponsPromocionais(lojId);
   }
 
   public static mapearFreteOpcoes(opcoes: Array<{ cotacaoUuid: string; tipo: string; valor: number; prazo: string }>) {

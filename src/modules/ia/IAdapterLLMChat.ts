@@ -17,6 +17,8 @@ export interface IAdapterLLMChat {
       perguntasFollowUp?: string[];
       perfil?: { idadeAnos?: number; estado?: string; nome?: string };
       modoPosvenda?: boolean;
+      /** Limite de tokens de saída por intenção (Task 3). Default 1024. */
+      maxTokens?: number;
     }
   ): Promise<string>;
 

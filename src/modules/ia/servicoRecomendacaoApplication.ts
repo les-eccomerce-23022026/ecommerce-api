@@ -22,6 +22,7 @@ import {
 import { IMetricasDeterministicas } from './IMetricasDeterministicas';
 import { ServicoFiltroCatalogo } from './servicoFiltroCatalogo';
 import { AdapterLangChainGemini } from './adapterLangChainGemini';
+import { FactoryEmbedding } from './factoryEmbedding';
 import { IContextoRecomendacao } from './IContextoRecomendacao.entity';
 import {
   IntencaoRecomendacao,
@@ -97,8 +98,14 @@ export interface OpcoesRecomendacaoInterna {
 
 type HistoricoGemini = { papel: 'user' | 'model'; conteudo: string }[] | undefined;
 
+/** Nome dos eventos SSE do chat em streaming (Task 6). */
+export type NomeEventoSSEChat = 'meta' | 'produtos' | 'token' | 'done' | 'error';
+
+/** Callback de emissão de evento SSE: nome do evento + payload serializável. */
+export type EmitirEventoSSE = (evento: NomeEventoSSEChat, dados: unknown) => void;
+
 /** Timeouts para chamadas externas (ms). Evita que uma lentidão da API Gemini/Chroma bloqueie a requisição. */
-const TIMEOUT_EMBEDDING_MS = 8_000;
+const TIMEOUT_EMBEDDING_MS = 30_000;
 const TIMEOUT_INTENCAO_MS = 12_000;
 const TIMEOUT_RESPOSTA_CHAT_MS = 15_000;
 
@@ -135,8 +142,8 @@ export class ServicoRecomendacaoApplication {
     private servicoLivros: ServicoLivros,
     private servicoInterpretacaoIntencao: ServicoInterpretacaoIntencao
   ) {
-    // Inicializa validadores de alucinações (Camadas 2, 3 e 4)
-    this.validadorSemantica = new ValidadorSemanticaDinamico(adapterLangChain);
+    // Usa FactoryEmbedding (huggingface_local) para validação semântica — não Gemini
+    this.validadorSemantica = new ValidadorSemanticaDinamico(FactoryEmbedding.obterInstancia());
     this.validadorCoerenciaLLM = new ValidadorCoerenciaLLM(adapterLangChain);
     this.aprendizadoAlucinacoes = new AprendizadoAlucinacoes();
   }
@@ -334,7 +341,7 @@ export class ServicoRecomendacaoApplication {
           'interpretacao-intencao'
         ),
         this.comTimeout(
-          this.adapterLangChain.gerarEmbedding(dados.mensagem),
+          FactoryEmbedding.obterInstancia().gerarEmbedding(dados.mensagem),
           TIMEOUT_EMBEDDING_MS,
           'embedding-mensagem'
         ),
@@ -390,6 +397,71 @@ export class ServicoRecomendacaoApplication {
     }
   }
 
+  /**
+   * Endpoint: chat com streaming SSE (Task 6).
+   *
+   * Estratégia de baixo risco: reaproveita integralmente o pipeline de `chat()`
+   * (interpretação de intenção, RAG, geração da resposta), garantindo paridade
+   * total de comportamento com o caminho não-streaming. Em seguida emite os
+   * eventos SSE na ordem do contrato:
+   *   meta → produtos → token(s) → done
+   *
+   * Os deltas de `token` são derivados da resposta final por fragmentação
+   * (chunking) — o cliente recebe o texto incrementalmente. A geração nativa
+   * em streaming dos provedores está disponível via
+   * `adapterLangChain.gerarRespostaChatStream` e é usada internamente pelos
+   * caminhos que chamam a LLM; aqui o foco é o contrato SSE estável.
+   *
+   * @param emitir Callback de emissão de eventos SSE (evento + dados serializáveis)
+   */
+  async chatStream(
+    dados: IChatRequestDTO,
+    incluirMetricas: boolean,
+    emitir: EmitirEventoSSE
+  ): Promise<void> {
+    try {
+      const resultado = await this.chat(dados, incluirMetricas);
+
+      emitir('meta', {
+        tipoResposta: resultado.tipoResposta,
+        intencaoResumida: resultado.intencaoResumida,
+        contextoUsado: resultado.contextoUsado,
+        numeroTurno: resultado.numeroTurno,
+      });
+
+      emitir('produtos', {
+        produtosRecomendados: resultado.produtosRecomendados,
+      });
+
+      for (const delta of this.fragmentarTexto(resultado.resposta)) {
+        emitir('token', { delta });
+      }
+
+      emitir('done', resultado);
+    } catch (erro) {
+      const mensagem = erro instanceof Error ? erro.message : String(erro);
+      Logger.error(`[ServicoRecomendacaoApplication] Erro no chatStream: ${mensagem}`);
+      emitir('error', { message: mensagem });
+    }
+  }
+
+  /**
+   * Fragmenta o texto final em deltas pequenos para emissão incremental via SSE.
+   * Mantém a pontuação/espaços, preservando o texto original ao concatenar.
+   */
+  private *fragmentarTexto(texto: string): Generator<string> {
+    if (!texto) return;
+    // Quebra preservando os separadores (espaços e quebras de linha).
+    const partes = texto.match(/\S+\s*|\s+/g);
+    if (!partes) {
+      yield texto;
+      return;
+    }
+    for (const parte of partes) {
+      yield parte;
+    }
+  }
+
   // ── Handlers por tipo de intenção ─────────────────────────────────────────
 
   /**
@@ -413,6 +485,8 @@ export class ServicoRecomendacaoApplication {
         modoEsclarecimento: true,
         perguntasFollowUp: intencao.perguntasEsclarecimento,
         perfil: contextoCliente?.perfil,
+        // Intenção curta (Task 3): resposta breve, limite menor de tokens.
+        maxTokens: 384,
       }
     );
 
@@ -458,6 +532,8 @@ export class ServicoRecomendacaoApplication {
       {
         perfil: contextoCliente?.perfil,
         modoPosvenda: true,
+        // Intenção curta (Task 3): resposta breve, limite menor de tokens.
+        maxTokens: 384,
       }
     );
 
@@ -1200,8 +1276,9 @@ export class ServicoRecomendacaoApplication {
   }
 
   private async gerarEmbeddingQuery(query: string): Promise<number[]> {
+    const adapterEmbedding = FactoryEmbedding.obterInstancia();
     return this.comTimeout(
-      this.adapterLangChain.gerarEmbedding(query),
+      adapterEmbedding.gerarEmbedding(query),
       TIMEOUT_EMBEDDING_MS,
       'embedding'
     );

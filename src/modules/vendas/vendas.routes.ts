@@ -9,6 +9,7 @@ import { RepositorioCotacaoFretePostgres } from '@/modules/frete/cotacaoFrete/Re
 import { RepositorioPagamentosPostgres } from '@/modules/pagamentos/repositories/RepositorioPagamentosPostgres';
 import { RepositorioEntregaPostgres } from '@/modules/entrega/RepositorioEntregaPostgres';
 import { RepositorioRastreamentoPostgres } from '@/modules/logistica-mocks/repositorios/RepositorioRastreamentoPostgres';
+import { RepositorioLivrosPostgres } from '@/modules/livros/repositorioLivrosPostgres';
 
 /**
  * Registra rotas de vendas no roteador.
@@ -20,8 +21,9 @@ export function registrarRotasVendas(router: Router): void {
   const repoPagamentos = new RepositorioPagamentosPostgres(db);
   const repoRastreamento = new RepositorioRastreamentoPostgres(db);
   const repoEntrega = new RepositorioEntregaPostgres(db, repoRastreamento);
-  const servico = new ServicoVendas(repo, repoCotacao, repoEntrega);
-  const controller = new ControladorVendas(servico, repoPagamentos, repoEntrega);
+  const repoLivros = new RepositorioLivrosPostgres(db);
+  const servico = new ServicoVendas(repo, repoCotacao, repoEntrega, repoLivros);
+  const controller = new ControladorVendas(servico, repoPagamentos, repoEntrega, repoLivros);
 
   router.post('/vendas', autenticacaoMiddleware, controller.registrarPedidoVenda);
   router.get('/vendas/:uuid', autenticacaoMiddleware, controller.visualizarDetalhesVenda);

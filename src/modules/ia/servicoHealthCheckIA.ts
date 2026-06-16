@@ -20,7 +20,7 @@ export interface ISaudeIaDependencia {
  * Resultado agregado de saúde do módulo de IA.
  *
  * Status possíveis:
- * - `ok`       → ChromaDB e Gemini operacionais
+ * - `ok`       → ChromaDB e Embedding operacionais
  * - `degraded` → exatamente uma dependência falhou
  * - `down`     → ambas as dependências falharam
  */
@@ -30,7 +30,7 @@ export interface ISaudeIaResultado {
   timestamp: string;
   dependencias: {
     chromadb: ISaudeIaDependencia;
-    gemini: ISaudeIaDependencia;
+    embedding: ISaudeIaDependencia;
   };
 }
 
@@ -39,21 +39,21 @@ export interface ISaudeIaResultado {
 const PREFIXO_LOG = '[ServicoHealthCheckIA]';
 
 /** Tempo máximo de espera por verificação, em milissegundos */
-const TIMEOUT_VERIFICACAO_MS = 2000;
+const TIMEOUT_VERIFICACAO_MS = 10000;
 
 /**
  * TTL do cache de health check (ms).
- * Evita disparar um embedding Gemini em CADA requisição de chat/recomendar.
+ * Evita disparar um embedding em CADA requisição de chat/recomendar.
  * 30s é conservador: detecta falhas rapidamente sem custo por request.
  */
 const HEALTH_CACHE_TTL_MS = 30_000;
 
-/** Texto mínimo enviado ao Gemini como requisição de ping */
-const TEXTO_PING_GEMINI = 'ping';
+/** Texto mínimo enviado ao provedor de embedding como requisição de ping */
+const TEXTO_PING_EMBEDDING = 'ping';
 
 /**
  * Chave composta para resolução de status.
- * Formato: '<chromadb>-<gemini>', onde cada parte é 'ok' ou 'falhou'.
+ * Formato: '<chromadb>-<embedding>', onde cada parte é 'ok' ou 'falhou'.
  */
 type ChaveStatus = 'ok-ok' | 'ok-falhou' | 'falhou-ok' | 'falhou-falhou';
 
@@ -61,7 +61,7 @@ type ChaveStatus = 'ok-ok' | 'ok-falhou' | 'falhou-ok' | 'falhou-falhou';
  * Tabela de despacho para resolução do status agregado do módulo de IA.
  * Substitui switch/case conforme regra U2 (OCP — SOLID).
  *
- * Leitura: chave = '<resultado ChromaDB>-<resultado Gemini>'
+ * Leitura: chave = '<resultado ChromaDB>-<resultado Embedding>'
  */
 const TABELA_STATUS: Record<ChaveStatus, ISaudeIaResultado['status']> = {
   'ok-ok':          'ok',
@@ -138,13 +138,13 @@ function resolverChaveStatus(
  * ```
  */
 export class ServicoHealthCheckIA {
-  /** Cache do último resultado de saúde — evita hit em Gemini/ChromaDB por request. */
+  /** Cache do último resultado de saúde — evita hit em Embedding/ChromaDB por request. */
   private cacheResultado: ISaudeIaResultado | null = null;
   private cacheExpiresAt = 0;
 
   constructor(
     private readonly repositorioChromaDB: IRepositorioEmbedding,
-    private readonly adapterGemini: IAdapterEmbedding,
+    private readonly adapterEmbedding: IAdapterEmbedding,
   ) {}
 
   /**
@@ -201,16 +201,16 @@ export class ServicoHealthCheckIA {
    *
    * @returns `ISaudeIaDependencia` com `ok`, `mensagem` opcional e `latencyMs`
    */
-  async verificarGemini(): Promise<ISaudeIaDependencia> {
+  async verificarEmbedding(): Promise<ISaudeIaDependencia> {
     const inicio = Date.now();
 
     try {
-      Logger.debug(`${PREFIXO_LOG} Verificando conexão com Gemini...`);
+      Logger.debug(`${PREFIXO_LOG} Verificando conexão com provedor de embedding...`);
 
       const embedding = await comTimeout(
-        this.adapterGemini.gerarEmbedding(TEXTO_PING_GEMINI),
+        this.adapterEmbedding.gerarEmbedding(TEXTO_PING_EMBEDDING),
         TIMEOUT_VERIFICACAO_MS,
-        'Gemini',
+        'Embedding',
       );
 
       const latencyMs = Date.now() - inicio;
@@ -218,24 +218,24 @@ export class ServicoHealthCheckIA {
       // Early return: embedding retornado é inválido
       if (!Array.isArray(embedding) || embedding.length === 0) {
         Logger.warn(
-          `${PREFIXO_LOG} Gemini retornou embedding inválido | latência: ${latencyMs}ms`,
+          `${PREFIXO_LOG} Provedor de embedding retornou embedding inválido | latência: ${latencyMs}ms`,
         );
         return {
           ok: false,
-          mensagem: 'Gemini retornou embedding inválido ou vazio',
+          mensagem: 'Provedor de embedding retornou embedding inválido ou vazio',
           latencyMs,
         };
       }
 
       Logger.info(
-        `${PREFIXO_LOG} Gemini saudável | dimensão do embedding: ${embedding.length} | latência: ${latencyMs}ms`,
+        `${PREFIXO_LOG} Provedor de embedding saudável | dimensão do embedding: ${embedding.length} | latência: ${latencyMs}ms`,
       );
       return { ok: true, latencyMs };
 
     } catch (erro) {
       const latencyMs = Date.now() - inicio;
       const mensagem   = erro instanceof Error ? erro.message : String(erro);
-      Logger.warn(`${PREFIXO_LOG} Gemini indisponível: ${mensagem} | latência: ${latencyMs}ms`);
+      Logger.warn(`${PREFIXO_LOG} Provedor de embedding indisponível: ${mensagem} | latência: ${latencyMs}ms`);
       return { ok: false, mensagem, latencyMs };
     }
   }
@@ -243,14 +243,14 @@ export class ServicoHealthCheckIA {
   /**
    * Executa a verificação de todas as dependências em paralelo.
    *
-   * Usa `Promise.all` para minimizar a latência total — ChromaDB e Gemini são
+   * Usa `Promise.all` para minimizar a latência total — ChromaDB e Embedding são
    * verificados simultaneamente. O status agregado é resolvido via tabela de
    * despacho `TABELA_STATUS`, sem switch/case.
    *
    * @returns `ISaudeIaResultado` com status consolidado, timestamp e detalhes
    */
   async verificarTodasDependencias(): Promise<ISaudeIaResultado> {
-    // Cache hit: evita embedding Gemini em cada request de chat/recomendar.
+    // Cache hit: evita embedding em cada request de chat/recomendar.
     // Princípio: health checks são probes de disponibilidade, não devem ser
     // blocking I/O no critical path — TTL de 30s é conservador e suficiente.
     const agora = Date.now();
@@ -261,24 +261,24 @@ export class ServicoHealthCheckIA {
 
     Logger.info(`${PREFIXO_LOG} Iniciando verificação paralela de dependências...`);
 
-    const [chromadb, gemini] = await Promise.all([
+    const [chromadb, embedding] = await Promise.all([
       this.verificarChromaDB(),
-      this.verificarGemini(),
+      this.verificarEmbedding(),
     ]);
 
-    const chave  = resolverChaveStatus(chromadb, gemini);
+    const chave  = resolverChaveStatus(chromadb, embedding);
     const status = TABELA_STATUS[chave];
 
     const resultado: ISaudeIaResultado = {
       status,
       timestamp: new Date().toISOString(),
-      dependencias: { chromadb, gemini },
+      dependencias: { chromadb, embedding },
     };
 
     Logger.info(
       `${PREFIXO_LOG} Verificação concluída | status: ${status}` +
       ` | chromadb: ${chromadb.ok} (${chromadb.latencyMs}ms)` +
-      ` | gemini: ${gemini.ok} (${gemini.latencyMs}ms)`,
+      ` | embedding: ${embedding.ok} (${embedding.latencyMs}ms)`,
     );
 
     this.cacheResultado = resultado;

@@ -10,7 +10,7 @@ import { ServicoCacheArquivo } from '@/shared/infrastructure/cache/ServicoCacheA
 
 export type IDashboardAdminJson = Record<string, unknown>;
 
-const CHAVE_CACHE_DASHBOARD = 'dashboard:admin:metricas';
+const CHAVE_CACHE_DASHBOARD = 'dashboard:admin:metricas:v2';
 
 export class ServicoDashboardAdmin {
   private readonly consultas: DashboardAdminConsultas;
@@ -21,14 +21,63 @@ export class ServicoDashboardAdmin {
     this.cache = new ServicoCacheArquivo('./cache/dashboard', 300); // 5 minutos
   }
 
-  async obterDashboard(): Promise<IDashboardAdminJson> {
-    const dadosCache = await this.cache.obter<IDashboardAdminJson>(CHAVE_CACHE_DASHBOARD);
+  async obterDashboard(filtros?: { periodo?: string; status?: string }): Promise<IDashboardAdminJson> {
+    const chaveCache = filtros 
+      ? `${CHAVE_CACHE_DASHBOARD}:${filtros.periodo || 'todos'}:${filtros.status || 'todos'}`
+      : CHAVE_CACHE_DASHBOARD;
+    
+    const dadosCache = await this.cache.obter<IDashboardAdminJson>(chaveCache);
     if (dadosCache) {
       return dadosCache;
     }
 
     const agora = new Date();
     const ano = agora.getFullYear();
+    
+    // Calcular datas baseadas no filtro de período
+    let inicioPeriodo: Date;
+    let fimPeriodo: Date;
+    
+    if (filtros?.periodo && filtros.periodo !== 'todos') {
+      const periodo = filtros.periodo;
+      inicioPeriodo = new Date();
+      fimPeriodo = new Date();
+      
+      switch (periodo) {
+        case '7d':
+          inicioPeriodo.setDate(agora.getDate() - 7);
+          break;
+        case '30d':
+          inicioPeriodo.setDate(agora.getDate() - 30);
+          break;
+        case '1w':
+          inicioPeriodo.setDate(agora.getDate() - 7);
+          break;
+        case '2w':
+          inicioPeriodo.setDate(agora.getDate() - 14);
+          break;
+        case '1m':
+          inicioPeriodo.setMonth(agora.getMonth() - 1);
+          break;
+        case '3m':
+          inicioPeriodo.setMonth(agora.getMonth() - 3);
+          break;
+        case '6m':
+          inicioPeriodo.setMonth(agora.getMonth() - 6);
+          break;
+        case '1a':
+          inicioPeriodo.setFullYear(agora.getFullYear() - 1);
+          break;
+        default:
+          inicioPeriodo.setDate(agora.getDate() - 7);
+      }
+    } else {
+      inicioPeriodo = new Date(ano, agora.getMonth() - 2, 1); // Últimos 3 meses por padrão
+    }
+    
+    fimPeriodo = new Date();
+    fimPeriodo.setHours(23, 59, 59, 999);
+    
     const inicioMes = new Date(ano, agora.getMonth(), 1);
     const fimMes = new Date(ano, agora.getMonth() + 1, 0, 23, 59, 59, 999);
     const inicioMesAnterior = new Date(ano, agora.getMonth() - 1, 1);
@@ -131,8 +180,26 @@ export class ServicoDashboardAdmin {
         : 0;
     const pctCrescimentoClientes = percentualCrescimento(novosClientesMes, novosClientesMesAnterior);
 
-    const statusLabels = ['Entregues', 'Em Trânsito', 'Preparando', 'Pendentes', 'Devoluções'];
-    const statusData = [cntEntregue, cntTransito, cntPreparando, cntPendentes, cntDevolucoes];
+    // Aplicar filtro de status se fornecido
+    let statusLabels = ['Entregues', 'Em Trânsito', 'Preparando', 'Pendentes', 'Devoluções'];
+    let statusData = [cntEntregue, cntTransito, cntPreparando, cntPendentes, cntDevolucoes];
+    
+    if (filtros?.status && filtros.status !== 'todos') {
+      const statusFiltro = filtros.status;
+      const statusMap: Record<string, { label: string; valor: number }> = {
+        'entregue': { label: 'Entregues', valor: cntEntregue },
+        'transito': { label: 'Em Trânsito', valor: cntTransito },
+        'preparando': { label: 'Preparando', valor: cntPreparando },
+        'pendente': { label: 'Pendentes', valor: cntPendentes },
+        'devolucao': { label: 'Devoluções', valor: cntDevolucoes },
+      };
+      
+      const statusSelecionado = statusMap[statusFiltro];
+      if (statusSelecionado) {
+        statusLabels = [statusSelecionado.label];
+        statusData = [statusSelecionado.valor];
+      }
+    }
 
     const mesesReceita = await Promise.all(
       indicesUltimosMeses(3).map(async (i) => {
@@ -140,11 +207,35 @@ export class ServicoDashboardAdmin {
         const label = d.toLocaleString('pt-BR', { month: 'short' });
         const labelFmt = label.charAt(0).toUpperCase() + label.slice(1);
         const { ini, fim } = inicioFimMes(d.getFullYear(), d.getMonth());
+        
+        // Se houver filtro de período, usar o período filtrado
+        // Caso contrário, usar o mês específico
+        let dataInicio: Date;
+        let dataFim: Date;
+        
+        if (filtros?.periodo && filtros.periodo !== 'todos') {
+          // Calcular o início e fim do período baseado no mês atual
+          const mesInicio = new Date(d.getFullYear(), d.getMonth(), 1);
+          const mesFim = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999);
+          
+          // Intersecção entre o período filtrado e o mês específico
+          dataInicio = inicioPeriodo > mesInicio ? inicioPeriodo : mesInicio;
+          dataFim = fimPeriodo < mesFim ? fimPeriodo : mesFim;
+          
+          // Se não houver intersecção, retornar 0
+          if (dataInicio > dataFim) {
+            return { labelFmt, valor: 0 };
+          }
+        } else {
+          dataInicio = ini;
+          dataFim = fim;
+        }
+        
         const r = await this.consultas.obterScalar(
           `SELECT COALESCE(SUM(ven_total_venda), 0)::numeric AS v
            FROM livraria_comercial.vendas
            WHERE ven_criado_em >= $1 AND ven_criado_em <= $2`,
-          [ini, fim],
+          [dataInicio, dataFim],
         );
         return { labelFmt, valor: Number(r) };
       }),
@@ -213,7 +304,7 @@ export class ServicoDashboardAdmin {
       atividadesRecentes,
     };
 
-    await this.cache.definir(CHAVE_CACHE_DASHBOARD, dadosDashboard);
+    await this.cache.definir(chaveCache, dadosDashboard);
 
     return dadosDashboard;
   }

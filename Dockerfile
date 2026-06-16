@@ -55,7 +55,7 @@ EXPOSE 3000
 CMD ["pm2-runtime", "dist/server.js", "-i", "max", "--node-args=--max-old-space-size=768"]
 
 # Stage 3: Development - Para desenvolvimento com hot reload
-FROM node:20-alpine AS development
+FROM node:20 AS development
 
 # Definir diretório de trabalho
 WORKDIR /app

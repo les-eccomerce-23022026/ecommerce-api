@@ -3,6 +3,7 @@ import { ServicoVendas } from '@/modules/vendas/services/ServicoVendas';
 import { PAPEL_ADMIN } from '@/shared/types/papeis';
 import type { IRepositorioPagamentos } from '@/modules/pagamentos/repositories/IRepositorioPagamentos';
 import type { IRepositorioEntrega } from '@/modules/entrega/IRepositorioEntrega';
+import { RepositorioLivrosPostgres } from '@/modules/livros/repositorioLivrosPostgres';
 
 /**
  * Controlador para requisições de vendas.
@@ -14,7 +15,7 @@ export class ControladorVendas {
 
   private readonly repoEntrega: IRepositorioEntrega | null;
 
-  constructor(servicoVendas: ServicoVendas, repoPagamentos: IRepositorioPagamentos, repoEntrega?: IRepositorioEntrega) {
+  constructor(servicoVendas: ServicoVendas, repoPagamentos: IRepositorioPagamentos, repoEntrega?: IRepositorioEntrega, repoLivros?: RepositorioLivrosPostgres) {
     this.servicoVendas = servicoVendas;
     this.repoPagamentos = repoPagamentos;
     this.repoEntrega = repoEntrega ?? null;

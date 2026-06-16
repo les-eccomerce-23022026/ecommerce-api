@@ -309,13 +309,27 @@ export class ControladorRecomendacao {
         return;
       }
 
-      const resultado = await this.servicoRecomendacao.chat({
+      const dadosChat: IChatRequestDTO = {
         ...dados,
         mensagem: mensagemSanitizada,
         clienteUuid,
         incluirMetricas: dados.incluirMetricas ?? false,
         contextoIA, // Passa contexto para serviço de aplicação
-      });
+      };
+
+      // Streaming SSE (Task 6): ativado por header Accept: text/event-stream
+      // OU body { stream: true }. Caso contrário mantém o JSON tradicional.
+      const aceitaSSE = (req.headers.accept ?? '').includes('text/event-stream');
+      const pediuStreamBody = (req.body as { stream?: unknown })?.stream === true;
+      if (aceitaSSE || pediuStreamBody) {
+        await this.responderChatStream(res, dadosChat);
+        return;
+      }
+
+      const resultado = await this.servicoRecomendacao.chat(
+        dadosChat,
+        dadosChat.incluirMetricas ?? false
+      );
       RespostaPadrao.enviarSucesso(res, 200, resultado);
     } catch (erro) {
       const msg = this.obterMensagemErroApi(erro, 'Erro no chat');
@@ -323,6 +337,45 @@ export class ControladorRecomendacao {
       RespostaPadrao.enviarErro(res, this.obterStatusHttpErro(erro, 500), msg);
     }
   };
+
+  /**
+   * Responde ao chat em modo streaming SSE (Task 6).
+   *
+   * Contrato de eventos:
+   *   event: meta     data: { tipoResposta, intencaoResumida, contextoUsado, numeroTurno }
+   *   event: produtos data: { produtosRecomendados: [...] }
+   *   event: token    data: { delta: "..." }   (vários)
+   *   event: done     data: IChatResponseDTO + metricas
+   *   event: error    data: { message }
+   */
+  private async responderChatStream(res: Response, dadosChat: IChatRequestDTO): Promise<void> {
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no'); // desabilita buffering em proxies (nginx)
+    res.flushHeaders?.();
+
+    const escreverEvento = (evento: string, dados: unknown): void => {
+      res.write(`event: ${evento}\n`);
+      res.write(`data: ${JSON.stringify(dados)}\n\n`);
+      // Flush incremental quando o framework de compressão expõe o método.
+      (res as Response & { flush?: () => void }).flush?.();
+    };
+
+    try {
+      await this.servicoRecomendacao.chatStream(
+        dadosChat,
+        dadosChat.incluirMetricas ?? false,
+        escreverEvento
+      );
+    } catch (erro) {
+      const msg = erro instanceof Error ? erro.message : String(erro);
+      Logger.error(`[ControladorRecomendacao.responderChatStream] Erro: ${msg}`);
+      escreverEvento('error', { message: msg });
+    } finally {
+      res.end();
+    }
+  }
 
   /**
    * Endpoint POST /api/ia/reindexar (Admin only)

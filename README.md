@@ -4,6 +4,31 @@ API Node.js/TypeScript (Express, PostgreSQL, JWT).
 
 ---
 
+## 🚀 Setup Automatizado (Recomendado)
+
+Para configurar e iniciar o backend automaticamente em um novo ambiente, execute:
+
+```bash
+# Na raiz do projeto
+./start-backend.sh
+
+# Ou diretamente no backend
+cd backend
+./scripts/setup-complete.sh
+```
+
+Este script automatizado irá:
+- ✅ Verificar pré-requisitos (Docker, Docker Compose)
+- ✅ Configurar o arquivo `.env` automaticamente
+- ✅ Instalar dependências npm
+- ✅ Subir containers Docker (PostgreSQL, ChromaDB, Backend)
+- ✅ Configurar o banco de dados completo
+- ✅ Validar que tudo está funcionando
+
+**Documentação completa dos scripts:** [`scripts/README-SETUP.md`](scripts/README-SETUP.md)
+
+---
+
 ## Contexto no monorepo
 
 - Visão geral do projeto: [`../README.md`](../README.md)
@@ -186,14 +211,6 @@ Usuários criados pelos seeds em `sql/modelagem-dados/dml/` e migrations. Após 
 | **Maria Silva** | `cliente1@livraria.com.br` | `123456` | `095_seed_desenvolvimento_minimo_corrigido.sql` | Endereço, telefone, cartão Visa |
 | **João Santos** | `cliente2@livraria.com.br` | `123456` | `095_seed_desenvolvimento_minimo_corrigido.sql` | Endereço, telefone, cartão Mastercard |
 
-### Clientes Demo (30 cadastrados - Seed 065)
-
-| Nome | E-mail | Senha | Origem | Observação |
-|------|--------|-------|--------|------------|
-| **Ana Beatriz Souza** | `demo.cliente01@les.demo.br` | `Cliente@123` | `065_seed_demo_30_clientes_100_livros.sql` | Cliente demo padrão |
-| **Bruno Henrique Lima** | `demo.cliente02@les.demo.br` | `Cliente@123` | `065_seed_demo_30_clientes_100_livros.sql` | Cliente demo padrão |
-| **...** | `demo.cliente03@les.demo.br` a `demo.cliente30@les.demo.br` | `Cliente@123` | `065_seed_demo_30_clientes_100_livros.sql` | 30 clientes demo com senha padrão |
-
 ### Administradores de Loja (2 cadastrados)
 
 | Nome | E-mail | Senha | Papel | Escopo | Origem |
@@ -353,6 +370,7 @@ npm run test:coverage
 | `npm test` | Testes Jest |
 | `npm run test:coverage` | Testes + cobertura |
 | `./scripts/setup-db.sh` | DDL/DML/migrations no Postgres dev |
+| `./scripts/setup-banco-completo.sh` | Setup unificado do banco (DDL, DML, migrations críticas) |
 | `./scripts/reset-db.sh` | Limpa volumes Docker e recria banco (ver script) |
 | `./iniciar-docker.sh` | Sobe compose, valida API na `PORTA_HTTP_EXTERNA` e roda setup do banco |
 
