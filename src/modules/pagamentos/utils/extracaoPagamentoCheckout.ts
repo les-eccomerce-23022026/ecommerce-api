@@ -85,6 +85,24 @@ function mapearPagamentosCartao(
   });
 }
 
+function validarValorMinimoPorCartao(pagamentosCartao: Array<{ valor: number; parcelasCartao?: number }>): void {
+  for (const pagamento of pagamentosCartao) {
+    if (pagamento.valor < 10) {
+      throw new Error('RN0034: Valor mínimo por cartão deve ser R$ 10,00');
+    }
+  }
+}
+
+function validarParcelamentoMinimo(
+  pagamentosCartao: Array<{ valor: number; parcelasCartao?: number }>,
+  valorTotal: number,
+): void {
+  const temParcelamento = pagamentosCartao.some(p => p.parcelasCartao && p.parcelasCartao > 1);
+  if (temParcelamento && valorTotal < 80) {
+    throw new Error('RN0069: Compras abaixo de R$ 80,00 não permitem parcelamento');
+  }
+}
+
 function garantirSomaIgualTotal(
   pagamentosCartao: Array<{ valor: number; parcelasCartao?: number }>,
   valorTotal: number,
@@ -101,6 +119,13 @@ function extrairVendaUuidOpcionalCheckout(corpo: Record<string, unknown>): strin
   }
   const t = corpo.vendaUuid.trim();
   return t === '' ? undefined : t;
+}
+
+function validarCupomPromocionalUnico(cuponsAplicados: Array<{ tipo: string }>): void {
+  const cuponsPromocionais = cuponsAplicados.filter(c => c.tipo === 'promocional');
+  if (cuponsPromocionais.length > 1) {
+    throw new Error('RN0033: Apenas 1 cupom promocional por compra');
+  }
 }
 
 function mapearCuponsAplicados(cuponsBrutos: unknown): Array<{ uuid: string; codigo: string; tipo: string; valor: number }> {
@@ -133,11 +158,14 @@ export function extrairCheckoutPagamento(corpo: Record<string, unknown>): Checko
 
   const cuponsAplicados = mapearCuponsAplicados(corpo.cuponsAplicados);
   const is100PercentCoupon = cuponsAplicados.length > 0 && pagamentosBrutos.length === 0;
+  validarCupomPromocionalUnico(cuponsAplicados);
 
   const credenciais = extrairCredenciaisIntencao(corpo, is100PercentCoupon);
   const valorTotal = extrairValorTotalCheckout(corpo, is100PercentCoupon);
   const pagamentosCartao = mapearPagamentosCartao(pagamentosBrutos);
   garantirSomaIgualTotal(pagamentosCartao, valorTotal);
+  validarValorMinimoPorCartao(pagamentosCartao);
+  validarParcelamentoMinimo(pagamentosCartao, valorTotal);
 
   const vendaUuid = extrairVendaUuidOpcionalCheckout(corpo);
 

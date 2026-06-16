@@ -442,4 +442,22 @@ export class RepositorioEmbeddingChromaDB implements IRepositorioEmbedding {
       return false;
     }
   }
+
+  /**
+   * Conta o número de documentos na coleção
+   * 
+   * @returns Número de documentos na coleção
+   */
+  async contarDocumentos(): Promise<number> {
+    try {
+      const colecao = await this.inicializarColecao();
+      const resultado = await colecao.count();
+      Logger.info(`[RepositorioEmbeddingChromaDB] Coleção possui ${resultado} documentos`);
+      return resultado;
+    } catch (erro) {
+      const mensagem = erro instanceof Error ? erro.message : String(erro);
+      Logger.warn(`[RepositorioEmbeddingChromaDB] Erro ao contar documentos: ${mensagem}`);
+      return 0;
+    }
+  }
 }

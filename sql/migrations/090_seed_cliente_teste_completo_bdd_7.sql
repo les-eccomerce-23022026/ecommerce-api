@@ -97,32 +97,32 @@ BEGIN
 
     RAISE NOTICE 'Cartão criado para cliente test: crt_id=%', v_car_id;
 
-    -- Criar cupom de troca para o cliente (schema: livraria_comercial)
-    INSERT INTO livraria_comercial.cupom (
-        cup_uuid, cup_codigo, cup_tipo, cup_valor_desconto, cup_valor_minimo,
-        cup_ativo, cup_valido_ate, loj_id
+    -- Criar cupom de troca para o cliente (schema: livraria_comercial - tabela cupons_troca)
+    -- OBS: Cupons de troca vinculados a clientes devem usar a tabela cupons_troca, não cupom
+    INSERT INTO livraria_comercial.cupons_troca (
+        cpt_uuid, cpt_codigo, cpt_valor, cpt_cliente_id,
+        cpt_status, cpt_valido_ate, loj_id
     )
     VALUES (
         gen_random_uuid(),
         'TROCA-TESTE-BDD-7',
-        'troca',
         50.00,
-        0,
-        TRUE,
+        (SELECT cli_id FROM livraria_gestao.clientes WHERE usu_id = v_usu_id),
+        'DISPONIVEL',
         (CURRENT_DATE + INTERVAL '6 months')::date,
         v_loj_id
     )
-    ON CONFLICT (cup_codigo) DO UPDATE SET
-        cup_valor_desconto = EXCLUDED.cup_valor_desconto,
-        cup_ativo = TRUE,
-        cup_valido_ate = EXCLUDED.cup_valido_ate
-    RETURNING cup_id INTO v_cup_id;
+    ON CONFLICT (cpt_codigo) DO UPDATE SET
+        cpt_valor = EXCLUDED.cpt_valor,
+        cpt_status = 'DISPONIVEL',
+        cpt_valido_ate = EXCLUDED.cpt_valido_ate
+    RETURNING cpt_id INTO v_cup_id;
 
     IF v_cup_id IS NULL THEN
-        SELECT cup_id INTO v_cup_id FROM livraria_comercial.cupom WHERE cup_codigo = 'TROCA-TESTE-BDD-7' LIMIT 1;
+        SELECT cpt_id INTO v_cup_id FROM livraria_comercial.cupons_troca WHERE cpt_codigo = 'TROCA-TESTE-BDD-7' LIMIT 1;
     END IF;
 
-    RAISE NOTICE 'Cupom de troca criado para cliente test: cup_id=%, codigo=TROCA-TESTE-BDD-7, valor=50.00', v_cup_id;
+    RAISE NOTICE 'Cupom de troca criado para cliente test: cpt_id=%, codigo=TROCA-TESTE-BDD-7, valor=50.00', v_cup_id;
 
 END $$;
 

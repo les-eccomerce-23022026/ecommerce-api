@@ -9,6 +9,7 @@ import type { IRepositorioVendas } from '@/modules/vendas/repositories/IReposito
 import {
   persistirPagamentosCheckoutAprovados,
   processarSaldosCuponsTroca,
+  gerarCupomTrocaExcedente,
   type CupomCheckoutLinha,
   type PagamentoCartaoCheckoutLinha,
 } from '@/modules/pagamentos/services/servicoPagamentosCheckout.util';
@@ -48,6 +49,7 @@ async function persistirSeCheckoutAprovado(
   vendaUuid: string | undefined,
   registroIntencao: IntencaoPagamentoPersistida | null,
   pagamentosCartao: PagamentoCartaoCheckoutLinha[],
+  valorTotal: number,
   cuponsAplicados?: CupomCheckoutLinha[],
 ): Promise<string[]> {
   if (!sucesso || !vendaUuid?.trim()) {
@@ -62,6 +64,18 @@ async function persistirSeCheckoutAprovado(
   });
   if (cuponsAplicados && cuponsAplicados.length > 0) {
     await processarSaldosCuponsTroca(deps.repositorioPagamentos, cuponsAplicados);
+
+    // RN0036: Gerar cupom de troca excedente se valor dos cupons > total da compra
+    const valorTotalCupons = cuponsAplicados.reduce((acc, c) => acc + c.valor, 0);
+    const cupomExcedente = await gerarCupomTrocaExcedente(
+      deps.repositorioPagamentos,
+      v,
+      valorTotalCupons,
+      valorTotal,
+    );
+    if (cupomExcedente) {
+      console.log(`[RN0036] Cupom de troca excedente gerado: ${cupomExcedente.codigo} (R$ ${cupomExcedente.valor.toFixed(2)})`);
+    }
   }
   await sincronizarStatusVendaAposPagamentos(deps.repositorioPagamentos, deps.repositorioVendas, v, deps.db);
   return pagamentosUuids;
@@ -89,6 +103,7 @@ export async function confirmarAutorizacaoFinanceiraCheckoutServico(
     vendaUuid,
     registroIntencao,
     pagamentosCartao,
+    valorTotal,
     cuponsAplicados,
   );
   return {

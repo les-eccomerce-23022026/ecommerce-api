@@ -3,20 +3,17 @@ import type { IAdapterLLMChat } from './IAdapterLLMChat';
 import type { IntencaoRecomendacao, ContextoInterpretacaoIntencao } from './IntencaoRecomendacao.entity';
 import type { MensagemChatDTO } from './IRecomendacao.dto';
 
-const MODELOS_FALLBACK = [
-  'groq/llama-3.3-70b-versatile', // Groq - API key funcionando
-  'openai/gpt-3.5-turbo',         // Fallback mais barato
-] as const;
+const MODELO = 'llama-3.1-8b-instant';
 
-const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions';
+const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
-export class AdapterOpenRouter implements IAdapterLLMChat {
+export class AdapterGroq implements IAdapterLLMChat {
   private readonly apiKey: string;
 
   constructor() {
-    const key = process.env.OPENROUTER_API_KEY;
+    const key = process.env.GROQ_API_KEY;
     if (!key) {
-      throw new Error('OPENROUTER_API_KEY não definida nas variáveis de ambiente');
+      throw new Error('GROQ_API_KEY não definida nas variáveis de ambiente');
     }
     this.apiKey = key;
   }
@@ -25,40 +22,29 @@ export class AdapterOpenRouter implements IAdapterLLMChat {
     mensagens: { role: 'system' | 'user' | 'assistant'; content: string }[],
     maxTokens = 1024
   ): Promise<string> {
-    for (const modelo of MODELOS_FALLBACK) {
-      try {
-        const resposta = await fetch(OPENROUTER_API_URL, {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${this.apiKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ model: modelo, messages: mensagens, max_tokens: maxTokens }),
-        });
+    const resposta = await fetch(GROQ_API_URL, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${this.apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ model: MODELO, messages: mensagens, max_tokens: maxTokens }),
+    });
 
-        if (!resposta.ok) {
-          const corpo = await resposta.text();
-          Logger.warn(`[AdapterOpenRouter] ${modelo} retornou ${resposta.status}: ${corpo}`);
-          continue;
-        }
-
-        const dados = await resposta.json();
-        const texto: string = dados?.choices?.[0]?.message?.content ?? '';
-
-        if (!texto.trim()) {
-          Logger.warn(`[AdapterOpenRouter] ${modelo} retornou resposta vazia`);
-          continue;
-        }
-
-        Logger.info(`[AdapterOpenRouter] Resposta obtida via ${modelo}`);
-        return texto.trim();
-      } catch (erro) {
-        const msg = erro instanceof Error ? erro.message : String(erro);
-        Logger.warn(`[AdapterOpenRouter] Erro em ${modelo}: ${msg}`);
-      }
+    if (!resposta.ok) {
+      const corpo = await resposta.text();
+      throw new Error(`[AdapterGroq] ${MODELO} retornou ${resposta.status}: ${corpo}`);
     }
 
-    throw new Error('Todos os modelos OpenRouter falharam');
+    const dados = await resposta.json();
+    const texto: string = dados?.choices?.[0]?.message?.content ?? '';
+
+    if (!texto.trim()) {
+      throw new Error(`[AdapterGroq] ${MODELO} retornou resposta vazia`);
+    }
+
+    Logger.info(`[AdapterGroq] Resposta obtida via ${MODELO}`);
+    return texto.trim();
   }
 
   async interpretarIntencao(
@@ -92,10 +78,13 @@ export class AdapterOpenRouter implements IAdapterLLMChat {
       .filter(Boolean)
       .join('\n');
 
-    const texto = await this.chamarAPI([
-      { role: 'system', content: system },
-      { role: 'user', content: user },
-    ], 512);
+    const texto = await this.chamarAPI(
+      [
+        { role: 'system', content: system },
+        { role: 'user', content: user },
+      ],
+      512
+    );
 
     const jsonLimpo = texto.replace(/```json\n?|\n?```/g, '').trim();
     const parsed = JSON.parse(jsonLimpo) as IntencaoRecomendacao;
@@ -122,6 +111,7 @@ export class AdapterOpenRouter implements IAdapterLLMChat {
       perguntasFollowUp?: string[];
       perfil?: { idadeAnos?: number; estado?: string; nome?: string };
       modoPosvenda?: boolean;
+      maxTokens?: number;
     }
   ): Promise<string> {
     if (opcoes?.modoEsclarecimento) {
@@ -172,8 +162,134 @@ export class AdapterOpenRouter implements IAdapterLLMChat {
       content: `${rotuloContexto}:\n${contexto}\n\nPergunta do cliente: ${pergunta}`,
     });
 
-    const texto = await this.chamarAPI(mensagens);
+    const texto = await this.chamarAPI(mensagens, opcoes?.maxTokens ?? 1024);
     return this.parsearRespostaChat(texto);
+  }
+
+  /**
+   * Versão streaming de gerarRespostaChat (Task 6).
+   *
+   * Usa o streaming nativo da API OpenAI-compat do Groq (`stream: true`) e
+   * repassa cada fragmento de texto ao callback `onDelta`. Como o system prompt
+   * pede JSON `{"resposta":"..."}`, fazemos um parse incremental tolerante:
+   * extraímos apenas o conteúdo do campo "resposta" à medida que chega.
+   * Retorna o texto final completo.
+   */
+  async gerarRespostaChatStream(
+    pergunta: string,
+    contexto: string,
+    onDelta: (delta: string) => void,
+    historicoConversa?: { papel: 'user' | 'model'; conteudo: string }[],
+    opcoes?: {
+      modoEsclarecimento?: boolean;
+      perguntasFollowUp?: string[];
+      perfil?: { idadeAnos?: number; estado?: string; nome?: string };
+      modoPosvenda?: boolean;
+      maxTokens?: number;
+    }
+  ): Promise<string> {
+    if (opcoes?.modoEsclarecimento) {
+      const texto = await this.gerarRespostaChat(pergunta, contexto, historicoConversa, opcoes);
+      onDelta(texto);
+      return texto;
+    }
+
+    const tomPerfil = this.montarInstrucaoTomPerfil(opcoes?.perfil);
+    const regrasPosvenda = opcoes?.modoPosvenda
+      ? 'MODO PÓS-VENDA ativo: responda APENAS com base nos pedidos listados no contexto. Nunca invente status, datas ou rastreamentos.'
+      : '';
+
+    const system = [
+      'Você é o assistente de uma livraria brasileira, especialista em recomendação de livros e atendimento pós-venda.',
+      'Use APENAS os dados fornecidos no contexto.',
+      'Responda em português do Brasil, de forma acolhedora e objetiva.',
+      'Formate em tópicos curtos com "• " (3 a 5 tópicos, cada um com no máximo uma frase).',
+      regrasPosvenda,
+      tomPerfil,
+      'IMPORTANTE: retorne APENAS JSON válido no formato {"resposta":"texto aqui"}. Nenhum texto fora do JSON.',
+    ]
+      .filter(Boolean)
+      .join(' ');
+
+    const mensagens: { role: 'system' | 'user' | 'assistant'; content: string }[] = [
+      { role: 'system', content: system },
+    ];
+    if (historicoConversa) {
+      for (const msg of historicoConversa) {
+        mensagens.push({ role: msg.papel === 'model' ? 'assistant' : 'user', content: msg.conteudo });
+      }
+    }
+    const rotuloContexto = opcoes?.modoPosvenda
+      ? 'Contexto de pedidos (única fonte de verdade)'
+      : 'Contexto (única fonte de verdade)';
+    mensagens.push({
+      role: 'user',
+      content: `${rotuloContexto}:\n${contexto}\n\nPergunta do cliente: ${pergunta}`,
+    });
+
+    const textoBruto = await AdapterGroq.streamChatCompletion(
+      this.apiKey,
+      mensagens,
+      opcoes?.maxTokens ?? 1024
+    );
+
+    // Parse final do JSON e emissão do texto limpo. O streaming acima já entregou
+    // os deltas brutos via callback interno; aqui retornamos o texto parseado.
+    const respostaFinal = this.parsearRespostaChat(textoBruto);
+    onDelta(respostaFinal);
+    return respostaFinal;
+  }
+
+  /**
+   * Consome o stream SSE OpenAI-compat do Groq e acumula o conteúdo bruto.
+   * Estático para reuso pelo AdapterLangChainGemini (mesmo endpoint).
+   */
+  static async streamChatCompletion(
+    apiKey: string,
+    mensagens: { role: 'system' | 'user' | 'assistant'; content: string }[],
+    maxTokens: number
+  ): Promise<string> {
+    const resposta = await fetch(GROQ_API_URL, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: MODELO, messages: mensagens, max_tokens: maxTokens, stream: true }),
+    });
+
+    if (!resposta.ok || !resposta.body) {
+      const corpo = resposta.ok ? 'corpo vazio' : await resposta.text();
+      throw new Error(`[AdapterGroq] stream ${MODELO} retornou ${resposta.status}: ${corpo}`);
+    }
+
+    const reader = resposta.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let acumulado = '';
+
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+
+      let limite = buffer.indexOf('\n');
+      while (limite !== -1) {
+        const linha = buffer.slice(0, limite).trim();
+        buffer = buffer.slice(limite + 1);
+        limite = buffer.indexOf('\n');
+
+        if (!linha.startsWith('data:')) continue;
+        const payload = linha.slice(5).trim();
+        if (payload === '[DONE]') continue;
+        try {
+          const json = JSON.parse(payload) as { choices?: { delta?: { content?: string } }[] };
+          const delta = json.choices?.[0]?.delta?.content;
+          if (delta) acumulado += delta;
+        } catch {
+          // fragmento incompleto; ignora
+        }
+      }
+    }
+
+    return acumulado.trim();
   }
 
   private parsearRespostaChat(json: string): string {
@@ -184,7 +300,7 @@ export class AdapterOpenRouter implements IAdapterLLMChat {
       if (!resposta) throw new Error('campo resposta vazio');
       return resposta;
     } catch {
-      Logger.warn('[AdapterOpenRouter] JSON inválido em gerarRespostaChat, usando texto bruto');
+      Logger.warn('[AdapterGroq] JSON inválido em gerarRespostaChat, usando texto bruto');
       return json.trim();
     }
   }

@@ -60,6 +60,7 @@ export class ClassificadorDominioIA implements IClassificadorDominio {
 
     try {
       const resposta = await this.adapterLLM.validarCoerencia(prompt);
+      Logger.info(`[ClassificadorDominioIA] Entrada: "${entrada}" | Resposta LLM: "${resposta.substring(0, 200)}"`);
       return this.parsearResposta(resposta, entrada);
     } catch (erro) {
       const msg = erro instanceof Error ? erro.message : String(erro);

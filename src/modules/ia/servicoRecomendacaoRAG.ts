@@ -21,6 +21,26 @@ const MMR_LAMBDA = (() => {
 })();
 
 /**
+ * Multiplicador do limite de busca vetorial sobre o limite solicitado.
+ * Reduzido de 4x para 3x (Task 4): menos candidatos brutos do ChromaDB significam
+ * menos deduplicação/MMR a processar, reduzindo latência sem perda relevante de
+ * cobertura. Configurável via RAG_LIMITE_BUSCA_MULT (default 3).
+ */
+const RAG_LIMITE_BUSCA_MULT = (() => {
+  const valor = parseInt(process.env.RAG_LIMITE_BUSCA_MULT || '3', 10);
+  return Number.isFinite(valor) && valor >= 1 ? valor : 3;
+})();
+
+/**
+ * Piso mínimo de candidatos buscados (Task 4). Garante cobertura mínima mesmo
+ * para limites pequenos. Configurável via RAG_LIMITE_BUSCA_MIN (default 24).
+ */
+const RAG_LIMITE_BUSCA_MIN = (() => {
+  const valor = parseInt(process.env.RAG_LIMITE_BUSCA_MIN || '24', 10);
+  return Number.isFinite(valor) && valor >= 1 ? valor : 24;
+})();
+
+/**
  * Serviço de Domínio para Recomendação com RAG
  * 
  * Responsável por orquestrar o fluxo de recomendação usando RAG:
@@ -51,7 +71,7 @@ export class ServicoRecomendacaoRAG {
     // Passa temContexto para o repositório aplicar o multiplicador dinâmico:
     //   - 2x com contexto (sinal personalizado aumenta a precisão)
     //   - 3x sem contexto (maior cobertura compensa incerteza da busca genérica)
-    const limiteBusca = Math.max(limite * 4, 30);
+    const limiteBusca = Math.max(limite * RAG_LIMITE_BUSCA_MULT, RAG_LIMITE_BUSCA_MIN);
     const inicioBuscaVetorial = Date.now();
     const produtosSimilares = await this.repositorioEmbedding.buscarSimilares(
       queryEmbedding,

@@ -28,8 +28,14 @@ export interface IServicoLivros {
  * - Limitação de concorrência para evitar rate limiting da API Gemini
  */
 export class ServicoIndexacaoProdutos {
-  private readonly TAMANHO_BATCH_LIVROS = 5; // Processa 5 livros em paralelo
-  private readonly MAX_CONCORRENCIA_EMBEDDINGS = 3; // Max 3 embeddings simultâneos por livro
+  // HuggingFace local: sem rate limit, usa lote nativo → batch maior
+  // APIs externas (Gemini/OpenAI): rate limit → batch menor
+  private get TAMANHO_BATCH_LIVROS(): number {
+    return this.adapterEmbedding.gerarEmbeddingsLote ? 20 : 5;
+  }
+  private get MAX_CONCORRENCIA_EMBEDDINGS(): number {
+    return this.adapterEmbedding.gerarEmbeddingsLote ? 20 : 3;
+  }
 
   constructor(
     private servicoLivros: IServicoLivros,
@@ -193,8 +199,7 @@ export class ServicoIndexacaoProdutos {
     // Obtém chunks — 1 para sinopses curtas, N para longas (chunking automático)
     const chunks = this.servicoGeracaoEmbedding.gerarChunksDoProduto(metadados);
 
-    // Processa chunks em paralelo com limitação de concorrência
-    const embeddings = await this.processarChunksEmParalelo(chunks);
+    const embeddings = await this.processarChunks(chunks);
 
     // Armazena todos os embeddings em paralelo
     await Promise.all(
@@ -222,27 +227,23 @@ export class ServicoIndexacaoProdutos {
   }
 
   /**
-   * Processa chunks em paralelo com limitação de concorrência.
-   * Evita rate limiting da API Gemini.
-   * 
-   * @param chunks - Array de chunks para gerar embeddings
-   * @returns Array de embeddings gerados
+   * Processa chunks usando lote nativo (HuggingFace local) ou concorrência controlada (APIs externas).
+   * HuggingFace local: envia todos de uma vez para o modelo — mais eficiente.
+   * APIs externas: respeita rate limit com concorrência controlada.
    */
-  private async processarChunksEmParalelo(chunks: string[]): Promise<number[][]> {
+  private async processarChunks(chunks: string[]): Promise<number[][]> {
+    if (this.adapterEmbedding.gerarEmbeddingsLote) {
+      return this.adapterEmbedding.gerarEmbeddingsLote(chunks);
+    }
+
     const embeddings: number[][] = [];
-    
-    // Processa chunks em batches controlados
     for (let i = 0; i < chunks.length; i += this.MAX_CONCORRENCIA_EMBEDDINGS) {
       const batch = chunks.slice(i, i + this.MAX_CONCORRENCIA_EMBEDDINGS);
-      
-      // Gera embeddings do batch em paralelo
       const batchEmbeddings = await Promise.all(
         batch.map((chunk) => this.adapterEmbedding.gerarEmbedding(chunk))
       );
-      
       embeddings.push(...batchEmbeddings);
     }
-    
     return embeddings;
   }
 }

@@ -6,6 +6,7 @@ import { IRepositorioEntrega } from '@/modules/entrega/IRepositorioEntrega';
 import { MENSAGENS_ERRO } from '@/shared/constants/mensagens-erro.constants';
 import { STATUS_VENDAS } from '../constants/statusVendas.constant';
 import { ContextoRequisicao } from '@/shared/infrastructure/contexto/ContextoRequisicao';
+import { RepositorioLivrosPostgres } from '@/modules/livros/repositorioLivrosPostgres';
 
 const TOLERANCIA_MOEDA = 1.00;
 
@@ -19,14 +20,18 @@ export class ServicoVendas {
 
   private readonly repositorioEntrega: IRepositorioEntrega | null;
 
+  private readonly repositorioLivros: RepositorioLivrosPostgres;
+
   constructor(
     repositorioVendas: IRepositorioVendas,
     repositorioCotacaoFrete?: IRepositorioCotacaoFrete,
     repositorioEntrega?: IRepositorioEntrega,
+    repositorioLivros?: RepositorioLivrosPostgres,
   ) {
     this.repositorioVendas = repositorioVendas;
     this.repositorioCotacaoFrete = repositorioCotacaoFrete ?? null;
     this.repositorioEntrega = repositorioEntrega ?? null;
+    this.repositorioLivros = repositorioLivros ?? new RepositorioLivrosPostgres(null as any);
   }
 
   /**
@@ -153,6 +158,16 @@ export class ServicoVendas {
       if (precoCatalogo === null) {
         throw new Error('Livro não encontrado ou indisponível no catálogo');
       }
+      
+      // RN0032: Validar estoque disponível
+      const livro = await this.repositorioLivros.obterPorUuid(item.livroUuid);
+      if (!livro) {
+        throw new Error(`RN0032: Livro ${item.livroUuid} não encontrado`);
+      }
+      if (livro.estoqueDisponivel < item.quantidade) {
+        throw new Error(`RN0032: Estoque insuficiente para o livro ${livro.titulo}. Disponível: ${livro.estoqueDisponivel}, Solicitado: ${item.quantidade}`);
+      }
+      
       precosPorItem[item.livroUuid] = precoCatalogo;
       total += precoCatalogo * item.quantidade;
     }

@@ -15,9 +15,14 @@ export class ControladorAdminPainel {
     private readonly servicoAnaliseVendas: ServicoAnaliseVendas,
   ) {}
 
-  public obterDashboard = async (_req: Request, res: Response): Promise<Response> => {
+  public obterDashboard = async (req: Request, res: Response): Promise<Response> => {
     try {
-      const dados = await this.servicoDashboard.obterDashboard();
+      const { periodo, status } = req.query;
+      const filtros = {
+        periodo: periodo as string,
+        status: status as string,
+      };
+      const dados = await this.servicoDashboard.obterDashboard(filtros);
       return RespostaPadrao.enviarSucesso(res, 200, dados);
     } catch (erro) {
       const mensagem = RespostaPadrao.obterMensagemErro(erro, 'Erro ao montar dashboard administrativo.');

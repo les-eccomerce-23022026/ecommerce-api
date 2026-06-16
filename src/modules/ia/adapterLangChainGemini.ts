@@ -8,7 +8,7 @@ import { IntencaoRecomendacao } from './IntencaoRecomendacao.entity';
 import type { ContextoInterpretacaoIntencao } from './IntencaoRecomendacao.entity';
 import type { MensagemChatDTO } from './IRecomendacao.dto';
 import type { IAdapterLLMChat } from './IAdapterLLMChat';
-import { AdapterOpenRouter } from './adapterOpenRouter';
+import { AdapterGroq } from './adapterGroq';
 
 /**
  * Implementação personalizada de embeddings usando API do Groq
@@ -97,143 +97,156 @@ const MODELS_FALLBACK = [
  */
 export class AdapterLangChainGemini implements IAdapterEmbedding {
   private embeddings: GoogleGenerativeAIEmbeddings | GroqEmbeddingsCustom | null = null;
-  private genAI: GoogleGenerativeAI | null = null;
   private modeloAtual: string | null = null;
   private provedorAtual: 'gemini' | 'groq' | null = null;
-  private fallbackChat: IAdapterLLMChat | null = null;
-  private readonly cacheEmbedding = new Map<string, { embedding: number[]; expiraEm: number }>();
-  private static readonly CACHE_EMBEDDING_TTL_MS = 10 * 60 * 1000;
+  // Cache de embedding removido: agora centralizado em CacheEmbeddingDecorator
+  // (FactoryEmbedding) para evitar cache duplicado. Task 1.
+
+  private provedorChat: 'groq' | 'gemini' | null = null;
+  private verificacaoChatPromise: Promise<void> | null = null;
 
   constructor() {
-    if (!process.env.GEMINI_API_KEY && !process.env.GROQ_API_KEY) {
-      throw new Error('GEMINI_API_KEY ou GROQ_API_KEY não está definida nas variáveis de ambiente');
+    if (!process.env.GROQ_API_KEY && !process.env.GEMINI_API_KEY) {
+      throw new Error('Nenhuma API key de LLM configurada. Defina GROQ_API_KEY ou GEMINI_API_KEY.');
     }
-    if (process.env.OPENROUTER_API_KEY) {
-      this.fallbackChat = new AdapterOpenRouter();
-      Logger.info('[AdapterLangChainGemini] Fallback OpenRouter configurado para operações de chat');
+  }
+
+  private async testarGroq(): Promise<boolean> {
+    if (!process.env.GROQ_API_KEY) return false;
+    try {
+      const resposta = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${process.env.GROQ_API_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: 'llama-3.1-8b-instant', messages: [{ role: 'user', content: 'ok' }], max_tokens: 1 }),
+        signal: AbortSignal.timeout(5000),
+      });
+      return resposta.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  private async testarGemini(): Promise<boolean> {
+    if (!process.env.GEMINI_API_KEY) return false;
+    try {
+      const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+      const modelo = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+      await modelo.generateContent({ contents: [{ role: 'user', parts: [{ text: 'ok' }] }], generationConfig: { maxOutputTokens: 1 } });
+      return true;
+    } catch {
+      return false;
     }
   }
 
   /**
-   * Inicializa o cliente de embeddings com sistema de fallback
-   * Tenta Gemini primeiro, se falhar, tenta Groq
+   * Warm-up público do provedor de chat: dispara a seleção Groq/Gemini ainda no
+   * boot do servidor, evitando que a primeira requisição real pague a latência
+   * da verificação de disponibilidade. Idempotente. Task 2.
    */
-  private async inicializarEmbeddings(): Promise<GoogleGenerativeAIEmbeddings | GroqEmbeddingsCustom> {
+  async prewarmChat(): Promise<void> {
+    await this.verificarDisponibilidadeChat();
+  }
+
+  private async verificarDisponibilidadeChat(): Promise<void> {
+    if (this.provedorChat) return;
+    if (this.verificacaoChatPromise) return this.verificacaoChatPromise;
+
+    this.verificacaoChatPromise = (async () => {
+      Logger.info('[AdapterLangChainGemini] Verificando disponibilidade de provedores LLM em paralelo...');
+      const [groqOk, geminiOk] = await Promise.all([this.testarGroq(), this.testarGemini()]);
+
+      if (groqOk) {
+        this.provedorChat = 'groq';
+        Logger.info('[AdapterLangChainGemini] Provedor chat selecionado: Groq (llama-3.1-8b-instant)');
+      } else if (geminiOk) {
+        this.provedorChat = 'gemini';
+        Logger.info('[AdapterLangChainGemini] Provedor chat selecionado: Gemini (gemini-2.5-flash)');
+      } else {
+        throw new Error('Nenhum provedor LLM disponível. Verifique GROQ_API_KEY e GEMINI_API_KEY.');
+      }
+    })();
+
+    return this.verificacaoChatPromise;
+  }
+
+  private async chamarChatGroq(
+    mensagens: { role: 'system' | 'user' | 'assistant'; content: string }[],
+    maxTokens = 1024
+  ): Promise<string> {
+    const adapterGroq = new AdapterGroq();
+    // Reutiliza apenas o método interno via chamada direta à API
+    const resposta = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${process.env.GROQ_API_KEY!}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: 'llama-3.1-8b-instant', messages: mensagens, max_tokens: maxTokens }),
+    });
+    if (!resposta.ok) throw new Error(`Groq: ${resposta.status} ${await resposta.text()}`);
+    const dados = await resposta.json();
+    const texto: string = dados?.choices?.[0]?.message?.content ?? '';
+    if (!texto.trim()) throw new Error('Groq retornou resposta vazia');
+    return texto.trim();
+  }
+
+  private async chamarChatGemini(
+    systemPrompt: string,
+    mensagens: { role: 'user' | 'model'; parts: { text: string }[] }[],
+    maxTokens = 1024
+  ): Promise<string> {
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+    const modelo = genAI.getGenerativeModel({
+      model: 'gemini-2.5-flash',
+      systemInstruction: systemPrompt,
+    });
+    const resultado = await modelo.generateContent({
+      contents: mensagens,
+      generationConfig: { maxOutputTokens: maxTokens },
+    });
+    return resultado.response.text().trim();
+  }
+
+  private async inicializarEmbeddings(): Promise<GoogleGenerativeAIEmbeddings> {
     if (this.embeddings) {
-      return this.embeddings;
+      return this.embeddings as GoogleGenerativeAIEmbeddings;
     }
 
-    // Tenta Gemini primeiro
-    if (process.env.GEMINI_API_KEY) {
-      try {
-        Logger.info('[AdapterLangChainGemini] Tentando inicializar embeddings com Gemini...');
-        
-        const modeloConfigurado = process.env.GEMINI_EMBEDDING_MODEL || 'gemini-embedding-001';
-        
-        this.embeddings = new GoogleGenerativeAIEmbeddings({
-          apiKey: process.env.GEMINI_API_KEY,
-          modelName: modeloConfigurado,
-        });
-
-        // Testa se o modelo funciona gerando um embedding de teste
-        const teste = await this.embeddings.embedQuery('teste');
-        
-        if (!Array.isArray(teste) || teste.length === 0) {
-          throw new Error('Embedding de teste retornou array vazio');
-        }
-
-        this.modeloAtual = modeloConfigurado;
-        this.provedorAtual = 'gemini';
-        Logger.info(`[AdapterLangChainGemini] Embeddings inicializados com sucesso usando Gemini ${modeloConfigurado} (dimensão: ${teste.length})`);
-        return this.embeddings;
-
-      } catch (erro) {
-        const mensagem = erro instanceof Error ? erro.message : String(erro);
-        Logger.warn(`[AdapterLangChainGemini] Falha ao usar Gemini: ${mensagem}`);
-        this.embeddings = null; // Limpa para tentar Groq
-      }
+    if (!process.env.GEMINI_API_KEY) {
+      throw new Error('[AdapterLangChainGemini] GEMINI_API_KEY não definida. Para embeddings, use FactoryEmbedding (huggingface_local).');
     }
 
-    // Fallback para Groq
-    if (process.env.GROQ_API_KEY) {
-      try {
-        Logger.info('[AdapterLangChainGemini] Tentando inicializar embeddings com Groq como fallback...');
-        
-        this.embeddings = new GroqEmbeddingsCustom({
-          apiKey: process.env.GROQ_API_KEY,
-          modelName: 'nomic-ai/nomic-embed-text-v1',
-        });
+    const modeloConfigurado = process.env.GEMINI_EMBEDDING_MODEL || 'gemini-embedding-001';
+    Logger.info(`[AdapterLangChainGemini] Inicializando embeddings Gemini (${modeloConfigurado})...`);
 
-        // Testa se o modelo funciona gerando um embedding de teste
-        const teste = await this.embeddings.embedQuery('teste');
-        
-        if (!Array.isArray(teste) || teste.length === 0) {
-          throw new Error('Embedding de teste retornou array vazio');
-        }
+    this.embeddings = new GoogleGenerativeAIEmbeddings({
+      apiKey: process.env.GEMINI_API_KEY,
+      modelName: modeloConfigurado,
+    });
 
-        this.modeloAtual = 'nomic-ai/nomic-embed-text-v1';
-        this.provedorAtual = 'groq';
-        Logger.info(`[AdapterLangChainGemini] Embeddings inicializados com sucesso usando Groq (dimensão: ${teste.length})`);
-        return this.embeddings;
-
-      } catch (erro) {
-        const mensagem = erro instanceof Error ? erro.message : String(erro);
-        Logger.error(`[AdapterLangChainGemini] Falha ao usar Groq: ${mensagem}`);
-        this.embeddings = null;
-      }
+    const teste = await (this.embeddings as GoogleGenerativeAIEmbeddings).embedQuery('teste');
+    if (!Array.isArray(teste) || teste.length === 0) {
+      throw new Error('[AdapterLangChainGemini] Gemini retornou embedding vazio no teste inicial.');
     }
 
-    // Se todos falharem
-    throw new Error('Não foi possível inicializar embeddings com Gemini nem Groq. Verifique as API Keys e a conexão.');
+    this.modeloAtual = modeloConfigurado;
+    this.provedorAtual = 'gemini';
+    Logger.info(`[AdapterLangChainGemini] Embeddings Gemini prontos (dimensão: ${teste.length})`);
+    return this.embeddings as GoogleGenerativeAIEmbeddings;
   }
 
   /**
-   * Inicializa o cliente generativo do Gemini
-   */
-  private inicializarGenAI(): GoogleGenerativeAI {
-    if (!this.genAI) {
-      this.genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
-      Logger.info('[AdapterLangChainGemini] GenAI inicializado');
-    }
-    return this.genAI;
-  }
-
-  private obterDoCacheEmbedding(texto: string): number[] | null {
-    const entrada = this.cacheEmbedding.get(texto);
-    if (!entrada || Date.now() > entrada.expiraEm) {
-      this.cacheEmbedding.delete(texto);
-      return null;
-    }
-    return entrada.embedding;
-  }
-
-  private salvarNoCacheEmbedding(texto: string, embedding: number[]): void {
-    if (this.cacheEmbedding.size > 1000) {
-      const primeiraChave = this.cacheEmbedding.keys().next().value;
-      if (primeiraChave) this.cacheEmbedding.delete(primeiraChave);
-    }
-    this.cacheEmbedding.set(texto, { embedding, expiraEm: Date.now() + AdapterLangChainGemini.CACHE_EMBEDDING_TTL_MS });
-  }
-
-  /**
-   * Gera embedding para um texto
+   * Gera embedding para um texto.
+   *
+   * O cache em memória foi movido para CacheEmbeddingDecorator (FactoryEmbedding).
+   * Este método permanece simples — produz o embedding sem cache local. Task 1.
    */
   async gerarEmbedding(texto: string): Promise<number[]> {
-    const cached = this.obterDoCacheEmbedding(texto);
-    if (cached) {
-      Logger.debug('[AdapterLangChainGemini] Cache hit embedding');
-      return cached;
-    }
-
     try {
       const embeddings = await this.inicializarEmbeddings();
       const resultado = await embeddings.embedQuery(texto);
-      
+
       if (!Array.isArray(resultado) || resultado.length === 0) {
         throw new Error('Embedding inválido retornado pelo Gemini');
       }
 
-      this.salvarNoCacheEmbedding(texto, resultado);
       return resultado;
     } catch (erro) {
       const mensagem = erro instanceof Error ? erro.message : String(erro);
@@ -296,105 +309,44 @@ export class AdapterLangChainGemini implements IAdapterEmbedding {
     historico: MensagemChatDTO[] | undefined,
     contexto: ContextoInterpretacaoIntencao
   ): Promise<IntencaoRecomendacao> {
-    const genAI = this.inicializarGenAI();
-    const modeloChat = process.env.GEMINI_CHAT_MODEL || 'gemini-3.1-flash-lite';
+    await this.verificarDisponibilidadeChat();
 
-    const model = genAI.getGenerativeModel({
-      model: modeloChat,
-      generationConfig: {
-        responseMimeType: 'application/json',
-        responseSchema: {
-          type: SchemaType.OBJECT,
-          properties: {
-            tipo: { type: SchemaType.STRING },
-            generos: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING } },
-            precoMax: { type: SchemaType.NUMBER, nullable: true },
-            precoMin: { type: SchemaType.NUMBER, nullable: true },
-            paginasMax: { type: SchemaType.NUMBER, nullable: true },
-            publicoAlvo: { type: SchemaType.STRING, nullable: true },
-            quantidadeLivros: { type: SchemaType.NUMBER },
-            comparar: { type: SchemaType.ARRAY, items: { type: SchemaType.STRING }, nullable: true },
-            precisaEsclarecer: { type: SchemaType.BOOLEAN },
-            perguntasEsclarecimento: {
-              type: SchemaType.ARRAY,
-              items: { type: SchemaType.STRING },
-              nullable: true,
-            },
-            queryBusca: { type: SchemaType.STRING },
-            confianca: { type: SchemaType.NUMBER },
-          },
-          required: [
-            'tipo',
-            'generos',
-            'quantidadeLivros',
-            'precisaEsclarecer',
-            'queryBusca',
-            'confianca',
-          ],
-        },
-      },
-    });
+    if (this.provedorChat === 'groq') {
+      const adapterGroq = new AdapterGroq();
+      return adapterGroq.interpretarIntencao(mensagem, historico, contexto);
+    }
 
     const historicoTexto =
       historico
         ?.map((m) => {
-          const papel =
-            m.papel ??
-            (m.remetente === 'assistente' ? 'assistant' : 'user');
+          const papel = m.papel ?? (m.remetente === 'assistente' ? 'assistant' : 'user');
           return `${papel}: ${m.conteudo}`;
         })
         .join('\n') ?? '';
 
-    const prompt = [
+    const system = [
       'Você classifica intenções em um assistente de livraria online (pré-venda e pós-venda).',
-      'Responda apenas JSON válido conforme o schema.',
-      '',
-      'CLASSIFICAÇÃO DO CAMPO "tipo":',
-      '- "recomendacao"   : cliente pede indicação, sugestão ou ajuda para escolher livros.',
-      '- "esclarecimento" : mensagem vaga sem gênero/tema claro (ex.: "um presente", "me indica algo").',
-      '- "comparativo"    : cliente quer comparar dois ou mais livros específicos.',
-      '- "conversa"       : bate-papo sem intenção clara de compra ou pós-venda.',
-      '- "pos_venda"      : dúvidas sobre pedido, status de entrega, prazo de troca ou como cancelar.',
-      '- "tendencias"     : perguntas sobre mais vendidos, livros populares, ranking por categoria ou faixa etária.',
-      '- "informacao"     : perguntas sobre políticas da loja, frete, prazo de entrega estimado ou horário de atendimento.',
-      '',
-      'REGRAS ADICIONAIS:',
-      'Use precisaEsclarecer=true APENAS quando o tipo for "recomendacao" ou "esclarecimento" e a mensagem for vaga SEM gênero ou tema literário claro.',
-      'Para tipos pos_venda, tendencias e informacao: sempre use precisaEsclarecer=false.',
-      'Se o usuário citar gênero/tema (terror, mistério, romance, fantasia, ficção científica), use precisaEsclarecer=false e preencha generos.',
-      'Com histórico de chat: trate a mensagem atual como continuação — mantenha gêneros e critérios já citados; refinamentos ("mais barato", "mais curto", "outro") são tipo recomendacao.',
-      'queryBusca deve ser texto otimizado para busca semântica (sem cumprimentos), incorporando contexto do histórico quando relevante.',
-      'Para tipo "tendencias" ou pedidos de "mais vendidos"/ranking: use quantidadeLivros entre 4 e 5.',
+      'Responda APENAS JSON válido com os campos: tipo, generos (array), precoMax, precoMin, paginasMax, publicoAlvo, quantidadeLivros, comparar, precisaEsclarecer, perguntasEsclarecimento, queryBusca, confianca.',
+      'Tipos válidos: recomendacao, esclarecimento, comparativo, conversa, pos_venda, tendencias, informacao.',
       'generos: minúsculas, sem acento (terror, misterio, romance, fantasia, ficcao_cientifica, romance_historico).',
+      'Use precisaEsclarecer=true apenas quando tipo for recomendacao ou esclarecimento e a mensagem for vaga.',
+      'Para tendencias use quantidadeLivros entre 4 e 5.',
       `Perfil do cliente: ${JSON.stringify(contexto.perfil ?? {})}`,
-      `Histórico de compras (resumo): ${contexto.resumoCompras ?? 'nenhum'}`,
-      historicoTexto ? `Histórico do chat:\n${historicoTexto}` : '',
-      `Mensagem atual: ${mensagem}`,
-    ]
+      `Histórico de compras: ${contexto.resumoCompras ?? 'nenhum'}`,
+    ].join(' ');
+
+    const userText = [historicoTexto ? `Histórico do chat:\n${historicoTexto}` : '', `Mensagem atual: ${mensagem}`]
       .filter(Boolean)
       .join('\n');
 
-    let texto: string;
-    try {
-      const resultado = await model.generateContent(prompt);
-      texto = resultado.response.text();
-    } catch (erroGemini) {
-      const msg = erroGemini instanceof Error ? erroGemini.message : String(erroGemini);
-      Logger.warn(`[AdapterLangChainGemini] interpretarIntencao falhou no Gemini: ${msg}. Tentando OpenRouter...`);
-      if (!this.fallbackChat) throw erroGemini;
-      return this.fallbackChat.interpretarIntencao(mensagem, historico, contexto);
-    }
-    const parsed = JSON.parse(texto) as IntencaoRecomendacao;
-
+    const texto = await this.chamarChatGemini(system, [{ role: 'user', parts: [{ text: userText }] }], 512);
+    const jsonLimpo = texto.replace(/```json\n?|\n?```/g, '').trim();
+    const parsed = JSON.parse(jsonLimpo) as IntencaoRecomendacao;
     const quantidadePadrao = parsed.tipo === 'tendencias' ? 5 : 1;
     const quantidadeMinima = parsed.tipo === 'tendencias' ? 4 : 1;
-
     return {
       ...parsed,
-      quantidadeLivros: Math.min(
-        Math.max(parsed.quantidadeLivros || quantidadePadrao, quantidadeMinima),
-        5
-      ),
+      quantidadeLivros: Math.min(Math.max(parsed.quantidadeLivros || quantidadePadrao, quantidadeMinima), 5),
       generos: parsed.generos ?? [],
     };
   }
@@ -419,182 +371,148 @@ export class AdapterLangChainGemini implements IAdapterEmbedding {
       modoEsclarecimento?: boolean;
       perguntasFollowUp?: string[];
       perfil?: { idadeAnos?: number; estado?: string; nome?: string };
-      /** Ativa modo pós-venda: contexto contém pedidos, não catálogo */
       modoPosvenda?: boolean;
+      maxTokens?: number;
     }
   ): Promise<string> {
-    try {
-      if (opcoes?.modoEsclarecimento) {
-        const perguntas = opcoes.perguntasFollowUp ?? [];
-        if (perguntas.length > 0) {
-          return `Para te ajudar melhor, preciso de mais alguns detalhes:\n\n${perguntas.map((p, i) => `${i + 1}. ${p}`).join('\n')}`;
-        }
-        return 'Para te ajudar melhor, pode me contar um pouco mais sobre o que você procura?';
-      }
+    await this.verificarDisponibilidadeChat();
 
-      const genAI = this.inicializarGenAI();
-      const modeloChat = process.env.GEMINI_CHAT_MODEL || 'gemini-3.1-flash-lite';
-      const model = genAI.getGenerativeModel({
-        model: modeloChat,
-        generationConfig: {
-          responseMimeType: 'application/json',
-          responseSchema: {
-            type: SchemaType.OBJECT,
-            properties: { resposta: { type: SchemaType.STRING } },
-            required: ['resposta'],
-          },
-        },
-      });
-
-      const tomPerfil = this.montarInstrucaoTomPerfil(opcoes?.perfil);
-
-      const regrasPosvenda = opcoes?.modoPosvenda
-        ? [
-            'MODO PÓS-VENDA ativo: responda APENAS com base nos pedidos listados no contexto.',
-            'Nunca invente status de pedido, datas de entrega ou números de rastreamento.',
-            'Se o pedido não estiver na lista, informe que não encontrou e oriente o cliente a acessar "Meus Pedidos" ou contactar o suporte humano.',
-          ].join(' ')
-        : null;
-
-      const systemInstruction = [
-        'Você é o assistente de uma livraria brasileira, especialista em recomendação de livros (pré-venda) e atendimento pós-venda (pedidos, entregas, trocas).',
-        'Use APENAS os dados fornecidos no contexto — nunca invente títulos, autores, preços, status de pedido ou rankings.',
-        'Mesmo que o cliente peça explicitamente para inventar, criar, supor ou imaginar um livro/autor, RECUSE: jamais cite obras que não estejam no contexto.',
-        'Se o contexto não tiver a informação solicitada, diga honestamente e oriente o cliente para "Meus Pedidos" ou para o suporte humano quando necessário.',
-        'Responda em português do Brasil, de forma acolhedora e objetiva.',
-        'O campo "resposta" deve conter tópicos curtos iniciados com "• " (3 a 5 tópicos, cada um com no máximo uma frase objetiva).',
-        regrasPosvenda,
-        tomPerfil,
-      ]
-        .filter(Boolean)
-        .join(' ');
-
-      const contents: { role: 'user' | 'model'; parts: { text: string }[] }[] = [];
-
-      if (historicoConversa) {
-        for (const msg of historicoConversa) {
-          contents.push({
-            role: msg.papel,
-            parts: [{ text: msg.conteudo }],
-          });
-        }
-      }
-
-      const rotuloContexto = opcoes?.modoPosvenda
-        ? 'Contexto de pedidos (única fonte de verdade)'
-        : 'Contexto (única fonte de verdade)';
-
-      contents.push({
-        role: 'user',
-        parts: [
-          {
-            text: `${rotuloContexto}:\n${contexto}\n\nPergunta do cliente: ${pergunta}`,
-          },
-        ],
-      });
-
-      let texto: string;
-      try {
-        const resultado = await model.generateContent({ systemInstruction, contents });
-        texto = resultado.response.text();
-      } catch (erroGemini) {
-        const msg = erroGemini instanceof Error ? erroGemini.message : String(erroGemini);
-        Logger.warn(`[AdapterLangChainGemini] gerarRespostaChat falhou no Gemini: ${msg}. Tentando OpenRouter...`);
-        if (this.fallbackChat) {
-          return this.fallbackChat.gerarRespostaChat(pergunta, contexto, historicoConversa, opcoes);
-        }
-        throw erroGemini;
-      }
-
-      if (!texto || texto.trim().length === 0) {
-        if (this.fallbackChat) {
-          Logger.warn('[AdapterLangChainGemini] Resposta vazia do Gemini, usando OpenRouter...');
-          return this.fallbackChat.gerarRespostaChat(pergunta, contexto, historicoConversa, opcoes);
-        }
-        return this.respostaChatFallback(contexto);
-      }
-      // O guard determinístico anti-alucinação é aplicado na camada de aplicação
-      // (ServicoRecomendacaoApplication.finalizarRespostaChat), ponto único que
-      // cobre todos os adapters e valida contra o catálogo completo.
-      return this.parsearRespostaChat(texto, contexto);
-    } catch (erro) {
-      const mensagem = erro instanceof Error ? erro.message : String(erro);
-      Logger.error(`[AdapterLangChainGemini] Erro ao gerar resposta de chat: ${mensagem}`);
-      return this.respostaChatFallback(contexto);
+    if (this.provedorChat === 'groq') {
+      const adapterGroq = new AdapterGroq();
+      return adapterGroq.gerarRespostaChat(pergunta, contexto, historicoConversa, opcoes);
     }
-  }
 
-  private parsearRespostaChat(json: string, contexto: string): string {
+    if (opcoes?.modoEsclarecimento) {
+      const perguntas = opcoes.perguntasFollowUp ?? [];
+      if (perguntas.length > 0) {
+        return `Para te ajudar melhor, preciso de mais alguns detalhes:\n\n${perguntas.map((p, i) => `${i + 1}. ${p}`).join('\n')}`;
+      }
+      return 'Para te ajudar melhor, pode me contar um pouco mais sobre o que você procura?';
+    }
+
+    const regrasPosvenda = opcoes?.modoPosvenda
+      ? 'MODO PÓS-VENDA ativo: responda APENAS com base nos pedidos listados no contexto. Nunca invente status, datas ou rastreamentos.'
+      : '';
+
+    const system = [
+      'Você é o assistente de uma livraria brasileira, especialista em recomendação de livros e atendimento pós-venda.',
+      'Use APENAS os dados fornecidos no contexto.',
+      'Responda em português do Brasil, de forma acolhedora e objetiva.',
+      'Formate em tópicos curtos com "• " (3 a 5 tópicos, cada um com no máximo uma frase).',
+      regrasPosvenda,
+      'IMPORTANTE: retorne APENAS JSON válido no formato {"resposta":"texto aqui"}. Nenhum texto fora do JSON.',
+    ]
+      .filter(Boolean)
+      .join(' ');
+
+    const rotuloContexto = opcoes?.modoPosvenda ? 'Contexto de pedidos (única fonte de verdade)' : 'Contexto (única fonte de verdade)';
+    const userText = `${rotuloContexto}:\n${contexto}\n\nPergunta do cliente: ${pergunta}`;
+
+    const mensagensGemini: { role: 'user' | 'model'; parts: { text: string }[] }[] = [];
+    if (historicoConversa) {
+      for (const msg of historicoConversa) {
+        mensagensGemini.push({ role: msg.papel, parts: [{ text: msg.conteudo }] });
+      }
+    }
+    mensagensGemini.push({ role: 'user', parts: [{ text: userText }] });
+
+    const texto = await this.chamarChatGemini(system, mensagensGemini, opcoes?.maxTokens ?? 1024);
     try {
-      const parsed = JSON.parse(json) as { resposta?: string };
-      const resposta = parsed.resposta?.trim();
-      if (!resposta) throw new Error('campo resposta vazio');
-      return resposta;
+      const limpo = texto.replace(/```json\n?|\n?```/g, '').trim();
+      const parsed = JSON.parse(limpo) as { resposta?: string };
+      return parsed.resposta?.trim() ?? texto;
     } catch {
-      Logger.warn('[AdapterLangChainGemini] JSON inválido em gerarRespostaChat, usando texto bruto');
-      const texto = json.trim();
-      return texto || this.respostaChatFallback(contexto);
+      return texto;
     }
-  }
-
-  private montarInstrucaoTomPerfil(perfil?: {
-    idadeAnos?: number;
-    estado?: string;
-    nome?: string;
-  }): string {
-    if (!perfil) {
-      return '';
-    }
-    const partes: string[] = [];
-    if (perfil.nome) {
-      partes.push(`Chame o cliente pelo primeiro nome (${perfil.nome.split(' ')[0]}) quando natural.`);
-    }
-    if (perfil.idadeAnos !== undefined && perfil.idadeAnos >= 55) {
-      partes.push('Use tom respeitoso e um pouco mais contextual para leitores maduros.');
-    } else if (perfil.idadeAnos !== undefined && perfil.idadeAnos < 25) {
-      partes.push('Use tom direto e leve para leitores jovens.');
-    }
-    if (perfil.estado) {
-      partes.push(
-        `O cliente está em ${perfil.estado}; pode mencionar envio regional apenas se relevante.`
-      );
-    }
-    return partes.join(' ');
-  }
-
-  private respostaChatFallback(contexto: string): string {
-    const livrosEncontrados = this.extrairLivrosDoContexto(contexto);
-    if (livrosEncontrados.length === 0) {
-      return 'Não encontrei livros correspondentes à sua solicitação no momento.';
-    }
-    return `Com base no catálogo, sugiro:\n\n${livrosEncontrados
-      .slice(0, 3)
-      .map(
-        (livro, i) =>
-          `${i + 1}. "${livro.titulo}" de ${livro.autor} - R$ ${livro.preco.toFixed(2)}`
-      )
-      .join('\n')}`;
   }
 
   /**
-   * Extrai informações de livros do contexto
+   * Versão streaming de gerarRespostaChat (Task 6).
+   *
+   * Repassa cada fragmento de texto ao callback `onDelta` usando o streaming
+   * nativo do provedor selecionado:
+   * - Groq: stream SSE OpenAI-compat (AdapterGroq.gerarRespostaChatStream).
+   * - Gemini: generateContentStream.
+   *
+   * Em ambos os casos o system prompt pede JSON {"resposta":"..."}; aqui
+   * acumulamos os deltas brutos, parseamos no fim e devolvemos o texto limpo.
+   * Retorna o texto final completo.
    */
-  private extrairLivrosDoContexto(contexto: string): Array<{ titulo: string; autor: string; preco: number }> {
-    const livros: Array<{ titulo: string; autor: string; preco: number }> = [];
-    
-    // Padrão regex para extrair informações de livros do contexto
-    const regex = /(\d+)\.\s*"([^"]+)"\s+de\s+([^()]+)\s+\([^)]+R\$\s+([\d.,]+)/g;
-    
-    let match;
-    while ((match = regex.exec(contexto)) !== null) {
-      livros.push({
-        titulo: match[2],
-        autor: match[3].trim(),
-        preco: parseFloat(match[4].replace(',', '.')),
-      });
+  async gerarRespostaChatStream(
+    pergunta: string,
+    contexto: string,
+    onDelta: (delta: string) => void,
+    historicoConversa?: { papel: 'user' | 'model'; conteudo: string }[],
+    opcoes?: {
+      modoEsclarecimento?: boolean;
+      perguntasFollowUp?: string[];
+      perfil?: { idadeAnos?: number; estado?: string; nome?: string };
+      modoPosvenda?: boolean;
+      maxTokens?: number;
     }
-    
-    return livros;
+  ): Promise<string> {
+    await this.verificarDisponibilidadeChat();
+
+    if (this.provedorChat === 'groq') {
+      const adapterGroq = new AdapterGroq();
+      return adapterGroq.gerarRespostaChatStream(pergunta, contexto, onDelta, historicoConversa, opcoes);
+    }
+
+    if (opcoes?.modoEsclarecimento) {
+      const texto = await this.gerarRespostaChat(pergunta, contexto, historicoConversa, opcoes);
+      onDelta(texto);
+      return texto;
+    }
+
+    const regrasPosvenda = opcoes?.modoPosvenda
+      ? 'MODO PÓS-VENDA ativo: responda APENAS com base nos pedidos listados no contexto. Nunca invente status, datas ou rastreamentos.'
+      : '';
+
+    const system = [
+      'Você é o assistente de uma livraria brasileira, especialista em recomendação de livros e atendimento pós-venda.',
+      'Use APENAS os dados fornecidos no contexto.',
+      'Responda em português do Brasil, de forma acolhedora e objetiva.',
+      'Formate em tópicos curtos com "• " (3 a 5 tópicos, cada um com no máximo uma frase).',
+      regrasPosvenda,
+      'IMPORTANTE: retorne APENAS JSON válido no formato {"resposta":"texto aqui"}. Nenhum texto fora do JSON.',
+    ]
+      .filter(Boolean)
+      .join(' ');
+
+    const rotuloContexto = opcoes?.modoPosvenda ? 'Contexto de pedidos (única fonte de verdade)' : 'Contexto (única fonte de verdade)';
+    const userText = `${rotuloContexto}:\n${contexto}\n\nPergunta do cliente: ${pergunta}`;
+
+    const mensagensGemini: { role: 'user' | 'model'; parts: { text: string }[] }[] = [];
+    if (historicoConversa) {
+      for (const msg of historicoConversa) {
+        mensagensGemini.push({ role: msg.papel, parts: [{ text: msg.conteudo }] });
+      }
+    }
+    mensagensGemini.push({ role: 'user', parts: [{ text: userText }] });
+
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+    const modelo = genAI.getGenerativeModel({ model: 'gemini-2.5-flash', systemInstruction: system });
+    const resultado = await modelo.generateContentStream({
+      contents: mensagensGemini,
+      generationConfig: { maxOutputTokens: opcoes?.maxTokens ?? 1024 },
+    });
+
+    let acumulado = '';
+    for await (const chunk of resultado.stream) {
+      const parte = chunk.text();
+      if (parte) acumulado += parte;
+    }
+
+    const limpo = acumulado.replace(/```json\n?|\n?```/g, '').trim();
+    let respostaFinal = limpo;
+    try {
+      const parsed = JSON.parse(limpo) as { resposta?: string };
+      respostaFinal = parsed.resposta?.trim() ?? limpo;
+    } catch {
+      respostaFinal = acumulado.trim();
+    }
+    onDelta(respostaFinal);
+    return respostaFinal;
   }
 
   /**
@@ -605,27 +523,14 @@ export class AdapterLangChainGemini implements IAdapterEmbedding {
    * @returns Resposta JSON do LLM
    */
   async validarCoerencia(prompt: string): Promise<string> {
-    try {
-      const genAI = this.inicializarGenAI();
-      const modeloChat = process.env.GEMINI_CHAT_MODEL || 'gemini-3.1-flash-lite';
-      const model = genAI.getGenerativeModel({ model: modeloChat });
+    await this.verificarDisponibilidadeChat();
 
-      const resultado = await model.generateContent(prompt);
-      const texto = resultado.response.text();
-
-      if (!texto || texto.trim().length === 0) {
-        throw new Error('Resposta vazia do LLM');
-      }
-
-      return texto.trim();
-    } catch (erro) {
-      const mensagem = erro instanceof Error ? erro.message : String(erro);
-      Logger.warn(`[AdapterLangChainGemini] validarCoerencia falhou no Gemini: ${mensagem}. Tentando OpenRouter...`);
-      if (this.fallbackChat) {
-        return this.fallbackChat.validarCoerencia(prompt);
-      }
-      throw new Error(`Falha ao validar coerência: ${mensagem}`);
+    if (this.provedorChat === 'groq') {
+      const adapterGroq = new AdapterGroq();
+      return adapterGroq.validarCoerencia(prompt);
     }
+
+    return this.chamarChatGemini('', [{ role: 'user', parts: [{ text: prompt }] }], 512);
   }
 
   /**
