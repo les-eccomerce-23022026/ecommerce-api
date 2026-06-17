@@ -164,6 +164,26 @@ export class ServicoRecomendacaoApplication {
     const inicio = Date.now();
 
     try {
+      // Interpreta intenção da mensagem
+      const intencao = await this.servicoInterpretacaoIntencao.interpretar(
+        dados.query,
+        undefined,
+        { perfil: undefined, resumoCompras: undefined }
+      );
+
+      // Rejeita solicitações fora do escopo (criação/invenção)
+      if (intencao.tipo === 'fora_escopo') {
+        return {
+          resposta: 'Desculpe, não posso criar ou inventar livros. Posso apenas recomendar livros existentes do catálogo. Como posso ajudar você a encontrar um livro?',
+          produtosRecomendados: [],
+          contextoUsado: false,
+          tempoRespostaMs: Date.now() - inicio,
+          tipoResposta: 'fora_escopo',
+          intencaoResumida: dados.query,
+          metricas: undefined,
+        };
+      }
+
       // CORREÇÃO: Determina se deve buscar contexto do cliente baseado no papel
       const contextoIA = dados.contextoIA;
       const deveBuscarContextoCliente = contextoIA?.tipo === TipoContextoIA.CLIENTE && contextoIA.clienteUuid;
@@ -720,7 +740,7 @@ export class ServicoRecomendacaoApplication {
       metricasPipelineComparativo = resultadoBusca.metricasPipeline;
     }
 
-    const contextoChat = this.construirContextoChat(produtosDTO);
+    const contextoChat = this.construirContextoChat(produtosDTO, intencao);
 
     const resposta =
       produtosDTO.length > 0
@@ -781,7 +801,7 @@ export class ServicoRecomendacaoApplication {
       undefined,
       embeddingPreComputado
     );
-    const contextoChat = this.construirContextoChat(produtosDTO);
+    const contextoChat = this.construirContextoChat(produtosDTO, intencao);
 
     const resposta =
       produtosDTO.length > 0
@@ -832,6 +852,58 @@ export class ServicoRecomendacaoApplication {
    * MMR (Maximal Marginal Relevance): diversifica resultados para não mostrar
    * apenas produtos muito similares entre si.
    */
+  /**
+   * Fallback lexical: busca livros cujo título ou autor contenham os termos da query.
+   * Ignora acentuação e caixa. Usado quando a busca semântica não retorna nada para
+   * termos curtos/ambíguos que coincidem com títulos reais (ex.: "O Senhor").
+   */
+  private async buscarPorTituloLexical(query: string, limite: number): Promise<ProdutoRecomendado[]> {
+    const normalizar = (texto: string): string =>
+      texto
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .trim();
+
+    const STOPWORDS = new Set(['o', 'a', 'os', 'as', 'de', 'do', 'da', 'dos', 'das', 'e', 'um', 'uma', 'livro', 'livros']);
+    const queryNorm = normalizar(query);
+    const termos = queryNorm.split(/\s+/).filter((t) => t.length >= 2 && !STOPWORDS.has(t));
+    if (termos.length === 0) {
+      return [];
+    }
+
+    const catalogo = await this.servicoLivros.listarCatalogoGlobal(1000);
+    const correspondencias = catalogo
+      .map((livro) => {
+        const tituloNorm = normalizar(livro.titulo);
+        const autorNorm = normalizar(livro.autor);
+        // Casa se o título contém a query inteira, ou se contém algum termo significativo
+        const casaFrase = tituloNorm.includes(queryNorm);
+        const termosCasados = termos.filter((t) => tituloNorm.includes(t) || autorNorm.includes(t)).length;
+        const score = (casaFrase ? 1 : 0) + termosCasados / termos.length;
+        return { livro, score };
+      })
+      .filter((c) => c.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, limite);
+
+    return correspondencias.map(({ livro, score }) => ({
+      uuid: livro.uuid,
+      similaridade: Math.min(0.5 + score * 0.25, 0.95),
+      motivo: 'correspondencia_titulo',
+      metadados: {
+        titulo: livro.titulo,
+        autor: livro.autor,
+        categoria: livro.categoria ?? 'Geral',
+        sinopse: livro.sinopse,
+        isbn: livro.isbn,
+        preco: livro.preco,
+        numeroPaginas: livro.numeroPaginas,
+        anoPublicacao: livro.anoPublicacao,
+      },
+    }));
+  }
+
   private async executarPipelineRecomendacao(
     query: string,
     contextoCliente: IContextoRecomendacao | null,
@@ -877,11 +949,42 @@ export class ServicoRecomendacaoApplication {
     //    Motivo: o Gemini pode classificar gêneros em termos que não batem exatamente
     //    com as categorias do catálogo (ex: "ficção" vs "Ficção Científica").
     //    O RAG já garante relevância semântica — o filtro é complementar, não bloqueante.
+    //    IMPORTANTE: relaxamos APENAS o gênero. Autor, ano e preço permanecem como
+    //    AND rígido — reintroduzir itens que violem esses critérios produziria
+    //    resultados incorretos (ex.: devolver Fahrenheit 451 numa busca por Asimov).
     if (produtosFiltrados.length === 0 && resultadoRag.produtos.length > 0 && filtros.generos?.length) {
-      Logger.warn(
-        `[ServicoRecomendacaoApplication] Filtro de gênero ${JSON.stringify(filtros.generos)} eliminou todos os ${resultadoRag.produtos.length} candidatos RAG — aplicando fallback semântico`
-      );
-      produtosFiltrados = resultadoRag.produtos;
+      const { produtos: semGenero } = this.servicoFiltroCatalogo.aplicar(resultadoRag.produtos, {
+        ...filtros,
+        generos: undefined,
+        publicoAlvo: undefined,
+      });
+      if (semGenero.length > 0) {
+        Logger.warn(
+          `[ServicoRecomendacaoApplication] Filtro de gênero ${JSON.stringify(filtros.generos)} eliminou todos os ${resultadoRag.produtos.length} candidatos RAG — aplicando fallback semântico (autor/ano/preço preservados)`
+        );
+        produtosFiltrados = semGenero;
+      }
+    }
+
+    // 5.1. Fallback lexical por título/autor: buscas curtas e ambíguas (ex.: "O Senhor")
+    //    têm similaridade semântica baixa e podem ser zeradas pelo RAG/validador.
+    //    Buscar por correspondência de título/autor no catálogo garante resultados
+    //    diversificados para termos que coincidem com títulos reais.
+    if (produtosFiltrados.length === 0) {
+      const lexicais = await this.buscarPorTituloLexical(opcoes.queryTexto ?? query, limite);
+      // Respeita os filtros rígidos (autor/ano/preço): a correspondência de título não
+      // pode reintroduzir itens que violem critérios estruturais do pedido.
+      const { produtos: lexicaisFiltrados } = this.servicoFiltroCatalogo.aplicar(lexicais, {
+        ...filtros,
+        generos: undefined,
+        publicoAlvo: undefined,
+      });
+      if (lexicaisFiltrados.length > 0) {
+        Logger.debug(
+          `[ServicoRecomendacaoApplication] Fallback lexical por título acionado para "${query}" — ${lexicaisFiltrados.length} resultado(s)`
+        );
+        produtosFiltrados = lexicaisFiltrados;
+      }
     }
 
     // 6. Remove produtos já exibidos em turnos anteriores
@@ -942,6 +1045,7 @@ export class ServicoRecomendacaoApplication {
         limite: limiteBusca,
         excluirUuids: contextoTurno.uuidsJaMostrados,
         embeddingPreComputado,
+        queryTexto: intencao.queryBusca || dados.mensagem,
       }
     );
 
@@ -1405,9 +1509,15 @@ export class ServicoRecomendacaoApplication {
     throw erro;
   }
 
-  private construirContextoChat(produtos: ProdutoRecomendadoDTO[]): string {
+  private construirContextoChat(
+    produtos: ProdutoRecomendadoDTO[],
+    intencao?: IntencaoRecomendacao
+  ): string {
     if (produtos.length === 0) {
-      return 'Nenhum produto encontrado.';
+      const sugestao = intencao ? this.gerarSugestaoRelaxamento(intencao) : undefined;
+      return sugestao
+        ? `Nenhum produto encontrado com TODAS as condições pedidas. ${sugestao}`
+        : 'Nenhum produto encontrado.';
     }
 
     const linhas = produtos.map(
@@ -1416,6 +1526,32 @@ export class ServicoRecomendacaoApplication {
     );
 
     return `Livros encontrados:\n${linhas.join('\n')}`;
+  }
+
+  /**
+   * Quando a busca com filtros estruturais (AND) zera, orienta o assistente a sugerir
+   * o relaxamento do critério mais restritivo. Ordem de restritividade: autor > ano >
+   * preço > gênero. Não inventa títulos: apenas instrui a oferecer a flexibilização.
+   */
+  private gerarSugestaoRelaxamento(intencao: IntencaoRecomendacao): string | undefined {
+    const criterios: string[] = [];
+    if (intencao.autor) criterios.push(`autor "${intencao.autor}"`);
+    if (intencao.anoMin !== undefined || intencao.anoMax !== undefined) {
+      criterios.push(`período (${intencao.anoMin ?? '...'}–${intencao.anoMax ?? '...'})`);
+    }
+    if (intencao.precoMax !== undefined) criterios.push(`preço até R$${intencao.precoMax}`);
+    if (intencao.generos.length > 0) criterios.push(`gênero (${intencao.generos.join(', ')})`);
+
+    if (criterios.length <= 1) {
+      return undefined;
+    }
+
+    // O primeiro critério (autor/ano) é o mais restritivo; sugira removê-lo primeiro.
+    return (
+      `Filtros aplicados: ${criterios.join(', ')}. ` +
+      `Sugira ao cliente, de forma cordial, remover o critério mais restritivo (${criterios[0]}) ` +
+      `para ampliar os resultados. Não invente títulos que não estejam no catálogo.`
+    );
   }
 
   /**

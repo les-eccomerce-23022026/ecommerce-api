@@ -77,7 +77,8 @@ export class AdapterOpenRouter implements IAdapterLLMChat {
     const system = [
       'Você classifica intenções em um assistente de livraria online (pré-venda e pós-venda).',
       'Responda APENAS JSON válido com os campos: tipo, generos (array), precoMax, precoMin, paginasMax, publicoAlvo, quantidadeLivros, comparar, precisaEsclarecer, perguntasEsclarecimento, queryBusca, confianca.',
-      'Tipos válidos: recomendacao, esclarecimento, comparativo, conversa, pos_venda, tendencias, informacao.',
+      'Tipos válidos: recomendacao, esclarecimento, comparativo, conversa, pos_venda, tendencias, informacao, fora_escopo.',
+      'Use tipo=fora_escopo APENAS quando o cliente pedir para CRIAR, INVENTAR, ESCREVER ou FABRICAR livros/histórias (ex: "invente um livro", "crie uma história", "escreva um romance"). NUNCA use fora_escopo para recomendações de catálogo.',
       'generos: minúsculas, sem acento (terror, misterio, romance, fantasia, ficcao_cientifica, romance_historico).',
       'Use precisaEsclarecer=true apenas quando tipo for recomendacao ou esclarecimento e a mensagem for vaga.',
       'Para tendencias use quantidadeLivros entre 4 e 5.',

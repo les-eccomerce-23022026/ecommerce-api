@@ -62,11 +62,15 @@ export class AdapterGroq implements IAdapterLLMChat {
 
     const system = [
       'Você classifica intenções em um assistente de livraria online (pré-venda e pós-venda).',
-      'Responda APENAS JSON válido com os campos: tipo, generos (array), precoMax, precoMin, paginasMax, publicoAlvo, quantidadeLivros, comparar, precisaEsclarecer, perguntasEsclarecimento, queryBusca, confianca.',
-      'Tipos válidos: recomendacao, esclarecimento, comparativo, conversa, pos_venda, tendencias, informacao.',
+      'Responda APENAS JSON válido com os campos: tipo, generos (array), autor, anoMin, anoMax, precoMax, precoMin, paginasMax, publicoAlvo, quantidadeLivros, comparar, precisaEsclarecer, perguntasEsclarecimento, queryBusca, confianca.',
+      'Tipos válidos: recomendacao, esclarecimento, comparativo, conversa, pos_venda, tendencias, informacao, fora_escopo.',
+      'Use tipo=fora_escopo APENAS quando o cliente pedir para CRIAR, INVENTAR, ESCREVER ou FABRICAR livros/histórias (ex: "invente um livro", "crie uma história", "escreva um romance"). NUNCA use fora_escopo para recomendações de catálogo.',
       'generos: minúsculas, sem acento (terror, misterio, romance, fantasia, ficcao_cientifica, romance_historico).',
+      'autor: nome do autor citado pelo cliente (ex.: "Isaac Asimov"); omita se não houver. anoMin/anoMax: faixa de ano de publicação quando o cliente restringir período (ex.: "entre 1950 e 2000" => anoMin=1950, anoMax=2000); omita se não houver.',
       'Use precisaEsclarecer=true apenas quando tipo for recomendacao ou esclarecimento e a mensagem for vaga.',
       'Para tendencias use quantidadeLivros entre 4 e 5.',
+      'REGRA DE PRIORIDADE: Se a mensagem contiver a palavra "livros" ou "livro", use tipo=recomendacao (exceto se mencionar explicitamente "pedido", "entrega", "troca", "devolução"). NÃO use pos_venda apenas por conter "acima de" ou "mais de".',
+      'IMPORTANTE: precoMax deve ser preenchido APENAS quando o cliente mencionar "até", "max" ou "máximo" com valor (ex: "até R$30", "máximo 50"). precoMin deve ser preenchido APENAS quando o cliente mencionar "acima de", "mais de", "mínimo", "min" com valor em CONTEXTO DE RECOMENDAÇÃO DE LIVROS (ex: "livros acima de R$100", "mais de 50 reais", "mínimo 30"). Se a menção for sobre pedidos (ex: "pedidos acima de 100"), use tipo=pos_venda e NÃO preencha precoMin. Termos vagos como "barato", "econômico", "em conta" NÃO devem gerar precoMax/precoMin — deixe undefined.',
       `Perfil do cliente: ${JSON.stringify(contexto.perfil ?? {})}`,
       `Histórico de compras: ${contexto.resumoCompras ?? 'nenhum'}`,
     ].join(' ');

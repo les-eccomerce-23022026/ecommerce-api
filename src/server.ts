@@ -18,7 +18,7 @@ import { RepositorioLivrosPostgres } from '@/modules/livros/repositorioLivrosPos
 import { RepositorioUsuarios } from '@/modules/usuarios/usuario.repository';
 import { JobLimpezaTokensRevocados } from '@/modules/auth/jobs/JobLimpezaTokensRevocados';
 import { JobAutoIndexacaoChromaDB } from '@/modules/ia/jobs/JobAutoIndexacaoChromaDB';
-import { AdapterLangChainGemini } from '@/modules/ia/adapterLangChainGemini';
+import { adapterChatLLM } from '@/modules/ia/ia.routes';
 
 dotenv.config();
 
@@ -34,8 +34,12 @@ const variaveisObrigatorias: Record<string, string | undefined> = {
   REDIS_HOST: process.env.REDIS_HOST,
   REDIS_PORT: process.env.REDIS_PORT,
   SEGREDO_HMAC_INTENCAO: process.env.SEGREDO_HMAC_INTENCAO,
-  GEMINI_API_KEY: process.env.GEMINI_API_KEY,
 };
+
+// Validar pelo menos uma API key de LLM (Gemini ou Groq)
+if (!process.env.GEMINI_API_KEY && !process.env.GROQ_API_KEY) {
+  throw new Error('Pelo menos uma API key de LLM deve ser configurada: GEMINI_API_KEY ou GROQ_API_KEY');
+}
 
 const variaveisFaltando = Object.entries(variaveisObrigatorias)
   .filter(([, valor]) => !valor)
@@ -81,19 +85,14 @@ app.listen(Number(porta), () => {
   // Warm-up do LLM de chat (Task 2): dispara a seleção Groq/Gemini ainda no boot,
   // de forma não-bloqueante, para que a primeira requisição real não pague a
   // latência da verificação de disponibilidade. Falha não derruba o boot.
-  try {
-    const adapterChat = new AdapterLangChainGemini();
-    void adapterChat
-      .prewarmChat()
-      .then(() => Logger.info('[Server] Warm-up do LLM de chat concluído com sucesso'))
-      .catch((erro: unknown) => {
-        const msg = erro instanceof Error ? erro.message : String(erro);
-        Logger.warn(`[Server] Warm-up do LLM de chat falhou (seguindo sem warm-up). Causa: ${msg}`);
-      });
-  } catch (erro) {
-    const msg = erro instanceof Error ? erro.message : String(erro);
-    Logger.warn(`[Server] Não foi possível iniciar warm-up do LLM de chat. Causa: ${msg}`);
-  }
+  // Reusa instância única de ia.routes.ts para evitar duplicação (DRY).
+  void adapterChatLLM
+    .prewarmChat()
+    .then(() => Logger.info('[Server] Warm-up do LLM de chat concluído com sucesso'))
+    .catch((erro: unknown) => {
+      const msg = erro instanceof Error ? erro.message : String(erro);
+      Logger.warn(`[Server] Warm-up do LLM de chat falhou (seguindo sem warm-up). Causa: ${msg}`);
+    });
 });
 
 // Job de auto-confirmação de entregas com prazo vencido

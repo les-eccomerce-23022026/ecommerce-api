@@ -1,12 +1,45 @@
-# Backend — API LES (Livraria)
+# LES — Servidor de Negócios (Backend)
 
-API Node.js/TypeScript (Express, PostgreSQL, JWT).
+Responsável por todas as regras de negócio da Livraria E-Commerce: autenticação, catálogo de livros, carrinho, pedidos, pagamentos, entrega, trocas e devoluções. Expõe uma API consumida exclusivamente pela interface web.
 
 ---
 
-## 🚀 Setup Automatizado (Recomendado)
+## Como o Sistema está Organizado
 
-Para configurar e iniciar o backend automaticamente em um novo ambiente, execute:
+O servidor segue uma separação clara de responsabilidades: as regras de negócio ficam isoladas do banco de dados e dos detalhes de infraestrutura. Isso permite evoluir cada parte independentemente.
+
+```mermaid
+graph TD
+    subgraph Entrada["Entrada de Requisições"]
+        R[Rotas HTTP]
+        G[Guardas de Acesso\nverifica perfil e escopo]
+    end
+
+    subgraph Negocio["Regras de Negócio"]
+        U[Casos de Uso\ncompra · pagamento · entrega · troca]
+        E[Entidades do Domínio\nPedido · Livro · Cliente · Cupom]
+    end
+
+    subgraph Persistencia["Persistência"]
+        P[Repositórios\nacesso ao banco de dados]
+        DB[(Banco de Dados\nPostgreSQL)]
+    end
+
+    R --> G --> U
+    U --> E
+    U --> P
+    P --> DB
+
+    style Entrada fill:#5a1e1e,color:#fff
+    style Negocio fill:#1e3a5f,color:#fff
+    style Persistencia fill:#2d5016,color:#fff
+```
+
+---
+
+## Inicialização (Recomendado)
+
+O backend roda em contêineres isolados. O script cuida de subir tudo automaticamente:
 
 ```bash
 # Na raiz do projeto
@@ -17,251 +50,151 @@ cd backend
 ./scripts/setup-complete.sh
 ```
 
-Este script automatizado irá:
-- ✅ Verificar pré-requisitos (Docker, Docker Compose)
-- ✅ Configurar o arquivo `.env` automaticamente
-- ✅ Instalar dependências npm
-- ✅ Subir containers Docker (PostgreSQL, ChromaDB, Backend)
-- ✅ Configurar o banco de dados completo
-- ✅ Validar que tudo está funcionando
+O script verifica pré-requisitos, configura o ambiente, sobe os serviços e prepara o banco de dados com dados iniciais.
 
-**Documentação completa dos scripts:** [`scripts/README-SETUP.md`](scripts/README-SETUP.md)
+Veja detalhes completos em [`scripts/README-SETUP.md`](scripts/README-SETUP.md) e [`DOCKER.md`](DOCKER.md).
 
 ---
 
-## Contexto no monorepo
+## Ambiente de Execução
 
-- Visão geral do projeto: [`../README.md`](../README.md)
-- Frontend consumidor da API: [`../web/README.md`](../web/README.md)
-- Requisitos e ADRs (SSoT): [`../documentacao-exigida/README.md`](../documentacao-exigida/README.md)
+O sistema roda em três serviços isolados. Em desenvolvimento, a interface web e as ferramentas de teste acessam o servidor pela porta `3002`:
 
----
+```mermaid
+graph LR
+    subgraph Sua_Máquina["Sua Máquina"]
+        FE["Interface Web\n(porta 3000)"]
+        DEV["Ferramentas de teste\ncurl · Postman"]
+    end
 
-## 1. Banco de dados (desenvolvimento)
+    subgraph Servicos["Serviços em Contêiner"]
+        APP["Servidor de Negócios\n(porta 3002)"]
+        DB["Banco de Dados\n(porta 5432)"]
+        BUS["Buscador Semântico\nChromaDB"]
+    end
 
-Na pasta `backend`:
+    subgraph Testes["Ambiente de Testes (isolado)"]
+        APPT["Servidor de Testes\n(porta 3003)"]
+        DBT["Banco de Testes\n(porta 5433)"]
+    end
 
-```bash
-docker compose up -d
-./scripts/setup-db.sh
+    FE -->|requisições /api| APP
+    DEV --> APP
+    APP --> DB
+    APP --> BUS
+    APPT --> DBT
 ```
 
-- Postgres: `localhost:5432` — banco `ecm_livraria` (usuário/senha padrão do `docker-compose.yml`: `ecm_user` / `ecm_senha`).
-
-**Ambiente de testes isolado** (Postgres `5433`):
+### Iniciar e Parar os Serviços
 
 ```bash
-docker compose -f docker-compose.test.yml up -d
-./scripts/setup-test-db.sh
-```
-
-Configure no `.env` os hosts/portas de teste (`POSTGRES_HOST_TEST`, etc.) conforme [`.env.example`](.env.example).
-
-### Instalação em Novo Ambiente
-
-Para configurar o sistema completo em um novo ambiente (desenvolvimento ou teste), use o script de implantação consolidado:
-
-```bash
-# Ambiente de desenvolvimento
-./scripts/implantar-sistema-completo.sh --env dev
-
-# Ambiente de testes
-./scripts/implantar-sistema-completo.sh --env test
-```
-
-**O que o script faz:**
-1. **FASE 1 - DDLs:** Aplica todos os scripts de estrutura de tabelas em ordem correta
-2. **FASE 2 - DMLs:** Executa todos os seeds de dados iniciais (cidades, bairros, motivos, transportadoras, etc.)
-3. **FASE 3 - Migrations:** Aplica migrations para alterações em banco existente
-4. **FASE 4 - Verificação:** Valida integridade das tabelas críticas
-
-**Scripts incluídos:**
-- DDLs (012-016): Tabelas de motivos de troca/devolução, transportadoras, status de rastreamento, tipos e status de cupom
-- DMLs (009-014): Seeds de cidades/bairros (capitais + bairros principais), motivos de troca/devolução, transportadoras, status de rastreamento, tipos e status de cupom
-
-**Logs de execução:**
-- Salvo em `logs/implantar-sistema-completo-[env]-[timestamp].log`
-- Inclui validação de sucesso/erro em cada fase
-
-**Credenciais após instalação:**
-- Cliente: `clientetest@email.com` / `123456`
-- Admin: `admintest@email.com` / `123456`
-- DB: `ecm_user` / `ecm_senha`
-
-### Migração de cotação de frete
-
-Execute no Postgres de dev/teste o script [`sql/migrations/020_cotacao_frete_transportadora.sql`](sql/migrations/020_cotacao_frete_transportadora.sql) (tabelas `cotacao_frete`, `cotacao_frete_simulada`, coluna `vendas.cfr_id`).
-
-No `.env` / `.env.test`, defina **`PROVEDOR_FRETE=simulado`** (obrigatório para subir a API). Opcionais: `FRETE_CEP_ORIGEM_PADRAO`, `FRETE_COTACAO_TTL_MINUTOS`, parâmetros de simulação (`FRETE_SIM_*`).
-
-### PIX simulado (checkout)
-
-Execute [`sql/migrations/024_cobranca_pix_simulada.sql`](sql/migrations/024_cobranca_pix_simulada.sql): tabela `pagamento_pix_simulado`, status de venda `AGUARDANDO PAGAMENTO`.
-
-- `POST /api/pagamentos/selecionar` com `tipoPagamento: pix` devolve `pixCobranca` (copia-e-cola, QR base64, expiração, segredo para testes).
-- `POST /api/pagamentos/:uuid/processar` **não** liquida PIX — use `POST /api/webhooks/pagamento-pix-simulado` com `{ pagamentoUuid, segredoConfirmacao }`.
-- `GET /api/pagamentos/venda/:vendaUuid/resumo` (autenticado) para polling no frontend.
-- Opcional: `PIX_COBRANCA_TTL_MINUTOS` (padrão 30).
-
----
-
-## 2. Iniciar a aplicação
-
-**⚠️ IMPORTANTE: Este projeto usa Docker Compose para gerenciar o backend em ambiente de desenvolvimento.**
-
-Para instruções detalhadas sobre como usar Docker Compose para gerenciar o backend, consulte [DOCKER.md](DOCKER.md).
-
-### Comandos principais do Docker Compose
-
-```bash
-# Iniciar todos os serviços (app + postgres)
+# Iniciar todos os serviços
 docker compose up -d
 
 # Parar todos os serviços
 docker compose down
 
-# Reiniciar o backend após alterações
+# Reiniciar após alterações no código
 docker compose restart app
 
-# Reconstruir e iniciar (quando há alterações no Dockerfile)
+# Reconstruir após alterações no Dockerfile
 docker compose up -d --build app
 ```
 
-**NÃO rode o backend diretamente no host com `npm run dev` quando estiver usando Docker.** Isso causa conflitos de porta (3000) e inconsistência entre o código no host e o container.
-
-### Contrato de portas (Docker vs host)
-
-O descompasso mais comum em dev é confundir **a porta em que o Express escuta** com **a porta publicada no host pelo Docker**. Use duas variáveis no `.env` (ver [`.env.example`](.env.example)):
-
-| Variável | Onde vale | Padrão | Uso |
-|----------|-----------|--------|-----|
-| `PORTA_HTTP` | Container / host sem Docker | `3000` | Porta em que o Express **escuta** (`server.ts`) |
-| `PORTA_HTTP_EXTERNA` | Host (Docker dev) | `3002` | Porta para browser, curl, Postman (`localhost:3002`) |
-| `PORTA_HTTP_TEST_EXTERNA` | Host (`docker-compose.test.yml`) | `3003` | Stack de testes isolada |
-
-O `docker-compose.yml` publica **`${PORTA_HTTP_EXTERNA}:${PORTA_HTTP}`** (ex.: `3002:3000`). Se alterar `PORTA_HTTP` no `.env`, não edite o compose manualmente — recrie o serviço:
-
-```bash
-docker compose up -d app
-```
-
-**URLs da API:**
-
-| Modo | Base URL |
-|------|----------|
-| Com Docker (recomendado) | `http://localhost:${PORTA_HTTP_EXTERNA:-3002}/api` |
-| Sem Docker (`npm run dev`) | `http://localhost:${PORTA_HTTP:-3000}/api` |
-
-O healthcheck do serviço `app` valida HTTP na `PORTA_HTTP` **dentro** do container. O script [`iniciar-docker.sh`](iniciar-docker.sh) confere a resposta na porta externa após subir os containers.
-
-**Diagnóstico rápido** (`curl: (56) Conexão fechada`):
-
-```bash
-docker port ecm_app
-# Esperado: 3000/tcp -> 0.0.0.0:3002
-
-docker logs ecm_app --tail 5
-# Esperado: Servidor iniciado na porta 3000
-
-curl -I http://localhost:3002/api
-```
-
-Mais detalhes e troubleshooting: [DOCKER.md](DOCKER.md).
-
----
-
-### Iniciar localmente (sem Docker - não recomendado)
-
-Se preferir rodar localmente (apenas para desenvolvimento rápido):
+### Inicializar sem Contêiner (apenas desenvolvimento rápido)
 
 ```bash
 npm install
-npm run dev
+npm run dev   # disponível em http://localhost:3000/api
 ```
 
-A API sobe em `http://localhost:${PORTA_HTTP:-3000}` (prefixo `/api`). Variáveis: copie [`.env.example`](.env.example) para `.env` e defina pelo menos `JWT_SEGREDO`, `JWT_TEMPO_EXPIRACAO` (ex.: `1h`) e `CORS_ORIGIN` (origens do frontend com credenciais, ex.: `http://localhost:5173,http://127.0.0.1:5173`).
-
-### Sessão (JWT + cookie HttpOnly)
-
-- `POST /api/auth/login` define cookie `les_token` (HttpOnly, `SameSite=Lax`; nome configurável com `AUTH_COOKIE_NAME`). Em produção o corpo **não** inclui o JWT; em `NODE_ENV=test` o token também vem em `dados.token` para supertest.
-- `POST /api/auth/logout` remove o cookie.
-- `GET /api/auth/me` aceita o JWT pelo cookie **ou** pelo header `Authorization: Bearer` (útil em testes).
-- CORS usa `credentials: true`; a origem precisa estar em `CORS_ORIGIN`.
-
-**Só com Docker (app + banco):** `docker compose up -d` (o serviço `app` usa o `.env`).
-
-### Contrato com frontend
-
-- Base de API consumida pelo frontend: `/api`.
-- Sessão principal via cookie HttpOnly (`les_token` por padrão).
-- Com backend em Docker, o frontend deve apontar para `http://localhost:3002` (ou `PORTA_HTTP_EXTERNA`); sem Docker, para `http://localhost:3000` (`PORTA_HTTP`). Ver contrato de portas acima.
-- Para detalhes do cliente web, proxy Next e variáveis de ambiente: [`../web/README.md`](../web/README.md).
+> Copie `.env.example` para `.env` antes de iniciar. Consulte o arquivo para as variáveis necessárias.
 
 ---
 
-## 3. Credenciais de login (desenvolvimento e BDD)
+## Acesso ao Sistema
 
-Usuários criados pelos seeds em `sql/modelagem-dados/dml/` e migrations. Após `./scripts/setup-db.sh`, use `POST /api/auth/login` com `{ "email", "senha" }`.
+### Fluxo de Autenticação
 
-### Clientes (3 cadastrados)
+A sessão do usuário é estabelecida no login e mantida por um cookie seguro. Cada requisição subsequente carrega esse cookie automaticamente, e o servidor verifica o perfil do usuário antes de liberar qualquer operação.
 
-| Nome | E-mail | Senha | Origem | Dados extras (após setup) |
-|------|--------|-------|--------|---------------------------|
-| **Cliente Teste** | `clientetest@email.com` | `123456` | `005_seed_usuarios_teste.sql` | Endereço principal, cartões salvos (`090`), cupom de troca (`TROCA-TESTE-BDD-7`) |
-| **Maria Silva** | `cliente1@livraria.com.br` | `123456` | `095_seed_desenvolvimento_minimo_corrigido.sql` | Endereço, telefone, cartão Visa |
-| **João Santos** | `cliente2@livraria.com.br` | `123456` | `095_seed_desenvolvimento_minimo_corrigido.sql` | Endereço, telefone, cartão Mastercard |
+```mermaid
+sequenceDiagram
+    participant U as Usuário
+    participant S as Servidor LES
+    participant DB as Banco de Dados
 
-### Administradores de Loja (2 cadastrados)
+    U->>S: Entra com e-mail e senha
+    S->>DB: Verifica credenciais
+    DB-->>S: Credenciais válidas
+    S-->>U: Sessão iniciada (cookie seguro)
 
-| Nome | E-mail | Senha | Papel | Escopo | Origem |
-|------|--------|-------|-------|--------|--------|
-| **Admin Teste** | `admintest@email.com` | `123456` | `admin` | LOJA (loja atribuída) | `005_seed_usuarios_teste.sql` |
-| **Admin Livraria** | `admin_loja@livraria.com.br` | `123456` | `admin` | LOJA (livraria-padrao) | `095_seed_desenvolvimento_minimo_corrigido.sql` |
+    Note over U,S: Próximas requisições
 
-### Administradores de Sistema (2 cadastrados)
+    U->>S: Solicita pedidos (cookie enviado)
+    S->>S: Verifica perfil e escopo de acesso
+    S->>DB: Busca dados dentro do escopo permitido
+    DB-->>S: Dados
+    S-->>U: Resposta
 
-| Nome | E-mail | Senha | Papel | Escopo | Origem |
-|------|--------|-------|-------|--------|--------|
-| **Administrador do Sistema** | `admin.sistema@livraria.com.br` | `Admin@123` | `admin_sistema` | SISTEMA (acesso global) | Seed existente no banco |
-| **Admin Livraria** | `admin@livraria.com.br` | (senha não definida) | `admin_sistema` | SISTEMA (acesso global) | Seed existente no banco |
-
-### Seed de Vendas Históricas (Análise de Vendas)
-
-Para demonstração do gráfico de análise de vendas por categoria, execute a migration `070_seed_vendas_historicas_13_meses.sql`:
-
-```bash
-docker exec ecm_postgres psql -U ecm_user -d ecm_livraria < sql/migrations/070_seed_vendas_historicas_13_meses.sql
+    U->>S: Encerra sessão
+    S-->>U: Cookie removido
 ```
 
-**Dados populados:**
-- **Período**: 13 meses (maio 2025 a maio 2026)
-- **Total de vendas**: ~325 vendas
-- **Total de itens**: ~621 itens de venda
-- **Categorias**: 7 categorias distribuídas (Clássicos, Distopia, Fantasia, Ficção Científica, Literatura Brasileira, Negócios, Tecnologia)
-- **Clientes**: 2 clientes fixos (usu_id 92 e 94)
-- **Loja**: Loja Padrão (UUID: 82c0a24c-4cf4-4b12-823a-f1a8b9a086c3, loj_id: 32)
-- **Status**: 80% ENTREGUE, 15% APROVADA, 5% EM_PROCESSAMENTO
+### Perfis e Escopos de Acesso
 
-**Login para análise de vendas:**
-- **Email**: admin_loja@livraria.com.br
-- **Senha**: 123456
-- **Papel**: admin (PAPEL_ADMIN)
-- **Escopo**: LOJA (livraria-padrao)
+```mermaid
+graph TD
+    A([Usuário autenticado]) --> B{Qual perfil?}
 
-### Exemplo de login
+    B --> C[Cliente]
+    B --> D[Administrador de Loja]
+    B --> E[Administrador de Sistema]
 
-Com Docker (`PORTA_HTTP_EXTERNA=3002`):
+    C --> C1[Próprios pedidos\nPróprio carrinho\nPróprios dados]
+    D --> D1[Pedidos da loja\nEstoque da loja\nPagamentos da loja]
+    E --> E1[Todas as lojas\nTodos os usuários\nConfigurações globais]
+```
+
+### Usuários de Desenvolvimento
+
+Após executar o setup do banco, os seguintes usuários estão disponíveis:
+
+**Clientes**
+
+| Nome | E-mail | Senha |
+|------|--------|-------|
+| Cliente Teste | `clientetest@email.com` | `ASDF@asdf123` |
+| Maria Silva | `cliente1@livraria.com.br` | `ASDF@asdf123` |
+| João Santos | `cliente2@livraria.com.br` | `ASDF@asdf123` |
+
+**Administradores de Loja**
+
+| Nome | E-mail | Senha |
+|------|--------|-------|
+| Admin Teste | `admintest@email.com` | `ASDF@asdf123` |
+| Admin Livraria | `admin_loja@livraria.com.br` | `ASDF@asdf123` |
+
+**Administradores de Sistema**
+
+| Nome | E-mail | Senha |
+|------|--------|-------|
+| Administrador do Sistema | `admin.sistema@livraria.com.br` | `Admin@123` |
+
+> As senhas acima são exclusivas para ambiente local e de testes. Altere o administrador mestre antes de qualquer deploy em produção.
+
+### Exemplo de login via terminal
 
 ```bash
 # Cliente
 curl -s -X POST http://localhost:3002/api/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"email":"clientetest@email.com","senha":"123456"}'
+  -d '{"email":"clientetest@email.com","senha":"ASDF@asdf123"}'
 
 # Administrador de Loja
 curl -s -X POST http://localhost:3002/api/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"email":"admintest@email.com","senha":"123456"}'
+  -d '{"email":"admintest@email.com","senha":"ASDF@asdf123"}'
 
 # Administrador de Sistema
 curl -s -X POST http://localhost:3002/api/auth/login \
@@ -269,196 +202,139 @@ curl -s -X POST http://localhost:3002/api/auth/login \
   -d '{"email":"admin.sistema@livraria.com.br","senha":"Admin@123"}'
 ```
 
-Sem Docker, troque `3002` por `3000` (ou o valor de `PORTA_HTTP` no `.env`).
-
-### Cypress e CI
-
-Os testes E2E usam por padrão `clientetest@email.com` e `admintest@email.com` (senha `123456`). Sobrescreva com `CYPRESS_CLIENTE_EMAIL`, `CYPRESS_CLIENTE_SENHA`, `CYPRESS_ADMIN_EMAIL`, `CYPRESS_ADMIN_SENHA`.
-
-### Bootstrap (somente `NODE_ENV=test`)
-
-`POST /api/admin/bootstrap` — recria/atualiza o mestre `admin@livraria.com.br` com senha `Admin@123`. Exige header `x-test-bootstrap-key` igual a `TEST_BOOTSTRAP_KEY` e, em integração, `x-use-test-db: true` com `ENABLE_TEST_DB_SWITCH=true`.
-
-> **Segurança:** senhas acima são apenas para ambiente local/CI. Altere o mestre após o primeiro deploy em produção.
-
 ---
 
-## 4. CPFs válidos para testes (dígitos verificadores)
+## Dados para Testes
 
-A API valida CPF em cadastro de cliente (ambiente não-test). Use CPFs distintos por cadastro. Lista com **dígitos verificadores corretos**:
+### CPFs válidos (cadastro de cliente)
 
-1. `245.699.622-46`
-2. `019.364.721-47`
-3. `747.200.643-29`
-4. `371.568.753-37`
-5. `497.592.260-65`
-6. `283.323.987-46`
-7. `206.903.522-04`
-8. `824.477.504-12`
-9. `989.888.819-90`
-10. `267.905.031-29`
-11. `684.262.887-31`
-12. `802.563.243-10`
-13. `087.098.018-12`
-14. `707.848.056-28`
-15. `952.426.835-38`
+O sistema valida o CPF no cadastro. Use um CPF diferente para cada novo cliente de teste:
 
----
+`245.699.622-46` · `019.364.721-47` · `747.200.643-29` · `371.568.753-37` · `497.592.260-65`
+`283.323.987-46` · `206.903.522-04` · `824.477.504-12` · `989.888.819-90` · `267.905.031-29`
+`684.262.887-31` · `802.563.243-10` · `087.098.018-12` · `707.848.056-28` · `952.426.835-38`
 
-## 5. Números de cartão para testes (Luhn)
+### Cartões de teste (pagamento)
 
-A validação de cartão na API usa comprimento (13–19 dígitos) e **algoritmo de Luhn**. Os números abaixo são **apenas para desenvolvimento** (não são cartões reais); qualquer CVV de 3 dígitos e validade futura (`MM/AA`) costuma bastar onde o fluxo exigir.
+Use qualquer CVV de 3 dígitos e validade futura:
 
-| Bandeira (exemplo) | Número (16 dígitos) |
-|----------------------|---------------------|
+| Bandeira | Número |
+|----------|--------|
 | Visa | `4111111111111111` |
 | Visa | `4242424242424242` |
 | Mastercard | `5555555555554444` |
 
----
+### Pagamento PIX (simulado)
 
-## 6. Testes e cobertura
+O PIX em desenvolvimento é simulado. Após selecionar PIX no checkout, confirme o pagamento via:
 
 ```bash
-npm test
-npm run test:coverage
+curl -s -X POST http://localhost:3002/api/webhooks/pagamento-pix-simulado \
+  -H "Content-Type: application/json" \
+  -d '{"pagamentoUuid":"<uuid>","segredoConfirmacao":"<segredo>"}'
 ```
 
-- Relatório texto no terminal; HTML em `backend/coverage/index.html` (abra no navegador).
-- Cenários em linguagem de negócio: [`bdd/README.md`](bdd/README.md) (especificação; a automação está em `src/tests/**`, com pastas por domínio em `integracao/`).
-- Detalhes de SQL e modelagem: [`sql/README.md`](sql/README.md).
+O `segredoConfirmacao` é retornado no momento da seleção do PIX.
 
-### Guia rápido de testes por estratégia e domínio
+### Histórico de vendas para relatórios
 
-#### Estratégia
+Para popular o gráfico de análise de vendas (13 meses de histórico):
 
-| Comando | Escopo |
-|---------|--------|
-| `npm test` | Suite completa (unitários + integração + auditoria) |
-| `npm run test:unit` | Apenas testes unitários (`src/tests/unitarios`) |
-| `npm run test:int` | Apenas testes de integração (`src/tests/integracao`) |
-| `npm run test:coverage` | Suite completa com cobertura |
+```bash
+docker exec ecm_postgres psql -U ecm_user -d ecm_livraria \
+  < sql/migrations/070_seed_vendas_historicas_13_meses.sql
+```
 
-#### Domínio de negócio
-
-| Domínio | Unitário | Integração | Completo do domínio |
-|--------|----------|------------|---------------------|
-| Admin | `npm run test:unit:admin` | `npm run test:int:admin` | `npm run test:dominio:admin` |
-| Clientes | `npm run test:unit:clientes` | `npm run test:int:clientes` | `npm run test:dominio:clientes` |
-| Vendas | `npm run test:unit:vendas` | `npm run test:int:vendas` | `npm run test:dominio:vendas` |
-| Pagamentos | `npm run test:unit:pagamentos` | `npm run test:int:pagamentos` | `npm run test:dominio:pagamentos` |
-| Entrega | `npm run test:unit:entrega` | `npm run test:int:entrega` | `npm run test:dominio:entrega` |
-| Frete | `npm run test:unit:frete` | `npm run test:int:frete` | `npm run test:dominio:frete` |
-
-#### Complementares
-
-| Comando | Escopo |
-|---------|--------|
-| `npm run test:unit:usuarios` | Repositório de usuários |
-| `npm run test:unit:utils` | Utilitários (`utils` + formatação) |
-| `npm run test:unit:infra` | Infra/middlewares |
-| `npm run test:auditoria` | Auditoria de condicionais |
+Acesse com `admin_loja@livraria.com.br` / `ASDF@asdf123` para visualizar os relatórios.
 
 ---
 
-## 7. Scripts úteis
+## Banco de Dados
 
-| Comando | Descrição |
-|---------|-----------|
-| `npm run dev` | Servidor com hot-reload |
-| `npm run build` / `npm start` | Build e produção |
-| `npm test` | Testes Jest |
-| `npm run test:coverage` | Testes + cobertura |
-| `./scripts/setup-db.sh` | DDL/DML/migrations no Postgres dev |
-| `./scripts/setup-banco-completo.sh` | Setup unificado do banco (DDL, DML, migrations críticas) |
-| `./scripts/reset-db.sh` | Limpa volumes Docker e recria banco (ver script) |
-| `./iniciar-docker.sh` | Sobe compose, valida API na `PORTA_HTTP_EXTERNA` e roda setup do banco |
+### Configurar em Novo Ambiente
 
----
+```bash
+# Desenvolvimento
+./scripts/implantar-sistema-completo.sh --env dev
 
-## 8. Documentação (SSoT e quadro local)
+# Testes
+./scripts/implantar-sistema-completo.sh --env test
+```
 
-- Especificação e ADRs: [`../documentacao-exigida/README.md`](../documentacao-exigida/README.md)
-- Kanban backend: [`docs/PROJECT-BOARD.md`](docs/PROJECT-BOARD.md)
-- Protocolo SQL/migrations: [`sql/AGENTS.md`](sql/AGENTS.md)
-
----
-
-## 9. Referências
-
-- Rotas HTTP de exemplo: pasta `http/`.
-- BDD (cenários): pasta `bdd/`.
-- Scripts curl (fluxos): `scripts/curl-*-bdd.sh`.
-
----
-
-## 10. Segurança no ambiente de testes
-
-- `x-use-test-db` só deve ser usado em ambiente controlado (CI/local) com `ENABLE_TEST_DB_SWITCH=true`.
-- Endpoint `POST /api/admin/bootstrap` só funciona em `NODE_ENV=test` e exige header `x-test-bootstrap-key` igual a `TEST_BOOTSTRAP_KEY`.
-- Não versionar segredos reais em `.env`, `cypress.env.json` ou scripts.
-- Para Cypress, defina credenciais via variáveis de ambiente:
-  - `CYPRESS_ADMIN_EMAIL`, `CYPRESS_ADMIN_SENHA`
-  - `CYPRESS_CLIENTE_EMAIL`, `CYPRESS_CLIENTE_SENHA`
-- Pipeline de segurança recomendada (workflow `security-ci`):
-  - secret scan (`gitleaks`)
-  - SAST (`semgrep` + lint)
-  - config lint (`yamllint`, `shellcheck`, `hadolint`)
-  - testes backend/frontend
-- Política de gate incremental:
-  - checks rodam por escopo alterado (`backend/**`, `web/**`, `.github/**`);
-  - lint e SAST focam arquivos alterados no PR para não bloquear por dívida histórica fora do diff;
-  - E2E Cypress não entra no gate padrão neste estágio (somente unit/integration + segurança).
-- Validação operacional no GitHub:
-  - rode o workflow `security-ci` por `workflow_dispatch` com `full_gate=true` para execução completa (sem filtro incremental);
-  - mantenha `check_secrets=true` para validar os secrets obrigatórios antes de promover mudanças para `main/master`;
-  - use o modo incremental no dia a dia e o `full_gate` como checklist de release/hardening.
-- Secrets obrigatórios no repositório remoto (Settings → Secrets and variables → Actions):
-  - `TEST_BOOTSTRAP_KEY`
-  - `CYPRESS_ADMIN_EMAIL`, `CYPRESS_ADMIN_SENHA`
-  - `CYPRESS_CLIENTE_EMAIL`, `CYPRESS_CLIENTE_SENHA`
-
----
-
-## 11. Operações de Banco de Dados (Schema `livraria` e Índices)
-
-### Schema de aplicação (`livraria`)
-
-A partir da versão 1.0.1, o banco de dados utiliza o schema **`livraria`** para objetos de negócio (tabelas, triggers, funções). A partir de 2026-05-17, o schema foi reestruturado com subdivisões por contexto limitado DDD (ver ADR 0006). Extensões como `pg_trgm` e `unaccent` permanecem no schema `public`.
-
-A aplicação configura automaticamente o `search_path=livraria_comercial, livraria_logistica, livraria_financeiro, livraria_catalogo, livraria_gestao, livraria_ref, livraria_audit, livraria, public` via pool de conexão (variável `POSTGRES_SCHEMA`).
+O script aplica toda a estrutura de tabelas, dados iniciais (cidades, transportadoras, motivos de troca, tipos de cupom) e validações de integridade. O log é salvo em `logs/`.
 
 ### Scripts de Banco
 
 | Script | Quando usar |
 |--------|-------------|
-| `./scripts/setup-db.sh` | **Estrutura + Seeds**: Reconstrói o banco a partir dos arquivos SQL (DDL, DML e Migrations). Ideal para novos ambientes ou reset total. |
-| `./scripts/setup-test-db.sh` | **Ambiente de Teste**: Equivalente ao `setup-db.sh` mas direcionado ao banco de testes (`:5433`). |
-| `./scripts/sync-db-test.sh` | **Espelhamento**: Realiza um clone lógico dos dados do banco de desenvolvimento para o banco de testes. Útil para debugar falhas com massa de dados real. |
+| `./scripts/setup-db.sh` | Reconstruir banco de desenvolvimento do zero |
+| `./scripts/setup-test-db.sh` | Reconstruir banco de testes do zero |
+| `./scripts/sync-db-test.sh` | Copiar dados reais de dev para testes |
+| `./scripts/reset-db.sh` | Apagar tudo e recriar (destrutivo) |
 
 ### Backup e Restauração
 
-Para gerar um backup compactado do schema `les`:
-
 ```bash
+# Gerar backup
 docker exec ecm_postgres pg_dump -U ecm_user -d ecm_livraria -n les -Fc > backup_les_$(date +%Y%m%d).dump
-```
 
-Para restaurar:
-
-```bash
+# Restaurar backup
 docker exec -i ecm_postgres pg_restore -U ecm_user -d ecm_livraria --clean --if-exists < backup_les_...dump
 ```
 
-### Análise de Índices e Performance
+---
 
-Query para listar o tamanho dos índices e identificar candidatos a otimização:
+## Testes Automatizados
 
-```sql
-SELECT indexrelid::regclass AS indice,
-       pg_size_pretty(pg_relation_size(indexrelid)) AS tamanho
-FROM pg_stat_user_indexes
-ORDER BY pg_relation_size(indexrelid) DESC
-LIMIT 30;
+Os testes cobrem os domínios de negócio com suítes de integração. Execute a suíte completa ou por domínio:
+
+```bash
+# Suíte completa
+npm test
+
+# Com relatório de cobertura
+npm run test:coverage
+
+# Por domínio de negócio
+npm run test:dominio:clientes
+npm run test:dominio:vendas
+npm run test:dominio:pagamentos
+npm run test:dominio:entrega
+npm run test:dominio:frete
+npm run test:dominio:admin
 ```
 
+O relatório de cobertura em HTML fica em `coverage/index.html`. Os cenários em linguagem de negócio estão em [`bdd/README.md`](bdd/README.md).
+
+---
+
+## Scripts de Desenvolvimento
+
+| Comando | Descrição |
+|---------|-----------|
+| `npm run dev` | Iniciar servidor com recarregamento automático |
+| `npm run build` | Gerar versão de produção |
+| `npm start` | Iniciar versão de produção |
+| `npm test` | Executar testes |
+| `npm run test:coverage` | Executar testes com relatório de cobertura |
+| `./iniciar-docker.sh` | Subir contêineres, verificar API e preparar banco |
+
+---
+
+## Segurança em Testes
+
+- Credenciais de desenvolvimento **nunca** devem ir para produção
+- Variáveis de ambiente sensíveis não devem ser versionadas (`.env`, `cypress.env.json`)
+- Para os testes E2E, defina as credenciais via variáveis de ambiente: `CYPRESS_ADMIN_EMAIL`, `CYPRESS_ADMIN_SENHA`, `CYPRESS_CLIENTE_EMAIL`, `CYPRESS_CLIENTE_SENHA`
+- O endpoint de reset de administrador (`/api/admin/bootstrap`) só funciona em ambiente de testes e requer chave específica
+
+---
+
+## Documentação Relacionada
+
+- [Interface web (Frontend)](../web/README.md)
+- [Visão geral do projeto](../README.md)
+- [Requisitos e decisões de arquitetura](../documentacao-exigida/README.md)
+- [Cenários de negócio (BDD)](bdd/README.md)
+- [Estrutura do banco de dados](sql/README.md)
+- [Guia de operação Docker](DOCKER.md)

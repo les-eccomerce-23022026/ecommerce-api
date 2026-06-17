@@ -71,14 +71,16 @@ export const CONFIGURACAO_RECOMENDACAO = {
   quantidadeResultados: parseInt(process.env.RAG_TOP_K || '5', 10),
 
   // Limiar mínimo de similaridade semântica aceito (0-1)
-  limiarSimilaridade: parseFloat(process.env.RAG_SIMILARITY_THRESHOLD || '0.6'),
+  // Reduzido para 0.3 para permitir mais resultados em categorias com embedding menos similar
+  limiarSimilaridade: parseFloat(process.env.RAG_SIMILARITY_THRESHOLD || '0.3'),
 
   // Gate de relevância relativa ao topo (0-1): descarta candidatos cuja
   // similaridade fique mais que `gapRelevancia` abaixo do melhor resultado da
   // própria query. Adaptativo — corta outliers de outra categoria (ex.: um livro
   // de Tecnologia numa busca de Romance) sem precisar de um limiar global alto
-  // que prejudicaria o recall de queries esparsas. Default 0.04.
-  gapRelevancia: parseFloat(process.env.RAG_RELEVANCE_GAP || '0.04'),
+  // que prejudicaria o recall de queries esparsas. Aumentado para 0.25 para
+  // permitir mais resultados após população massiva do catálogo.
+  gapRelevancia: parseFloat(process.env.RAG_RELEVANCE_GAP || '0.25'),
 
   // Multiplicador de busca padrão (mantido para compatibilidade)
   multiplicadorBusca: parseInt(process.env.RAG_SEARCH_MULTIPLIER || '2', 10),

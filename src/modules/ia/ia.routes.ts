@@ -84,6 +84,9 @@ const pool = conexaoPostgres['poolProducao']; // Acessa o pool interno
 const repositorioEmbedding = new RepositorioEmbeddingChromaDB();
 const adapterEmbedding = FactoryEmbedding.obterInstancia();
 const adapterChatLLM = new AdapterLangChainGemini();
+
+// Exporta instância única para reuso no warm-up (server.ts) - evita duplicação
+export { adapterChatLLM };
 const servicoGeracaoEmbedding = new ServicoGeracaoEmbedding();
 const repositorioRecomendacao = new RepositorioRecomendacaoPostgres(pool);
 

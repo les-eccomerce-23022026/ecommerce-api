@@ -9,6 +9,7 @@
  * - pos_venda     : dúvidas sobre pedido, entrega, prazo de troca ou status
  * - tendencias    : mais vendidos por categoria, faixa etária ou de forma geral
  * - informacao    : políticas da loja, frete, horário de atendimento (sem inventar)
+ * - fora_escopo   : solicitações fora do escopo (criar/inventar livros, escrever histórias)
  */
 export type TipoIntencaoRecomendacao =
   | 'recomendacao'
@@ -17,7 +18,8 @@ export type TipoIntencaoRecomendacao =
   | 'conversa'
   | 'pos_venda'
   | 'tendencias'
-  | 'informacao';
+  | 'informacao'
+  | 'fora_escopo';
 
 export type PublicoAlvoIntencao = 'infantil' | 'juvenil' | 'adulto';
 
@@ -31,6 +33,9 @@ export interface ContextoInterpretacaoIntencao {
 export interface IntencaoRecomendacao {
   tipo: TipoIntencaoRecomendacao;
   generos: string[];
+  autor?: string;
+  anoMin?: number;
+  anoMax?: number;
   precoMax?: number;
   precoMin?: number;
   paginasMax?: number;

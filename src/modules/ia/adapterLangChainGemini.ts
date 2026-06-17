@@ -152,21 +152,45 @@ export class AdapterLangChainGemini implements IAdapterEmbedding {
     if (this.verificacaoChatPromise) return this.verificacaoChatPromise;
 
     this.verificacaoChatPromise = (async () => {
-      Logger.info('[AdapterLangChainGemini] Verificando disponibilidade de provedores LLM em paralelo...');
-      const [groqOk, geminiOk] = await Promise.all([this.testarGroq(), this.testarGemini()]);
+      const provedorForcado = process.env.LLM_CHAT_PROVIDER as 'groq' | 'gemini' | undefined;
+      
+      if (provedorForcado) {
+        Logger.info(`[AdapterLangChainGemini] Provedor forçado via LLM_CHAT_PROVIDER: ${provedorForcado}`);
+        if (provedorForcado === 'groq') {
+          this.provedorChat = 'groq';
+          Logger.info('[AdapterLangChainGemini] Provedor chat selecionado: Groq (llama-3.1-8b-instant)');
+          return;
+        } else if (provedorForcado === 'gemini') {
+          this.provedorChat = 'gemini';
+          Logger.info('[AdapterLangChainGemini] Provedor chat selecionado: Gemini (gemini-2.5-flash)');
+          return;
+        }
+      }
 
-      if (groqOk) {
-        this.provedorChat = 'groq';
-        Logger.info('[AdapterLangChainGemini] Provedor chat selecionado: Groq (llama-3.1-8b-instant)');
-      } else if (geminiOk) {
+      Logger.info('[AdapterLangChainGemini] Verificando disponibilidade de provedores LLM em paralelo...');
+      const [geminiOk, groqOk] = await Promise.all([this.testarGemini(), this.testarGroq()]);
+
+      if (geminiOk) {
         this.provedorChat = 'gemini';
         Logger.info('[AdapterLangChainGemini] Provedor chat selecionado: Gemini (gemini-2.5-flash)');
+      } else if (groqOk) {
+        this.provedorChat = 'groq';
+        Logger.info('[AdapterLangChainGemini] Provedor chat selecionado: Groq (llama-3.1-8b-instant)');
       } else {
         throw new Error('Nenhum provedor LLM disponível. Verifique GROQ_API_KEY e GEMINI_API_KEY.');
       }
     })();
 
     return this.verificacaoChatPromise;
+  }
+
+  private resetarProvedor(): void {
+    this.provedorChat = null;
+    this.verificacaoChatPromise = null;
+  }
+
+  private provedorAlternativo(): 'gemini' | 'groq' {
+    return this.provedorChat === 'gemini' ? 'groq' : 'gemini';
   }
 
   private async chamarChatGroq(
@@ -310,8 +334,24 @@ export class AdapterLangChainGemini implements IAdapterEmbedding {
     contexto: ContextoInterpretacaoIntencao
   ): Promise<IntencaoRecomendacao> {
     await this.verificarDisponibilidadeChat();
+    try {
+      return await this.interpretarIntencaoComProvedor(this.provedorChat!, mensagem, historico, contexto);
+    } catch (erro) {
+      const alternativo = this.provedorAlternativo();
+      Logger.warn(`[AdapterLangChainGemini] Provedor ${this.provedorChat} falhou na interpretação — tentando ${alternativo}`);
+      this.resetarProvedor();
+      this.provedorChat = alternativo;
+      return this.interpretarIntencaoComProvedor(alternativo, mensagem, historico, contexto);
+    }
+  }
 
-    if (this.provedorChat === 'groq') {
+  private async interpretarIntencaoComProvedor(
+    provedor: 'gemini' | 'groq',
+    mensagem: string,
+    historico: MensagemChatDTO[] | undefined,
+    contexto: ContextoInterpretacaoIntencao
+  ): Promise<IntencaoRecomendacao> {
+    if (provedor === 'groq') {
       const adapterGroq = new AdapterGroq();
       return adapterGroq.interpretarIntencao(mensagem, historico, contexto);
     }
@@ -326,11 +366,14 @@ export class AdapterLangChainGemini implements IAdapterEmbedding {
 
     const system = [
       'Você classifica intenções em um assistente de livraria online (pré-venda e pós-venda).',
-      'Responda APENAS JSON válido com os campos: tipo, generos (array), precoMax, precoMin, paginasMax, publicoAlvo, quantidadeLivros, comparar, precisaEsclarecer, perguntasEsclarecimento, queryBusca, confianca.',
-      'Tipos válidos: recomendacao, esclarecimento, comparativo, conversa, pos_venda, tendencias, informacao.',
+      'Responda APENAS JSON válido com os campos: tipo, generos (array), autor, anoMin, anoMax, precoMax, precoMin, paginasMax, publicoAlvo, quantidadeLivros, comparar, precisaEsclarecer, perguntasEsclarecimento, queryBusca, confianca.',
+      'Tipos válidos: recomendacao, esclarecimento, comparativo, conversa, pos_venda, tendencias, informacao, fora_escopo.',
+      'Use tipo=fora_escopo APENAS quando o cliente pedir para CRIAR, INVENTAR, ESCREVER ou FABRICAR livros/histórias (ex: "invente um livro", "crie uma história", "escreva um romance"). NUNCA use fora_escopo para recomendações de catálogo.',
       'generos: minúsculas, sem acento (terror, misterio, romance, fantasia, ficcao_cientifica, romance_historico).',
+      'autor: nome do autor citado pelo cliente (ex.: "Isaac Asimov"); omita se não houver. anoMin/anoMax: faixa de ano de publicação quando o cliente restringir período (ex.: "entre 1950 e 2000" => anoMin=1950, anoMax=2000); omita se não houver.',
       'Use precisaEsclarecer=true apenas quando tipo for recomendacao ou esclarecimento e a mensagem for vaga.',
       'Para tendencias use quantidadeLivros entre 4 e 5.',
+      'IMPORTANTE: precoMax deve ser preenchido APENAS quando o cliente mencionar "até", "max" ou "máximo" com valor (ex: "até R$30", "máximo 50"). precoMin deve ser preenchido APENAS quando o cliente mencionar "acima de", "mínimo", "min" ou "mais de" com valor (ex: "acima de R$100", "mínimo 50"). Termos vagos como "barato", "econômico", "em conta" NÃO devem gerar precoMax/precoMin — deixe undefined.',
       `Perfil do cliente: ${JSON.stringify(contexto.perfil ?? {})}`,
       `Histórico de compras: ${contexto.resumoCompras ?? 'nenhum'}`,
     ].join(' ');
@@ -376,8 +419,31 @@ export class AdapterLangChainGemini implements IAdapterEmbedding {
     }
   ): Promise<string> {
     await this.verificarDisponibilidadeChat();
+    try {
+      return await this.gerarRespostaChatComProvedor(this.provedorChat!, pergunta, contexto, historicoConversa, opcoes);
+    } catch (erro) {
+      const alternativo = this.provedorAlternativo();
+      Logger.warn(`[AdapterLangChainGemini] Provedor ${this.provedorChat} falhou no chat — tentando ${alternativo}`);
+      this.resetarProvedor();
+      this.provedorChat = alternativo;
+      return this.gerarRespostaChatComProvedor(alternativo, pergunta, contexto, historicoConversa, opcoes);
+    }
+  }
 
-    if (this.provedorChat === 'groq') {
+  private async gerarRespostaChatComProvedor(
+    provedor: 'gemini' | 'groq',
+    pergunta: string,
+    contexto: string,
+    historicoConversa?: { papel: 'user' | 'model'; conteudo: string }[],
+    opcoes?: {
+      modoEsclarecimento?: boolean;
+      perguntasFollowUp?: string[];
+      perfil?: { idadeAnos?: number; estado?: string; nome?: string };
+      modoPosvenda?: boolean;
+      maxTokens?: number;
+    }
+  ): Promise<string> {
+    if (provedor === 'groq') {
       const adapterGroq = new AdapterGroq();
       return adapterGroq.gerarRespostaChat(pergunta, contexto, historicoConversa, opcoes);
     }
@@ -483,8 +549,32 @@ export class AdapterLangChainGemini implements IAdapterEmbedding {
     }
   ): Promise<string> {
     await this.verificarDisponibilidadeChat();
+    try {
+      return await this.gerarRespostaChatStreamComProvedor(this.provedorChat!, pergunta, contexto, onDelta, historicoConversa, opcoes);
+    } catch (erro) {
+      const alternativo = this.provedorAlternativo();
+      Logger.warn(`[AdapterLangChainGemini] Provedor ${this.provedorChat} falhou no stream — tentando ${alternativo}`);
+      this.resetarProvedor();
+      this.provedorChat = alternativo;
+      return this.gerarRespostaChatStreamComProvedor(alternativo, pergunta, contexto, onDelta, historicoConversa, opcoes);
+    }
+  }
 
-    if (this.provedorChat === 'groq') {
+  private async gerarRespostaChatStreamComProvedor(
+    provedor: 'gemini' | 'groq',
+    pergunta: string,
+    contexto: string,
+    onDelta: (delta: string) => void,
+    historicoConversa?: { papel: 'user' | 'model'; conteudo: string }[],
+    opcoes?: {
+      modoEsclarecimento?: boolean;
+      perguntasFollowUp?: string[];
+      perfil?: { idadeAnos?: number; estado?: string; nome?: string };
+      modoPosvenda?: boolean;
+      maxTokens?: number;
+    }
+  ): Promise<string> {
+    if (provedor === 'groq') {
       const adapterGroq = new AdapterGroq();
       return adapterGroq.gerarRespostaChatStream(pergunta, contexto, onDelta, historicoConversa, opcoes);
     }
@@ -539,12 +629,22 @@ export class AdapterLangChainGemini implements IAdapterEmbedding {
    */
   async validarCoerencia(prompt: string): Promise<string> {
     await this.verificarDisponibilidadeChat();
+    try {
+      return await this.validarCoerenciaComProvedor(this.provedorChat!, prompt);
+    } catch (erro) {
+      const alternativo = this.provedorAlternativo();
+      Logger.warn(`[AdapterLangChainGemini] Provedor ${this.provedorChat} falhou na validação — tentando ${alternativo}`);
+      this.resetarProvedor();
+      this.provedorChat = alternativo;
+      return this.validarCoerenciaComProvedor(alternativo, prompt);
+    }
+  }
 
-    if (this.provedorChat === 'groq') {
+  private async validarCoerenciaComProvedor(provedor: 'gemini' | 'groq', prompt: string): Promise<string> {
+    if (provedor === 'groq') {
       const adapterGroq = new AdapterGroq();
       return adapterGroq.validarCoerencia(prompt);
     }
-
     return this.chamarChatGemini('', [{ role: 'user', parts: [{ text: prompt }] }], 512);
   }
 

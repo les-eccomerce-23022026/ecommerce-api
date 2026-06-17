@@ -5,9 +5,13 @@ import { ProdutoRecomendado } from './servicoRecomendacaoRAG';
 
 export interface FiltrosCatalogoEntrada {
   precoMax?: number;
+  precoMin?: number;
   paginasMax?: number;
   generos?: string[];
   publicoAlvo?: string;
+  autor?: string;
+  anoMin?: number;
+  anoMax?: number;
 }
 
 export interface ResultadoFiltroCatalogo {
@@ -24,61 +28,75 @@ const MAPA_PUBLICO_TAGS: Record<string, string[]> = {
 
 /**
  * Filtra candidatos do Chroma por metadados estruturados (preço, páginas, gênero/tags).
+ * Estratégia híbrida: match estrito por categoria primeiro, relaxa para semântico se resultados insuficientes.
  */
 export class ServicoFiltroCatalogo {
   aplicar(
     produtos: ProdutoRecomendado[],
     filtros: FiltrosCatalogoEntrada
   ): ResultadoFiltroCatalogo {
-    const filtrados = produtos.filter((p) => this.atendeFiltros(p, filtros, false));
+    // Filtro estrito (apenas categoria/tags exatas)
+    const estritos = produtos.filter((p) => this.atendeFiltros(p, filtros, false, true));
 
-    if (filtrados.length > 0 || !this.temFiltrosRestritivos(filtros)) {
-      return { produtos: filtrados, filtrosRelaxados: false };
+    if (estritos.length >= 3 || !filtros.generos || filtros.generos.length === 0) {
+      return { produtos: estritos, filtrosRelaxados: false };
     }
 
-    const relaxados = produtos.filter((p) => this.atendeFiltros(p, filtros, true));
+    // Relaxa para busca semântica se menos de 3 resultados
+    const relaxados = produtos.filter((p) => this.atendeFiltros(p, filtros, false, false));
 
     return {
       produtos: relaxados,
       filtrosRelaxados: true,
       mensagemRelaxamento:
-        'Não encontrei títulos com todas as condições; seguem sugestões próximas ao que você pediu.',
+        'Não encontrei suficientes títulos na categoria específica; seguem sugestões semelhantes.',
     };
   }
 
   filtrosDeIntencao(intencao: IntencaoRecomendacao): FiltrosCatalogoEntrada {
     return {
       precoMax: intencao.precoMax,
+      precoMin: intencao.precoMin,
       paginasMax: intencao.paginasMax,
       generos: intencao.generos,
       publicoAlvo: intencao.publicoAlvo,
+      autor: intencao.autor,
+      anoMin: intencao.anoMin,
+      anoMax: intencao.anoMax,
     };
   }
 
   private temFiltrosRestritivos(filtros: FiltrosCatalogoEntrada): boolean {
     return (
       filtros.precoMax !== undefined ||
+      filtros.precoMin !== undefined ||
       filtros.paginasMax !== undefined ||
       (filtros.generos !== undefined && filtros.generos.length > 0) ||
-      filtros.publicoAlvo !== undefined
+      filtros.publicoAlvo !== undefined ||
+      filtros.autor !== undefined ||
+      filtros.anoMin !== undefined ||
+      filtros.anoMax !== undefined
     );
   }
 
   private atendeFiltros(
     produto: ProdutoRecomendado,
     filtros: FiltrosCatalogoEntrada,
-    relaxarPaginas: boolean
+    relaxarPaginas: boolean,
+    matchEstritoGeneros: boolean = true
   ): boolean {
     const meta = produto.metadados ?? {};
     const preco = Number(meta.preco ?? 0);
     const paginas = Number(meta.numeroPaginas ?? 0);
+    const ano = Number(meta.anoPublicacao ?? 0);
+    const autor = normalizarTextoBusca(String(meta.autor ?? ''));
     const categoria = normalizarTextoBusca(String(meta.categoria ?? ''));
     const tags = normalizarTextoBusca(String(meta.tags ?? ''));
     const textoBusca = normalizarTextoBusca(
       `${meta.titulo ?? ''} ${meta.sinopse ?? ''} ${meta.categoria ?? ''} ${meta.tags ?? ''}`
     );
 
-    if (!this.atendeFiltroPreco(preco, filtros.precoMax)) {
+    if (!this.atendeFiltroPreco(preco, filtros.precoMax, filtros.precoMin)) {
       return false;
     }
 
@@ -86,7 +104,15 @@ export class ServicoFiltroCatalogo {
       return false;
     }
 
-    if (!this.atendeFiltroGeneros(filtros.generos, categoria, tags, textoBusca)) {
+    if (!this.atendeFiltroAutor(autor, filtros.autor)) {
+      return false;
+    }
+
+    if (!this.atendeFiltroAno(ano, filtros.anoMin, filtros.anoMax)) {
+      return false;
+    }
+
+    if (!this.atendeFiltroGeneros(filtros.generos, categoria, tags, textoBusca, matchEstritoGeneros)) {
       return false;
     }
 
@@ -100,12 +126,14 @@ export class ServicoFiltroCatalogo {
   /**
    * Verifica se produto atende filtro de preço usando early return
    */
-  private atendeFiltroPreco(preco: number, precoMax?: number): boolean {
-    if (precoMax === undefined) {
-      return true;
+  private atendeFiltroPreco(preco: number, precoMax?: number, precoMin?: number): boolean {
+    if (precoMax !== undefined && preco > precoMax) {
+      return false;
     }
-
-    return preco <= precoMax;
+    if (precoMin !== undefined && preco < precoMin) {
+      return false;
+    }
+    return true;
   }
 
   /**
@@ -124,13 +152,52 @@ export class ServicoFiltroCatalogo {
   }
 
   /**
+   * Filtro rígido de autor (nunca relaxado): match por inclusão de sobrenome/nome.
+   */
+  private atendeFiltroAutor(autorProduto: string, autorFiltro?: string): boolean {
+    if (!autorFiltro) {
+      return true;
+    }
+    const alvo = normalizarTextoBusca(autorFiltro);
+    if (alvo.length === 0) {
+      return true;
+    }
+    // Autor do produto ausente nunca casa um filtro de autor explícito (evita falso-positivo
+    // de `alvo.includes("")`, que seria sempre verdadeiro).
+    if (autorProduto.length === 0) {
+      return false;
+    }
+    // Casa se o autor do produto contém o termo buscado ou vice-versa (ex.: "asimov" ⊂ "isaac asimov").
+    return autorProduto.includes(alvo) || alvo.includes(autorProduto);
+  }
+
+  /**
+   * Filtro rígido de ano de publicação (nunca relaxado).
+   */
+  private atendeFiltroAno(ano: number, anoMin?: number, anoMax?: number): boolean {
+    if (ano === 0) {
+      // Sem dado de ano: só excluímos quando há restrição explícita de ano.
+      return anoMin === undefined && anoMax === undefined;
+    }
+    if (anoMin !== undefined && ano < anoMin) {
+      return false;
+    }
+    if (anoMax !== undefined && ano > anoMax) {
+      return false;
+    }
+    return true;
+  }
+
+  /**
    * Verifica se produto atende filtro de gêneros usando early return
+   * Prioriza match estrito por categoria para evitar alucinações
    */
   private atendeFiltroGeneros(
     generos?: string[],
     categoria?: string,
     tags?: string,
-    textoBusca?: string
+    textoBusca?: string,
+    matchEstrito: boolean = true
   ): boolean {
     if (!generos || generos.length === 0) {
       return true;
@@ -138,6 +205,17 @@ export class ServicoFiltroCatalogo {
 
     const matchGenero = generos.some((generoIntencao) => {
       const termos = expandirTermosGenero(generoIntencao);
+      
+      if (matchEstrito) {
+        // Match estrito: apenas categoria ou tags exatas
+        return termos.some(
+          (termo) =>
+            termo.length > 0 &&
+            (categoria?.includes(termo) || tags?.includes(termo))
+        );
+      }
+      
+      // Match relaxado: inclui textoBusca (semântico)
       return termos.some(
         (termo) =>
           termo.length > 0 &&
