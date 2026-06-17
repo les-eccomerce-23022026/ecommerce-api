@@ -64,12 +64,15 @@ async function carregarPerfilCheckout(
     const realCupons = await deps.repoPagamentos.listarCuponsTrocaPorUsuario(usuId);
     cuponsTroca = realCupons
       .filter((c) => c.ativo && c.valorAtual > 0)
-      .map((c) => ({
-        codigo: c.codigo,
-        valor: c.valorAtual,
-        tipo: 'troca' as const,
-        descricao: `Saldo de troca: R$ ${c.valorAtual.toFixed(2)}`,
-      }));
+      .map((c) => {
+        const valorAtualNumero = Number(c.valorAtual);
+        return {
+          codigo: c.codigo,
+          valor: valorAtualNumero,
+          tipo: 'troca' as const,
+          descricao: `Saldo de troca: R$ ${valorAtualNumero.toFixed(2)}`,
+        };
+      });
   }
   const enderecosCliente = (perfil.enderecos ?? []).map((e) => ({
     uuid: e.uuid ?? '',
@@ -132,6 +135,7 @@ async function montarRespostaCheckoutJson(
   params: {
     cepQ: string;
     pesoNum: number;
+    lojId: number | null;
     opcoes: Awaited<ReturnType<ServicoFrete['cotarEPersistir']>>;
     blocoCliente: BlocoPerfilCheckout;
   },
@@ -139,13 +143,13 @@ async function montarRespostaCheckoutJson(
   const { cepQ, pesoNum, opcoes, blocoCliente } = params;
   const freteOpcoes = montarFreteOpcoesResposta(opcoes);
   
-  // Buscar cupons promocionais do banco
-  const cuponsPromocionais = await deps.repoPagamentos.listarCuponsPromocionais();
+  const cuponsPromocionais = await deps.repoPagamentos.listarCuponsPromocionais(params.lojId);
   const cuponsPromocionaisFormatados = cuponsPromocionais.map((c) => ({
     uuid: c.uuid,
     codigo: c.codigo,
     tipo: 'promocional' as const,
     valor: c.valorDesconto,
+    valorMinimo: c.valorMinimo,
     descricao: `${c.valorDesconto}% de desconto`,
   }));
 
@@ -186,7 +190,8 @@ export async function executarObterPagamentoInfo(req: Request, res: Response, de
       valorTotalItens: valorItensNum !== undefined && Number.isFinite(valorItensNum) ? valorItensNum : undefined,
     });
     const blocoCliente = await coletarBlocoClienteCheckoutSeguro(deps, req.usuario?.uuid);
-    const respostaJson = await montarRespostaCheckoutJson(deps, { cepQ, pesoNum, opcoes, blocoCliente });
+    const lojId = req.usuario?.loj_id_atual ?? null;
+    const respostaJson = await montarRespostaCheckoutJson(deps, { cepQ, pesoNum, lojId, opcoes, blocoCliente });
     res.status(200).json(respostaJson);
   } catch (erro) {
     res.status(500).json({ erro: (erro as Error).message });

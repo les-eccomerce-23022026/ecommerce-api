@@ -23,6 +23,13 @@ export interface IEntradaEstoque {
   dataEntrada?: Date;
 }
 
+export interface IAtualizacaoEstoque {
+  estoqueUuid: string;
+  quantidadeDisponivel?: number;
+  precoVenda?: number;
+  valorCustoAtual?: number;
+}
+
 export class RepositorioEstoque {
   constructor(private readonly db: IConexaoBanco) {}
 
@@ -176,8 +183,8 @@ export class RepositorioEstoque {
           etq_quantidade_disponivel = etq_quantidade_disponivel + $1,
           etq_valor_custo_atual = $2,
           etq_atualizado_em = CURRENT_TIMESTAMP
-        WHERE liv_id = $3 AND etq_ativo = TRUE
-      `, [dados.quantidade, dados.custoUnitario, livId]);
+        WHERE liv_id = $3 AND loj_id = $4 AND etq_ativo = TRUE
+      `, [dados.quantidade, dados.custoUnitario, livId, lojId]);
 
       await this.db.executar(`
         COMMIT;
@@ -242,6 +249,55 @@ export class RepositorioEstoque {
         AND etq_ativo = TRUE
         AND loj_id = $3
     `, [quantidade, livroUuid, lojId]);
+  }
+
+  async atualizarEstoque(dados: IAtualizacaoEstoque): Promise<void> {
+    const lojId = this.obterLojId();
+
+    const campos: string[] = [];
+    const valores: any[] = [];
+    let indiceParametro = 1;
+
+    if (dados.quantidadeDisponivel !== undefined) {
+      campos.push(`etq_quantidade_disponivel = $${indiceParametro++}`);
+      valores.push(dados.quantidadeDisponivel);
+    }
+
+    if (dados.precoVenda !== undefined) {
+      campos.push(`etq_preco_venda = $${indiceParametro++}`);
+      valores.push(dados.precoVenda);
+    }
+
+    if (dados.valorCustoAtual !== undefined) {
+      campos.push(`etq_valor_custo_atual = $${indiceParametro++}`);
+      valores.push(dados.valorCustoAtual);
+    }
+
+    if (campos.length === 0) {
+      throw new Error('Nenhum campo fornecido para atualização.');
+    }
+
+    campos.push(`etq_atualizado_em = CURRENT_TIMESTAMP`);
+    valores.push(dados.estoqueUuid);
+
+    if (lojId) {
+      valores.push(lojId);
+    }
+
+    const sql = `
+      UPDATE estoques
+      SET ${campos.join(', ')}
+      WHERE etq_uuid = $${indiceParametro++}
+        ${lojId ? `AND loj_id = $${indiceParametro++}` : ''}
+        AND etq_ativo = TRUE
+      RETURNING etq_uuid
+    `;
+
+    const linhasAtualizadas = await this.db.executar<{ etq_uuid: string }>(sql, valores);
+
+    if (linhasAtualizadas.length === 0) {
+      throw new Error('Estoque não encontrado ou não pertence à loja.');
+    }
   }
 
   async calcularValorTotalEstoque(): Promise<number> {
@@ -323,5 +379,102 @@ export class RepositorioEstoque {
 
     const result = await this.db.executar<{ total: string }>(sql, params);
     return Number(result[0].total);
+  }
+
+  /**
+   * Incrementa a quantidade reservada e decrementa a disponível
+   * Usado ao criar uma reserva de estoque
+   */
+  async reservarQuantidade(livId: number, quantidade: number, lojId: number): Promise<void> {
+    const sql = `
+      UPDATE estoques
+      SET 
+        etq_quantidade_disponivel = etq_quantidade_disponivel - $1,
+        etq_quantidade_reservada = etq_quantidade_reservada + $1,
+        etq_atualizado_em = CURRENT_TIMESTAMP
+      WHERE liv_id = $2
+        AND loj_id = $3
+        AND etq_ativo = TRUE
+        AND etq_quantidade_disponivel >= $1
+      RETURNING etq_uuid
+    `;
+
+    const result = await this.db.executar<{ etq_uuid: string }>(sql, [quantidade, livId, lojId]);
+
+    if (result.length === 0) {
+      throw new Error('Estoque insuficiente ou não encontrado');
+    }
+  }
+
+  /**
+   * Decrementa a quantidade reservada e incrementa a disponível
+   * Usado ao cancelar ou expirar uma reserva
+   */
+  async liberarQuantidadeReservada(livId: number, quantidade: number, lojId: number): Promise<void> {
+    const sql = `
+      UPDATE estoques
+      SET 
+        etq_quantidade_disponivel = etq_quantidade_disponivel + $1,
+        etq_quantidade_reservada = etq_quantidade_reservada - $1,
+        etq_atualizado_em = CURRENT_TIMESTAMP
+      WHERE liv_id = $2
+        AND loj_id = $3
+        AND etq_ativo = TRUE
+        AND etq_quantidade_reservada >= $1
+      RETURNING etq_uuid
+    `;
+
+    const result = await this.db.executar<{ etq_uuid: string }>(sql, [quantidade, livId, lojId]);
+
+    if (result.length === 0) {
+      throw new Error('Reserva insuficiente ou estoque não encontrado');
+    }
+  }
+
+  /**
+   * Converte quantidade reservada em baixa definitiva (venda confirmada)
+   * Usado ao consumir uma reserva em uma venda
+   */
+  async consumirQuantidadeReservada(livId: number, quantidade: number, lojId: number): Promise<void> {
+    const sql = `
+      UPDATE estoques
+      SET 
+        etq_quantidade_reservada = etq_quantidade_reservada - $1,
+        etq_atualizado_em = CURRENT_TIMESTAMP
+      WHERE liv_id = $2
+        AND loj_id = $3
+        AND etq_ativo = TRUE
+        AND etq_quantidade_reservada >= $1
+      RETURNING etq_uuid
+    `;
+
+    const result = await this.db.executar<{ etq_uuid: string }>(sql, [quantidade, livId, lojId]);
+
+    if (result.length === 0) {
+      throw new Error('Reserva insuficiente ou estoque não encontrado');
+    }
+  }
+
+  /**
+   * Obtém o estoque disponível por liv_id
+   */
+  async obterEstoqueDisponivelPorLivId(livId: number): Promise<number | null> {
+    const lojId = this.obterLojId();
+
+    let sql = `
+      SELECT etq_quantidade_disponivel
+      FROM estoques
+      WHERE liv_id = $1 AND etq_ativo = TRUE
+    `;
+
+    const params: any[] = [livId];
+
+    if (lojId) {
+      sql += ` AND loj_id = $${params.length + 1}`;
+      params.push(lojId);
+    }
+
+    const result = await this.db.executar<{ etq_quantidade_disponivel: string }>(sql, params);
+    return result.length > 0 ? Number(result[0].etq_quantidade_disponivel) : null;
   }
 }

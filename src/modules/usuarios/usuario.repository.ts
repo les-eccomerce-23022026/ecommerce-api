@@ -6,7 +6,8 @@ import { montarClausulasAtualizacaoUsuario } from '@/modules/usuarios/usuario-re
 import { IConexaoBanco, DbParametro } from '@/shared/infrastructure/database/IConexaoBanco';
 import { Logger } from '@/shared/utils/Logger.util';
 import { ContextoRequisicao } from '@/shared/infrastructure/contexto/ContextoRequisicao';
-import { PAPEL_CLIENTE } from '@/shared/types/papeis';
+import { PAPEL_ADMIN_SISTEMA, PAPEL_CLIENTE } from '@/shared/types/papeis';
+import { IPapelUsuario } from '@/shared/types/Ipapel-usuario';
 import { obterTipoBancoAtual, obterTransacaoAtual } from '@/shared/infrastructure/database/ContextoBanco';
 import { limparDocumento } from '@/shared/validators/validadorDocumento';
 
@@ -29,9 +30,32 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
     return ContextoRequisicao.obterLojId();
   }
 
+  private ehAdminSistema(): boolean {
+    const contexto = ContextoRequisicao.obterContexto();
+    return contexto?.papeis?.includes(PAPEL_ADMIN_SISTEMA.descricao) ?? false;
+  }
+
+  /** Resolve pap_id real por descrição (evita FK quando serial do BD ≠ IDs simbólicos em papeis.ts). */
+  private async resolverPapelId(papel: IPapelUsuario): Promise<number> {
+    await this.db.executar(
+      `INSERT INTO livraria_gestao.papeis (pap_descricao) VALUES ($1)
+       ON CONFLICT (pap_descricao) DO NOTHING`,
+      [papel.descricao],
+    );
+    const rows = await this.db.executar<{ pap_id: number }>(
+      `SELECT pap_id FROM livraria_gestao.papeis WHERE pap_descricao = $1 LIMIT 1`,
+      [papel.descricao],
+    );
+    if (rows.length === 0) {
+      throw new Error(`Papel "${papel.descricao}" não encontrado em livraria_gestao.papeis.`);
+    }
+    return Number(rows[0].pap_id);
+  }
+
   public async criarUsuario(dados: IDadosCriarUsuario): Promise<IUsuario> {
     const { nome, email, cpf, cnpj, tipoPessoa, senhaHash, role, papeis } = dados;
-    const idPapel = role?.id ?? PAPEL_CLIENTE.id;
+    const papelPrincipal = role ?? PAPEL_CLIENTE;
+    const idPapel = await this.resolverPapelId(papelPrincipal);
     const lojId = dados.lojId ?? this.obterLojId() ?? 1;
 
     // Normalizar CPF e CNPJ para garantir consistência
@@ -46,17 +70,23 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
 
     // Associa os papéis na tabela muitos-para-muitos
     // Se papeis foi fornecido, usa todos; caso contrário, usa apenas o role principal
-    const papeisParaAssociar = papeis && papeis.length > 0 ? papeis : [role ?? PAPEL_CLIENTE];
+    const papeisParaAssociar = papeis && papeis.length > 0 ? papeis : [papelPrincipal];
     for (const papel of papeisParaAssociar) {
-      await this.associarPapelUsuario(usuarioId, papel.id);
+      const idPapelAssociado = await this.resolverPapelId(papel);
+      await this.associarPapelUsuario(usuarioId, idPapelAssociado);
     }
 
     return this.buscarPorUuid(usuarioCriadoRow.uuid as string) as Promise<IUsuario>;
   }
 
   public async buscarPorEmail(email: string): Promise<IUsuario | undefined> {
+    const emailNormalizado = email.trim().toLowerCase();
     const query = `${USUARIO_QUERIES.SELECT_BASE} WHERE u.usu_email = $1 LIMIT 1`;
-    const rows = await this.db.executar(query, [email]);
+    const rows = await this.db.executar(
+      query, 
+      [emailNormalizado],
+      { searchPath: 'livraria_comercial, livraria_financeiro, livraria_gestao, livraria_logistica, livraria_ref, public' }
+    );
 
     if (rows.length === 0) return undefined;
     
@@ -65,28 +95,58 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
     const usuarioId = Number(usuarioRow.id) as number;
     const papeisRows = await this.db.executar(
       USUARIO_QUERIES.SELECT_PAPEIS_USUARIO, 
-      [usuarioId]
+      [usuarioId],
+      { searchPath: 'livraria_comercial, livraria_financeiro, livraria_gestao, livraria_logistica, livraria_ref, public' }
     );
     
     return UsuarioMapper.mapearParaEntidade(usuarioRow, papeisRows as LinhaResultadoUsuario[]);
   }
 
   public async buscarPorEmailPapel(email: string, idPapel: number): Promise<IUsuario | undefined> {
+    const emailNormalizado = email.trim().toLowerCase();
     const query = `${USUARIO_QUERIES.SELECT_BASE} WHERE u.usu_email = $1 AND u.pap_id = $2`;
-    const rows = await this.db.executar(query, [email, idPapel]);
+    const rows = await this.db.executar(
+      query, 
+      [emailNormalizado, idPapel],
+      { searchPath: 'livraria_comercial, livraria_financeiro, livraria_gestao, livraria_logistica, livraria_ref, public' }
+    );
 
     if (rows.length === 0) return undefined;
     
     const usuarioRow = rows[0] as LinhaResultadoUsuario;
     const usuarioId = Number(usuarioRow.id) as number;
-    const papeisRows = await this.db.executar(USUARIO_QUERIES.SELECT_PAPEIS_USUARIO, [usuarioId]);
+    const papeisRows = await this.db.executar(
+      USUARIO_QUERIES.SELECT_PAPEIS_USUARIO, 
+      [usuarioId],
+      { searchPath: 'livraria_comercial, livraria_financeiro, livraria_gestao, livraria_logistica, livraria_ref, public' }
+    );
     
     return UsuarioMapper.mapearParaEntidade(usuarioRow, papeisRows as LinhaResultadoUsuario[]);
   }
 
   public async buscarTodosPorEmail(email: string): Promise<IUsuario[]> {
+    // Normalizar email: trim e lowercase para evitar problemas de encoding
+    const emailNormalizado = email.trim().toLowerCase();
+    
     const query = `${USUARIO_QUERIES.SELECT_BASE} WHERE u.usu_email = $1`;
-    const rows = await this.db.executar(query, [email]);
+    
+    Logger.debug('[buscarTodosPorEmail] Iniciando busca por email', { 
+      emailOriginal: email,
+      emailNormalizado,
+      query: query.trim().substring(0, 200) 
+    });
+    
+    const rows = await this.db.executar(
+      query, 
+      [emailNormalizado],
+      { searchPath: 'livraria_comercial, livraria_financeiro, livraria_gestao, livraria_logistica, livraria_ref, public' }
+    );
+    
+    Logger.debug('[buscarTodosPorEmail] Resultado da query base', { 
+      email: emailNormalizado, 
+      quantidadeRows: rows.length,
+      rows: rows.map(r => ({ id: (r as any).id, email: (r as any).email, ativo: (r as any).ativo }))
+    });
     
     // Buscar papéis para cada usuário
     const usuariosComPapeis = await Promise.all(
@@ -94,15 +154,31 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
         const usuarioRow = row as LinhaResultadoUsuario;
         const usuarioId = Number(usuarioRow.id) as number;
         
+        Logger.debug('[buscarTodosPorEmail] Buscando papéis do usuário', { 
+          usuarioId,
+          email: emailNormalizado 
+        });
+        
         const papeisRows = await this.db.executar(
           USUARIO_QUERIES.SELECT_PAPEIS_USUARIO, 
           [usuarioId],
           { searchPath: 'livraria_comercial, livraria_financeiro, livraria_gestao, livraria_logistica, livraria_ref, public' }
         );
         
+        Logger.debug('[buscarTodosPorEmail] Papéis encontrados', { 
+          usuarioId,
+          quantidadePapeis: papeisRows.length,
+          papeis: papeisRows.map(p => ({ id: (p as any).id, descricao: (p as any).descricao }))
+        });
+        
         return UsuarioMapper.mapearParaEntidade(usuarioRow, papeisRows as LinhaResultadoUsuario[]);
       })
     );
+    
+    Logger.debug('[buscarTodosPorEmail] Finalizado', { 
+      email: emailNormalizado, 
+      quantidadeUsuarios: usuariosComPapeis.length 
+    });
     
     return usuariosComPapeis;
   }
@@ -222,9 +298,9 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
   }
 
   public async buscarClientesComFiltros(filtros: IFiltrosConsultaClientes): Promise<IUsuario[]> {
-    const { nome, cpf, email, idPapel, offset, limite } = filtros;
-    const papelBusca = idPapel ?? PAPEL_CLIENTE.id;
-    const loj_id = this.obterLojId();
+    const { nome, cpf, email, ativo, idPapel, offset, limite } = filtros;
+    const papelBusca = idPapel ?? (await this.resolverPapelId(PAPEL_CLIENTE));
+    const loj_id = this.ehAdminSistema() ? undefined : this.obterLojId();
     const valores: DbParametro[] = [papelBusca];
     let query = `${USUARIO_QUERIES.SELECT_BASE} WHERE u.pap_id = $1`;
     let contador = 2;
@@ -238,10 +314,16 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
       }
     });
 
+    if (ativo !== undefined) {
+      query += ` AND u.usu_ativo = $${contador}`;
+      contador += 1;
+      valores.push(ativo);
+    }
+
     // Se multi-tenancy estiver habilitado, filtrar por loj_id via tabela clientes
     if (loj_id) {
       query += ` AND EXISTS (
-        SELECT 1 FROM livraria_gestao.clientes c 
+        SELECT 1 FROM livraria_gestao.clientes c
         WHERE c.usu_id = u.usu_id AND c.loj_id = $${contador}
       )`;
       contador += 1;
@@ -272,9 +354,10 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
   }
 
   public async contarClientesComFiltros(filtros: Omit<IFiltrosConsultaClientes, 'offset' | 'limite'>): Promise<number> {
-    const { nome, cpf, email } = filtros;
-    const loj_id = this.obterLojId();
-    const valores: DbParametro[] = [PAPEL_CLIENTE.id];
+    const { nome, cpf, email, ativo } = filtros;
+    const papelBusca = await this.resolverPapelId(PAPEL_CLIENTE);
+    const loj_id = this.ehAdminSistema() ? undefined : this.obterLojId();
+    const valores: DbParametro[] = [papelBusca];
     let query = 'SELECT COUNT(*) as total FROM livraria_gestao.usuarios u WHERE pap_id = $1';
     let contador = 2;
 
@@ -287,10 +370,16 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
       }
     });
 
+    if (ativo !== undefined) {
+      query += ` AND u.usu_ativo = $${contador}`;
+      contador += 1;
+      valores.push(ativo);
+    }
+
     // Se multi-tenancy estiver habilitado, filtrar por loj_id via tabela clientes
     if (loj_id) {
       query += ` AND EXISTS (
-        SELECT 1 FROM livraria_gestao.clientes c 
+        SELECT 1 FROM livraria_gestao.clientes c
         WHERE c.usu_id = u.usu_id AND c.loj_id = $${contador}
       )`;
       contador += 1;
@@ -481,10 +570,10 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
     return parseInt(rows[0].count) > 0;
   }
 
-  public async buscarUsuariosPorPapel(idPapel: number): Promise<IUsuario[]> {
+  public async buscarUsuariosPorPapel(descricaoPapel: string): Promise<IUsuario[]> {
     const rows = await this.db.executar(
-      USUARIO_QUERIES.SELECT_USUARIOS_POR_PAPEL, 
-      [idPapel],
+      USUARIO_QUERIES.SELECT_USUARIOS_POR_PAPEL,
+      [descricaoPapel],
       { searchPath: 'livraria_comercial, livraria_financeiro, livraria_gestao, livraria_logistica, livraria_ref, public' }
     );
     
@@ -505,5 +594,12 @@ export class RepositorioUsuarios implements IRepositorioUsuarios {
     );
     
     return usuariosComPapeis;
+  }
+
+  public async atualizarStatusAtivo(uuid: string, ativo: boolean): Promise<void> {
+    await this.db.executar(
+      'UPDATE livraria_gestao.usuarios SET usu_ativo = $1 WHERE usu_uuid = $2',
+      [ativo, uuid],
+    );
   }
 }

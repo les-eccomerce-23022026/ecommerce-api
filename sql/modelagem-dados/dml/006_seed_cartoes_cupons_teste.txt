@@ -1,0 +1,27 @@
+NOTICE:  Cartões cadastrados com sucesso para o usuário 96
+DO
+INSERT 0 1
+INSERT 0 1
+       mensagem       
+----------------------
+ Cartões cadastrados:
+(1 row)
+
+ crt_id |        crt_token         | crt_final | ban_descricao 
+--------+--------------------------+-----------+---------------
+     50 | token_visa_1111_96       | 1111      | Visa
+     51 | token_mastercard_2222_96 | 2222      | Mastercard
+     52 | token_elo_3333_96        | 3333      | Elo
+(3 rows)
+
+      mensagem       
+---------------------
+ Cupons cadastrados:
+(1 row)
+
+     cup_codigo     |  cup_tipo   | cup_valor_desconto | loj_id | cup_ativo 
+--------------------+-------------+--------------------+--------+-----------
+ CUPOM-LOJA-TESTE   | promocional |              10.00 |     32 | t
+ CUPOM-GLOBAL-TESTE | promocional |              15.00 |        | t
+(2 rows)
+

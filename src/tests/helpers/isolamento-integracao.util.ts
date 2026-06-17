@@ -35,7 +35,9 @@ export async function iniciarEscopoIsolamentoIntegracao(
   };
 
   await executarSqlOpcional(
-    `INSERT INTO livraria_comercial.status_venda (stv_descricao) VALUES ('FALHA NA ENTREGA')
+    `INSERT INTO livraria_comercial.status_venda (stv_descricao)
+     VALUES ('FALHA_NA_ENTREGA'), ('TROCA_AUTORIZADA'), ('TROCA_REJEITADA'), ('CONCLUIDA'), ('EM_TRANSITO'),
+            ('EM_TROCA'), ('EM_DEVOLUCAO'), ('DEVOLUCAO_AUTORIZADA'), ('DEVOLUCAO_REJEITADA')
      ON CONFLICT (stv_descricao) DO NOTHING`,
     'status_venda_comercial',
   );
@@ -43,6 +45,11 @@ export async function iniciarEscopoIsolamentoIntegracao(
     `INSERT INTO livraria_comercial.papeis (pap_descricao) VALUES ('admin'), ('cliente')
      ON CONFLICT (pap_descricao) DO NOTHING`,
     'papeis_comercial',
+  );
+  await executarSqlOpcional(
+    `INSERT INTO livraria_gestao.papeis (pap_descricao) VALUES ('admin'), ('cliente'), ('admin_sistema')
+     ON CONFLICT (pap_descricao) DO NOTHING`,
+    'papeis_gestao',
   );
   await executarSqlOpcional(
     `INSERT INTO livraria_gestao.lojas (loj_uuid, loj_nome, loj_slug, loj_ativo)

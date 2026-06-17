@@ -123,4 +123,24 @@ export class ServicoNotificacaoBanco implements IServicoNotificacao {
 
     await this.repositorioNotificacoes.criar(notificacao);
   }
+
+  /**
+   * Envia notificação de aviso de expiração de reserva no carrinho
+   */
+  async enviarNotificacaoExpiracaoReserva(
+    usuarioUuid: string,
+    livroTitulo: string,
+    tempoRestante: number
+  ): Promise<void> {
+    const notificacao: INotificacao = {
+      usuarioUuid,
+      vendaUuid: undefined,
+      tipo: 'EXPIRACAO_RESERVA',
+      titulo: 'Reserva do Carrinho Expirando',
+      mensagem: `O livro "${livroTitulo}" em seu carrinho expirará em ${tempoRestante} minutos. Finalize a compra para garantir o estoque.`,
+      lida: false,
+    };
+
+    await this.repositorioNotificacoes.criar(notificacao);
+  }
 }

@@ -51,7 +51,7 @@ export const USUARIO_QUERIES = {
     FROM livraria_gestao.usuarios u
     INNER JOIN livraria_gestao.usuario_papeis up ON u.usu_id = up.usu_id
     INNER JOIN livraria_gestao.papeis p ON up.pap_id = p.pap_id
-    WHERE up.pap_id = $1 AND up.usp_ativo = TRUE
+    WHERE p.pap_descricao = $1 AND up.usp_ativo = TRUE
  `,
   DELETE_BY_CPF: 'DELETE FROM livraria_gestao.usuarios WHERE usu_cpf = $1',
   DELETE_BY_EMAIL: 'DELETE FROM livraria_gestao.usuarios WHERE usu_email = $1',

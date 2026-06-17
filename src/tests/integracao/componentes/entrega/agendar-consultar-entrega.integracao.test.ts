@@ -55,7 +55,7 @@ describe('Integração - Módulo de Entrega', () => {
       .get(`/api/vendas/${vendaUuid}`)
       .set('Authorization', `Bearer ${token}`);
 
-    expect(resVendaAtualizada.body.status).toBe('EM TRÂNSITO');
+    expect(resVendaAtualizada.body.status).toBe('EM_TRANSITO');
   });
 
   it('deve retornar 404 ao consultar entrega inexistente', async () => {

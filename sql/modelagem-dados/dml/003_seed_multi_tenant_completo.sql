@@ -422,70 +422,46 @@ BEGIN
     ON CONFLICT DO NOTHING;
     
     -- ========================================================================
-    -- 4. CRIAR ESTOQUES (5 livros por loja)
+    -- 4. CRIAR ESTOQUES (5 livros por loja) - PREÇOS VARIADOS
     -- ========================================================================
     
-    -- Estoques para Loja São Paulo
+    -- Estoques para Loja São Paulo - Preços variados por livro
     INSERT INTO livraria_comercial.estoques (
         etq_uuid, liv_id, etq_quantidade_disponivel, etq_quantidade_reservada,
         etq_preco_venda, etq_valor_custo_atual, etq_ativo, loj_id
     )
-    SELECT
-        gen_random_uuid(),
-        liv_id,
-        20,  -- quantidade disponível
-        0,   -- quantidade reservada
-        49.90,  -- preço venda
-        25.00,  -- custo
-        TRUE,
-        (SELECT loj_id FROM livraria_gestao.lojas WHERE loj_slug = 'livraria-sao-paulo' LIMIT 1)
-    FROM livraria_comercial.livros
-    WHERE liv_isbn IN (
-        '9788532510776', '9788578270870', '9788532506166',
-        '9788532529631', '9788576830861'
-    )
+    VALUES
+    (gen_random_uuid(), (SELECT liv_id FROM livraria_comercial.livros WHERE liv_isbn = '9788532510776' LIMIT 1), 25, 0, 59.90, 30.00, TRUE, (SELECT loj_id FROM livraria_gestao.lojas WHERE loj_slug = 'livraria-sao-paulo' LIMIT 1)),
+    (gen_random_uuid(), (SELECT liv_id FROM livraria_comercial.livros WHERE liv_isbn = '9788578270870' LIMIT 1), 20, 0, 45.90, 22.00, TRUE, (SELECT loj_id FROM livraria_gestao.lojas WHERE loj_slug = 'livraria-sao-paulo' LIMIT 1)),
+    (gen_random_uuid(), (SELECT liv_id FROM livraria_comercial.livros WHERE liv_isbn = '9788532506166' LIMIT 1), 30, 0, 39.90, 20.00, TRUE, (SELECT loj_id FROM livraria_gestao.lojas WHERE loj_slug = 'livraria-sao-paulo' LIMIT 1)),
+    (gen_random_uuid(), (SELECT liv_id FROM livraria_comercial.livros WHERE liv_isbn = '9788532529631' LIMIT 1), 50, 0, 49.90, 25.00, TRUE, (SELECT loj_id FROM livraria_gestao.lojas WHERE loj_slug = 'livraria-sao-paulo' LIMIT 1)),
+    (gen_random_uuid(), (SELECT liv_id FROM livraria_comercial.livros WHERE liv_isbn = '9788576830861' LIMIT 1), 35, 0, 44.90, 22.00, TRUE, (SELECT loj_id FROM livraria_gestao.lojas WHERE loj_slug = 'livraria-sao-paulo' LIMIT 1))
     ON CONFLICT (liv_id) DO NOTHING;
     
-    -- Estoques para Loja Rio de Janeiro
+    -- Estoques para Loja Rio de Janeiro - Preços variados por livro
     INSERT INTO livraria_comercial.estoques (
         etq_uuid, liv_id, etq_quantidade_disponivel, etq_quantidade_reservada,
         etq_preco_venda, etq_valor_custo_atual, etq_ativo, loj_id
     )
-    SELECT
-        gen_random_uuid(),
-        liv_id,
-        15,
-        0,
-        59.90,
-        30.00,
-        TRUE,
-        (SELECT loj_id FROM livraria_gestao.lojas WHERE loj_slug = 'livraria-rio' LIMIT 1)
-    FROM livraria_comercial.livros
-    WHERE liv_isbn IN (
-        '9788577105377', '9788525062372', '9788525413995',
-        '9788577105407', '9788577105414'
-    )
+    VALUES
+    (gen_random_uuid(), (SELECT liv_id FROM livraria_comercial.livros WHERE liv_isbn = '9788577105377' LIMIT 1), 20, 0, 69.90, 35.00, TRUE, (SELECT loj_id FROM livraria_gestao.lojas WHERE loj_slug = 'livraria-rio' LIMIT 1)),
+    (gen_random_uuid(), (SELECT liv_id FROM livraria_comercial.livros WHERE liv_isbn = '9788525062372' LIMIT 1), 25, 0, 39.90, 20.00, TRUE, (SELECT loj_id FROM livraria_gestao.lojas WHERE loj_slug = 'livraria-rio' LIMIT 1)),
+    (gen_random_uuid(), (SELECT liv_id FROM livraria_comercial.livros WHERE liv_isbn = '9788525413995' LIMIT 1), 15, 0, 44.90, 22.00, TRUE, (SELECT loj_id FROM livraria_gestao.lojas WHERE loj_slug = 'livraria-rio' LIMIT 1)),
+    (gen_random_uuid(), (SELECT liv_id FROM livraria_comercial.livros WHERE liv_isbn = '9788577105407' LIMIT 1), 18, 0, 35.90, 18.00, TRUE, (SELECT loj_id FROM livraria_gestao.lojas WHERE loj_slug = 'livraria-rio' LIMIT 1)),
+    (gen_random_uuid(), (SELECT liv_id FROM livraria_comercial.livros WHERE liv_isbn = '9788577105414' LIMIT 1), 12, 0, 54.90, 27.00, TRUE, (SELECT loj_id FROM livraria_gestao.lojas WHERE loj_slug = 'livraria-rio' LIMIT 1))
     ON CONFLICT (liv_id) DO NOTHING;
     
-    -- Estoques para Loja Belo Horizonte
+    -- Estoques para Loja Belo Horizonte - Preços variados por livro
     INSERT INTO livraria_comercial.estoques (
         etq_uuid, liv_id, etq_quantidade_disponivel, etq_quantidade_reservada,
         etq_preco_venda, etq_valor_custo_atual, etq_ativo, loj_id
     )
-    SELECT
-        gen_random_uuid(),
-        liv_id,
-        25,
-        0,
-        39.90,
-        20.00,
-        TRUE,
-        (SELECT loj_id FROM livraria_gestao.lojas WHERE loj_slug = 'livraria-belo-horizonte' LIMIT 1)
-    FROM livraria_comercial.livros
-    WHERE liv_isbn IN (
-        '9788535902775', '9788535902782', '9788535902799',
-        '9788577105421', '9788577105438'
-    )
+    VALUES
+    (gen_random_uuid(), (SELECT liv_id FROM livraria_comercial.livros WHERE liv_isbn = '9788535902775' LIMIT 1), 30, 0, 29.90, 15.00, TRUE, (SELECT loj_id FROM livraria_gestao.lojas WHERE loj_slug = 'livraria-belo-horizonte' LIMIT 1)),
+    (gen_random_uuid(), (SELECT liv_id FROM livraria_comercial.livros WHERE liv_isbn = '9788535902782' LIMIT 1), 25, 0, 32.90, 16.00, TRUE, (SELECT loj_id FROM livraria_gestao.lojas WHERE loj_slug = 'livraria-belo-horizonte' LIMIT 1)),
+    (gen_random_uuid(), (SELECT liv_id FROM livraria_comercial.livros WHERE liv_isbn = '9788535902799' LIMIT 1), 20, 0, 24.90, 12.00, TRUE, (SELECT loj_id FROM livraria_gestao.lojas WHERE loj_slug = 'livraria-belo-horizonte' LIMIT 1)),
+    (gen_random_uuid(), (SELECT liv_id FROM livraria_comercial.livros WHERE liv_isbn = '9788577105421' LIMIT 1), 40, 0, 49.90, 25.00, TRUE, (SELECT loj_id FROM livraria_gestao.lojas WHERE loj_slug = 'livraria-belo-horizonte' LIMIT 1)),
+    (gen_random_uuid(), (SELECT liv_id FROM livraria_comercial.livros WHERE liv_isbn = '9788577105438' LIMIT 1), 35, 0, 54.90, 27.00, TRUE, (SELECT loj_id FROM livraria_gestao.lojas WHERE loj_slug = 'livraria-belo-horizonte' LIMIT 1))
     ON CONFLICT (liv_id) DO NOTHING;
     
     -- ========================================================================
@@ -609,28 +585,80 @@ BEGIN
     ON CONFLICT (usu_email) DO NOTHING;
     
     -- ========================================================================
-    -- 6. CRIAR REGISTROS DE CLIENTES (tabela clientes)
+    -- 6. CRIAR REGISTROS DE CLIENTES (tabela clientes) - DATAS DE NASCIMENTO REALISTAS
     -- ========================================================================
     
     INSERT INTO livraria_gestao.clientes (cli_uuid, usu_id, cli_genero, cli_data_nascimento, loj_id)
-    SELECT
-        gen_random_uuid(),
-        u.usu_id,
-        CASE WHEN u.usu_nome LIKE '%Fernanda%' OR u.usu_nome LIKE '%Juliana%' OR u.usu_nome LIKE '%Carla%' OR u.usu_nome LIKE '%Patricia%' OR u.usu_nome LIKE '%Mariana%'
-             THEN 'Feminino'
-             ELSE 'Masculino'
-        END,
-        '1990-01-15'::date,
-        u.loj_id
-    FROM livraria_gestao.usuarios u
-    JOIN livraria_comercial.papeis p ON u.pap_id = p.pap_id
-    WHERE p.pap_descricao = 'cliente'
-      AND u.usu_email IN (
-          'fernanda.santos@email.com', 'lucas.pereira@email.com', 'juliana.lima@email.com',
-          'marcos.almeida@email.com', 'carla.rodrigues@email.com', 'rafael.gomes@email.com',
-          'patricia.martins@email.com', 'andre.souza@email.com', 'mariana.ferreira@email.com'
-      )
-    ON CONFLICT (usu_id) DO NOTHING;
+    VALUES
+    (gen_random_uuid(), (SELECT usu_id FROM livraria_gestao.usuarios WHERE usu_email = 'fernanda.santos@email.com' LIMIT 1), 'Feminino', '1992-05-18'::date, (SELECT loj_id FROM livraria_gestao.lojas WHERE loj_slug = 'livraria-sao-paulo' LIMIT 1)),
+    (gen_random_uuid(), (SELECT usu_id FROM livraria_gestao.usuarios WHERE usu_email = 'lucas.pereira@email.com' LIMIT 1), 'Masculino', '1988-09-22'::date, (SELECT loj_id FROM livraria_gestao.lojas WHERE loj_slug = 'livraria-sao-paulo' LIMIT 1)),
+    (gen_random_uuid(), (SELECT usu_id FROM livraria_gestao.usuarios WHERE usu_email = 'juliana.lima@email.com' LIMIT 1), 'Feminino', '1995-03-10'::date, (SELECT loj_id FROM livraria_gestao.lojas WHERE loj_slug = 'livraria-sao-paulo' LIMIT 1)),
+    (gen_random_uuid(), (SELECT usu_id FROM livraria_gestao.usuarios WHERE usu_email = 'marcos.almeida@email.com' LIMIT 1), 'Masculino', '1985-11-30'::date, (SELECT loj_id FROM livraria_gestao.lojas WHERE loj_slug = 'livraria-rio' LIMIT 1)),
+    (gen_random_uuid(), (SELECT usu_id FROM livraria_gestao.usuarios WHERE usu_email = 'carla.rodrigues@email.com' LIMIT 1), 'Feminino', '1990-07-14'::date, (SELECT loj_id FROM livraria_gestao.lojas WHERE loj_slug = 'livraria-rio' LIMIT 1)),
+    (gen_random_uuid(), (SELECT usu_id FROM livraria_gestao.usuarios WHERE usu_email = 'rafael.gomes@email.com' LIMIT 1), 'Masculino', '1993-02-25'::date, (SELECT loj_id FROM livraria_gestao.lojas WHERE loj_slug = 'livraria-rio' LIMIT 1)),
+    (gen_random_uuid(), (SELECT usu_id FROM livraria_gestao.usuarios WHERE usu_email = 'patricia.martins@email.com' LIMIT 1), 'Feminino', '1987-12-05'::date, (SELECT loj_id FROM livraria_gestao.lojas WHERE loj_slug = 'livraria-belo-horizonte' LIMIT 1)),
+    (gen_random_uuid(), (SELECT usu_id FROM livraria_gestao.usuarios WHERE usu_email = 'andre.souza@email.com' LIMIT 1), 'Masculino', '1991-08-17'::date, (SELECT loj_id FROM livraria_gestao.lojas WHERE loj_slug = 'livraria-belo-horizonte' LIMIT 1)),
+    (gen_random_uuid(), (SELECT usu_id FROM livraria_gestao.usuarios WHERE usu_email = 'mariana.ferreira@email.com' LIMIT 1), 'Feminino', '1994-04-29'::date, (SELECT loj_id FROM livraria_gestao.lojas WHERE loj_slug = 'livraria-belo-horizonte' LIMIT 1))
+    ON CONFLICT (usu_id) DO UPDATE SET cli_data_nascimento = EXCLUDED.cli_data_nascimento, cli_genero = EXCLUDED.cli_genero;
+    
+    -- ========================================================================
+    -- 7. CRIAR TELEFONES PARA CLIENTES
+    -- ========================================================================
+    
+    -- Garantir que tipo de telefone Celular existe
+    INSERT INTO livraria_ref.tipos_telefones (ttp_descricao) VALUES ('Celular') ON CONFLICT (ttp_descricao) DO NOTHING;
+    
+    -- Telefones para clientes de São Paulo
+    INSERT INTO livraria_gestao.telefones (tel_uuid, usu_id, ttp_id, tel_numero, tel_principal)
+    VALUES
+    (gen_random_uuid(), (SELECT usu_id FROM livraria_gestao.usuarios WHERE usu_email = 'fernanda.santos@email.com' LIMIT 1), (SELECT ttp_id FROM livraria_ref.tipos_telefones WHERE ttp_descricao = 'Celular' LIMIT 1), '11987654321', TRUE),
+    (gen_random_uuid(), (SELECT usu_id FROM livraria_gestao.usuarios WHERE usu_email = 'lucas.pereira@email.com' LIMIT 1), (SELECT ttp_id FROM livraria_ref.tipos_telefones WHERE ttp_descricao = 'Celular' LIMIT 1), '11976543210', TRUE),
+    (gen_random_uuid(), (SELECT usu_id FROM livraria_gestao.usuarios WHERE usu_email = 'juliana.lima@email.com' LIMIT 1), (SELECT ttp_id FROM livraria_ref.tipos_telefones WHERE ttp_descricao = 'Celular' LIMIT 1), '11965432109', TRUE)
+    ON CONFLICT DO NOTHING;
+    
+    -- Telefones para clientes do Rio de Janeiro
+    INSERT INTO livraria_gestao.telefones (tel_uuid, usu_id, ttp_id, tel_numero, tel_principal)
+    VALUES
+    (gen_random_uuid(), (SELECT usu_id FROM livraria_gestao.usuarios WHERE usu_email = 'marcos.almeida@email.com' LIMIT 1), (SELECT ttp_id FROM livraria_ref.tipos_telefones WHERE ttp_descricao = 'Celular' LIMIT 1), '21987654321', TRUE),
+    (gen_random_uuid(), (SELECT usu_id FROM livraria_gestao.usuarios WHERE usu_email = 'carla.rodrigues@email.com' LIMIT 1), (SELECT ttp_id FROM livraria_ref.tipos_telefones WHERE ttp_descricao = 'Celular' LIMIT 1), '21976543210', TRUE),
+    (gen_random_uuid(), (SELECT usu_id FROM livraria_gestao.usuarios WHERE usu_email = 'rafael.gomes@email.com' LIMIT 1), (SELECT ttp_id FROM livraria_ref.tipos_telefones WHERE ttp_descricao = 'Celular' LIMIT 1), '21965432109', TRUE)
+    ON CONFLICT DO NOTHING;
+    
+    -- Telefones para clientes de Belo Horizonte
+    INSERT INTO livraria_gestao.telefones (tel_uuid, usu_id, ttp_id, tel_numero, tel_principal)
+    VALUES
+    (gen_random_uuid(), (SELECT usu_id FROM livraria_gestao.usuarios WHERE usu_email = 'patricia.martins@email.com' LIMIT 1), (SELECT ttp_id FROM livraria_ref.tipos_telefones WHERE ttp_descricao = 'Celular' LIMIT 1), '31987654321', TRUE),
+    (gen_random_uuid(), (SELECT usu_id FROM livraria_gestao.usuarios WHERE usu_email = 'andre.souza@email.com' LIMIT 1), (SELECT ttp_id FROM livraria_ref.tipos_telefones WHERE ttp_descricao = 'Celular' LIMIT 1), '31976543210', TRUE),
+    (gen_random_uuid(), (SELECT usu_id FROM livraria_gestao.usuarios WHERE usu_email = 'mariana.ferreira@email.com' LIMIT 1), (SELECT ttp_id FROM livraria_ref.tipos_telefones WHERE ttp_descricao = 'Celular' LIMIT 1), '31965432109', TRUE)
+    ON CONFLICT DO NOTHING;
+    
+    -- ========================================================================
+    -- 8. CRIAR ENDEREÇOS PARA CLIENTES
+    -- ========================================================================
+    
+    -- Endereços para clientes de São Paulo
+    INSERT INTO livraria_gestao.enderecos (end_uuid, usu_id, end_tipo, end_apelido, log_id, end_numero, end_complemento, cid_id, bai_id, cep_id, pai_id, loj_id, end_principal)
+    VALUES
+    (gen_random_uuid(), (SELECT usu_id FROM livraria_gestao.usuarios WHERE usu_email = 'fernanda.santos@email.com' LIMIT 1), 'entrega', 'Casa', 1, '123', 'Apto 41', 1, 1, '01310000', 1, (SELECT loj_id FROM livraria_gestao.lojas WHERE loj_slug = 'livraria-sao-paulo' LIMIT 1), TRUE),
+    (gen_random_uuid(), (SELECT usu_id FROM livraria_gestao.usuarios WHERE usu_email = 'lucas.pereira@email.com' LIMIT 1), 'entrega', 'Casa', 2, '456', NULL, 1, 2, '01452000', 1, (SELECT loj_id FROM livraria_gestao.lojas WHERE loj_slug = 'livraria-sao-paulo' LIMIT 1), TRUE),
+    (gen_random_uuid(), (SELECT usu_id FROM livraria_gestao.usuarios WHERE usu_email = 'juliana.lima@email.com' LIMIT 1), 'entrega', 'Trabalho', 3, '789', 'Sala 5', 1, 3, '01210000', 1, (SELECT loj_id FROM livraria_gestao.lojas WHERE loj_slug = 'livraria-sao-paulo' LIMIT 1), TRUE)
+    ON CONFLICT DO NOTHING;
+    
+    -- Endereços para clientes do Rio de Janeiro
+    INSERT INTO livraria_gestao.enderecos (end_uuid, usu_id, end_tipo, end_apelido, log_id, end_numero, end_complemento, cid_id, bai_id, cep_id, pai_id, loj_id, end_principal)
+    VALUES
+    (gen_random_uuid(), (SELECT usu_id FROM livraria_gestao.usuarios WHERE usu_email = 'marcos.almeida@email.com' LIMIT 1), 'entrega', 'Casa', 4, '321', NULL, 2, 4, '20040000', 1, (SELECT loj_id FROM livraria_gestao.lojas WHERE loj_slug = 'livraria-rio' LIMIT 1), TRUE),
+    (gen_random_uuid(), (SELECT usu_id FROM livraria_gestao.usuarios WHERE usu_email = 'carla.rodrigues@email.com' LIMIT 1), 'entrega', 'Casa', 5, '654', 'Apto 12', 2, 5, '22041000', 1, (SELECT loj_id FROM livraria_gestao.lojas WHERE loj_slug = 'livraria-rio' LIMIT 1), TRUE),
+    (gen_random_uuid(), (SELECT usu_id FROM livraria_gestao.usuarios WHERE usu_email = 'rafael.gomes@email.com' LIMIT 1), 'entrega', 'Trabalho', 6, '987', 'Bloco B', 2, 6, '22290000', 1, (SELECT loj_id FROM livraria_gestao.lojas WHERE loj_slug = 'livraria-rio' LIMIT 1), TRUE)
+    ON CONFLICT DO NOTHING;
+    
+    -- Endereços para clientes de Belo Horizonte
+    INSERT INTO livraria_gestao.enderecos (end_uuid, usu_id, end_tipo, end_apelido, log_id, end_numero, end_complemento, cid_id, bai_id, cep_id, pai_id, loj_id, end_principal)
+    VALUES
+    (gen_random_uuid(), (SELECT usu_id FROM livraria_gestao.usuarios WHERE usu_email = 'patricia.martins@email.com' LIMIT 1), 'entrega', 'Casa', 7, '159', NULL, 3, 7, '30130000', 1, (SELECT loj_id FROM livraria_gestao.lojas WHERE loj_slug = 'livraria-belo-horizonte' LIMIT 1), TRUE),
+    (gen_random_uuid(), (SELECT usu_id FROM livraria_gestao.usuarios WHERE usu_email = 'andre.souza@email.com' LIMIT 1), 'entrega', 'Casa', 8, '357', 'Apto 23', 3, 8, '30220000', 1, (SELECT loj_id FROM livraria_gestao.lojas WHERE loj_slug = 'livraria-belo-horizonte' LIMIT 1), TRUE),
+    (gen_random_uuid(), (SELECT usu_id FROM livraria_gestao.usuarios WHERE usu_email = 'mariana.ferreira@email.com' LIMIT 1), 'entrega', 'Trabalho', 9, '753', NULL, 3, 9, '31310000', 1, (SELECT loj_id FROM livraria_gestao.lojas WHERE loj_slug = 'livraria-belo-horizonte' LIMIT 1), TRUE)
+    ON CONFLICT DO NOTHING;
     
     RAISE NOTICE 'Seed multi-tenant completo criado com sucesso!';
     RAISE NOTICE '3 Lojas, 3 Administradores (com vínculos em admin_lojas), 15 Livros, 9 Clientes criados.';

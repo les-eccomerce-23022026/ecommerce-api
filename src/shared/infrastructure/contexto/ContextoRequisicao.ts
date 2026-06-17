@@ -4,16 +4,18 @@ import { AsyncLocalStorage } from 'async_hooks';
  * Interface do contexto de requisição.
  * Contém dados que devem estar disponíveis durante toda a execução da requisição.
  * 
- * IMPORTANTE: 
- * - Externamente (API, frontend): usa apenas UUIDs públicos (loj_uuid, usu_uuid)
- * - Internamente (repositórios): usa loj_id convertido para performance
- * - IDs internos (BIGSERIAL) NUNCA são expostos na API
+ * IMPORTANTE:
+ * - O contexto é um mecanismo INTERNO do backend, não exposto via HTTP
+ * - Externamente (API/frontend): usa apenas UUIDs públicos (loj_uuid, usu_uuid)
+ * - Internamente (repositórios): usa loj_id e usu_id para performance
+ * - IDs internos (BIGSERIAL) NUNCA são expostos nas respostas da API (DTOs)
  */
 export interface IContextoRequisicao {
   loj_id?: number;
   loj_uuid?: string;
   usu_id?: number;
   usu_uuid?: string;
+  papeis?: string[];
 }
 
 /**
@@ -70,20 +72,11 @@ class ContextoRequisicao {
    * Retorna undefined se não houver contexto definido.
    * 
    * NOTA: loj_id é usado internamente pelos repositórios para performance.
-   * Externamente (API/frontend), apenas loj_uuid é exposto.
+   * NUNCA deve ser exposto em respostas da API (DTOs).
    */
   static obterLojId(): number | undefined {
     const contexto = ContextoRequisicao.obterContexto();
     return contexto?.loj_id;
-  }
-
-  /**
-   * Obtém o usu_id do contexto atual.
-   * Retorna undefined se não houver contexto definido.
-   */
-  static obterUsuId(): number | undefined {
-    const contexto = ContextoRequisicao.obterContexto();
-    return contexto?.usu_id;
   }
 
   /**
@@ -93,6 +86,18 @@ class ContextoRequisicao {
   static obterUsuUuid(): string | undefined {
     const contexto = ContextoRequisicao.obterContexto();
     return contexto?.usu_uuid;
+  }
+
+  /**
+   * Obtém o usu_id do contexto atual.
+   * Retorna undefined se não houver contexto definido.
+   * 
+   * NOTA: usu_id é usado internamente pelos repositórios para performance.
+   * NUNCA deve ser exposto em respostas da API (DTOs).
+   */
+  static obterUsuId(): number | undefined {
+    const contexto = ContextoRequisicao.obterContexto();
+    return contexto?.usu_id;
   }
 
   /**

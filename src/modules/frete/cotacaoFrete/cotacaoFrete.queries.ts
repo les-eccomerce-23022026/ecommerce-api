@@ -15,6 +15,11 @@ export const COTACAO_FRETE_QUERIES = {
     FROM cotacao_frete
     WHERE cfr_uuid = $1
   `,
+  VINCULAR_VENDA: `
+    UPDATE cotacao_frete
+    SET ven_id = $1
+    WHERE cfr_uuid = $2 AND cfr_estado = $3 AND ven_id IS NULL
+  `,
   MARCAR_CONSUMIDA: `
     UPDATE cotacao_frete
     SET cfr_estado = $1, ven_id = $2

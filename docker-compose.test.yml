@@ -1,33 +1,43 @@
 version: "3.9"
 
 services:
-  postgres_test:
-    image: postgres:16-alpine
-    container_name: ecm_postgres_test
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: ecm_livraria_test
-      POSTGRES_USER: ecm_user_test
-      POSTGRES_PASSWORD: ecm_senha_test
-      DEFAULT_LOJA_ID: "1"
-      MULTI_TENANCY_ENABLED: "true"
-    ports:
-      - "5433:5432"
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ecm_user_test -d ecm_livraria_test"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    deploy:
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: 512M
-        reservations:
-          cpus: '0.25'
-          memory: 256M
-    networks:
-      - ecm_test_network
+  # postgres_test:
+  #   image: postgres:16-alpine
+  #   container_name: ecm_postgres_test
+  #   restart: unless-stopped
+  #   # Tuning calibrado para container de teste com 512MB de RAM
+  #   command: >
+  #     postgres
+  #     -c shared_buffers=128MB
+  #     -c effective_cache_size=384MB
+  #     -c work_mem=8MB
+  #     -c max_connections=50
+  #     -c checkpoint_completion_target=0.9
+  #     -c wal_buffers=8MB
+  #     -c random_page_cost=1.1
+  #   environment:
+  #     POSTGRES_DB: ecm_livraria_test
+  #     POSTGRES_USER: ecm_user_test
+  #     POSTGRES_PASSWORD: ecm_senha_test
+  #     DEFAULT_LOJA_ID: "1"
+  #     MULTI_TENANCY_ENABLED: "true"
+  #   ports:
+  #     - "5433:5432"
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U ecm_user_test -d ecm_livraria_test"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         cpus: '0.5'
+  #         memory: 512M
+  #       reservations:
+  #         cpus: '0.25'
+  #         memory: 256M
+  #   networks:
+  #     - ecm_test_network
 
   app_test:
     build:
@@ -43,9 +53,9 @@ services:
       - /app/node_modules
     env_file:
       - .env
-    depends_on:
-      postgres_test:
-        condition: service_healthy
+    # depends_on:
+    #   postgres_test:
+    #     condition: service_healthy
     environment:
       - NODE_ENV=test
       - DEFAULT_LOJA_ID=1
@@ -58,11 +68,11 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.5'
-          memory: 512M
+          cpus: '1.0'
+          memory: 1G
         reservations:
           cpus: '0.25'
-          memory: 256M
+          memory: 512M
     networks:
       - ecm_test_network
 

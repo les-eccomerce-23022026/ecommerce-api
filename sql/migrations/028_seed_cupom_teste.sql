@@ -4,14 +4,18 @@
 -- Correção: Adicionado schema livraria_comercial e cupom TROCA100
 
 -- Inserir cupons de teste
-INSERT INTO livraria_comercial.cupom (cup_codigo, cup_tipo, cup_valor_desconto, cup_valor_minimo, cup_valido_de, cup_valido_ate, cup_ativo) VALUES
--- Cupom promocional (máximo 1 por compra)
-('DESCONTO10', 'promocional', 10.00, 0.00, CURRENT_DATE, CURRENT_DATE + INTERVAL '2 years', true),
-('DESCONTO20', 'promocional', 20.00, 50.00, CURRENT_DATE, CURRENT_DATE + INTERVAL '2 years', true),
--- Cupons de troca (múltiplos permitidos)
-('TROCA50', 'troca', 50.00, 0.00, CURRENT_DATE, CURRENT_DATE + INTERVAL '2 years', true),
-('TROCA30', 'troca', 30.00, 0.00, CURRENT_DATE, CURRENT_DATE + INTERVAL '2 years', true),
-('TROCA100', 'troca', 100.00, 0.00, CURRENT_DATE, CURRENT_DATE + INTERVAL '2 years', true)
+INSERT INTO livraria_comercial.cupom (cup_codigo, cup_tipo, cup_valor_desconto, cup_valor_minimo, cup_valido_de, cup_valido_ate, cup_ativo, loj_id) VALUES
+-- Cupons promocionais (máximo 1 por compra)
+('DESCONTO10', 'promocional', 10.00, 0.00, CURRENT_DATE, CURRENT_DATE + INTERVAL '2 years', true, NULL),
+('DESCONTO20', 'promocional', 20.00, 50.00, CURRENT_DATE, CURRENT_DATE + INTERVAL '2 years', true, NULL),
+-- Cupons de loja específicos
+('CUPOM-LOJA-TESTE', 'promocional', 10.00, 50.00, CURRENT_DATE, CURRENT_DATE + INTERVAL '2 years', true, 32),
+-- Cupom global (sem loja específica)
+('CUPOM-GLOBAL-TESTE', 'promocional', 15.00, 30.00, CURRENT_DATE, CURRENT_DATE + INTERVAL '2 years', true, NULL),
+-- Cupons de troca (múltiplos permitidos) - OBS: Cupons de troca vinculados a clientes devem usar tabela cupons_troca
+('TROCA50', 'troca', 50.00, 0.00, CURRENT_DATE, CURRENT_DATE + INTERVAL '2 years', true, NULL),
+('TROCA30', 'troca', 30.00, 0.00, CURRENT_DATE, CURRENT_DATE + INTERVAL '2 years', true, NULL),
+('TROCA100', 'troca', 100.00, 0.00, CURRENT_DATE, CURRENT_DATE + INTERVAL '2 years', true, NULL)
 ON CONFLICT (cup_codigo) DO NOTHING;
 
 COMMENT ON TABLE livraria_comercial.cupom IS 'Seed de cupons para testes E2E do Cypress';

@@ -6,6 +6,12 @@ import { IUsuario } from '@/modules/usuarios/IUsuario.entity';
 import { IRowIdSimples } from '@/shared/types/db-rows.types';
 import { GestaoEnderecoLeituras } from '@/modules/clientes/gestaoIdentidadeClienteEndereco.leituras';
 import { mapearEnderecoUsuarioParaDto } from '@/modules/clientes/gestaoIdentidadeClienteEndereco.dto.mapper';
+import { MENSAGENS_ERRO } from '@/shared/constants/mensagens-erro.constants';
+
+/**
+ * Constantes de validação de negócio
+ */
+const LIMITE_MAXIMO_ENDERECOS_POR_CLIENTE = 5;
 
 type RefEnderecoUsuario = { current: IEnderecoUsuario };
 
@@ -149,8 +155,10 @@ export class GestaoEnderecoCliente {
     const idCep = await this.obterOuCriarCep(enderecoDto.cep, idCidade, idBairro);
     const idPais = GestaoEnderecoCliente.obterOuCriarPais(enderecoDto.pais || 'Brasil');
     const enderecosAtuais = await this.repositorioEndereco.buscarPorIdUsuario(idUsuario);
-    if (enderecosAtuais.length >= 5) {
-      throw new Error('Limite de 5 endereços atingido. Você só pode atualizar os endereços existentes.');
+    if (enderecosAtuais.length >= LIMITE_MAXIMO_ENDERECOS_POR_CLIENTE) {
+      throw new Error(
+        `Limite máximo de ${LIMITE_MAXIMO_ENDERECOS_POR_CLIENTE} endereços por cliente atingido.`
+      );
     }
     const endereco: IEnderecoUsuario = {
       idUsuario,
@@ -258,7 +266,7 @@ export class GestaoEnderecoCliente {
     const todosEnderecos = await this.repositorioEndereco.buscarPorIdUsuario(usuario.id);
     const enderecoExistente = todosEnderecos.find((e) => e.uuid === uuidEndereco);
     if (!enderecoExistente) {
-      throw new Error('Endereço não encontrado.');
+      throw new Error(MENSAGENS_ERRO.ENDERECO_NAO_ENCONTRADO);
     }
     const [dtoAtual] = await this.converterEnderecosParaDto([enderecoExistente]);
     const ref: RefEnderecoUsuario = { current: enderecoExistente };

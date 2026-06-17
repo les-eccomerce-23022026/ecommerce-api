@@ -165,6 +165,32 @@ O diagrama mostra todas as 14 tabelas com seus relacionamentos, chaves primária
 
 ---
 
+## Credenciais de Teste
+
+Para facilitar testes manuais e automatizados, as seguintes credenciais estão disponíveis nos seeds:
+
+### Usuários de Teste Principais
+
+| Tipo | Email | Senha | Arquivo Seed |
+|------|-------|-------|--------------|
+| Admin | admintest@email.com | @asdfJKLÇ123 | `modelagem-dados/dml/005_seed_usuarios_teste.sql` |
+| Cliente | clientetest@email.com | @asdfJKLÇ123 | `modelagem-dados/dml/005_seed_usuarios_teste.sql` |
+
+### Clientes Demo (30 usuários sintéticos)
+
+| Padrão de Email | Senha | Quantidade | Arquivo Seed |
+|-----------------|-------|------------|--------------|
+| demo.cliente01@les.demo.br a demo.cliente30@les.demo.br | Cliente@123 | 30 | `migrations/065_seed_demo_30_clientes_100_livros.sql` |
+
+### Notas Importantes
+
+- Todos os hashes de senha são gerados usando bcrypt (cost factor 10)
+- As senhas acima são documentadas apenas para fins de teste e desenvolvimento
+- Em produção, o administrador deve alterar a senha inicial imediatamente
+- Os clientes demo possuem endereços completos no Brasil para testes de checkout
+
+---
+
 ## Segurança
 
 - O arquivo `002_seed_usuario_admin_inicial.sql` contém apenas o **hash bcrypt** da senha de bootstrap (`Admin@123`). A senha nunca é armazenada em texto plano.

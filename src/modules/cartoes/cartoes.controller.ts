@@ -82,10 +82,15 @@ export class ControladorCartoes {
    */
   public static async atualizarCartao(requisicao: Request, resposta: Response): Promise<Response> {
     try {
+      const idUsuario = requisicao.usuario?.id;
+      if (!idUsuario) {
+        return RespostaPadrao.enviarErro(resposta, 401, 'Usuário não autenticado.');
+      }
+
       const { uuid } = requisicao.params;
       const dados: IAtualizarCartaoDto = requisicao.body;
 
-      const cartao = await servicoCartoes.atualizarCartao(uuid, dados);
+      const cartao = await servicoCartoes.atualizarCartao(idUsuario, uuid, dados);
       if (!cartao) {
         return RespostaPadrao.enviarErro(resposta, 404, 'Cartão não encontrado.');
       }
@@ -111,9 +116,14 @@ export class ControladorCartoes {
    */
   public static async removerCartao(requisicao: Request, resposta: Response): Promise<Response> {
     try {
+      const idUsuario = requisicao.usuario?.id;
+      if (!idUsuario) {
+        return RespostaPadrao.enviarErro(resposta, 401, 'Usuário não autenticado.');
+      }
+
       const { uuid } = requisicao.params;
 
-      await servicoCartoes.removerCartao(uuid);
+      await servicoCartoes.removerCartao(idUsuario, uuid);
 
       return RespostaPadrao.enviarSucesso(resposta, 200, { mensagem: 'Cartão removido com sucesso.' });
     } catch (erro) {

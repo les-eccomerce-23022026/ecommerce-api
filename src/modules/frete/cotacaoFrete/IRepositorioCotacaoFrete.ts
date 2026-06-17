@@ -19,6 +19,8 @@ export interface IRepositorioCotacaoFrete {
 
   obterPorUuid(cfrUuid: string): Promise<ICotacaoFretePersistida | null>;
 
+  vincularVenda(cfrUuid: string, venId: number): Promise<void>;
+
   marcarConsumida(cfrUuid: string, venId: number): Promise<void>;
 
   marcarExpiradasCriadasVencidas(): Promise<number>;

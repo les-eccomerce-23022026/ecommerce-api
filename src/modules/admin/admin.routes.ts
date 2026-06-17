@@ -6,6 +6,7 @@ import { ServicoDashboardAdmin } from '@/modules/admin/servicoDashboardAdmin';
 import { ServicoPedidosAdmin } from '@/modules/admin/servicoPedidosAdmin';
 import { ConexaoPostgres } from '@/shared/infrastructure/database/ConexaoPostgres';
 import { RepositorioVendasPostgres } from '@/modules/vendas/repositories/RepositorioVendasPostgres';
+import { ServicoAnaliseVendas } from '@/modules/vendas/services/ServicoAnaliseVendas';
 import { RepositorioEntregaPostgres } from '@/modules/entrega/RepositorioEntregaPostgres';
 import { ServicoEntrega } from '@/modules/entrega/ServicoEntrega';
 import { ServicoNotificacaoEmail } from '@/modules/entrega/adapters/ServicoNotificacaoEmail';
@@ -17,7 +18,9 @@ import { RepositorioEventoRastreamentoPostgres } from '@/modules/logistica-mocks
 import { RepositorioEstoque } from '@/modules/estoque/repositorioEstoque';
 import { ServicoEstoque } from '@/modules/estoque/servicoEstoque';
 import { ControladorEstoque } from '@/modules/estoque/controladorEstoque';
+import { RepositorioReservasPostgres } from '@/modules/estoque/repositorioReservas';
 import { autenticacaoMiddleware } from '@/shared/middlewares/autenticacao.middleware';
+import { contextoLojaMiddleware } from '@/shared/middlewares/contextoLoja.middleware';
 import {
   adminOnlyMiddleware,
   adminSistemaOnlyMiddleware
@@ -40,11 +43,13 @@ export function registrarRotasAdmin(app: IRouter): void {
   const servicoMockLoggi = new ServicoMockLoggi(repoRastreamento, repoEventoRastreamento);
   const servicoPedidosAdmin = new ServicoPedidosAdmin(repoVendas, servicoEntrega, servicoMockCorreios, servicoMockLoggi, servicoNotificacao);
   const servicoDashboardAdmin = new ServicoDashboardAdmin(db);
-  const controladorPainel = new ControladorAdminPainel(servicoDashboardAdmin, servicoPedidosAdmin);
+  const servicoAnaliseVendas = new ServicoAnaliseVendas(repoVendas);
+  const controladorPainel = new ControladorAdminPainel(servicoDashboardAdmin, servicoPedidosAdmin, servicoAnaliseVendas);
   
   // Estoque
   const repoEstoque = new RepositorioEstoque(db);
-  const servicoEstoque = new ServicoEstoque(repoEstoque);
+  const repoReservasAdmin = new RepositorioReservasPostgres(db);
+  const servicoEstoque = new ServicoEstoque(repoEstoque, repoReservasAdmin);
   const controladorEstoque = new ControladorEstoque(servicoEstoque);
 
   app.get(
@@ -52,6 +57,14 @@ export function registrarRotasAdmin(app: IRouter): void {
     autenticacaoMiddleware,
     adminOnlyMiddleware,
     controladorPainel.obterDashboard,
+  );
+
+  app.get(
+    '/admin/analise-vendas-categoria',
+    autenticacaoMiddleware,
+    contextoLojaMiddleware,
+    adminOnlyMiddleware,
+    controladorPainel.obterAnaliseVendasPorCategoria,
   );
 
   app.get(
@@ -177,5 +190,12 @@ export function registrarRotasAdmin(app: IRouter): void {
     autenticacaoMiddleware,
     adminOnlyMiddleware,
     controladorEstoque.registrarEntrada,
+  );
+
+  app.patch(
+    '/admin/estoque/atualizar',
+    autenticacaoMiddleware,
+    adminOnlyMiddleware,
+    controladorEstoque.atualizarEstoque,
   );
 }

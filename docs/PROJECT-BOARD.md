@@ -1,14 +1,15 @@
 # Project Board — LES Backend API
 
-> Atualizado em: 27 de abril de 2026  
+> Atualizado em: 28 de maio de 2026  
 > Status: Gestão local das atividades do projeto.
 
 ---
 
 ## Board Kanban
 
-| 📛 Todo (0) | 🔄 In Progress (0) | ✅ Done (38) |
+| 📛 Todo (0) | 🔄 In Progress (0) | ✅ Done (39) |
 | --- | --- | --- |
+|  |  | B39 · [IA] Chunking de Textos para Embeddings RAG |
 |  |  | B38 · [BACKEND] Refresh Token e Rate Limiting |
 |  |  | B2 · [BACKEND] Dockerização e Ambiente Dev |
 |  |  | B3 · [BACKEND] Modelagem SQL e Normalização |
@@ -53,6 +54,7 @@
 
 | ID | Área | Card | Status / Evidência |
 | :--- | :------ | :-------------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| B39 | IA | Chunking de Textos para Embeddings RAG | Implementado: ServicoChunkingTextos (domain, puro TS, sem dependências externas) com algoritmo RecursiveCharacterTextSplitter equivalente ao LangChain (chunkSize: 1000, overlap: 200). ServicoGeracaoEmbedding integrado via gerarChunksDoProduto. ServicoIndexacaoProdutos atualizado para indexar N embeddings por produto. 28 testes unitários passando. |
 | B1 | BACKEND | Setup Inicial e Arquitetura | Definir estrutura de módulos, injeção de dependência manual e padrões SOLID/DDD. |
 | B2 | BACKEND | Dockerização e Ambiente Dev | Criar Dockerfile multi-stage; configurar docker-compose com Node.js + Postgres; hot reload com ts-node-dev. |
 | B3 | BACKEND | Modelagem SQL e Normalização | Criar 14 tabelas normalizadas (DDR/DML); triggers de atualização; diagramas ER PlantUML. |

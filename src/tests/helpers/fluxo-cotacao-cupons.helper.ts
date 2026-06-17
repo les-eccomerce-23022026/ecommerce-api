@@ -1,6 +1,8 @@
 import request from 'supertest';
 import { Application } from 'express';
 import { LIVRO_UUID_TESTE } from '@/tests/helpers/pedido-venda.helper';
+import { obterPrecoCatalogo } from '@/tests/helpers/precos-catalogo.helper';
+import type { IConexaoBanco } from '@/shared/infrastructure/database/IConexaoBanco';
 
 /** Cartões com Luhn válido e bandeiras aceitas por `CartaoCredito`. */
 export const CARTAO_VISA_TESTE = {
@@ -77,11 +79,12 @@ export function montarPartesPagamentoCuponsEDoisCartoes(valorTotal: number): {
   return { promo, troca, cartaoVisa, cartaoMastercard };
 }
 
-export function payloadVendaComCotacao(
+export async function payloadVendaComCotacao(
   cotacao: CotacaoPac,
-  precoUnitario: number,
-  quantidade: number,
-): Record<string, unknown> {
+  db: IConexaoBanco,
+  quantidade: number = 1,
+): Promise<Record<string, unknown>> {
+  const precoUnitario = await obterPrecoCatalogo(db, LIVRO_UUID_TESTE);
   const valorTotalItens = Math.round(precoUnitario * quantidade * 100) / 100;
   const valorTotal = Math.round((valorTotalItens + cotacao.valorFrete) * 100) / 100;
   return {

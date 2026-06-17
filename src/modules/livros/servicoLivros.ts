@@ -2,20 +2,64 @@ import type { ILivroCatalogoDto } from '@/modules/livros/ILivroCatalogo.dto';
 import type { ICategoriaMenuDto, IListagemCatalogoLivros, OrdenacaoCatalogo } from '@/modules/livros/ICatalogoLivros.dto';
 import { RepositorioLivrosPostgres } from '@/modules/livros/repositorioLivrosPostgres';
 import { RepositorioLivrosBulkInsert } from '@/modules/livros/repositorioLivrosBulkInsert';
+import { CacheDisco } from '@/shared/infrastructure/cache/CacheDisco';
+import { GeradorChaveCache } from '@/shared/infrastructure/cache/geradorChaveCache';
+import { ContextoRequisicao } from '@/shared/infrastructure/contexto/ContextoRequisicao';
+import { MENSAGENS_ERRO } from '@/shared/constants/mensagens-erro.constants';
+import { ServicoInativacaoAutomaticaLivros } from '@/modules/livros/application/ServicoInativacaoAutomaticaLivros';
+import { ServicoAprovacaoPreco } from '@/modules/livros/application/ServicoAprovacaoPreco';
+import type { IAprovacaoPrecoLivro } from '@/modules/livros/domain/IAprovacaoPrecoLivro';
+import type { IRelatorioInativacaoAutomatica } from '@/modules/livros/domain/IRelatorioInativacaoAutomatica';
+
+export class AprovacaoPrecoNecessariaError extends Error {
+  constructor(mensagem: string) {
+    super(mensagem);
+    this.name = 'AprovacaoPrecoNecessariaError';
+  }
+}
 
 export class ServicoLivros {
   constructor(
     private readonly repo: RepositorioLivrosPostgres,
     private readonly bulkInsert: RepositorioLivrosBulkInsert,
+    private readonly cache: CacheDisco = new CacheDisco(),
+    private readonly servicoInativacao?: ServicoInativacaoAutomaticaLivros,
+    private readonly servicoAprovacao?: ServicoAprovacaoPreco,
   ) {}
 
-  listarCatalogo(opcoes: {
+  async listarCatalogo(opcoes: {
     pagina: number;
     itensPorPagina: number;
     categoriaSlug?: string;
     ordenacao: OrdenacaoCatalogo;
   }): Promise<IListagemCatalogoLivros> {
-    return this.repo.listarCatalogo(opcoes);
+    const lojaUuid = ContextoRequisicao.obterLojUuid();
+    const chave = GeradorChaveCache.gerarChaveCatalogo({
+      ...opcoes,
+      lojaUuid,
+    });
+
+    // TTL de 30 segundos (configurável via variável de ambiente se necessário)
+    const ttlMs = Number(process.env.CACHE_TTL_MS) || 30000;
+
+    // Tentar obter do cache
+    const cacheado = await this.cache.obter<IListagemCatalogoLivros>(chave);
+    if (cacheado) {
+      return cacheado;
+    }
+
+    // Se não há cache ou expirou, buscar do banco
+    const resultado = await this.repo.listarCatalogo(opcoes);
+
+    // Salvar no cache
+    try {
+      await this.cache.definir(chave, resultado, ttlMs);
+    } catch (erro) {
+      // Se falhar ao salvar no cache, não interromper o fluxo
+      console.error('[ServicoLivros.listarCatalogo] Erro ao salvar cache:', erro);
+    }
+
+    return resultado;
   }
 
   listarCategoriasMenu(): Promise<ICategoriaMenuDto[]> {
@@ -28,6 +72,16 @@ export class ServicoLivros {
 
   listarParaAdmin(limite = 500): Promise<ILivroCatalogoDto[]> {
     return this.repo.listarTodosAdmin(limite);
+  }
+
+  /**
+   * Lista todos os livros do catálogo global sem filtro de loja.
+   * Usado para indexação no ChromaDB (IA de recomendação).
+   * Clientes podem comprar de qualquer loja, então a IA precisa
+   * ter acesso ao catálogo completo.
+   */
+  listarCatalogoGlobal(limite = 1000): Promise<ILivroCatalogoDto[]> {
+    return this.repo.listarCatalogoGlobal(limite);
   }
 
   async criarLivro(dados: {
@@ -74,6 +128,12 @@ export class ServicoLivros {
     const mapaCategorias = await this.bulkInsert.buscarIdsPorNomes('categorias', 'cat_nome', 'cat_id', [dados.categoriaNome]);
     const categoriaId = mapaCategorias.get(dados.categoriaNome);
 
+    if (!categoriaId) {
+      throw new Error(`Categoria "${dados.categoriaNome}" não encontrada. Categoria é obrigatória para cadastro de livro.`);
+    }
+
+    const lojaUuid = ContextoRequisicao.obterLojUuid();
+
     // Criar livro com transação
     await this.bulkInsert.criarLivroComTransacao({
       uuid: dados.uuid,
@@ -96,7 +156,15 @@ export class ServicoLivros {
       quantidadeEstoque: dados.quantidadeEstoque,
       precoVenda: dados.precoVenda,
       valorCusto: dados.valorCusto,
+      lojaUuid,
     });
+
+    // Invalidar cache do catálogo
+    try {
+      await this.cache.invalidar('catalogo:*');
+    } catch (erro) {
+      console.error('[ServicoLivros.criarLivro] Erro ao invalidar cache:', erro);
+    }
 
     // Retornar o livro criado
     return this.repo.obterPorUuid(dados.uuid).then((livro) => {
@@ -189,6 +257,13 @@ export class ServicoLivros {
     // Criar livros em lote com transação
     await this.bulkInsert.criarLivrosEmLoteComTransacao(dadosPreparados);
 
+    // Invalidar cache do catálogo
+    try {
+      await this.cache.invalidar('catalogo:*');
+    } catch (erro) {
+      console.error('[ServicoLivros.criarLivrosEmLote] Erro ao invalidar cache:', erro);
+    }
+
     // Retornar os livros criados
     const livrosCriados = await Promise.all(
       dadosLivros.map((livro) => this.repo.obterPorUuid(livro.uuid)),
@@ -208,13 +283,21 @@ export class ServicoLivros {
   async inativarLivro(uuid: string, motivo: string, categoriaInativacao?: string): Promise<ILivroCatalogoDto> {
     const livro = await this.repo.obterPorUuid(uuid);
     if (!livro) {
-      throw new Error('Livro não encontrado.');
+      throw new Error(MENSAGENS_ERRO.LIVRO_NAO_ENCONTRADO);
     }
     if (!livro.status || livro.status === 'Inativo') {
       throw new Error('Livro já está inativo.');
     }
 
     await this.repo.inativarLivro(uuid);
+
+    // Invalidar cache do catálogo
+    try {
+      await this.cache.invalidar('catalogo:*');
+    } catch (erro) {
+      console.error('[ServicoLivros.inativarLivro] Erro ao invalidar cache:', erro);
+    }
+
     return this.repo.obterPorUuid(uuid).then((l) => {
       if (!l) throw new Error('Erro ao recuperar livro após inativação');
       return l;
@@ -224,13 +307,21 @@ export class ServicoLivros {
   async ativarLivro(uuid: string, motivo: string, categoriaAtivacao?: string): Promise<ILivroCatalogoDto> {
     const livro = await this.repo.obterPorUuid(uuid);
     if (!livro) {
-      throw new Error('Livro não encontrado.');
+      throw new Error(MENSAGENS_ERRO.LIVRO_NAO_ENCONTRADO);
     }
     if (livro.status === 'Ativo') {
       throw new Error('Livro já está ativo.');
     }
 
     await this.repo.ativarLivro(uuid);
+
+    // Invalidar cache do catálogo
+    try {
+      await this.cache.invalidar('catalogo:*');
+    } catch (erro) {
+      console.error('[ServicoLivros.ativarLivro] Erro ao invalidar cache:', erro);
+    }
+
     return this.repo.obterPorUuid(uuid).then((l) => {
       if (!l) throw new Error('Erro ao recuperar livro após ativação');
       return l;
@@ -270,6 +361,63 @@ export class ServicoLivros {
       throw new Error('Ano deve estar entre 1900 e 2100.');
     }
 
-    return this.repo.atualizarLivroParcial(uuid, dados);
+    if (dados.precoVenda !== undefined && this.servicoAprovacao) {
+      const grupo = await this.repo.obterGrupoPrecificacaoPorLivroUuid(uuid);
+      const custoAtual = await this.repo.obterValorCustoAtualPorLivroUuid(uuid);
+      if (grupo && custoAtual !== null) {
+        const custoEfetivo = dados.valorCusto ?? custoAtual;
+        const margemCalculada = custoEfetivo > 0
+          ? ((dados.precoVenda - custoEfetivo) / custoEfetivo) * 100
+          : 0;
+        if (margemCalculada < grupo.margemLucroPercentual) {
+          throw new AprovacaoPrecoNecessariaError(
+            `Preço abaixo da margem mínima do grupo (${grupo.margemLucroPercentual}%). Solicite aprovação gerencial.`,
+          );
+        }
+      }
+    }
+
+    const resultado = await this.repo.atualizarLivroParcial(uuid, dados);
+
+    // Invalidar cache do catálogo
+    try {
+      await this.cache.invalidar('catalogo:*');
+    } catch (erro) {
+      console.error('[ServicoLivros.atualizarLivroParcial] Erro ao invalidar cache:', erro);
+    }
+
+    return resultado;
+  }
+
+  async executarInativacaoAutomatica(): Promise<IRelatorioInativacaoAutomatica> {
+    if (!this.servicoInativacao) {
+      throw new Error('Serviço de inativação automática não configurado.');
+    }
+    const relatorio = await this.servicoInativacao.executarVerificacaoAutomatica();
+    try {
+      await this.cache.invalidar('catalogo:*');
+    } catch (erro) {
+      console.error('[ServicoLivros.executarInativacaoAutomatica] Erro ao invalidar cache:', erro);
+    }
+    return relatorio;
+  }
+
+  async listarAprovacoesPendentes(lojaUuid?: string): Promise<IAprovacaoPrecoLivro[]> {
+    if (!this.servicoAprovacao) return [];
+    return this.servicoAprovacao.listarPendentes(lojaUuid);
+  }
+
+  async aprovarPreco(uuid: string, aprovadorUuid: string, observacao?: string): Promise<void> {
+    if (!this.servicoAprovacao) {
+      throw new Error('Serviço de aprovação não configurado.');
+    }
+    await this.servicoAprovacao.aprovarSolicitacao(uuid, aprovadorUuid, observacao);
+  }
+
+  async rejeitarPreco(uuid: string, aprovadorUuid: string, motivo: string): Promise<void> {
+    if (!this.servicoAprovacao) {
+      throw new Error('Serviço de aprovação não configurado.');
+    }
+    await this.servicoAprovacao.rejeitarSolicitacao(uuid, aprovadorUuid, motivo);
   }
 }

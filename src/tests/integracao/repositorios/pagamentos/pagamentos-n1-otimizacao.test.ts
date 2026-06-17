@@ -22,17 +22,28 @@ describe('Integração - RepositorioPagamentosPostgres - Correção N+1 Query', 
   });
 
   describe('listarPorVenda - Sem N+1 Query', () => {
+    // Helper para obter pap_id do papel 'cliente'
+    async function obterPapelClienteId(): Promise<number> {
+      const papelRes = await contexto.db!.executar<{ pap_id: number }>(
+        `SELECT pap_id FROM livraria_gestao.papeis WHERE pap_descricao = 'cliente' LIMIT 1`
+      );
+      return papelRes[0].pap_id;
+    }
+
     it('deve listar pagamentos de uma venda com cartões em uma única query', async () => {
       // Setup: Limpar usuário existente para evitar duplicate key
       await contexto.db!.executar(`DELETE FROM livraria_gestao.clientes WHERE usu_id IN (SELECT usu_id FROM livraria_gestao.usuarios WHERE usu_cpf = '98765432100')`);
       await contexto.db!.executar(`DELETE FROM livraria_comercial.vendas WHERE usu_id IN (SELECT usu_id FROM livraria_gestao.usuarios WHERE usu_cpf = '98765432100')`);
       await contexto.db!.executar(`DELETE FROM livraria_gestao.usuarios WHERE usu_cpf = '98765432100'`);
       
+      const papelId = await obterPapelClienteId();
+      
       // Setup: Criar usuário
       const usuarioRes = await contexto.db!.executar<{ usu_uuid: string }>(
         `INSERT INTO livraria_gestao.usuarios (usu_nome, usu_email, usu_cpf, usu_senha_hash, pap_id, usu_ativo, loj_id)
-         VALUES ('Cliente Teste Pag', 'cliente.pag@teste.com', '98765432100', 'hash', 21625, TRUE, 1)
-         RETURNING usu_uuid`
+         VALUES ('Cliente Teste Pag', 'cliente.pag@teste.com', '98765432100', 'hash', $1, TRUE, 1)
+         RETURNING usu_uuid`,
+        [papelId]
       );
       const usuarioUuid = usuarioRes[0].usu_uuid;
 
@@ -41,7 +52,7 @@ describe('Integração - RepositorioPagamentosPostgres - Correção N+1 Query', 
         `INSERT INTO livraria_comercial.vendas (usu_id, stv_id, ven_total_itens, ven_frete, ven_total_venda, loj_id)
          VALUES (
            (SELECT usu_id FROM livraria_gestao.usuarios WHERE usu_uuid = $1),
-           (SELECT stv_id FROM livraria_comercial.status_venda WHERE stv_descricao = 'EM PROCESSAMENTO'),
+           (SELECT stv_id FROM livraria_comercial.status_venda WHERE stv_descricao = 'EM_PROCESSAMENTO'),
            100.00, 10.00, 110.00, 1
          )
          RETURNING ven_uuid`,
@@ -109,12 +120,14 @@ describe('Integração - RepositorioPagamentosPostgres - Correção N+1 Query', 
       await contexto.db!.executar(`DELETE FROM livraria_comercial.vendas WHERE usu_id IN (SELECT usu_id FROM livraria_gestao.usuarios WHERE usu_cpf = '55555555555')`);
       await contexto.db!.executar(`DELETE FROM livraria_gestao.usuarios WHERE usu_cpf = '55555555555'`);
       
+      const papelId = await obterPapelClienteId();
+      
       // Setup: Criar venda sem pagamentos
       const usuarioRes = await contexto.db!.executar<{ usu_uuid: string }>(
         `INSERT INTO livraria_gestao.usuarios (usu_nome, usu_email, usu_cpf, usu_senha_hash, pap_id, usu_ativo, loj_id)
          VALUES ($1, $2, $3, $4, $5, TRUE, 1)
          RETURNING usu_uuid`,
-        ['Cliente Sem Pag', 'cliente.sempag@teste.com', '55555555555', 'hash', 21625]
+        ['Cliente Sem Pag', 'cliente.sempag@teste.com', '55555555555', 'hash', papelId]
       );
       const usuarioUuid = usuarioRes[0].usu_uuid;
 
@@ -122,7 +135,7 @@ describe('Integração - RepositorioPagamentosPostgres - Correção N+1 Query', 
         `INSERT INTO livraria_comercial.vendas (usu_id, stv_id, ven_total_itens, ven_frete, ven_total_venda, loj_id)
          VALUES (
            (SELECT usu_id FROM livraria_gestao.usuarios WHERE usu_uuid = $1),
-           (SELECT stv_id FROM livraria_comercial.status_venda WHERE stv_descricao = 'EM PROCESSAMENTO'),
+           (SELECT stv_id FROM livraria_comercial.status_venda WHERE stv_descricao = 'EM_PROCESSAMENTO'),
            100.00, 10.00, 110.00, 1
          )
          RETURNING ven_uuid`,
@@ -143,11 +156,14 @@ describe('Integração - RepositorioPagamentosPostgres - Correção N+1 Query', 
       await contexto.db!.executar(`DELETE FROM livraria_comercial.vendas WHERE usu_id IN (SELECT usu_id FROM livraria_gestao.usuarios WHERE usu_cpf = '44444444444')`);
       await contexto.db!.executar(`DELETE FROM livraria_gestao.usuarios WHERE usu_cpf = '44444444444'`);
       
+      const papelId = await obterPapelClienteId();
+      
       // Setup
       const usuarioRes = await contexto.db!.executar<{ usu_uuid: string }>(
         `INSERT INTO livraria_gestao.usuarios (usu_nome, usu_email, usu_cpf, usu_senha_hash, pap_id, usu_ativo, loj_id)
-         VALUES ('Cliente Cupom', 'cliente.cupom@teste.com', '44444444444', 'hash', 21625, TRUE, 1)
-         RETURNING usu_uuid`
+         VALUES ('Cliente Cupom', 'cliente.cupom@teste.com', '44444444444', 'hash', $1, TRUE, 1)
+         RETURNING usu_uuid`,
+        [papelId]
       );
       const usuarioUuid = usuarioRes[0].usu_uuid;
 
@@ -155,7 +171,7 @@ describe('Integração - RepositorioPagamentosPostgres - Correção N+1 Query', 
         `INSERT INTO livraria_comercial.vendas (usu_id, stv_id, ven_total_itens, ven_frete, ven_total_venda, loj_id)
          VALUES (
            (SELECT usu_id FROM livraria_gestao.usuarios WHERE usu_uuid = $1),
-           (SELECT stv_id FROM livraria_comercial.status_venda WHERE stv_descricao = 'EM PROCESSAMENTO'),
+           (SELECT stv_id FROM livraria_comercial.status_venda WHERE stv_descricao = 'EM_PROCESSAMENTO'),
            50.00, 0.00, 50.00, 1
          )
          RETURNING ven_uuid`,
@@ -190,11 +206,14 @@ describe('Integração - RepositorioPagamentosPostgres - Correção N+1 Query', 
       await contexto.db!.executar(`DELETE FROM livraria_comercial.vendas WHERE usu_id IN (SELECT usu_id FROM livraria_gestao.usuarios WHERE usu_cpf = '66666666666')`);
       await contexto.db!.executar(`DELETE FROM livraria_gestao.usuarios WHERE usu_cpf = '66666666666'`);
       
+      const papelId = await obterPapelClienteId();
+      
       // Setup
       const usuarioRes = await contexto.db!.executar<{ usu_uuid: string }>(
         `INSERT INTO livraria_gestao.usuarios (usu_nome, usu_email, usu_cpf, usu_senha_hash, pap_id, usu_ativo, loj_id)
-         VALUES ('Cliente Status Pag', 'cliente.statuspag@teste.com', '66666666666', 'hash', 21625, TRUE, 1)
-         RETURNING usu_uuid`
+         VALUES ('Cliente Status Pag', 'cliente.statuspag@teste.com', '66666666666', 'hash', $1, TRUE, 1)
+         RETURNING usu_uuid`,
+        [papelId]
       );
       const usuarioUuid = usuarioRes[0].usu_uuid;
 
@@ -202,7 +221,7 @@ describe('Integração - RepositorioPagamentosPostgres - Correção N+1 Query', 
         `INSERT INTO livraria_comercial.vendas (usu_id, stv_id, ven_total_itens, ven_frete, ven_total_venda, loj_id)
          VALUES (
            (SELECT usu_id FROM livraria_gestao.usuarios WHERE usu_uuid = $1),
-           (SELECT stv_id FROM livraria_comercial.status_venda WHERE stv_descricao = 'EM PROCESSAMENTO'),
+           (SELECT stv_id FROM livraria_comercial.status_venda WHERE stv_descricao = 'EM_PROCESSAMENTO'),
            200.00, 0.00, 200.00, 1
          )
          RETURNING ven_uuid`,

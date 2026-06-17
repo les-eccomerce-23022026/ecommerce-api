@@ -28,3 +28,34 @@ export interface IListaLojaDto {
   cnpj: string;
   ativo: boolean;
 }
+
+/**
+ * DTO para atualização parcial de loja.
+ */
+export interface IAtualizarLojaDto {
+  nome?: string;
+  cnpj?: string;
+  ativo?: boolean;
+}
+
+/**
+ * Parâmetros de filtro e paginação para listagem de lojas.
+ */
+export interface IFiltrosListarLojasDto {
+  nome?: string;
+  cnpj?: string;
+  ativo?: boolean;
+  pagina?: number;
+  limite?: number;
+}
+
+/**
+ * DTO de resposta paginada para listagem de lojas.
+ */
+export interface IRespostaListarLojasPaginadoDto {
+  lojas: IListaLojaDto[];
+  total: number;
+  pagina: number;
+  limite: number;
+  totalPaginas: number;
+}

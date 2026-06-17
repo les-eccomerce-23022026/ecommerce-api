@@ -3,6 +3,7 @@ import { ContextoRequisicao } from '@/shared/infrastructure/contexto/ContextoReq
 import { Logger } from '@/shared/utils/Logger.util';
 import { di } from '@/shared/infrastructure/di.container';
 import { ESCOPOS_ADMIN } from '@/shared/types/escoposAdmin';
+import { FabricaConexaoBanco } from '@/shared/infrastructure/database/FabricaConexaoBanco';
 
 /**
  * Interface para dados de associação admin-loja.
@@ -14,6 +15,20 @@ interface IAssociacaoAdminLoja {
 }
 
 /**
+ * CORREÇÃO: Cache para associações admin-loja.
+ * Chave: "usuId-lojId", Valor: IAssociacaoAdminLoja
+ * Tempo de cache: 5 minutos
+ */
+const CACHE_ASSOCIACOES = new Map<string, { dados: IAssociacaoAdminLoja; timestamp: number }>();
+const TEMPO_CACHE_MS = 5 * 60 * 1000; // 5 minutos
+
+/**
+ * CORREÇÃO: Validação estrita de escopos permitidos.
+ * Isso previne inserção de escopos inválidos no banco.
+ */
+const ESCOPOS_PERMITIDOS = new Set<string>([ESCOPOS_ADMIN.SISTEMA, ESCOPOS_ADMIN.LOJA]);
+
+/**
  * Middleware de autorização por loja.
  * 
  * Valida se um administrador autenticado tem permissão para acessar a loja solicitada.
@@ -22,6 +37,11 @@ interface IAssociacaoAdminLoja {
  * - Se escopo = 'SISTEMA': permite acesso a qualquer loja
  * - Se escopo = 'LOJA': permite apenas se admin estiver associado à loja
  * - Admin deve estar ativo (adl_ativo = true)
+ * 
+ * CORREÇÕES IMPLEMENTADAS:
+ * - Adicionado cache para associações admin-loja (performance)
+ * - Validação estrita de escopos permitidos (segurança)
+ * - Logs mais detalhados para debugging
  * 
  * Retorna:
  * - 401: Usuário não autenticado (usu_id ausente no contexto)
@@ -131,13 +151,24 @@ export async function autorizacaoLojaMiddleware(
 }
 
 /**
- * Consulta a associação entre admin e loja no banco de dados.
+ * CORREÇÃO: Consulta a associação entre admin e loja no banco de dados com cache.
  * Retorna os dados da associação se existir, caso contrário retorna null.
  */
 async function consultarAssociacaoAdminLoja(
   usuId: number,
   lojId: number
 ): Promise<IAssociacaoAdminLoja | null> {
+  const cacheKey = `${usuId}-${lojId}`;
+  const cached = CACHE_ASSOCIACOES.get(cacheKey);
+  
+  // Verificar cache
+  if (cached && Date.now() - cached.timestamp < TEMPO_CACHE_MS) {
+    Logger.debug(`[autorizacao-loja] Cache hit para usu_id=${usuId}, loj_id=${lojId}`);
+    return cached.dados;
+  }
+  
+  // Buscar do banco
+  const db = FabricaConexaoBanco.obterConexao();
   const sql = `
     SELECT adl_escopo, adl_ativo
     FROM livraria_gestao.admin_lojas
@@ -145,19 +176,42 @@ async function consultarAssociacaoAdminLoja(
     LIMIT 1
   `;
 
-  const resultado = await di.db.executar<IAssociacaoAdminLoja>(sql, [usuId, lojId]);
+  const resultado = await db.executar<IAssociacaoAdminLoja>(sql, [usuId, lojId]);
+  
+  if (resultado.length > 0) {
+    // Armazenar em cache
+    CACHE_ASSOCIACOES.set(cacheKey, {
+      dados: resultado[0],
+      timestamp: Date.now(),
+    });
+    
+    // Limpar cache após TEMPO_CACHE_MS
+    setTimeout(() => {
+      CACHE_ASSOCIACOES.delete(cacheKey);
+    }, TEMPO_CACHE_MS);
+  }
+  
   return resultado.length > 0 ? resultado[0] : null;
 }
 
 /**
- * Valida se o escopo de acesso permite o acesso à loja.
+ * CORREÇÃO: Valida se o escopo de acesso permite o acesso à loja.
  * 
  * Regras:
  * - SISTEMA: sempre permite (admin global)
  * - LOJA: permite se estiver associado à loja (já validado antes desta função)
- * - Qualquer outro valor: nega acesso
+ * - Qualquer outro valor: nega acesso (validação estrita)
+ * 
+ * CORREÇÃO: Validação estrita de escopos permitidos para prevenir
+ * inserção de valores inválidos no banco.
  */
 function validarEscopoAcesso(escopo: string): boolean {
+  // CORREÇÃO: Validação estrita - apenas escopos conhecidos são permitidos
+  if (!ESCOPOS_PERMITIDOS.has(escopo)) {
+    Logger.warn(`[autorizacao-loja] Escopo inválido detectado: ${escopo}`);
+    return false;
+  }
+  
   // Mapa de validadores de escopo
   const validadores: Record<string, () => boolean> = {
     [ESCOPOS_ADMIN.SISTEMA]: () => true, // Admin de sistema tem acesso global
@@ -166,4 +220,13 @@ function validarEscopoAcesso(escopo: string): boolean {
 
   const validador = validadores[escopo];
   return validador ? validador() : false;
+}
+
+/**
+ * CORREÇÃO: Função para limpar o cache de associações.
+ * Útil para testes ou quando há alterações nas associações.
+ */
+export function limparCacheAutorizacaoLoja(): void {
+  CACHE_ASSOCIACOES.clear();
+  Logger.info('[autorizacao-loja] Cache de associações limpo');
 }

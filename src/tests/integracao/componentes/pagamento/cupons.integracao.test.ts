@@ -123,7 +123,7 @@ describe('Integração - Cupom', () => {
         .send({ codigo: 'CUPOM_INEXISTENTE' });
 
       expect(res.status).toBe(400);
-      expect(res.body.erro).toBe('Cupom inválido ou expirado');
+      expect(res.body.erro).toBe('Cupom inválido, expirado ou não pertence ao usuário');
     });
 
     it('[RNF0037] deve retornar 401 sem token', async () => {

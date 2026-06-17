@@ -2,8 +2,11 @@ import { Request, Response } from 'express';
 import { di } from '@/shared/infrastructure/di.container';
 import { RespostaPadrao } from '@/shared/errors/Iresposta-padrao';
 import { obterErroValidacaoCadastroPublico } from '@/modules/clientes/clientesCadastroPublicoValidacao.util';
+import { ConexaoPostgres } from '@/shared/infrastructure/database/ConexaoPostgres';
+import { MENSAGENS_ERRO } from '@/shared/constants/mensagens-erro.constants';
+import type { IRepositorioPagamentos } from '@/modules/pagamentos/repositories/IRepositorioPagamentos';
 
-const { gestaoIdentidadeCliente } = di;
+const { gestaoIdentidadeCliente, repositorioPagamentos } = di;
 
 /**
  * Controller responsável pelo cadastro público de clientes.
@@ -91,7 +94,7 @@ export class ControladorClientes {
       const dados = requisicao.body ?? {};
 
       if (!uuid) {
-        return RespostaPadrao.enviarErro(resposta, 401, 'Identificador de usuário não encontrado.');
+        return RespostaPadrao.enviarErro(resposta, 401, MENSAGENS_ERRO.IDENTIFICADOR_USUARIO_NAO_ENCONTRADO);
       }
 
       const clienteAtualizado = await gestaoIdentidadeCliente.atualizarCliente(uuid, dados);
@@ -115,8 +118,8 @@ export class ControladorClientes {
         return RespostaPadrao.enviarErro(resposta, 401, 'Usuário não autenticado.');
       }
 
-      const novoEndereco = await gestaoIdentidadeCliente.adicionarEndereco(uuid, dados);
-      return RespostaPadrao.enviarSucesso(resposta, 201, novoEndereco);
+      const enderecosAtualizados = await gestaoIdentidadeCliente.adicionarEndereco(uuid, dados);
+      return RespostaPadrao.enviarSucesso(resposta, 201, enderecosAtualizados);
     } catch (erro) {
       const mensagem = RespostaPadrao.obterMensagemErro(erro, 'Erro ao adicionar endereço.');
       return RespostaPadrao.enviarErro(resposta, 400, mensagem);
@@ -218,6 +221,55 @@ export class ControladorClientes {
       const mensagem = RespostaPadrao.obterMensagemErro(erro, 'Erro ao editar endereço.');
       const status = mensagem === 'Endereço não encontrado.' ? 404 : 400;
       return RespostaPadrao.enviarErro(resposta, status, mensagem);
+    }
+  }
+
+  /**
+   * Lista cupons disponíveis para o cliente (RF0046 - cupom de troca).
+   * Retorna cupons promocionais globais + cupons de troca específicos do usuário.
+   * Usa repositório existente para consistência com /pagamento/info.
+   */
+  public static async listarCupons(requisicao: Request, resposta: Response): Promise<Response> {
+    try {
+      const uuid = requisicao.usuario?.uuid;
+
+      if (!uuid) {
+        return RespostaPadrao.enviarErro(resposta, 401, 'Usuário não autenticado.');
+      }
+
+      const usuId = await repositorioPagamentos.obterUsuarioIdInternoPorUuid(uuid);
+      if (!usuId) {
+        return RespostaPadrao.enviarErro(resposta, 404, MENSAGENS_ERRO.USUARIO_NAO_ENCONTRADO);
+      }
+
+      // Buscar cupons de troca usando repositório existente
+      const cuponsTroca = await repositorioPagamentos.listarCuponsTrocaPorUsuario(usuId);
+      const cuponsTrocaFormatados = cuponsTroca
+        .filter((c: { ativo: boolean; valorAtual: number }) => c.ativo && c.valorAtual > 0)
+        .map((c: { codigo: string; valorAtual: number }) => ({
+          tipo: 'troca' as const,
+          codigo: c.codigo,
+          valor: c.valorAtual,
+        }));
+
+      // Buscar cupons promocionais usando repositório existente
+      const cuponsPromocionais = await repositorioPagamentos.listarCuponsPromocionais();
+      const cuponsPromocionaisFormatados = cuponsPromocionais.map((c: { codigo: string; valorDesconto: number }) => ({
+        tipo: 'promocional' as const,
+        codigo: c.codigo,
+        valor: c.valorDesconto,
+      }));
+
+      // Combinar e formatar para o frontend
+      const cuponsFormatados = [
+        ...cuponsTrocaFormatados,
+        ...cuponsPromocionaisFormatados,
+      ];
+
+      return RespostaPadrao.enviarSucesso(resposta, 200, cuponsFormatados);
+    } catch (erro) {
+      const mensagem = RespostaPadrao.obterMensagemErro(erro, 'Erro ao listar cupons.');
+      return RespostaPadrao.enviarErro(resposta, 400, mensagem);
     }
   }
 }

@@ -1,0 +1,82 @@
+BEGIN
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+DELETE 18
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+             status             
+--------------------------------
+ CORREÇÃO REALIZADA COM SUCESSO
+(1 row)
+
+        info         | valor 
+---------------------+-------
+ Autores corrigidos: |    18
+(1 row)
+
+          info          | valor 
+------------------------+-------
+ Categorias corrigidas: |    21
+(1 row)
+
+ liv_id |                                 liv_titulo                                 |     autor_corrigido      |   categoria_corrigida   
+--------+----------------------------------------------------------------------------+--------------------------+-------------------------
+    146 | Código Limpo: Habilidades Práticas para escrever código limpo              | Robert C. Martin         | Tecnologia
+    147 | Padrões de Projeto: Soluções reutilizáveis de software orientado a objetos | Gang of Four             | Tecnologia
+    148 | O Programador Pragmático: Viajando para o aprendizado e a maestria         | Andrew Hunt              | Tecnologia
+    150 | As Crônicas de Nárnia: O Leão, a Feiticeira e o Guarda-Roupa               | Antoine de Saint-Exupéry | Fantasia
+    151 | Admirável Mundo Novo                                                       | Aldous Huxley            | Distopia
+    152 | O Hobbit                                                                   | J.R.R. Tolkien           | Fantasia
+    153 | O Senhor dos Anéis: A Sociedade do Anel                                    | J.R.R. Tolkien           | Fantasia
+    154 | Duna                                                                       | Frank Herbert            | Ficção Científica
+    155 | 1984                                                                       | George Orwell            | Distopia
+    156 | Neuromancer                                                                | William Gibson           | Ficção Científica
+    157 | Memórias Póstumas de Brás Cubas                                            | Machado de Assis         | Literatura Brasileira
+    158 | Percy Jackson e os Olimpianos: O Ladrão de Raios                           | Rick Riordan             | Young Adult
+    158 | Percy Jackson e os Olimpianos: O Ladrão de Raios                           | Rick Riordan             | Fantasia
+    159 | O Poder do Hábito                                                          | Charles Duhigg           | Desenvolvimento Pessoal
+    160 | O Alienista                                                                | Machado de Assis         | Literatura Brasileira
+    161 | Harry Potter e a Pedra Filosofal                                           | J.K. Rowling             | Young Adult
+    161 | Harry Potter e a Pedra Filosofal                                           | J.K. Rowling             | Fantasia
+    162 | Dom Casmurro                                                               | Machado de Assis         | Literatura Brasileira
+    162 | Dom Casmurro                                                               | Machado de Assis         | Clássicos
+    163 | Como Fazer Amigos e Influenciar Pessoas                                    | Dale Carnegie            | Desenvolvimento Pessoal
+    164 | Fahrenheit 451                                                             | Ray Bradbury             | Distopia
+(21 rows)
+
+COMMIT

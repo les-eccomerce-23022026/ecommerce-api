@@ -2,7 +2,9 @@ import request, { Response } from 'supertest';
 import { Application } from 'express';
 import bcrypt from 'bcryptjs';
 import { di } from '@/shared/infrastructure/di.container';
+import { FabricaConexaoBanco } from '@/shared/infrastructure/database/FabricaConexaoBanco';
 import { PAPEL_ADMIN, PAPEL_CLIENTE, PAPEL_ADMIN_SISTEMA } from '@/shared/types/papeis';
+import { IPapelUsuario } from '@/shared/types/Ipapel-usuario';
 import { ITelefoneDto, IEnderecoDto } from '@/modules/clientes/Iclientes.dto';
 import { validarCpf } from '@/shared/utils/validacao-cpf.util';
 import { gerarCnpjValido } from '@/shared/utils/validacao-cnpj.util';
@@ -138,22 +140,53 @@ export async function realizarLogin(
   return request(app).post('/api/auth/login').send({ email, senha });
 }
 
+/** Cabeçalho de autenticação usado pela API (middleware lê Bearer ou cookie les_token). */
+export function cabecalhoBearerAuth(token: string): { Authorization: string } {
+  return { Authorization: `Bearer ${token}` };
+}
+
+/**
+ * Resolve pap_id real em livraria_gestao.papeis (serial do BD de teste).
+ * Não use PAPEL_*.id de @/shared/types/papeis em inserts de teste — IDs fixos (1,2,3)
+ * quebram FK em usuario_papeis quando o serial não coincide com o seed.
+ */
+async function resolverPapelGestao(descricao: string): Promise<IPapelUsuario> {
+  const db = FabricaConexaoBanco.obterConexao();
+  await db.executar(
+    `INSERT INTO livraria_gestao.papeis (pap_descricao) VALUES ($1)
+     ON CONFLICT (pap_descricao) DO NOTHING`,
+    [descricao],
+  );
+  const rows = await db.executar<{ pap_id: number; pap_descricao: string }>(
+    `SELECT pap_id, pap_descricao FROM livraria_gestao.papeis WHERE pap_descricao = $1 LIMIT 1`,
+    [descricao],
+  );
+  if (rows.length === 0) {
+    throw new Error(`Papel "${descricao}" não encontrado em livraria_gestao.papeis`);
+  }
+  return { id: Number(rows[0].pap_id), descricao: rows[0].pap_descricao };
+}
+
 export async function obterTokenCliente(
   app: Application,
   email = 'cliente.teste@email.com',
-  cpf = '529.982.247-25',
+  cpf?: string,
   limparDados = false
 ): Promise<string> {
   const repositorioUsuarios = di.repoUsuarios;
   const repositorioPerfil = di.repoPerfil;
 
+  // SOLID: Sempre gerar CPF único para evitar violação de constraint uq_usuarios_cpf
+  const cpfUnico = cpf || gerarCpfValidoUnico();
+
   if (limparDados) {
-    await repositorioUsuarios.limparDadosUsuarioPorCpf(cpf);
+    await repositorioUsuarios.limparDadosUsuarioPorCpf(cpfUnico);
   }
 
   // Mesma abordagem de obterTokenAdmin: cria/atualiza via repositório diretamente
   // para que o usuário fique visível dentro da transação de isolamento do teste.
   const senhaHash = await bcrypt.hash('SenhaForte@123', 10);
+  const papelCliente = await resolverPapelGestao(PAPEL_CLIENTE.descricao);
   const clienteExistente = await repositorioUsuarios.buscarPorEmail(email);
 
   let usuarioId: number;
@@ -162,10 +195,10 @@ export async function obterTokenCliente(
     const usuario = await repositorioUsuarios.criarUsuario({
       nome: 'Cliente Teste',
       email,
-      cpf,
+      cpf: cpfUnico,
       senhaHash,
-      role: PAPEL_CLIENTE,
-      papeis: [PAPEL_CLIENTE],
+      role: papelCliente,
+      papeis: [papelCliente],
     });
     usuarioId = usuario.id;
 
@@ -179,13 +212,13 @@ export async function obterTokenCliente(
     // Garante que a senha é 'SenhaForte@123' e que o papel seja apenas cliente na transação atual
     await repositorioUsuarios.atualizarUsuario(clienteExistente.uuid, {
       senhaHash,
-      idPapel: PAPEL_CLIENTE.id,
+      idPapel: papelCliente.id,
     });
     
     // Remove TODOS os papéis existentes e garante que apenas cliente esteja ativo
     // Isso resolve o problema de usuários com múltiplos papéis (admin + cliente)
     await repositorioUsuarios.removerTodosPapeisUsuario(clienteExistente.id);
-    await repositorioUsuarios.associarPapelUsuario(clienteExistente.id, PAPEL_CLIENTE.id);
+    await repositorioUsuarios.associarPapelUsuario(clienteExistente.id, papelCliente.id);
     
     usuarioId = clienteExistente.id;
 
@@ -226,6 +259,10 @@ export async function obterTokenAdmin(app: Application): Promise<string> {
   const repositorioUsuarios = di.repoUsuarios;
   const adminExistente = await repositorioUsuarios.buscarPorEmail('admin@livraria.com.br');
 
+  const papelCliente = await resolverPapelGestao(PAPEL_CLIENTE.descricao);
+  const papelAdmin = await resolverPapelGestao(PAPEL_ADMIN.descricao);
+  const papelAdminSistema = await resolverPapelGestao(PAPEL_ADMIN_SISTEMA.descricao);
+
   // Gera o hash para a senha conhecida dos testes uma única vez
   const senhaHashAdmin = await bcrypt.hash('Admin@123', 10);
 
@@ -235,8 +272,8 @@ export async function obterTokenAdmin(app: Application): Promise<string> {
       email: 'admin@livraria.com.br',
       cpf: '000.000.000-00',
       senhaHash: senhaHashAdmin,
-      role: PAPEL_ADMIN,
-      papeis: [PAPEL_CLIENTE, PAPEL_ADMIN, PAPEL_ADMIN_SISTEMA],
+      role: papelAdmin,
+      papeis: [papelCliente, papelAdmin, papelAdminSistema],
     });
   } else {
     // Atualiza o hash dentro da transação de isolamento para garantir que a senha
@@ -245,10 +282,10 @@ export async function obterTokenAdmin(app: Application): Promise<string> {
     await repositorioUsuarios.atualizarUsuario(adminExistente.uuid, {
       senhaHash: senhaHashAdmin,
     });
-    // Garante que o admin tenha todos os papéis associados
-    await repositorioUsuarios.associarPapelUsuario(adminExistente.id, PAPEL_CLIENTE.id);
-    await repositorioUsuarios.associarPapelUsuario(adminExistente.id, PAPEL_ADMIN.id);
-    await repositorioUsuarios.associarPapelUsuario(adminExistente.id, PAPEL_ADMIN_SISTEMA.id);
+    // Garante que o admin tenha todos os papéis associados (IDs reais do banco de teste)
+    await repositorioUsuarios.associarPapelUsuario(adminExistente.id, papelCliente.id);
+    await repositorioUsuarios.associarPapelUsuario(adminExistente.id, papelAdmin.id);
+    await repositorioUsuarios.associarPapelUsuario(adminExistente.id, papelAdminSistema.id);
   }
 
   const maximoTentativas = 5;
@@ -268,6 +305,131 @@ export async function obterTokenAdmin(app: Application): Promise<string> {
   }
 
   throw new Error('Não foi possível obter token do administrador inicial.');
+}
+
+/**
+ * Cria um administrador do sistema (apenas com papel admin_sistema) e retorna o token.
+ * Usado para testar permissões exclusivas do admin_sistema.
+ */
+export async function obterTokenAdminSistema(app: Application): Promise<string> {
+  const repositorioUsuarios = di.repoUsuarios;
+  const email = 'admin.sistema@livraria.com.br';
+  const adminExistente = await repositorioUsuarios.buscarPorEmail(email);
+
+  const papelAdminSistema = await resolverPapelGestao(PAPEL_ADMIN_SISTEMA.descricao);
+  const senhaHashAdmin = await bcrypt.hash('AdminSistema@123', 10);
+
+  if (!adminExistente) {
+    await repositorioUsuarios.criarUsuario({
+      nome: 'Administrador do Sistema',
+      email,
+      cpf: '000.000.000-01',
+      senhaHash: senhaHashAdmin,
+      role: papelAdminSistema,
+      papeis: [papelAdminSistema],
+    });
+  } else {
+    // Remove todos os papéis existentes e garante que apenas admin_sistema esteja ativo
+    await repositorioUsuarios.removerTodosPapeisUsuario(adminExistente.id);
+    await repositorioUsuarios.associarPapelUsuario(adminExistente.id, papelAdminSistema.id);
+    await repositorioUsuarios.atualizarUsuario(adminExistente.uuid, {
+      senhaHash: senhaHashAdmin,
+    });
+  }
+
+  const maximoTentativas = 5;
+
+  for (let tentativa = 1; tentativa <= maximoTentativas; tentativa += 1) {
+    // eslint-disable-next-line no-await-in-loop
+    const respostaLogin = await realizarLogin(app, email, 'AdminSistema@123');
+
+    if (respostaLogin.status === 200 && respostaLogin.body?.dados?.token) {
+      return respostaLogin.body.dados.token as string;
+    }
+
+    if (tentativa === maximoTentativas) {
+      // eslint-disable-next-line no-console
+      console.debug('[DEBUG] Falha temporária no login de admin sistema:', respostaLogin.status, JSON.stringify(respostaLogin.body));
+    }
+
+    // eslint-disable-next-line no-await-in-loop
+    await new Promise((resolve) => { setTimeout(resolve, 50); });
+  }
+
+  throw new Error(`Não foi possível obter token do administrador do sistema (${email}).`);
+}
+
+/**
+ * Cria um administrador comum (apenas com papel admin, sem admin_sistema) e retorna o token.
+ * Usado para testar restrições de multi-tenancy e permissões de admin comum.
+ */
+export async function obterTokenAdminComum(app: Application): Promise<string> {
+  const repositorioUsuarios = di.repoUsuarios;
+  const db = FabricaConexaoBanco.obterConexao();
+  const email = 'admin.comum@livraria.com.br';
+  const adminExistente = await repositorioUsuarios.buscarPorEmail(email);
+
+  const papelAdmin = await resolverPapelGestao(PAPEL_ADMIN.descricao);
+  const papelCliente = await resolverPapelGestao(PAPEL_CLIENTE.descricao);
+  const senhaHashAdmin = await bcrypt.hash('AdminComum@123', 10);
+
+  // Obter loja padrão para associar ao admin comum
+  const lojas = await db.executar<{ loj_id: number }>(
+    'SELECT loj_id FROM livraria_gestao.lojas WHERE loj_ativo = TRUE ORDER BY loj_id LIMIT 1'
+  );
+  const lojId = lojas.length > 0 ? lojas[0].loj_id : 1;
+
+  if (!adminExistente) {
+    await repositorioUsuarios.criarUsuario({
+      nome: 'Administrador Comum',
+      email,
+      cpf: '000.000.000-02',
+      senhaHash: senhaHashAdmin,
+      role: papelAdmin,
+      papeis: [papelCliente, papelAdmin],
+      lojId,
+    });
+  } else {
+    // Remove todos os papéis existentes e garante que apenas cliente e admin estejam ativos
+    await repositorioUsuarios.removerTodosPapeisUsuario(adminExistente.id);
+    await repositorioUsuarios.associarPapelUsuario(adminExistente.id, papelCliente.id);
+    await repositorioUsuarios.associarPapelUsuario(adminExistente.id, papelAdmin.id);
+    await repositorioUsuarios.atualizarUsuario(adminExistente.uuid, {
+      senhaHash: senhaHashAdmin,
+    });
+  }
+
+  // Associar admin à loja padrão na tabela admin_lojas
+  const usuarioAtualizado = await repositorioUsuarios.buscarPorEmail(email);
+  if (usuarioAtualizado) {
+    await db.executar(
+      `INSERT INTO livraria_gestao.admin_lojas (usu_id, loj_id, adl_papel, adl_ativo, adl_escopo)
+       VALUES ($1, $2, 'admin_principal', TRUE, 'LOJA')
+       ON CONFLICT (usu_id, loj_id) DO UPDATE SET adl_ativo = TRUE`,
+      [usuarioAtualizado.id, lojId]
+    );
+  }
+
+  const maximoTentativas = 5;
+
+  for (let tentativa = 1; tentativa <= maximoTentativas; tentativa += 1) {
+    // eslint-disable-next-line no-await-in-loop
+    const respostaLogin = await realizarLogin(app, email, 'AdminComum@123');
+
+    if (respostaLogin.status === 200 && respostaLogin.body?.dados?.token) {
+      return respostaLogin.body.dados.token as string;
+    }
+
+    if (tentativa === maximoTentativas) {
+      // eslint-disable-next-line no-console
+      console.debug('[DEBUG] Falha temporária no login de admin comum:', respostaLogin.status, JSON.stringify(respostaLogin.body));
+    }
+
+    // eslint-disable-next-line no-await-in-loop
+    await new Promise((resolve) => { setTimeout(resolve, 50); });
+  }
+
+  throw new Error(`Não foi possível obter token do administrador comum (${email}).`);
 }
 
 /**

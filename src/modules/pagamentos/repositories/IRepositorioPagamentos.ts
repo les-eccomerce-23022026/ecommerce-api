@@ -6,10 +6,14 @@ export { IPagamento } from '../entities/IPagamento';
  * Interface do repositório de pagamentos.
  */
 export interface IRepositorioPagamentos {
-  cadastrar(pagamento: IPagamento, opcoes?: { inpIdIntencao?: number }): Promise<IPagamento>;
+  cadastrar(pagamento: IPagamento, opcoes?: { inpIdIntencao?: number; idempotencyKey?: string }): Promise<IPagamento>;
+  cadastrarEmLote(pagamentos: IPagamento[], opcoes?: { inpIdIntencao?: number }): Promise<IPagamento[]>;
+  obterPorIdempotencyKey(idempotencyKey: string): Promise<IPagamento | null>;
   obterVenIdPorVendaUuid(vendaUuid: string): Promise<number | null>;
   obterPagIdInternoPorUuid(pagUuid: string): Promise<number | null>;
   obterPorUuid(uuid: string): Promise<IPagamento | null>;
+  /** Busca pagamento pelo UUID sem aplicar filtro de tenant — uso exclusivo de webhooks externos. */
+  obterPorUuidSemTenant(uuid: string): Promise<IPagamento | null>;
   atualizar(uuid: string, pagamento: IPagamento): Promise<IPagamento>;
   listarPorVenda(vendaUuid: string): Promise<IPagamento[]>;
   inserirPixSimulado(
@@ -51,7 +55,7 @@ export interface IRepositorioPagamentos {
     ativo: boolean;
   }>>;
 
-  listarCuponsPromocionais(): Promise<Array<{
+  listarCuponsPromocionais(lojId?: number | null): Promise<Array<{
     uuid: string;
     codigo: string;
     valorDesconto: number;

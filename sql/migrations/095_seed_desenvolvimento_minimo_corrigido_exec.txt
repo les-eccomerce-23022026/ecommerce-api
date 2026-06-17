@@ -1,0 +1,15 @@
+BEGIN
+NOTICE:  Admin de loja criado: 89
+DO
+ERROR:  column "loj_id" of relation "telefones" does not exist
+LINE 2:     tel_uuid, tel_numero, tel_principal, usu_id, loj_id
+                                                         ^
+QUERY:  INSERT INTO livraria_gestao.telefones (
+    tel_uuid, tel_numero, tel_principal, usu_id, loj_id
+  )
+  VALUES (
+    gen_random_uuid(), '(11) 97777-1111', TRUE, v_cliente1_id, v_loja_id
+  )
+CONTEXT:  PL/pgSQL function inline_code_block line 101 at SQL statement
+ERROR:  current transaction is aborted, commands ignored until end of transaction block
+ROLLBACK

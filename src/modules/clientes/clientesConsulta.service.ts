@@ -37,11 +37,8 @@ export class ClientesConsultaService {
     // Fallback para telefoneRapido se a tabela normalizada estiver vazia
     if (!telefonePrincipal && usuario.telefoneRapido) {
       telefonePrincipal = {
-        id: 0,
-        uuid: '',
         idUsuario: usuario.id,
-        idTipoTelefone: 1, // Celular
-        ddd: '',
+        idTipoTelefone: 1,
         numero: usuario.telefoneRapido,
         principal: true,
       };

@@ -2,6 +2,8 @@ import request from 'supertest';
 import { configurarTesteIntegracao } from '@/tests/helpers/setup-integracao.util';
 import { obterTokenAdmin, registrarAdmin } from '@/tests/helpers/requisicoes-api.util';
 import { di } from '@/shared/infrastructure/di.container';
+import { servicoContextoLoja } from '@/shared/services/ServicoContextoLoja';
+import { limparCacheAutorizacaoLoja } from '@/shared/middlewares/autorizacaoLoja.middleware';
 
 /**
  * Testes de integração para multi-tenancy por loja.
@@ -11,9 +13,19 @@ import { di } from '@/shared/infrastructure/di.container';
  * - Admin de loja X só vê produtos/vendas/clientes da loja X
  * - Admin sistema vê dados de todas as lojas
  * - Clientes veem produtos de todas as lojas (catálogo compartilhado)
+ *
+ * MITIGAÇÃO DE CACHE: Este teste cria lojas e associa admins a lojas, o que afeta
+ * os caches globais de ServicoContextoLoja e autorizacaoLoja. Para evitar problemas
+ * em testes paralelos, os caches são limpos antes de cada teste.
  */
 describe('Integração - Multi-tenancy por Loja', () => {
   const contexto = configurarTesteIntegracao();
+
+  beforeEach(() => {
+    // Limpar caches globais para evitar interferência entre testes
+    servicoContextoLoja.limparCache();
+    limparCacheAutorizacaoLoja();
+  });
 
   describe('POST /api/admin/lojas - Criação de Lojas', () => {
     it('[RN0091] deve criar loja com sucesso', async () => {

@@ -211,10 +211,9 @@ export class RepositorioLivrosBulkInsert {
     precoVenda: number;
     valorCusto: number;
     categoriaId?: number;
+    lojaUuid?: string;
   }): Promise<{ livId: number; livroUuid: string }> {
-    // Contexto de teste já fornece transação, usar this.db diretamente
-    const client = this.db;
-
+    return this.db.transacao(async (client) => {
     // Inserir livro
     const livroSql = `
       INSERT INTO livros (
@@ -246,19 +245,19 @@ export class RepositorioLivrosBulkInsert {
     const livroRows = await client.executar<{ liv_id: number }>(livroSql, livroParams);
     const livId = livroRows[0].liv_id;
 
-    // Inserir estoque
-    const estoqueSql = `
-      INSERT INTO estoques (
-        liv_id, etq_quantidade_disponivel, etq_quantidade_reservada,
-        etq_preco_venda, etq_valor_custo_atual, loj_id
-      ) VALUES ($1, $2, 0, $3, $4, 1)
-    `;
-    const estoqueParams = [
-      livId,
-      dados.quantidadeEstoque,
-      dados.precoVenda,
-      dados.valorCusto,
-    ] as DbParametro[];
+    // Inserir estoque — loj_id resolvido via UUID ou fallback para a única loja existente
+    const estoqueSql = dados.lojaUuid
+      ? `INSERT INTO estoques (
+           liv_id, etq_quantidade_disponivel, etq_quantidade_reservada,
+           etq_preco_venda, etq_valor_custo_atual, loj_id
+         ) VALUES ($1, $2, 0, $3, $4, (SELECT loj_id FROM lojas WHERE loj_uuid = $5))`
+      : `INSERT INTO estoques (
+           liv_id, etq_quantidade_disponivel, etq_quantidade_reservada,
+           etq_preco_venda, etq_valor_custo_atual, loj_id
+         ) VALUES ($1, $2, 0, $3, $4, (SELECT loj_id FROM lojas ORDER BY loj_id ASC LIMIT 1))`;
+    const estoqueParams = dados.lojaUuid
+      ? [livId, dados.quantidadeEstoque, dados.precoVenda, dados.valorCusto, dados.lojaUuid] as DbParametro[]
+      : [livId, dados.quantidadeEstoque, dados.precoVenda, dados.valorCusto] as DbParametro[];
     await client.executar(estoqueSql, estoqueParams);
 
     // Vincular categoria se fornecida
@@ -271,6 +270,7 @@ export class RepositorioLivrosBulkInsert {
     }
 
     return { livId, livroUuid: dados.uuid };
+    }); // fim this.db.transacao
   }
 
   async criarLivrosEmLoteComTransacao(dadosLivros: Array<{

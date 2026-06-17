@@ -23,16 +23,22 @@ scripts/config/credentials.sh
 .DS_Store
 Thumbs.db
 .idea
+.claude/
+
+# Clinic.js profiling
+.clinic/
 
 # Ferramentas
 *.tsbuildinfo
 tmp
 .cache
+cache/
 AGENTS.md
 exports
 .github
 scripts
 .agents
+.devin
 .windsurf
 .cursor
 .gemini
@@ -44,3 +50,22 @@ github-projects
 
 .qwen
 .vscode
+
+# Dados runtime
+data/
+*.sqlite3
+chroma.sqlite3
+# ChromaDB collections (UUID directories)
+# ChromaDB collections (UUID directories)
+*-*-*-*-*
+
+# Arquivos temporários de teste
+cookies.txt
+headers.txt
+*.txt
+
+# Logs de migrations
+sql/migrations/*.txt
+
+# Snapshots históricos (backups)
+sql/snapshots/historico/

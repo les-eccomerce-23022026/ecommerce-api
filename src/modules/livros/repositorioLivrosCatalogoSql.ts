@@ -24,9 +24,10 @@ function joinEVendaPorOrdenacao(ordenacao: OrdenacaoCatalogo): { joinVendas: str
   }
   return {
     joinVendas: `LEFT JOIN (
-            SELECT liv_id, SUM(itv_quantidade)::numeric AS qtd_vendida
-            FROM itens_venda
-            GROUP BY liv_id
+            SELECT l.liv_id, SUM(iv.itv_quantidade)::numeric AS qtd_vendida
+            FROM livraria_comercial.itens_venda iv
+            INNER JOIN livraria_comercial.livros l ON l.liv_uuid = iv.liv_uuid
+            GROUP BY l.liv_id
           ) vendas_agg ON vendas_agg.liv_id = l.liv_id`,
     orderBy: 'ORDER BY COALESCE(vendas_agg.qtd_vendida, 0) DESC, l.liv_criado_em DESC NULLS LAST',
   };

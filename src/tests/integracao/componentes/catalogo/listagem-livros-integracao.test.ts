@@ -1,6 +1,8 @@
 import request from 'supertest';
 import { configurarTesteIntegracao } from '@/tests/helpers/setup-integracao.util';
 import { obterTokenAdmin, registrarAdmin } from '@/tests/helpers/requisicoes-api.util';
+import { servicoContextoLoja } from '@/shared/services/ServicoContextoLoja';
+import { limparCacheAutorizacaoLoja } from '@/shared/middlewares/autorizacaoLoja.middleware';
 
 /**
  * Gera um UUID v4 aleatório para uso em testes
@@ -18,9 +20,19 @@ function gerarUuidAleatorio(): string {
  * - Admin de loja X só vê produtos da loja X
  * - Admin sistema vê produtos de todas as lojas
  * - Clientes veem produtos de todas as lojas (catálogo compartilhado)
+ *
+ * MITIGAÇÃO DE CACHE: Este teste cria lojas, o que afeta o cache global
+ * de ServicoContextoLoja. Para evitar problemas em testes paralelos,
+ * o cache é limpo antes de cada teste.
  */
 describe('Integração - CRUD de Produtos com Multi-tenancy', () => {
   const contexto = configurarTesteIntegracao();
+
+  beforeEach(() => {
+    // Limpar caches globais para evitar interferência entre testes
+    servicoContextoLoja.limparCache();
+    limparCacheAutorizacaoLoja();
+  });
 
   describe('Criação de Livros', () => {
     it('[RN0091] deve criar livro com sucesso', async () => {

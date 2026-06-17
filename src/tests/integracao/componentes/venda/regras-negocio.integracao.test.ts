@@ -1,7 +1,7 @@
 import request from 'supertest';
 import { configurarTesteIntegracao } from '@/tests/helpers/setup-integracao.util';
 import { obterTokenCliente, registrarCliente, gerarCpfValidoUnico } from '@/tests/helpers/requisicoes-api.util';
-import { LIVRO_UUID_TESTE } from '@/tests/helpers/pedido-venda.helper';
+import { garantirLivroComEstoqueParaCarrinho } from '@/tests/helpers/carrinho-integracao.helper';
 
 /**
  * Gera um UUID v4 aleatório para uso em testes
@@ -21,6 +21,12 @@ function gerarUuidAleatorio(): string {
  */
 describe('Integração - Regras de Negócio de Vendas (API HTTP)', () => {
   const contexto = configurarTesteIntegracao();
+  let livroUuid: string;
+
+  beforeEach(async () => {
+    const livro = await garantirLivroComEstoqueParaCarrinho(contexto.db!);
+    livroUuid = livro.livUuid;
+  });
 
   describe('POST /api/vendas - RN0069 Parcelamento Mínimo', () => {
     it('deve lançar erro RN0069: parcelamento abaixo de R$ 80,00', async () => {
@@ -30,7 +36,7 @@ describe('Integração - Regras de Negócio de Vendas (API HTTP)', () => {
         .post('/api/vendas')
         .set('Authorization', `Bearer ${token}`)
         .send({
-          itens: [{ livroUuid: LIVRO_UUID_TESTE, quantidade: 1, precoUnitario: 50 }],
+          itens: [{ livroUuid: livroUuid, quantidade: 1, precoUnitario: 50 }],
           valorTotalItens: 50,
           valorFrete: 10,
           valorTotal: 60,
@@ -48,7 +54,6 @@ describe('Integração - Regras de Negócio de Vendas (API HTTP)', () => {
       await registrarCliente(contexto.app, {
         cpf: cpfUnico,
         email: emailUnico,
-        limparDados: true,
       });
 
       const loginRes = await request(contexto.app)
@@ -61,7 +66,7 @@ describe('Integração - Regras de Negócio de Vendas (API HTTP)', () => {
         .post('/api/vendas')
         .set('Authorization', `Bearer ${token}`)
         .send({
-          itens: [{ livroUuid: LIVRO_UUID_TESTE, quantidade: 2, precoUnitario: 50 }],
+          itens: [{ livroUuid: livroUuid, quantidade: 2, precoUnitario: 50 }],
           valorTotalItens: 100,
           valorFrete: 10,
           valorTotal: 110,
@@ -85,7 +90,7 @@ describe('Integração - Regras de Negócio de Vendas (API HTTP)', () => {
         .post('/api/vendas')
         .set('Authorization', `Bearer ${token}`)
         .send({
-          itens: [{ livroUuid: LIVRO_UUID_TESTE, quantidade: 1, precoUnitario: 50 }],
+          itens: [{ livroUuid: livroUuid, quantidade: 1, precoUnitario: 50 }],
           valorTotalItens: 50,
           valorFrete: 10,
           valorTotal: 60,
@@ -103,7 +108,6 @@ describe('Integração - Regras de Negócio de Vendas (API HTTP)', () => {
       await registrarCliente(contexto.app, {
         cpf: cpfUnico,
         email: emailUnico,
-        limparDados: true,
       });
 
       const loginRes = await request(contexto.app)
@@ -116,7 +120,7 @@ describe('Integração - Regras de Negócio de Vendas (API HTTP)', () => {
         .post('/api/vendas')
         .set('Authorization', `Bearer ${token}`)
         .send({
-          itens: [{ livroUuid: LIVRO_UUID_TESTE, quantidade: 1, precoUnitario: 50 }],
+          itens: [{ livroUuid: livroUuid, quantidade: 1, precoUnitario: 50 }],
           valorTotalItens: 50,
           valorFrete: 10,
           valorTotal: 60,
@@ -152,7 +156,6 @@ describe('Integração - Regras de Negócio de Vendas (API HTTP)', () => {
       await registrarCliente(contexto.app, {
         cpf: cpfA,
         email: emailA,
-        limparDados: true,
       });
 
       const loginA = await request(contexto.app)
@@ -178,7 +181,7 @@ describe('Integração - Regras de Negócio de Vendas (API HTTP)', () => {
         .post('/api/vendas')
         .set('Authorization', `Bearer ${tokenA}`)
         .send({
-          itens: [{ livroUuid: LIVRO_UUID_TESTE, quantidade: 1, precoUnitario: 50 }],
+          itens: [{ livroUuid: livroUuid, quantidade: 1, precoUnitario: 50 }],
           valorTotalItens: 50,
           valorFrete: 10,
           valorTotal: 60,
@@ -222,7 +225,7 @@ describe('Integração - Regras de Negócio de Vendas (API HTTP)', () => {
         .post('/api/vendas')
         .set('Authorization', `Bearer ${token}`)
         .send({
-          itens: [{ livroUuid: LIVRO_UUID_TESTE, quantidade: 1, precoUnitario: 50 }],
+          itens: [{ livroUuid: livroUuid, quantidade: 1, precoUnitario: 50 }],
           valorTotalItens: 50,
           valorFrete: 10,
           valorTotal: 60,
@@ -255,7 +258,7 @@ describe('Integração - Regras de Negócio de Vendas (API HTTP)', () => {
         .post('/api/vendas')
         .set('Authorization', `Bearer ${token}`)
         .send({
-          itens: [{ livroUuid: LIVRO_UUID_TESTE, quantidade: 1, precoUnitario: 50 }],
+          itens: [{ livroUuid: livroUuid, quantidade: 1, precoUnitario: 50 }],
           valorTotalItens: 50,
           valorFrete: 10,
           valorTotal: 60,

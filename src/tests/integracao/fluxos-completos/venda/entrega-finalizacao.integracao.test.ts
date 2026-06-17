@@ -9,6 +9,7 @@ import {
   montarPartesPagamentoCuponsEDoisCartoes,
   payloadVendaComCotacao,
 } from '@/tests/helpers/fluxo-cotacao-cupons.helper';
+import { obterPrecoCatalogo } from '@/tests/helpers/precos-catalogo.helper';
 
 /**
  * Gera um UUID v4 aleatório para uso em testes
@@ -36,9 +37,9 @@ describe('Integração — Checkout: cotação de frete + cupons + cartões', ()
 
   describe('cenários felizes', () => {
     it('fluxo completo: cotar PAC → POST /vendas com cotacaoUuid → DESCONTO10 + TROCA50 + 2 cartões → processar → entrega → consultas', async () => {
-      const precoUnitario = 50;
+      const precoUnitario = await obterPrecoCatalogo(contexto.db!);
       const cot = await cotarFretePac(app, token, precoUnitario);
-      const bodyVenda = payloadVendaComCotacao(cot, precoUnitario, 1);
+      const bodyVenda = await payloadVendaComCotacao(cot, contexto.db!, 1);
       const valorTotal = Number(bodyVenda.valorTotal);
 
       const resVenda = await request(app)
@@ -48,7 +49,7 @@ describe('Integração — Checkout: cotação de frete + cupons + cartões', ()
 
       expect(resVenda.status).toBe(201);
       const vendaUuid = resVenda.body.id as string;
-      expect(resVenda.body.status).toBe('EM PROCESSAMENTO');
+      expect(resVenda.body.status).toBe('EM_PROCESSAMENTO');
       expect(resVenda.body.frete).toBe(cot.valorFrete);
 
       // Garantir cupom de troca no banco usando a rota API de teste
@@ -152,7 +153,7 @@ describe('Integração — Checkout: cotação de frete + cupons + cartões', ()
         .get(`/api/vendas/${vendaUuid}`)
         .set('Authorization', `Bearer ${token}`);
       expect(det.status).toBe(200);
-      expect(det.body.status).toBe('EM TRÂNSITO');
+      expect(det.body.status).toBe('EM_TRANSITO');
 
       const minhas = await request(app)
         .get('/api/minhas-vendas')
@@ -172,8 +173,9 @@ describe('Integração — Checkout: cotação de frete + cupons + cartões', ()
 
   describe('cenários de falha — POST /api/vendas com cotação', () => {
     it('retorna 400 quando cotacaoUuid não existe', async () => {
-      const cot = await cotarFretePac(app, token, 50);
-      const body = payloadVendaComCotacao(cot, 50, 1);
+      const precoUnitario = await obterPrecoCatalogo(contexto.db!);
+      const cot = await cotarFretePac(app, token, precoUnitario);
+      const body = await payloadVendaComCotacao(cot, contexto.db!, 1);
       body.cotacaoUuid = gerarUuidAleatorio();
 
       const res = await request(app)
@@ -186,8 +188,9 @@ describe('Integração — Checkout: cotação de frete + cupons + cartões', ()
     });
 
     it('retorna 400 ao reutilizar a mesma cotação em uma segunda venda', async () => {
-      const cot = await cotarFretePac(app, token, 50);
-      const body = payloadVendaComCotacao(cot, 50, 1);
+      const precoUnitario = await obterPrecoCatalogo(contexto.db!);
+      const cot = await cotarFretePac(app, token, precoUnitario);
+      const body = await payloadVendaComCotacao(cot, contexto.db!, 1);
 
       const primeiro = await request(app)
         .post('/api/vendas')
@@ -215,7 +218,7 @@ describe('Integração — Checkout: cotação de frete + cupons + cartões', ()
         [cot.cotacaoUuid],
       );
 
-      const body = payloadVendaComCotacao(cot, 50, 1);
+      const body = await payloadVendaComCotacao(cot, contexto.db!, 1);
       const res = await request(app)
         .post('/api/vendas')
         .set('Authorization', `Bearer ${token}`)
@@ -226,8 +229,9 @@ describe('Integração — Checkout: cotação de frete + cupons + cartões', ()
     });
 
     it('retorna 400 quando valorTotal não confere com itens + frete da cotação', async () => {
-      const cot = await cotarFretePac(app, token, 50);
-      const body = payloadVendaComCotacao(cot, 50, 1);
+      const precoUnitario = await obterPrecoCatalogo(contexto.db!);
+      const cot = await cotarFretePac(app, token, precoUnitario);
+      const body = await payloadVendaComCotacao(cot, contexto.db!, 1);
       body.valorTotal = Number(body.valorTotal) + 5;
 
       const res = await request(app)
@@ -243,14 +247,15 @@ describe('Integração — Checkout: cotação de frete + cupons + cartões', ()
 
   describe('cenários de falha — POST /api/pagamentos/selecionar (cupons)', () => {
     async function criarVendaParaPagamento(): Promise<string> {
-      const cot = await cotarFretePac(app, token, 50);
-      const body = payloadVendaComCotacao(cot, 50, 1);
+      const precoUnitario = await obterPrecoCatalogo(contexto.db!);
+      const cot = await cotarFretePac(app, token, precoUnitario);
+      const body = await payloadVendaComCotacao(cot, contexto.db!, 1);
       const res = await request(app)
         .post('/api/vendas')
         .set('Authorization', `Bearer ${token}`)
         .send(body);
       expect(res.status).toBe(201);
-      return res.body.id as string;
+      return res.body.uuid || res.body.id as string;
     }
 
     it('retorna 400 para cupom promocional inválido', async () => {

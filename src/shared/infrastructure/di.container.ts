@@ -13,6 +13,13 @@ import { RepositorioTelefoneUsuarioPostgres } from '@/shared/infrastructure/data
 import { RepositorioLojasPostgres } from '@/modules/lojas/repositorioLojasPostgres';
 import { ServicoLojas } from '@/modules/lojas/servicoLojas';
 import { RepositorioVendasPostgres } from '@/modules/vendas/repositories/RepositorioVendasPostgres';
+import { GestaoSenhaCliente } from '@/modules/clientes/gestaoSenhaCliente.service';
+import { GestaoTelefoneCliente } from '@/modules/clientes/gestaoTelefoneCliente.service';
+import { GestaoCartaoCliente } from '@/modules/clientes/gestaoCartaoCliente.service';
+import { GestaoPerfilCliente } from '@/modules/clientes/gestaoPerfilCliente.service';
+import { RepositorioAuditoriaPostgres } from '@/shared/infrastructure/auditoria/RepositorioAuditoriaPostgres';
+import { ServicoAuditoria } from '@/shared/infrastructure/auditoria/ServicoAuditoria';
+import { RepositorioPagamentosPostgres } from '@/modules/pagamentos/repositories/RepositorioPagamentosPostgres';
 
 /**
  * Contêiner de Injeção de Dependências Manual.
@@ -34,9 +41,17 @@ class ContainerDI {
 
   public static readonly repoCartoes = new RepositorioCartaoUsuario(ContainerDI.db);
   public static readonly repoLojas = new RepositorioLojasPostgres(ContainerDI.db);
+  public static readonly repoAuditoria = new RepositorioAuditoriaPostgres(ContainerDI.db);
+  public static readonly repositorioPagamentos = new RepositorioPagamentosPostgres(ContainerDI.db);
 
   // Serviços
   public static readonly servicoLojas = new ServicoLojas(ContainerDI.repoLojas);
+
+  // Serviços especializados de gestão de cliente
+  public static readonly gestaoSenhaCliente = new GestaoSenhaCliente(ContainerDI.repoUsuarios);
+  public static readonly gestaoTelefoneCliente = new GestaoTelefoneCliente(ContainerDI.repoTelefone);
+  public static readonly gestaoCartaoCliente = new GestaoCartaoCliente(ContainerDI.repoCartoes);
+  public static readonly gestaoPerfilCliente = new GestaoPerfilCliente(ContainerDI.repoPerfil);
 
   public static readonly gestaoIdentidadeCliente = new GestaoIdentidadeCliente(
     ContainerDI.repoUsuarios,
@@ -48,7 +63,12 @@ class ContainerDI {
     ContainerDI.servicoLojas,
   );
 
-  public static readonly servicoConsultaClientes = new ServicoConsultaClientes(ContainerDI.repoUsuarios);
+  public static readonly servicoConsultaClientes = new ServicoConsultaClientes(
+    ContainerDI.repoUsuarios,
+    ContainerDI.repoEndereco,
+    ContainerDI.repoCartoes,
+    ContainerDI.repoVendas,
+  );
 
   public static readonly servicoCartoes = new ServicoCartoes(ContainerDI.repoCartoes);
 
@@ -58,6 +78,8 @@ class ContainerDI {
     ContainerDI.repoUsuarios,
     ContainerDI.repoRefreshTokens
   );
+
+  public static readonly servicoAuditoria = new ServicoAuditoria(ContainerDI.repoAuditoria);
 
   // Controllers (se houver injeção via construtor, instanciaríamos aqui)
 }

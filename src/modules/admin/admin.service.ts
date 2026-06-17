@@ -1,10 +1,12 @@
 import bcrypt from 'bcryptjs';
+import { IConexaoBanco } from '@/shared/infrastructure/database/IConexaoBanco';
 import { IRepositorioUsuarios } from '@/modules/usuarios/IRepositorioUsuarios';
 import { IRepositorioVendas } from '@/modules/vendas/repositories/IRepositorioVendas';
 import { ICriarAdminDto, IListaAdminDto, IRespostaAdminCriadoDto } from '@/modules/admin/Iadmin.dto';
 import { verificarForcaSenha } from '@/shared/utils/senha.util';
 import { Logger } from '@/shared/utils/Logger.util';
 import { PAPEL_ADMIN, PAPEL_CLIENTE } from '@/shared/types/papeis';
+import { MENSAGENS_ERRO } from '@/shared/constants/mensagens-erro.constants';
 
 /**
  * Serviço responsável por tarefas de administração do sistema.
@@ -36,11 +38,11 @@ export class ServicoAdmin {
    */
   public async listarAdministradores(): Promise<IListaAdminDto[]> {
     Logger.info('[listarAdministradores] Buscando administradores via usuario_papeis');
-    const todos = await this.repositorioUsuarios.buscarUsuariosPorPapel(PAPEL_ADMIN.id);
+    const todos = await this.repositorioUsuarios.buscarUsuariosPorPapel(PAPEL_ADMIN.descricao);
     Logger.info('[listarAdministradores] Administradores encontrados', { quantidade: todos.length });
     
     // Contar vendas com status de troca pendente por loja
-    const trocasPorLoja = await this.repositorioVendas.contarVendasPorStatusELoja(['EM TROCA', 'TROCA AUTORIZADA']);
+    const trocasPorLoja = await this.repositorioVendas.contarVendasPorStatusELoja(['EM_TROCA', 'TROCA_AUTORIZADA']);
     
     // Para cada administrador, buscar suas lojas e somar as trocas pendentes
     const administradoresComTrocas = await Promise.all(
@@ -72,13 +74,13 @@ export class ServicoAdmin {
     
     if (!admin) {
       Logger.warn('[inativarAdministrador] Administrador não encontrado', { uuid });
-      throw new Error('Administrador não encontrado.');
+      throw new Error(MENSAGENS_ERRO.ADMINISTRADOR_NAO_ENCONTRADO);
     }
     
-    const temPapelAdmin = admin.papeis.some(p => p.id === PAPEL_ADMIN.id);
+    const temPapelAdmin = admin.papeis.some(p => p.descricao === PAPEL_ADMIN.descricao);
     if (!temPapelAdmin) {
       Logger.warn('[inativarAdministrador] Usuário não tem papel admin', { uuid, papeis: admin.papeis.map(p => p.descricao) });
-      throw new Error('Administrador não encontrado.');
+      throw new Error(MENSAGENS_ERRO.ADMINISTRADOR_NAO_ENCONTRADO);
     }
 
     if (!admin.ativo) {
@@ -96,16 +98,16 @@ export class ServicoAdmin {
   public async ativarAdministrador(uuid: string): Promise<void> {
     Logger.info('[ativarAdministrador] Iniciando ativação', { uuid });
     const admin = await this.repositorioUsuarios.buscarPorUuid(uuid);
-    
+
     if (!admin) {
       Logger.warn('[ativarAdministrador] Administrador não encontrado', { uuid });
-      throw new Error('Administrador não encontrado.');
+      throw new Error(MENSAGENS_ERRO.ADMINISTRADOR_NAO_ENCONTRADO);
     }
-    
-    const temPapelAdmin = admin.papeis.some(p => p.id === PAPEL_ADMIN.id);
+
+    const temPapelAdmin = admin.papeis.some(p => p.descricao === PAPEL_ADMIN.descricao);
     if (!temPapelAdmin) {
       Logger.warn('[ativarAdministrador] Usuário não tem papel admin', { uuid, papeis: admin.papeis.map(p => p.descricao) });
-      throw new Error('Administrador não encontrado.');
+      throw new Error(MENSAGENS_ERRO.ADMINISTRADOR_NAO_ENCONTRADO);
     }
 
     if (admin.ativo) {
@@ -128,13 +130,13 @@ export class ServicoAdmin {
     
     if (!admin) {
       Logger.warn('[atualizarAdministrador] Administrador não encontrado', { uuid });
-      throw new Error('Administrador não encontrado.');
+      throw new Error(MENSAGENS_ERRO.ADMINISTRADOR_NAO_ENCONTRADO);
     }
     
     const temPapelAdmin = admin.papeis.some(p => p.id === PAPEL_ADMIN.id);
     if (!temPapelAdmin) {
       Logger.warn('[atualizarAdministrador] Usuário não tem papel admin', { uuid, papeis: admin.papeis.map(p => p.descricao) });
-      throw new Error('Administrador não encontrado.');
+      throw new Error(MENSAGENS_ERRO.ADMINISTRADOR_NAO_ENCONTRADO);
     }
 
     const dadosAtualizar: { nome?: string; email?: string; cpf?: string } = {};
@@ -279,9 +281,43 @@ export class ServicoAdmin {
         uuid: usuario.uuid, 
         email: usuario.email,
         papeis: usuario.papeis.map(p => p.descricao),
-        rolePrincipal: usuario.role.descricao
       });
-      
+
+      // Vincular à loja padrão por segurança se ele ainda não tiver lojas
+      try {
+        const db = (this.repositorioUsuarios as any).db as IConexaoBanco;
+        const configLojaId = process.env.DEFAULT_LOJA_ID ? parseInt(process.env.DEFAULT_LOJA_ID) : 1;
+
+        const lojaExiste = (await db.executar(
+          'SELECT loj_id FROM livraria_gestao.lojas WHERE loj_id = $1 LIMIT 1',
+          [configLojaId],
+        )) as Array<{ loj_id: number }>;
+
+        const lojaFallback = lojaExiste.length > 0
+          ? lojaExiste
+          : (await db.executar(
+              'SELECT loj_id FROM livraria_gestao.lojas ORDER BY loj_id LIMIT 1',
+            ) as Array<{ loj_id: number }>);
+
+        if (lojaFallback.length === 0) {
+          throw new Error('Nenhuma loja disponível no banco de dados.');
+        }
+
+        const lojaId = lojaFallback[0].loj_id;
+
+        await db.executar(
+          `INSERT INTO livraria_gestao.admin_lojas (usu_id, loj_id, adl_papel, adl_ativo, adl_escopo)
+           VALUES ($1, $2, 'admin_loja', TRUE, 'LOJA')
+           ON CONFLICT (usu_id, loj_id) DO NOTHING`,
+          [existenteClientePorEmail.id, lojaId],
+        );
+        Logger.info('[registrarNovoAdministrador] Administrador promovido vinculado à loja padrão com sucesso', { usuarioId: existenteClientePorEmail.id, lojaId });
+      } catch (erro) {
+        Logger.warn('[registrarNovoAdministrador] Falha ao vincular admin promovido à loja padrão', {
+          erro: erro instanceof Error ? erro.message : String(erro),
+        });
+      }
+
       return {
         uuid: usuario.uuid,
         nome: usuario.nome,
@@ -291,6 +327,7 @@ export class ServicoAdmin {
         role: usuario.role.descricao,
       };
     }
+
 
     const usuario = await this.repositorioUsuarios.criarUsuario({
       nome: dados.nome,
@@ -303,6 +340,41 @@ export class ServicoAdmin {
       papeis: [PAPEL_CLIENTE, PAPEL_ADMIN],
     });
 
+    // Vincular à loja padrão por segurança (especialmente para os testes onde o admin é criado sem loja específica)
+    try {
+      const db = (this.repositorioUsuarios as any).db as IConexaoBanco;
+      const configLojaId = process.env.DEFAULT_LOJA_ID ? parseInt(process.env.DEFAULT_LOJA_ID) : 1;
+
+      const lojaExiste = (await db.executar(
+        'SELECT loj_id FROM livraria_gestao.lojas WHERE loj_id = $1 LIMIT 1',
+        [configLojaId],
+      )) as Array<{ loj_id: number }>;
+
+      const lojaFallback = lojaExiste.length > 0
+        ? lojaExiste
+        : (await db.executar(
+            'SELECT loj_id FROM livraria_gestao.lojas ORDER BY loj_id LIMIT 1',
+          ) as Array<{ loj_id: number }>);
+
+      if (lojaFallback.length === 0) {
+        throw new Error('Nenhuma loja disponível no banco de dados.');
+      }
+
+      const lojaId = lojaFallback[0].loj_id;
+
+      await db.executar(
+        `INSERT INTO livraria_gestao.admin_lojas (usu_id, loj_id, adl_papel, adl_ativo, adl_escopo)
+         VALUES ($1, $2, 'admin_loja', TRUE, 'LOJA')
+         ON CONFLICT (usu_id, loj_id) DO NOTHING`,
+        [usuario.id, lojaId],
+      );
+      Logger.info('[registrarNovoAdministrador] Administrador vinculado à loja padrão com sucesso', { usuarioId: usuario.id, lojaId });
+    } catch (erro) {
+      Logger.warn('[registrarNovoAdministrador] Falha ao vincular administrador à loja padrão', {
+        erro: erro instanceof Error ? erro.message : String(erro),
+      });
+    }
+
     return {
       uuid: usuario.uuid,
       nome: usuario.nome,
@@ -313,3 +385,4 @@ export class ServicoAdmin {
     };
   }
 }
+

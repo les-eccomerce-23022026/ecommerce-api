@@ -32,7 +32,9 @@ export function usuarioTemPapelAdmin(usuario: { papeis?: unknown[]; role?: unkno
   if (!usuario) {
     return false;
   }
-  const temPapel = possuiPapel(usuario, PAPEL_ADMIN.descricao);
+  const temPapelAdmin = possuiPapel(usuario, PAPEL_ADMIN.descricao);
+  const temPapelAdminSistema = possuiPapel(usuario, PAPEL_ADMIN_SISTEMA.descricao);
+  const temPapel = temPapelAdmin || temPapelAdminSistema;
   if (process.env.NODE_ENV === 'test' && temPapel) {
     console.log(`[DEBUG-AUTH] Usuário TEM papel admin. Role: ${JSON.stringify(usuario.role)}, Papeis: ${JSON.stringify(usuario.papeis)}`);
   }
@@ -107,6 +109,28 @@ export function clienteOnlyMiddleware(
   if (!usuario || !(possuiPapel(usuario, PAPEL_CLIENTE.descricao) || possuiPapel(usuario, PAPEL_ADMIN.descricao))) {
     res.status(403).json({
       mensagem: 'Acesso negado. Esta rota é restrita a clientes.',
+      sucesso: false,
+    });
+    return;
+  }
+
+  next();
+}
+
+/**
+ * Middleware para garantir que o usuário esteja autenticado (qualquer papel).
+ * Permite acesso a clientes, administradores de loja e administradores do sistema.
+ */
+export function autenticadoMiddleware(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): void {
+  const { usuario } = req;
+
+  if (!usuario) {
+    res.status(401).json({
+      mensagem: 'Acesso negado. Usuário não autenticado.',
       sucesso: false,
     });
     return;

@@ -6,12 +6,18 @@ import { RepositorioCarrinhoPostgres } from '@/modules/carrinho/repositorioCarri
 import { RepositorioLivrosPostgres } from '@/modules/livros/repositorioLivrosPostgres';
 import { ServicoCarrinho } from '@/modules/carrinho/servicoCarrinho';
 import { ControladorCarrinho } from '@/modules/carrinho/controladorCarrinho';
+import { RepositorioEstoque } from '@/modules/estoque/repositorioEstoque';
+import { ServicoEstoque } from '@/modules/estoque/servicoEstoque';
+import { RepositorioReservasPostgres } from '@/modules/estoque/repositorioReservas';
 
 export function registrarRotasCarrinho(router: Router): void {
   const db = ConexaoPostgres.obterInstancia();
   const repoCarrinho = new RepositorioCarrinhoPostgres(db);
   const repoLivros = new RepositorioLivrosPostgres(db);
-  const servico = new ServicoCarrinho(repoCarrinho, repoLivros);
+  const repoEstoque = new RepositorioEstoque(db);
+  const repoReservas = new RepositorioReservasPostgres(db);
+  const servicoEstoque = new ServicoEstoque(repoEstoque, repoReservas);
+  const servico = new ServicoCarrinho(repoCarrinho, repoLivros, servicoEstoque, repoReservas);
   const controller = new ControladorCarrinho(servico);
 
   router.get(

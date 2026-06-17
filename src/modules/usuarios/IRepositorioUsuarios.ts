@@ -8,6 +8,7 @@ export interface IFiltrosConsultaClientes {
   nome?: string;
   cpf?: string;
   email?: string;
+  ativo?: boolean;
   idPapel?: number;
   offset: number;
   limite: number;
@@ -40,5 +41,6 @@ export interface IRepositorioUsuarios {
   removerPapelUsuario(usuarioId: number, papelId: number): Promise<void>;
   removerTodosPapeisUsuario(usuarioId: number): Promise<void>;
   verificarPapelUsuario(usuarioId: number, papelId: number): Promise<boolean>;
-  buscarUsuariosPorPapel(idPapel: number): Promise<IUsuario[]>;
+  buscarUsuariosPorPapel(descricaoPapel: string): Promise<IUsuario[]>;
+  atualizarStatusAtivo(uuid: string, ativo: boolean): Promise<void>;
 }

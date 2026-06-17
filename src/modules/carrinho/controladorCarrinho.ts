@@ -53,7 +53,7 @@ export class ControladorCarrinho {
         res.status(401).json({ mensagem: 'Não autenticado.', sucesso: false });
         return;
       }
-      const dados = await this.servico.limpar(usuUuid);
+      const dados = await this.servico.limpar(usuUuid, req.usuario?.loj_id_atual);
       res.status(200).json(dados);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Erro ao limpar carrinho';

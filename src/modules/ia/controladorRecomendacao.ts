@@ -1,0 +1,538 @@
+import { Request, Response } from 'express';
+import { ServicoRecomendacaoApplication } from './servicoRecomendacaoApplication';
+import { RespostaPadrao } from '@/shared/errors/Iresposta-padrao';
+import { Logger } from '@/shared/utils/Logger.util';
+import {
+  IRecomendarRequestDTO,
+  IRecomendarResponseDTO,
+  IChatRequestDTO,
+  IChatResponseDTO,
+  IReindexarRequestDTO,
+  IReindexarResponseDTO,
+  ContextoRequisicaoIA,
+  TipoContextoIA,
+  MensagemChatEntradaDTO,
+  normalizarMensagemEntrada,
+} from './IRecomendacao.dto';
+import { PeriodoMetrica } from './IRepositorioRecomendacao';
+import { ErroIa } from './erroIa.middleware';
+import {
+  sanitizarTextoEntrada,
+  validarClienteUuidOpcional,
+  validarConteudoMensagemChat,
+  validarConteudoQuery,
+  validarHistoricoChat,
+  validarTamanhoMensagemChat,
+  validarTamanhoMinimoMensagemChat,
+  validarTamanhoMinimoQuery,
+  validarTamanhoQuery,
+} from './validacaoEntradaIA.util';
+import { ServicoValidacaoSegurancaIA } from './servicoValidacaoSegurancaIA';
+import { ServicoHealthCheckIA } from './servicoHealthCheckIA';
+import { IAdapterEmbedding } from './IAdapterEmbedding';
+import { AdapterLangChainGemini } from './adapterLangChainGemini';
+import { ServicoCachePadroesValidacaoIA } from './servicoCachePadroesValidacaoIA';
+import type { IClassificadorDominio } from './IClassificadorDominio';
+import { PAPEL_CLIENTE, PAPEL_ADMIN, PAPEL_ADMIN_SISTEMA } from '@/shared/types/papeis';
+
+/** Períodos válidos para filtro de métricas de recomendação */
+const PERIODOS_VALIDOS: ReadonlySet<string> = new Set<PeriodoMetrica>([
+  'hoje',
+  'semana',
+  'mes',
+  'todos',
+]);
+
+/**
+ * Controller de Recomendação de Produtos com IA
+ * 
+ * Expõe endpoints para recomendação de produtos usando RAG com ChromaDB e Gemini.
+ */
+export class ControladorRecomendacao {
+  private readonly servicoValidacaoSeguranca: ServicoValidacaoSegurancaIA;
+
+  constructor(
+    private servicoRecomendacao: ServicoRecomendacaoApplication,
+    private servicoHealthCheck: ServicoHealthCheckIA,
+    private adapterEmbedding?: IAdapterEmbedding,
+    private adapterLLM?: AdapterLangChainGemini,
+    private cachePadroesValidacao?: ServicoCachePadroesValidacaoIA,
+    private classificadorDominio?: IClassificadorDominio
+  ) {
+    this.servicoValidacaoSeguranca = new ServicoValidacaoSegurancaIA(adapterEmbedding, adapterLLM, cachePadroesValidacao, classificadorDominio);
+  }
+
+  /**
+   * Determina o contexto de requisição IA baseado no papel do usuário.
+   * 
+   * SRP: Single Responsibility Principle - isolada para facilitar testes e manutenção.
+   * 
+   * @param req Requisição Express com usuário autenticado
+   * @returns Contexto de requisição com tipo, clienteUuid e lojId
+   */
+  private determinarContextoRequisicao(req: Request): ContextoRequisicaoIA {
+    const { usuario } = req;
+
+    if (!usuario || !usuario.papeis || usuario.papeis.length === 0) {
+      throw new ErroIa('USUARIO_NAO_AUTENTICADO', 'Usuário não autenticado ou sem papéis definidos.', 401);
+    }
+
+    const papeis = usuario.papeis;
+    const lojId = usuario.loj_id_atual || 1;
+
+    // Prioridade: admin_sistema > admin > cliente
+    if (papeis.includes(PAPEL_ADMIN_SISTEMA.descricao)) {
+      return {
+        tipo: TipoContextoIA.ADMIN_SISTEMA,
+        clienteUuid: null, // Admin sistema não tem contexto de cliente específico
+        lojId,
+        papeis,
+      };
+    }
+
+    if (papeis.includes(PAPEL_ADMIN.descricao)) {
+      return {
+        tipo: TipoContextoIA.ADMIN_LOJA,
+        clienteUuid: null, // Admin loja não tem contexto de cliente específico
+        lojId,
+        papeis,
+      };
+    }
+
+    if (papeis.includes(PAPEL_CLIENTE.descricao)) {
+      return {
+        tipo: TipoContextoIA.CLIENTE,
+        clienteUuid: usuario.uuid, // Cliente acessa apenas seus próprios dados
+        lojId,
+        papeis,
+      };
+    }
+
+    throw new ErroIa('PAPEL_NAO_AUTORIZADO', 'Papel não autorizado para chat de recomendação.', 403);
+  }
+
+  private obterStatusHttpErro(erro: unknown, padrao: number): number {
+    if (erro instanceof ErroIa) {
+      return erro.statusCode;
+    }
+    return padrao;
+  }
+
+  private obterMensagemErroApi(erro: unknown, mensagemPadrao: string): string {
+    if (erro instanceof ErroIa) {
+      return erro.message;
+    }
+    return RespostaPadrao.obterMensagemErroCliente(erro, mensagemPadrao);
+  }
+
+  /**
+   * Endpoint POST /api/ia/recomendar
+   *
+   * Gera recomendações de produtos baseadas na query do usuário.
+   * Requer autenticação de cliente (middlewares na rota).
+   */
+  recomendar = async (req: Request, res: Response): Promise<void> => {
+    try {
+      // Determina contexto baseado no papel do usuário (SRP)
+      const contextoIA = this.determinarContextoRequisicao(req);
+
+      // Health check de dependências antes de processar requisição
+      const saude = await this.servicoHealthCheck.verificarTodasDependencias();
+      if (!this.servicoHealthCheck.estaSaudavel()) {
+        Logger.warn(
+          `[ControladorRecomendacao.recomendar] Dependências não saudáveis: ${JSON.stringify(saude.dependencias)}`
+        );
+        RespostaPadrao.enviarSucesso(res, 503, saude);
+        return;
+      }
+
+      const dados: IRecomendarRequestDTO = req.body;
+
+      // Validações básicas
+      if (!dados.query || typeof dados.query !== 'string' || dados.query.trim().length === 0) {
+        RespostaPadrao.enviarErro(res, 400, 'Query é obrigatória e não pode ser vazia');
+        return;
+      }
+
+      const querySanitizada = sanitizarTextoEntrada(dados.query);
+      if (querySanitizada.length === 0) {
+        RespostaPadrao.enviarErro(res, 400, 'Query é obrigatória e não pode ser vazia');
+        return;
+      }
+
+      // Validação antecipada de tamanho mínimo — executada antes da geração de embedding (custoso)
+      const erroTamanhoMinimoQuery = validarTamanhoMinimoQuery(querySanitizada);
+      if (erroTamanhoMinimoQuery) {
+        RespostaPadrao.enviarErro(res, 400, erroTamanhoMinimoQuery);
+        return;
+      }
+
+      // Validação antecipada de conteúdo — rejeita entradas sem caracteres alfanuméricos
+      const erroConteudoQuery = validarConteudoQuery(querySanitizada);
+      if (erroConteudoQuery) {
+        RespostaPadrao.enviarErro(res, 400, erroConteudoQuery);
+        return;
+      }
+
+      const erroTamanhoQuery = validarTamanhoQuery(querySanitizada);
+      if (erroTamanhoQuery) {
+        RespostaPadrao.enviarErro(res, 400, erroTamanhoQuery);
+        return;
+      }
+
+      // Validação de segurança contra injeção de prompt e solicitações impossíveis
+      const resultadoSeguranca = await this.servicoValidacaoSeguranca.validarEntrada(querySanitizada);
+      if (!resultadoSeguranca.seguro) {
+        const mensagemRejeicao = ServicoValidacaoSegurancaIA.gerarMensagemRejeicao(resultadoSeguranca);
+        RespostaPadrao.enviarErro(res, 400, mensagemRejeicao);
+        return;
+      }
+
+      // CORREÇÃO: Usa clienteUuid do contexto determinado pelo papel
+      // Se for admin, clienteUuid será null (acesso a dados agregados)
+      // Se for cliente, clienteUuid será o UUID do próprio cliente
+      const clienteUuid = contextoIA.clienteUuid ?? dados.clienteUuid;
+      const erroClienteUuid = validarClienteUuidOpcional(clienteUuid);
+      if (erroClienteUuid) {
+        RespostaPadrao.enviarErro(res, 400, erroClienteUuid);
+        return;
+      }
+
+      if (dados.limite !== undefined && (typeof dados.limite !== 'number' || dados.limite < 1 || dados.limite > 20)) {
+        RespostaPadrao.enviarErro(res, 400, 'Limite deve ser entre 1 e 20');
+        return;
+      }
+
+      const resultado = await this.servicoRecomendacao.recomendar({
+        ...dados,
+        query: querySanitizada,
+        clienteUuid,
+        incluirMetricas: dados.incluirMetricas ?? false,
+        contextoIA, // Passa contexto para serviço de aplicação
+      });
+      RespostaPadrao.enviarSucesso(res, 200, resultado);
+    } catch (erro) {
+      const msg = this.obterMensagemErroApi(erro, 'Erro ao gerar recomendações');
+      Logger.error(`[ControladorRecomendacao.recomendar] Erro: ${msg}`, erro instanceof Error ? erro.stack : String(erro));
+      RespostaPadrao.enviarErro(res, this.obterStatusHttpErro(erro, 500), msg);
+    }
+  };
+
+  /**
+   * Endpoint POST /api/ia/chat
+   *
+   * Gera resposta de chat com recomendações integradas.
+   * Requer autenticação de cliente (middlewares na rota).
+   */
+  chat = async (req: Request, res: Response): Promise<void> => {
+    try {
+      // Determina contexto baseado no papel do usuário (SRP)
+      const contextoIA = this.determinarContextoRequisicao(req);
+
+      // Health check de dependências antes de processar requisição
+      const saude = await this.servicoHealthCheck.verificarTodasDependencias();
+      if (!this.servicoHealthCheck.estaSaudavel()) {
+        Logger.warn(
+          `[ControladorRecomendacao.chat] Dependências não saudáveis: ${JSON.stringify(saude.dependencias)}`
+        );
+        RespostaPadrao.enviarSucesso(res, 503, saude);
+        return;
+      }
+
+      const dados: Omit<IChatRequestDTO, 'historico'> & { historico?: MensagemChatEntradaDTO[] } = req.body;
+
+      // Validações básicas
+      if (!dados.mensagem || typeof dados.mensagem !== 'string' || dados.mensagem.trim().length === 0) {
+        RespostaPadrao.enviarErro(res, 400, 'Mensagem é obrigatória e não pode ser vazia');
+        return;
+      }
+
+      const mensagemSanitizada = sanitizarTextoEntrada(dados.mensagem);
+      if (mensagemSanitizada.length === 0) {
+        RespostaPadrao.enviarErro(res, 400, 'Mensagem é obrigatória e não pode ser vazia');
+        return;
+      }
+
+      // Validação antecipada de tamanho mínimo — executada antes da geração de embedding (custoso)
+      const erroTamanhoMinimoMensagem = validarTamanhoMinimoMensagemChat(mensagemSanitizada);
+      if (erroTamanhoMinimoMensagem) {
+        RespostaPadrao.enviarErro(res, 400, erroTamanhoMinimoMensagem);
+        return;
+      }
+
+      // Validação antecipada de conteúdo — rejeita entradas sem caracteres alfanuméricos
+      const erroConteudoMensagem = validarConteudoMensagemChat(mensagemSanitizada);
+      if (erroConteudoMensagem) {
+        RespostaPadrao.enviarErro(res, 400, erroConteudoMensagem);
+        return;
+      }
+
+      const erroTamanhoMensagem = validarTamanhoMensagemChat(mensagemSanitizada);
+      if (erroTamanhoMensagem) {
+        RespostaPadrao.enviarErro(res, 400, erroTamanhoMensagem);
+        return;
+      }
+
+      // Validação de segurança contra injeção de prompt e solicitações impossíveis
+      const resultadoSeguranca = await this.servicoValidacaoSeguranca.validarEntrada(mensagemSanitizada);
+      if (!resultadoSeguranca.seguro) {
+        const mensagemRejeicao = ServicoValidacaoSegurancaIA.gerarMensagemRejeicao(resultadoSeguranca);
+        RespostaPadrao.enviarErro(res, 400, mensagemRejeicao);
+        return;
+      }
+
+      if (dados.historico && !Array.isArray(dados.historico)) {
+        RespostaPadrao.enviarErro(res, 400, 'Histórico deve ser um array');
+        return;
+      }
+
+      const erroHistorico = validarHistoricoChat(dados.historico);
+      if (erroHistorico) {
+        RespostaPadrao.enviarErro(res, 400, erroHistorico);
+        return;
+      }
+
+      const historicoNormalizado = dados.historico && dados.historico.length > 0
+        ? dados.historico.map(normalizarMensagemEntrada)
+        : undefined;
+
+      if (historicoNormalizado && historicoNormalizado.length > 0) {
+        const resultadoHistorico = await this.servicoValidacaoSeguranca.validarConteudoHistorico(historicoNormalizado);
+        if (!resultadoHistorico.seguro) {
+          Logger.warn(`[ControladorRecomendacao.chat] Histórico bloqueado na mensagem ${resultadoHistorico.indice} (${resultadoHistorico.papel})`);
+          RespostaPadrao.enviarErro(res, 400, ServicoValidacaoSegurancaIA.gerarMensagemRejeicao(resultadoHistorico));
+          return;
+        }
+      }
+
+      // CORREÇÃO: Usa clienteUuid do contexto determinado pelo papel
+      // Se for admin, clienteUuid será null (acesso a dados agregados)
+      // Se for cliente, clienteUuid será o UUID do próprio cliente
+      const clienteUuid = contextoIA.clienteUuid ?? dados.clienteUuid;
+      const erroClienteUuid = validarClienteUuidOpcional(clienteUuid);
+      if (erroClienteUuid) {
+        RespostaPadrao.enviarErro(res, 400, erroClienteUuid);
+        return;
+      }
+
+      const dadosChat: IChatRequestDTO = {
+        ...dados,
+        mensagem: mensagemSanitizada,
+        clienteUuid,
+        historico: historicoNormalizado,
+        incluirMetricas: dados.incluirMetricas ?? false,
+        contextoIA, // Passa contexto para serviço de aplicação
+      };
+
+      // Streaming SSE (Task 6): ativado por header Accept: text/event-stream
+      // OU body { stream: true }. Caso contrário mantém o JSON tradicional.
+      const aceitaSSE = (req.headers.accept ?? '').includes('text/event-stream');
+      const pediuStreamBody = (req.body as { stream?: unknown })?.stream === true;
+      if (aceitaSSE || pediuStreamBody) {
+        await this.responderChatStream(res, dadosChat);
+        return;
+      }
+
+      const resultado = await this.servicoRecomendacao.chat(
+        dadosChat,
+        dadosChat.incluirMetricas ?? false
+      );
+      RespostaPadrao.enviarSucesso(res, 200, resultado);
+    } catch (erro) {
+      const msg = this.obterMensagemErroApi(erro, 'Erro no chat');
+      Logger.error(`[ControladorRecomendacao.chat] Erro: ${msg}`, erro instanceof Error ? erro.stack : String(erro));
+      RespostaPadrao.enviarErro(res, this.obterStatusHttpErro(erro, 500), msg);
+    }
+  };
+
+  /**
+   * Responde ao chat em modo streaming SSE (Task 6).
+   *
+   * Contrato de eventos:
+   *   event: meta     data: { tipoResposta, intencaoResumida, contextoUsado, numeroTurno }
+   *   event: produtos data: { produtosRecomendados: [...] }
+   *   event: token    data: { delta: "..." }   (vários)
+   *   event: done     data: IChatResponseDTO + metricas
+   *   event: error    data: { message }
+   */
+  private async responderChatStream(res: Response, dadosChat: IChatRequestDTO): Promise<void> {
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no'); // desabilita buffering em proxies (nginx)
+    res.flushHeaders?.();
+
+    const escreverEvento = (evento: string, dados: unknown): void => {
+      res.write(`event: ${evento}\n`);
+      res.write(`data: ${JSON.stringify(dados)}\n\n`);
+      // Flush incremental quando o framework de compressão expõe o método.
+      (res as Response & { flush?: () => void }).flush?.();
+    };
+
+    try {
+      await this.servicoRecomendacao.chatStream(
+        dadosChat,
+        dadosChat.incluirMetricas ?? false,
+        escreverEvento
+      );
+    } catch (erro) {
+      const msg = erro instanceof Error ? erro.message : String(erro);
+      Logger.error(`[ControladorRecomendacao.responderChatStream] Erro: ${msg}`);
+      escreverEvento('error', { message: msg });
+    } finally {
+      res.end();
+    }
+  }
+
+  /**
+   * Endpoint POST /api/ia/reindexar (Admin only)
+   * 
+   * Reindexa todos os produtos no ChromaDB.
+   */
+  reindexar = async (req: Request, res: Response): Promise<void> => {
+    try {
+      // Autorização garantida pelos middlewares autenticacaoMiddleware + adminOnlyMiddleware
+      // registrados na camada de rotas (ia.routes.ts). Nenhuma verificação adicional é necessária aqui.
+      const dados: IReindexarRequestDTO = req.body;
+      const resultado = await this.servicoRecomendacao.reindexarCatalogo(dados.forcarReindexacao || false);
+
+      const resposta: IReindexarResponseDTO = {
+        mensagem: 'Catálogo reindexado com sucesso',
+        produtosIndexados: resultado.produtosIndexados,
+        tempoExecucaoMs: resultado.tempoExecucaoMs,
+      };
+
+      RespostaPadrao.enviarSucesso(res, 200, resposta);
+    } catch (erro) {
+      const msg = this.obterMensagemErroApi(erro, 'Erro ao reindexar catálogo');
+      Logger.error(`[ControladorRecomendacao.reindexar] Erro: ${msg}`, erro instanceof Error ? erro.stack : String(erro));
+      RespostaPadrao.enviarErro(res, this.obterStatusHttpErro(erro, 500), msg);
+    }
+  };
+
+  /**
+   * Endpoint POST /api/ia/padroes/atualizar (Admin only)
+   *
+   * Força invalidação do cache de padrões de validação (memória + disco)
+   * e recarga imediata a partir do banco de dados.
+   * Query param: ?forcar=true (equivalente, sempre força)
+   */
+  atualizarPadroesValidacao = async (_req: Request, res: Response): Promise<void> => {
+    try {
+      if (!this.cachePadroesValidacao) {
+        RespostaPadrao.enviarErro(res, 503, 'Cache de padrões não disponível');
+        return;
+      }
+      this.cachePadroesValidacao.invalidar();
+      await this.cachePadroesValidacao.obterPadroes(true);
+      RespostaPadrao.enviarSucesso(res, 200, { mensagem: 'Cache de padrões atualizado com sucesso' });
+    } catch (erro) {
+      const msg = this.obterMensagemErroApi(erro, 'Erro ao atualizar padrões');
+      Logger.error(`[ControladorRecomendacao.atualizarPadroesValidacao] ${msg}`, erro instanceof Error ? erro.stack : String(erro));
+      RespostaPadrao.enviarErro(res, 500, msg);
+    }
+  };
+
+  /**
+   * Endpoint GET /api/ia/metricas
+   * Endpoint GET /api/ia/metricas/:periodo
+   *
+   * Retorna o histórico detalhado de métricas de recomendação registradas no período.
+   * O parâmetro :periodo é opcional; quando ausente, retorna todos os registros.
+   * Valores aceitos: hoje, semana, mes, todos.
+   */
+  buscarMetricas = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const periodoParam = (req.params.periodo ?? 'todos').toLowerCase();
+
+      if (!PERIODOS_VALIDOS.has(periodoParam)) {
+        RespostaPadrao.enviarErro(
+          res,
+          400,
+          `Período inválido. Valores aceitos: ${Array.from(PERIODOS_VALIDOS).join(', ')}`,
+        );
+        return;
+      }
+
+      const periodo = periodoParam as PeriodoMetrica;
+      const metricas = await this.servicoRecomendacao.buscarMetricas(periodo);
+
+      // Omite o id interno para não expor BIGSERIAL conforme regra U4
+      const metricasPublicas = metricas.map((m) => ({
+        clienteUuid: m.clienteUuid,
+        query: m.query,
+        produtosRecomendados: m.produtosRecomendados,
+        tempoRespostaMs: m.tempoRespostaMs,
+        precisao: m.precisao,
+        recall: m.recall,
+        f1Score: m.f1Score,
+        relevanciaSemantica: m.relevanciaSemantica,
+        dataCriacao: m.dataCriacao,
+      }));
+
+      RespostaPadrao.enviarSucesso(res, 200, {
+        periodo,
+        total: metricasPublicas.length,
+        metricas: metricasPublicas,
+      });
+    } catch (erro) {
+      const msg = this.obterMensagemErroApi(erro, 'Erro ao buscar métricas de recomendação');
+      Logger.error(
+        `[ControladorRecomendacao.buscarMetricas] Erro: ${msg}`,
+        erro instanceof Error ? erro.stack : String(erro),
+      );
+      RespostaPadrao.enviarErro(res, this.obterStatusHttpErro(erro, 500), msg);
+    }
+  };
+
+  /**
+   * Endpoint GET /api/ia/metricas/agregadas
+   *
+   * Retorna médias e totais consolidados das métricas de recomendação.
+   * Aceita query param opcional ?periodo= (hoje, semana, mes, todos).
+   * Quando omitido, consolida todos os registros históricos.
+   */
+  buscarMetricasAgregadas = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const periodoParam = ((req.query.periodo as string) ?? 'todos').toLowerCase();
+
+      if (!PERIODOS_VALIDOS.has(periodoParam)) {
+        RespostaPadrao.enviarErro(
+          res,
+          400,
+          `Período inválido. Valores aceitos: ${Array.from(PERIODOS_VALIDOS).join(', ')}`,
+        );
+        return;
+      }
+
+      const periodo = periodoParam as PeriodoMetrica;
+      const agregadas = await this.servicoRecomendacao.buscarMetricasAgregadas(periodo);
+
+      RespostaPadrao.enviarSucesso(res, 200, agregadas);
+    } catch (erro) {
+      const msg = this.obterMensagemErroApi(erro, 'Erro ao buscar métricas agregadas de recomendação');
+      Logger.error(
+        `[ControladorRecomendacao.buscarMetricasAgregadas] Erro: ${msg}`,
+        erro instanceof Error ? erro.stack : String(erro),
+      );
+      RespostaPadrao.enviarErro(res, this.obterStatusHttpErro(erro, 500), msg);
+    }
+  };
+
+  /**
+   * Endpoint GET /api/ia/saude
+   * 
+   * Verifica saúde do serviço de IA.
+   */
+  saude = async (_req: Request, res: Response): Promise<void> => {
+    try {
+      const resultado = await this.servicoRecomendacao.verificarSaude();
+      const statusCode = resultado.status === 'down' ? 503 : 200;
+      RespostaPadrao.enviarSucesso(res, statusCode, resultado);
+    } catch (erro) {
+      const msg = this.obterMensagemErroApi(erro, 'Erro ao verificar saúde');
+      Logger.error(`[ControladorRecomendacao.saude] Erro: ${msg}`, erro instanceof Error ? erro.stack : String(erro));
+      RespostaPadrao.enviarErro(res, 500, msg);
+    }
+  };
+}

@@ -15,6 +15,8 @@ import { registrarRotasCupom } from '@/modules/cupom/cupom.routes';
 import { criarRotasLogisticaMocks } from '@/modules/logistica-mocks/logisticaMocks.routes';
 import { registrarRotasLojas } from '@/modules/lojas/lojas.routes';
 import rotasUsuarioPapeis from '@/modules/usuarios/usuarioPapeis.routes';
+import { registrarRotasIA } from '@/modules/ia/ia.routes';
+import { registrarRotasAdminSistema } from '@/modules/admin-sistema/adminSistema.routes';
 import { ServicoMockCorreios } from '@/modules/logistica-mocks/servicoMockCorreios';
 import { ServicoMockLoggi } from '@/modules/logistica-mocks/servicoMockLoggi';
 import { RepositorioRastreamentoPostgres } from '@/modules/logistica-mocks/repositorios/RepositorioRastreamentoPostgres';
@@ -40,12 +42,12 @@ export function criarAplicacao(): Application {
   const apiRouter = Router();
   const db = ConexaoPostgres.obterInstancia();
 
-  // Logging de todas as requisições para debug
-  app.use((req, res, next) => {
-    console.log(`[REQUEST] ${req.method} ${req.url}`);
-    Logger.info(`[REQUEST] ${req.method} ${req.url}`);
-    next();
-  });
+  if (process.env.NODE_ENV === 'development') {
+    app.use((req, _res, next) => {
+      Logger.info(`[REQUEST] ${req.method} ${req.url}`);
+      next();
+    });
+  }
 
   app.use(cookieParser());
   app.use(
@@ -66,8 +68,12 @@ export function criarAplicacao(): Application {
   );
   // Configura os middlewares globais ANTES das rotas.
   app.use(express.json());
+  // middlewareTrocaBanco deve vir antes de contextoLojaMiddleware para garantir que
+  // o contexto de banco de teste seja aplicado antes de consultar a tabela de lojas
+  if (process.env.NODE_ENV === 'test') { // [BANCO DE TESTES DESABILITADO] || process.env.ENABLE_TEST_DB_SWITCH === 'true'
+    app.use(middlewareTrocaBanco);
+  }
   app.use(contextoLojaMiddleware);
-  // app.use(middlewareTrocaBanco);
 
   // Instanciar serviços mock de logística
   const repoRastreamento = new RepositorioRastreamentoPostgres(db);
@@ -88,12 +94,14 @@ export function criarAplicacao(): Application {
   registrarRotasAutenticacao(apiRouter);
   registrarRotasClientes(apiRouter);
   registrarRotasCartoes(apiRouter);
-  registrarRotasAdmin(apiRouter);
   registrarRotasVendas(apiRouter);
+  registrarRotasAdmin(apiRouter);
   registrarRotasLivros(apiRouter);
   registrarRotasCarrinho(apiRouter);
   registrarRotasCupom(apiRouter);
   registrarRotasLojas(apiRouter);
+  registrarRotasIA(apiRouter);
+  registrarRotasAdminSistema(apiRouter);
   apiRouter.use('/usuarios/papeis', rotasUsuarioPapeis);
   
   // Rotas mockadas para APIs de logística (Correios e Loggi)

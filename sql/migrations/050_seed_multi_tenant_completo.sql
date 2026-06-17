@@ -3,14 +3,19 @@
 -- Ambiente: Desenvolvimento, Testes
 -- Autor: Senior DBA
 -- Data: 2026-05-26
+-- 
+-- IMPORTANTE: A Loja Padrão usa um UUID fixo determinístico (82c0a24c-4cf4-4b12-823a-f1a8b9a086c3)
+-- para garantir consistência entre execuções de seeds e testes.
+-- Outros seeds (como 070_seed_vendas_historicas_13_meses.sql) dependem deste UUID fixo.
 
 BEGIN;
 
 -- ============================================
--- PASSO 1: Criar 3 lojas distintas
+-- PASSO 1: Criar Loja Padrão com UUID fixo e outras lojas
 -- ============================================
 INSERT INTO livraria_gestao.lojas (loj_uuid, loj_nome, loj_slug, loj_cnpj, loj_ativo)
 VALUES
+  ('82c0a24c-4cf4-4b12-823a-f1a8b9a086c3'::UUID, 'Loja Padrão', 'loja-padrao', '00.000.000/0001-00', TRUE),
   (gen_random_uuid(), 'Livraria Centro', 'livraria-centro', '12.345.678/0001-90', TRUE),
   (gen_random_uuid(), 'Livraria Norte', 'livraria-norte', '23.456.789/0001-01', TRUE),
   (gen_random_uuid(), 'Livraria Sul', 'livraria-sul', '34.567.890/0001-12', TRUE)

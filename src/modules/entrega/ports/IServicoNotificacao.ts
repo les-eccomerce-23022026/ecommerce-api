@@ -16,4 +16,12 @@ export interface IServicoNotificacao {
    * @param vendaUuid UUID da venda para referência.
    */
   enviarNotificacaoReconfirmacaoEndereco(email: string, vendaUuid: string): Promise<void>;
+
+  /**
+   * Envia uma notificação de aviso de expiração de reserva no carrinho.
+   * @param usuarioUuid UUID do usuário.
+   * @param livroTitulo Título do livro.
+   * @param tempoRestante Tempo restante em minutos.
+   */
+  enviarNotificacaoExpiracaoReserva(usuarioUuid: string, livroTitulo: string, tempoRestante: number): Promise<void>;
 }

@@ -7,13 +7,17 @@
 BEGIN;
 
 -- ============================================
--- PASSO 1: Garantir apenas loja padrão para testes
+-- PASSO 1: Garantir loja padrão e preservar lojas multi-tenancy
 -- ============================================
--- Remover vínculos de admin_lojas para lojas extras antes de deletar as lojas
-DELETE FROM livraria_gestao.admin_lojas WHERE loj_id > 1;
+-- Remover vínculos de admin_lojas para lojas extras (exceto multi-tenancy)
+DELETE FROM livraria_gestao.admin_lojas 
+WHERE loj_id > 1 
+AND loj_id NOT IN (18, 19); -- IDs fixos das lojas multi-tenancy
 
--- Remover lojas extras se existirem (apenas manter loja padrão)
-DELETE FROM livraria_gestao.lojas WHERE loj_id > 1;
+-- Remover lojas extras se existirem (apenas manter loja padrão e multi-tenancy)
+DELETE FROM livraria_gestao.lojas 
+WHERE loj_id > 1 
+AND loj_id NOT IN (18, 19); -- IDs fixos das lojas multi-tenancy
 
 -- ============================================
 -- PASSO 2: Vincular admin à loja padrão para testes
@@ -23,8 +27,8 @@ DECLARE
   v_admin_id BIGINT;
   v_loja_padrao BIGINT;
 BEGIN
-  -- Buscar ID da loja padrão
-  SELECT loj_id INTO v_loja_padrao FROM livraria_gestao.lojas WHERE loj_slug = 'loja-padrao';
+  -- Buscar ID da loja padrão (pode ser 'loja-padrao' ou 'livraria-teste')
+  SELECT loj_id INTO v_loja_padrao FROM livraria_gestao.lojas WHERE loj_slug IN ('loja-padrao', 'livraria-teste') LIMIT 1;
   
   -- Buscar primeiro admin (assumindo que existe)
   SELECT usu_id INTO v_admin_id FROM livraria_gestao.usuarios LIMIT 1;
@@ -52,8 +56,8 @@ DECLARE
   v_preco_teste NUMERIC := 29.90;
   v_quantidade_teste INTEGER := 50;
 BEGIN
-  -- Buscar ID da loja padrão
-  SELECT loj_id INTO v_loja_padrao FROM livraria_gestao.lojas WHERE loj_slug = 'loja-padrao';
+  -- Buscar ID da loja padrão (pode ser 'loja-padrao' ou 'livraria-teste')
+  SELECT loj_id INTO v_loja_padrao FROM livraria_gestao.lojas WHERE loj_slug IN ('loja-padrao', 'livraria-teste') LIMIT 1;
   
   IF v_loja_padrao IS NOT NULL THEN
     -- Para os primeiros 5 livros
@@ -83,7 +87,8 @@ END $$;
 -- ============================================
 -- RESUMO DO SEED
 -- ============================================
--- ✅ Apenas loja padrão (loj_id = 1) mantida para testes
+-- ✅ Loja padrão (loj_id = 1) mantida para testes
+-- ✅ Lojas multi-tenancy (loj_id = 18, 19) preservadas
 -- ✅ Admin vinculado à loja padrão
 -- ✅ Estoques mínimos criados para 5 livros na loja padrão
 -- ✅ Ambiente de testes isolado e previsível

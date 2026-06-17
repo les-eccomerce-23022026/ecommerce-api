@@ -1,0 +1,198 @@
+/**
+ * Mocks compartilhados para testes de integração do módulo IA.
+ * Importe este arquivo como primeira linha do arquivo de teste (antes de outros imports da app).
+ */
+
+export const mockGerarEmbedding = jest.fn().mockResolvedValue([0.1, 0.2, 0.3, 0.4, 0.5]);
+export const mockGerarEmbeddingsLote = jest.fn().mockResolvedValue([[0.1, 0.2, 0.3, 0.4, 0.5]]);
+export const mockGerarRespostaChat = jest.fn().mockResolvedValue(
+  'Resposta simulada do catálogo da livraria.',
+);
+export const mockInterpretarIntencao = jest.fn().mockResolvedValue({
+  tipo: 'recomendacao',
+  generos: [],
+  quantidadeLivros: 1,
+  precisaEsclarecer: false,
+  queryBusca: 'consulta simulada',
+  confianca: 0.9,
+});
+export const mockValidarConexaoGemini = jest.fn().mockResolvedValue(true);
+
+// ── Mocks do RepositorioRecomendacaoPostgres ────────────────────────────────
+// IRepositorioContextoCliente
+export const mockBuscarContexto = jest.fn().mockResolvedValue(null);
+// IRepositorioTendencias (pos_venda e tendencias)
+export const mockBuscarPedidosRecentes = jest.fn().mockResolvedValue([]);
+export const mockBuscarTendenciasPorCategoria = jest.fn().mockResolvedValue([]);
+export const mockBuscarTendenciasPorFaixaEtaria = jest.fn().mockResolvedValue([]);
+// IRepositorioMetricasRecomendacao
+export const mockSalvarMetrica = jest.fn().mockResolvedValue(undefined);
+export const mockBuscarMetricasRepositorio = jest.fn().mockResolvedValue([]);
+export const mockBuscarMetricasAgregadasRepositorio = jest.fn().mockResolvedValue({
+  periodo: 'todos',
+  totalRecomendacoes: 0,
+  tempoRespostaMedio: 0,
+  precisaoMedia: 0,
+  recallMedio: 0,
+  f1ScoreMedio: 0,
+  relevanciaSemanticaMedia: 0,
+  taxaErro: 0,
+});
+
+export const mockCriarEmbedding = jest.fn().mockResolvedValue({
+  id: 0,
+  uuid: 'embed-uuid-padrao',
+  produtoUuid: 'prod-uuid-padrao',
+  embedding: [0.1, 0.2, 0.3],
+  metadados: {},
+  criadoEm: new Date(),
+  atualizadoEm: new Date(),
+});
+export const mockBuscarPorProdutoUuid = jest.fn().mockResolvedValue(null);
+export const mockBuscarSimilares = jest.fn().mockResolvedValue([]);
+export const mockAtualizarEmbedding = jest.fn().mockResolvedValue({});
+export const mockRemoverEmbedding = jest.fn().mockResolvedValue(undefined);
+export const mockIndexarCatalogo = jest.fn().mockResolvedValue(0);
+export const mockLimparColecao = jest.fn().mockResolvedValue(undefined);
+export const mockVerificarConexaoChroma = jest.fn().mockResolvedValue(true);
+export const mockIndexarProduto = jest.fn().mockResolvedValue(undefined);
+export const mockRemoverProduto = jest.fn().mockResolvedValue(undefined);
+
+// Mocks do ServicoHealthCheckIA
+export const mockVerificarChromaDB = jest.fn().mockResolvedValue({
+  ok: true,
+  latencyMs: 50,
+});
+export const mockVerificarGemini = jest.fn().mockResolvedValue({
+  ok: true,
+  latencyMs: 75,
+});
+export const mockVerificarTodasDependencias = jest.fn().mockResolvedValue({
+  status: 'ok',
+  timestamp: new Date().toISOString(),
+  dependencias: {
+    chromadb: { ok: true, latencyMs: 50 },
+    gemini: { ok: true, latencyMs: 75 },
+  },
+});
+export const mockEstaSaudavel = jest.fn().mockReturnValue(true);
+
+jest.mock('@/modules/ia/adapterLangChainGemini', () => ({
+  AdapterLangChainGemini: jest.fn().mockImplementation(() => ({
+    gerarEmbedding: mockGerarEmbedding,
+    gerarEmbeddingsLote: mockGerarEmbeddingsLote,
+    gerarRespostaChat: mockGerarRespostaChat,
+    interpretarIntencao: mockInterpretarIntencao,
+    validarConexao: mockValidarConexaoGemini,
+  })),
+}));
+
+export const mockConfiguracaoRecomendacao = {
+  quantidadeResultados: 5,
+  limiarSimilaridade: 0.6,
+  multiplicadorBusca: 2,
+  multiplicadorBuscaComContexto: 2,
+  multiplicadorBuscaSemContexto: 3,
+  personalizacao: {
+    boostCategoria: 1.2,
+    boostAutor: 1.3,
+    boostPreco: 1.1,
+  },
+};
+
+/** Mock da função calcularMultiplicadorBusca — espelha a lógica real para testes */
+export const mockCalcularMultiplicadorBusca = jest.fn(
+  (temContexto: boolean) => (temContexto ? 2 : 3)
+);
+
+jest.mock('@/modules/ia/repositorioEmbeddingChromaDB', () => ({
+  CONFIGURACAO_RECOMENDACAO: mockConfiguracaoRecomendacao,
+  calcularMultiplicadorBusca: mockCalcularMultiplicadorBusca,
+  RepositorioEmbeddingChromaDB: jest.fn().mockImplementation(() => ({
+    criar: mockCriarEmbedding,
+    buscarPorProdutoUuid: mockBuscarPorProdutoUuid,
+    buscarSimilares: mockBuscarSimilares,
+    atualizar: mockAtualizarEmbedding,
+    remover: mockRemoverEmbedding,
+    indexarCatalogo: mockIndexarCatalogo,
+    limparColecao: mockLimparColecao,
+    verificarConexao: mockVerificarConexaoChroma,
+  })),
+}));
+
+jest.mock('@/modules/ia/repositorioRecomendacaoPostgres', () => ({
+  RepositorioRecomendacaoPostgres: jest.fn().mockImplementation(() => ({
+    buscarContexto: mockBuscarContexto,
+    buscarPedidosRecentes: mockBuscarPedidosRecentes,
+    buscarTendenciasPorCategoria: mockBuscarTendenciasPorCategoria,
+    buscarTendenciasPorFaixaEtaria: mockBuscarTendenciasPorFaixaEtaria,
+    salvarMetrica: mockSalvarMetrica,
+    buscarMetricas: mockBuscarMetricasRepositorio,
+    buscarMetricasAgregadas: mockBuscarMetricasAgregadasRepositorio,
+  })),
+}));
+
+jest.mock('@/modules/ia/servicoIndexacaoProdutos', () => ({
+  ServicoIndexacaoProdutos: jest.fn().mockImplementation(() => ({
+    indexarCatalogo: mockIndexarCatalogo,
+    indexarProduto: mockIndexarProduto,
+    removerProduto: mockRemoverProduto,
+  })),
+}));
+
+jest.mock('@/modules/ia/servicoHealthCheckIA', () => ({
+  ServicoHealthCheckIA: jest.fn().mockImplementation(() => ({
+    verificarChromaDB: mockVerificarChromaDB,
+    verificarGemini: mockVerificarGemini,
+    verificarTodasDependencias: mockVerificarTodasDependencias,
+    estaSaudavel: mockEstaSaudavel,
+  })),
+}));
+
+/** Reinicia contadores e implementações dos mocks entre testes (opcional). */
+export function reiniciarMocksIa(): void {
+  jest.clearAllMocks();
+  mockCalcularMultiplicadorBusca.mockImplementation((temContexto: boolean) =>
+    temContexto ? 2 : 3
+  );
+  mockGerarEmbedding.mockResolvedValue([0.1, 0.2, 0.3, 0.4, 0.5]);
+  mockGerarEmbeddingsLote.mockResolvedValue([[0.1, 0.2, 0.3, 0.4, 0.5]]);
+  mockGerarRespostaChat.mockResolvedValue('Resposta simulada do catálogo da livraria.');
+  mockInterpretarIntencao.mockResolvedValue({
+    tipo: 'recomendacao',
+    generos: [],
+    quantidadeLivros: 1,
+    precisaEsclarecer: false,
+    queryBusca: 'consulta simulada',
+    confianca: 0.9,
+  });
+  mockValidarConexaoGemini.mockResolvedValue(true);
+  mockBuscarSimilares.mockResolvedValue([]);
+  mockIndexarCatalogo.mockResolvedValue(0);
+  mockVerificarConexaoChroma.mockResolvedValue(true);
+  // RepositorioRecomendacaoPostgres
+  mockBuscarContexto.mockResolvedValue(null);
+  mockBuscarPedidosRecentes.mockResolvedValue([]);
+  mockBuscarTendenciasPorCategoria.mockResolvedValue([]);
+  mockBuscarTendenciasPorFaixaEtaria.mockResolvedValue([]);
+  mockSalvarMetrica.mockResolvedValue(undefined);
+  mockBuscarMetricasRepositorio.mockResolvedValue([]);
+  // ServicoHealthCheckIA
+  mockVerificarChromaDB.mockResolvedValue({
+    ok: true,
+    latencyMs: 50,
+  });
+  mockVerificarGemini.mockResolvedValue({
+    ok: true,
+    latencyMs: 75,
+  });
+  mockVerificarTodasDependencias.mockResolvedValue({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    dependencias: {
+      chromadb: { ok: true, latencyMs: 50 },
+      gemini: { ok: true, latencyMs: 75 },
+    },
+  });
+  mockEstaSaudavel.mockReturnValue(true);
+}

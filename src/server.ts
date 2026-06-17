@@ -5,6 +5,20 @@ import { SimuladorAtualizacaoRastreamento } from '@/modules/logistica-mocks/Simu
 import { RepositorioRastreamentoPostgres } from '@/modules/logistica-mocks/repositorios/RepositorioRastreamentoPostgres';
 import { RepositorioEventoRastreamentoPostgres } from '@/modules/logistica-mocks/repositorios/RepositorioEventoRastreamentoPostgres';
 import { ConexaoPostgres } from '@/shared/infrastructure/database/ConexaoPostgres';
+import { JobAutoConfirmacaoEntrega } from '@/modules/entrega/jobs/JobAutoConfirmacaoEntrega';
+import { RepositorioVendasPostgres } from '@/modules/vendas/repositories/RepositorioVendasPostgres';
+import { RepositorioEntregaPostgres } from '@/modules/entrega/RepositorioEntregaPostgres';
+import { ServicoEntrega } from '@/modules/entrega/ServicoEntrega';
+import { ServicoNotificacaoBanco } from '@/modules/entrega/adapters/ServicoNotificacaoBanco';
+import { RepositorioNotificacoes } from '@/modules/entrega/RepositorioNotificacoes';
+import { JobExpiracaoReservas } from '@/modules/estoque/jobs/JobExpiracaoReservas';
+import { RepositorioReservasPostgres } from '@/modules/estoque/repositorioReservas';
+import { RepositorioEstoque } from '@/modules/estoque/repositorioEstoque';
+import { RepositorioLivrosPostgres } from '@/modules/livros/repositorioLivrosPostgres';
+import { RepositorioUsuarios } from '@/modules/usuarios/usuario.repository';
+import { JobLimpezaTokensRevocados } from '@/modules/auth/jobs/JobLimpezaTokensRevocados';
+import { JobAutoIndexacaoChromaDB } from '@/modules/ia/jobs/JobAutoIndexacaoChromaDB';
+import { adapterChatLLM } from '@/modules/ia/ia.routes';
 
 dotenv.config();
 
@@ -21,6 +35,11 @@ const variaveisObrigatorias: Record<string, string | undefined> = {
   REDIS_PORT: process.env.REDIS_PORT,
   SEGREDO_HMAC_INTENCAO: process.env.SEGREDO_HMAC_INTENCAO,
 };
+
+// Validar pelo menos uma API key de LLM (Gemini ou Groq)
+if (!process.env.GEMINI_API_KEY && !process.env.GROQ_API_KEY) {
+  throw new Error('Pelo menos uma API key de LLM deve ser configurada: GEMINI_API_KEY ou GROQ_API_KEY');
+}
 
 const variaveisFaltando = Object.entries(variaveisObrigatorias)
   .filter(([, valor]) => !valor)
@@ -62,8 +81,95 @@ if (process.env.NODE_ENV === 'development') {
 
 app.listen(Number(porta), () => {
   Logger.info(`Servidor iniciado na porta ${porta}`);
+
+  // Warm-up do LLM de chat (Task 2): dispara a seleção Groq/Gemini ainda no boot,
+  // de forma não-bloqueante, para que a primeira requisição real não pague a
+  // latência da verificação de disponibilidade. Falha não derruba o boot.
+  // Reusa instância única de ia.routes.ts para evitar duplicação (DRY).
+  void adapterChatLLM
+    .prewarmChat()
+    .then(() => Logger.info('[Server] Warm-up do LLM de chat concluído com sucesso'))
+    .catch((erro: unknown) => {
+      const msg = erro instanceof Error ? erro.message : String(erro);
+      Logger.warn(`[Server] Warm-up do LLM de chat falhou (seguindo sem warm-up). Causa: ${msg}`);
+    });
 });
 
+// Job de auto-confirmação de entregas com prazo vencido
+try {
+  const db = ConexaoPostgres.obterInstancia();
+  const repoVendasJob = new RepositorioVendasPostgres(db);
+  const repoRastreamentoJob = new RepositorioRastreamentoPostgres(db);
+  const repoEntregaJob = new RepositorioEntregaPostgres(db, repoRastreamentoJob);
+  const repoNotificacoesJob = new RepositorioNotificacoes(db);
+  const servicoNotificacaoJob = new ServicoNotificacaoBanco(repoNotificacoesJob);
+  const servicoEntregaJob = new ServicoEntrega(repoEntregaJob, repoVendasJob, servicoNotificacaoJob);
+
+  const jobAutoConfirmacao = new JobAutoConfirmacaoEntrega(
+    repoVendasJob,
+    repoEntregaJob,
+    servicoEntregaJob,
+    60,
+  );
+  jobAutoConfirmacao.iniciar();
+
+  process.on('SIGTERM', () => jobAutoConfirmacao.parar());
+  process.on('SIGINT', () => jobAutoConfirmacao.parar());
+} catch (erro) {
+  const msg = erro instanceof Error ? erro.message : String(erro);
+  Logger.warn(`[Server] Job de auto-confirmação fora do ar. Causa: ${msg}`);
+}
+
+// Job de expiração de reservas de estoque
+try {
+  const db = ConexaoPostgres.obterInstancia();
+  const repoReservasJob = new RepositorioReservasPostgres(db);
+  const repoEstoqueJob = new RepositorioEstoque(db);
+  const repoNotificacoesJob = new RepositorioNotificacoes(db);
+  const servicoNotificacaoJob = new ServicoNotificacaoBanco(repoNotificacoesJob);
+  const repoLivrosJob = new RepositorioLivrosPostgres(db);
+  const repoUsuariosJob = new RepositorioUsuarios(db);
+
+  const jobExpiracaoReservas = new JobExpiracaoReservas(
+    repoReservasJob,
+    repoEstoqueJob,
+    servicoNotificacaoJob,
+    repoLivrosJob,
+    repoUsuariosJob,
+    10, // 10 minutos
+  );
+  jobExpiracaoReservas.iniciar();
+
+  process.on('SIGTERM', () => jobExpiracaoReservas.parar());
+  process.on('SIGINT', () => jobExpiracaoReservas.parar());
+} catch (erro) {
+  const msg = erro instanceof Error ? erro.message : String(erro);
+  Logger.warn(`[Server] Job de expiração de reservas fora do ar. Causa: ${msg}`);
+}
+
+// Job de limpeza de tokens revocados (diário)
+try {
+  const jobLimpezaTokens = new JobLimpezaTokensRevocados(24); // 24 horas
+  jobLimpezaTokens.iniciar();
+
+  process.on('SIGTERM', () => jobLimpezaTokens.parar());
+  process.on('SIGINT', () => jobLimpezaTokens.parar());
+} catch (erro) {
+  const msg = erro instanceof Error ? erro.message : String(erro);
+  Logger.warn(`[Server] Job de limpeza de tokens fora do ar. Causa: ${msg}`);
+}
+
+// Job de auto-indexacao do ChromaDB (assincrono no startup)
+try {
+  const jobAutoIndexacao = new JobAutoIndexacaoChromaDB();
+  jobAutoIndexacao.executarAssincrono();
+  Logger.info('[Server] Job de auto-indexacao do ChromaDB iniciado (assincrono)');
+} catch (erro) {
+  const msg = erro instanceof Error ? erro.message : String(erro);
+  Logger.warn(`[Server] Job de auto-indexacao do ChromaDB fora do ar. Causa: ${msg}`);
+}
+
+// 
 // Parar simulador ao encerrar o servidor (temporariamente desabilitado)
 /*
 process.on('SIGTERM', () => {

@@ -4,6 +4,7 @@ import { vendaParaPayloadPedidoAdmin } from '@/modules/admin/mappers/pedido-admi
 import { ServicoMockCorreios } from '@/modules/logistica-mocks/servicoMockCorreios';
 import { ServicoMockLoggi } from '@/modules/logistica-mocks/servicoMockLoggi';
 import { IServicoNotificacao } from '@/modules/entrega/ports/IServicoNotificacao';
+import { MENSAGENS_ERRO } from '@/shared/constants/mensagens-erro.constants';
 
 const ENDERECO_PADRAO_ADMIN = {
   logradouro: 'Despacho administrativo',
@@ -31,13 +32,13 @@ export class ServicoPedidosAdmin {
   async despachar(vendaUuid: string): Promise<Record<string, unknown>> {
     const venda = await this.repositorioVendas.obterPorUuid(vendaUuid);
     if (!venda) {
-      throw new Error('Pedido não encontrado.');
+      throw new Error(MENSAGENS_ERRO.PEDIDO_NAO_ENCONTRADO);
     }
     const statusAtual = venda.status.trim().toUpperCase();
     if (process.env.NODE_ENV === 'test') {
       console.log(`[DEBUG-DESPACHO] Pedido ${vendaUuid} Status Atual no BD: "${venda.status}" (Trimmed: "${statusAtual}")`);
     }
-    const statusPermitidos = new Set(['EM PROCESSAMENTO', 'APROVADA', 'APROVADO']);
+    const statusPermitidos = new Set(['EM_PROCESSAMENTO', 'APROVADA', 'APROVADO']);
     if (!statusPermitidos.has(statusAtual)) {
       throw new Error('Somente pedidos em processamento ou aprovados podem ser despachados.');
     }
@@ -80,9 +81,11 @@ export class ServicoPedidosAdmin {
       local: 'São Paulo/SP',
     });
 
+    await this.repositorioVendas.salvarDataPrevistaEntrega(vendaUuid, new Date(calculoFrete.dataPrevistaEntrega));
+
     const atualizada = await this.repositorioVendas.obterPorUuid(vendaUuid);
     if (!atualizada) throw new Error('Pedido não encontrado após despacho.');
-    
+
     const payload = vendaParaPayloadPedidoAdmin(atualizada);
     return {
       ...payload,
@@ -115,10 +118,10 @@ export class ServicoPedidosAdmin {
   async confirmarEntrega(vendaUuid: string): Promise<Record<string, unknown>> {
     const venda = await this.repositorioVendas.obterPorUuid(vendaUuid);
     if (!venda) {
-      throw new Error('Pedido não encontrado.');
+      throw new Error(MENSAGENS_ERRO.PEDIDO_NAO_ENCONTRADO);
     }
     const statusAtual = venda.status.trim().toUpperCase();
-    if (statusAtual !== 'EM TRÂNSITO') {
+    if (statusAtual !== 'EM_TRANSITO') {
       throw new Error('Somente pedidos em trânsito podem ter entrega confirmada.');
     }
 
@@ -138,10 +141,10 @@ export class ServicoPedidosAdmin {
   async marcarFalhaEntrega(vendaUuid: string, motivo: string): Promise<Record<string, unknown>> {
     const venda = await this.repositorioVendas.obterPorUuid(vendaUuid);
     if (!venda) {
-      throw new Error('Pedido não encontrado.');
+      throw new Error(MENSAGENS_ERRO.PEDIDO_NAO_ENCONTRADO);
     }
     const statusAtual = venda.status.trim().toUpperCase();
-    if (statusAtual !== 'EM TRÂNSITO') {
+    if (statusAtual !== 'EM_TRANSITO') {
       throw new Error('Somente pedidos em trânsito podem ter falha de entrega marcada.');
     }
 
@@ -163,7 +166,7 @@ export class ServicoPedidosAdmin {
   async redespachar(vendaUuid: string): Promise<Record<string, unknown>> {
     const venda = await this.repositorioVendas.obterPorUuid(vendaUuid);
     if (!venda) {
-      throw new Error('Pedido não encontrado.');
+      throw new Error(MENSAGENS_ERRO.PEDIDO_NAO_ENCONTRADO);
     }
     const statusAtual = venda.status.trim().toUpperCase();
     if (statusAtual !== 'FALHOU') {
@@ -207,8 +210,10 @@ export class ServicoPedidosAdmin {
       local: 'São Paulo/SP',
     });
 
+    await this.repositorioVendas.salvarDataPrevistaEntrega(vendaUuid, new Date(calculoFrete.dataPrevistaEntrega));
+
     // Atualizar status para EM TRÂNSITO
-    await this.repositorioVendas.atualizarStatus(vendaUuid, 'EM TRÂNSITO');
+    await this.repositorioVendas.atualizarStatus(vendaUuid, 'EM_TRANSITO');
 
     const atualizada = await this.repositorioVendas.obterPorUuid(vendaUuid);
     if (!atualizada) throw new Error('Pedido não encontrado após redespacho.');
@@ -225,7 +230,7 @@ export class ServicoPedidosAdmin {
   async solicitarReconfirmacaoEndereco(vendaUuid: string): Promise<void> {
     const venda = await this.repositorioVendas.obterPorUuid(vendaUuid);
     if (!venda) {
-      throw new Error('Pedido não encontrado.');
+      throw new Error(MENSAGENS_ERRO.PEDIDO_NAO_ENCONTRADO);
     }
     const statusAtual = venda.status.trim().toUpperCase();
     if (statusAtual !== 'FALHOU') {

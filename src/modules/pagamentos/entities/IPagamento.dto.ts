@@ -15,6 +15,8 @@ export interface IPagamentoInputDto {
   /** 1..PARCELAS_CARTAO_MAX; apenas para cartão de crédito. */
   parcelasCartao?: number;
   cartao?: ICartaoInputDto; // Apenas para cartão
+  /** Chave de idempotência para prevenir cobranças duplicadas (opcional) */
+  idempotencyKey?: string;
 }
 
 /**

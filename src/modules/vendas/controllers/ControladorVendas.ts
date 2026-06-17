@@ -3,6 +3,7 @@ import { ServicoVendas } from '@/modules/vendas/services/ServicoVendas';
 import { PAPEL_ADMIN } from '@/shared/types/papeis';
 import type { IRepositorioPagamentos } from '@/modules/pagamentos/repositories/IRepositorioPagamentos';
 import type { IRepositorioEntrega } from '@/modules/entrega/IRepositorioEntrega';
+import { RepositorioLivrosPostgres } from '@/modules/livros/repositorioLivrosPostgres';
 
 /**
  * Controlador para requisições de vendas.
@@ -14,7 +15,7 @@ export class ControladorVendas {
 
   private readonly repoEntrega: IRepositorioEntrega | null;
 
-  constructor(servicoVendas: ServicoVendas, repoPagamentos: IRepositorioPagamentos, repoEntrega?: IRepositorioEntrega) {
+  constructor(servicoVendas: ServicoVendas, repoPagamentos: IRepositorioPagamentos, repoEntrega?: IRepositorioEntrega, repoLivros?: RepositorioLivrosPostgres) {
     this.servicoVendas = servicoVendas;
     this.repoPagamentos = repoPagamentos;
     this.repoEntrega = repoEntrega ?? null;
@@ -45,19 +46,17 @@ export class ControladorVendas {
         return;
       }
 
-      // Calcular valorTotalItens automaticamente
-      const valorTotalItens = itens.reduce((acc: number, item: any) => {
-        if (!item.livroUuid || !item.quantidade || !item.precoUnitario) {
-          throw new Error('Cada item deve conter livroUuid, quantidade e precoUnitario');
+      // Validar que cada item tem livroUuid e quantidade (preço será buscado do catálogo)
+      itens.forEach((item: any) => {
+        if (!item.livroUuid || !item.quantidade) {
+          throw new Error('Cada item deve conter livroUuid e quantidade');
         }
-        return acc + (item.quantidade * item.precoUnitario);
-      }, 0);
-
-      // Usar valorFrete fornecido ou padrão 0
+      });
+      
+      // valorTotalItens e valorTotal serão calculados pelo serviço a partir do catálogo
+      const valorTotalItens = 0;
+      const valorTotal = req.body.valorTotal || 0;
       const valorFreteFinal = valorFrete || 0;
-
-      // Usar valorTotal fornecido ou calcular automaticamente
-      const valorTotal = req.body.valorTotal !== undefined ? req.body.valorTotal : valorTotalItens + valorFreteFinal;
 
       const vInput = {
         usuarioUuid: usuarioUuidFinal,
@@ -114,10 +113,10 @@ export class ControladorVendas {
 
       const vendas = await this.servicoVendas.listarVendasCliente(usuarioUuid);
       
-      // Mapear dataHoraEntrega para dataEntrega para compatibilidade com frontend
       const vendasMapeadas = vendas.map((venda) => ({
         ...venda,
         dataEntrega: venda.dataHoraEntrega ? venda.dataHoraEntrega.toISOString() : undefined,
+        dataPrevistaEntrega: venda.dataPrevistaEntrega ? venda.dataPrevistaEntrega.toISOString() : undefined,
       }));
       
       res.json(vendasMapeadas);
@@ -158,6 +157,18 @@ export class ControladorVendas {
   };
 
   /**
+   * Listar devoluções pendentes: GET /admin/pedidos/devolucoes
+   */
+  public listarDevolucoesPendentes = async (_req: Request, res: Response) => {
+    try {
+      const devolucoes = await this.servicoVendas.listarDevolucoesPendentes();
+      res.json(devolucoes);
+    } catch (err: unknown) {
+      res.status(400).json({ erro: (err as Error).message });
+    }
+  };
+
+  /**
    * Autorizar troca: PUT /admin/pedidos/:uuid/autorizar-troca
    */
   public autorizarTroca = async (req: Request, res: Response) => {
@@ -179,6 +190,69 @@ export class ControladorVendas {
       const { motivo } = req.body;
       const venda = await this.servicoVendas.rejeitarTroca(uuid, motivo);
       res.json(venda);
+    } catch (err: unknown) {
+      res.status(400).json({ erro: (err as Error).message });
+    }
+  };
+
+  /**
+   * Solicitar devolução: POST /vendas/:uuid/devolucao
+   */
+  public solicitarDevolucao = async (req: Request, res: Response) => {
+    try {
+      const { uuid } = req.params;
+      const { motivo, itensUuids } = req.body;
+      const usuarioUuid = req.usuario?.uuid;
+      if (!usuarioUuid) throw new Error('Não autenticado');
+
+      const venda = await this.servicoVendas.solicitarDevolucao(uuid, usuarioUuid, motivo, itensUuids);
+      res.json(venda);
+    } catch (err: unknown) {
+      res.status(400).json({ erro: (err as Error).message });
+    }
+  };
+
+  /**
+   * Autorizar devolução: PUT /admin/pedidos/:uuid/autorizar-devolucao
+   */
+  public autorizarDevolucao = async (req: Request, res: Response) => {
+    try {
+      const { uuid } = req.params;
+      const venda = await this.servicoVendas.autorizarDevolucao(uuid);
+      res.json(venda);
+    } catch (err: unknown) {
+      res.status(400).json({ erro: (err as Error).message });
+    }
+  };
+
+  /**
+   * Rejeitar devolução: PUT /admin/pedidos/:uuid/rejeitar-devolucao
+   */
+  public rejeitarDevolucao = async (req: Request, res: Response) => {
+    try {
+      const { uuid } = req.params;
+      const { motivo } = req.body;
+      const venda = await this.servicoVendas.rejeitarDevolucao(uuid, motivo);
+      res.json(venda);
+    } catch (err: unknown) {
+      res.status(400).json({ erro: (err as Error).message });
+    }
+  };
+
+  /**
+   * Confirmar recebimento de devolução: PUT /admin/pedidos/:uuid/confirmar-recebimento-devolucao
+   */
+  public confirmarRecebimentoDevolucao = async (req: Request, res: Response) => {
+    try {
+      const { uuid } = req.params;
+      const { retornarEstoque } = req.body;
+
+      const { venda, reembolsoProcessado } = await this.servicoVendas.confirmarRecebimentoDevolucao(
+        uuid,
+        Boolean(retornarEstoque),
+      );
+
+      res.json({ pedido: venda, reembolsoProcessado });
     } catch (err: unknown) {
       res.status(400).json({ erro: (err as Error).message });
     }
@@ -231,8 +305,8 @@ export class ControladorVendas {
   public despacharPedido = async (req: Request, res: Response) => {
     try {
       const { uuid } = req.params;
-      await this.servicoVendas.atualizarStatus(uuid, 'EM TRÂNSITO');
-      res.json({ status: 'EM TRÂNSITO' });
+      await this.servicoVendas.atualizarStatus(uuid, 'EM_TRANSITO');
+      res.json({ status: 'EM_TRANSITO' });
     } catch (err: unknown) {
       res.status(400).json({ erro: (err as Error).message });
     }
@@ -244,8 +318,34 @@ export class ControladorVendas {
   public confirmarEntrega = async (req: Request, res: Response) => {
     try {
       const { uuid } = req.params;
-      await this.servicoVendas.atualizarStatus(uuid, 'Entregue');
+      await this.servicoVendas.confirmarEntregaAdmin(uuid);
       res.json({ status: 'Entregue' });
+    } catch (err: unknown) {
+      res.status(400).json({ erro: (err as Error).message });
+    }
+  };
+
+  /**
+   * Confirmação de recebimento pelo cliente: PATCH /vendas/:uuid/confirmar-entrega
+   * Busca a entrega mais recente da venda e confirma o recebimento.
+   */
+  public confirmarRecebimentoCliente = async (req: Request, res: Response) => {
+    try {
+      const { uuid } = req.params;
+
+      if (!this.repoEntrega) {
+        res.status(501).json({ erro: 'Módulo de entrega não configurado.' });
+        return;
+      }
+
+      const entregas = await this.repoEntrega.listarPorVendaUuid(uuid);
+      if (entregas.length === 0) {
+        res.status(404).json({ erro: 'Nenhuma entrega encontrada para este pedido.' });
+        return;
+      }
+
+      await this.servicoVendas.atualizarStatus(uuid, 'ENTREGUE');
+      res.status(204).send();
     } catch (err: unknown) {
       res.status(400).json({ erro: (err as Error).message });
     }

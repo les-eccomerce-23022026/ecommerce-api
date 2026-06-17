@@ -1,4 +1,7 @@
-import { Client, Pool, type PoolClient } from 'pg';
+import { Client, Pool, type PoolClient, types } from 'pg';
+
+// DECIMAL/NUMERIC (OID 1700) e FLOAT8 (701) chegam como string por padrão no node-postgres
+types.setTypeParser(1700, (val) => parseFloat(val));
 import { existsSync } from 'node:fs';
 import { IConexaoBanco, DbParametro } from './IConexaoBanco';
 import { obterTipoBancoAtual, obterTransacaoAtual, contextoBanco, obterContextoAtual, definirTransacaoGlobalParaTestes } from './ContextoBanco';
@@ -35,10 +38,14 @@ export class ConexaoPostgres implements IConexaoBanco {
   }
 
   private static criarPool(config: { connectionString: string }): Pool {
-    const pool = new Pool({ 
+    const isTeste = process.env.NODE_ENV === 'test';
+    const pool = new Pool({
       connectionString: config.connectionString,
-      // Configurar search_path para incluir todos os schemas do projeto
-      options: `-c search_path=livraria_comercial,livraria_financeiro,livraria_gestao,livraria_logistica,livraria_ref,public`
+      options: `-c search_path=livraria_comercial,livraria_financeiro,livraria_gestao,livraria_logistica,livraria_ref,public`,
+      max: isTeste ? 5 : 20,
+      min: isTeste ? 1 : 5,
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 3000,
     });
     return pool;
   }

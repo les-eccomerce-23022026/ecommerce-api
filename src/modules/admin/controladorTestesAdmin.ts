@@ -13,7 +13,7 @@ export class ControladorTestesAdmin {
    * Suporta tanto cupons de troca quanto promocionais usando a tabela unificada.
    */
   public static async criarCupomTroca(requisicao: Request, resposta: Response): Promise<Response> {
-    const ambienteTeste = process.env.NODE_ENV === 'test';
+    const ambienteTeste = process.env.NODE_ENV === 'test' || process.env.ENABLE_TEST_DB_SWITCH === 'true';
     if (!ambienteTeste) {
       return RespostaPadrao.enviarErro(
         resposta,
@@ -81,7 +81,7 @@ export class ControladorTestesAdmin {
    * Expira uma intenção de pagamento simulando TTL (apenas testes).
    */
   public static async expirarIntencao(requisicao: Request, resposta: Response): Promise<Response> {
-    const ambienteTeste = process.env.NODE_ENV === 'test';
+    const ambienteTeste = process.env.NODE_ENV === 'test' || process.env.ENABLE_TEST_DB_SWITCH === 'true';
     if (!ambienteTeste) {
       return RespostaPadrao.enviarErro(
         resposta,
@@ -118,7 +118,7 @@ export class ControladorTestesAdmin {
    * Muda o status de uma venda (apenas testes).
    */
   public static async mudarStatusVenda(requisicao: Request, resposta: Response): Promise<Response> {
-    const ambienteTeste = process.env.NODE_ENV === 'test';
+    const ambienteTeste = process.env.NODE_ENV === 'test' || process.env.ENABLE_TEST_DB_SWITCH === 'true';
     if (!ambienteTeste) {
       return RespostaPadrao.enviarErro(
         resposta,
@@ -167,7 +167,7 @@ export class ControladorTestesAdmin {
    * Insere dados de tipo_pagamento, status_venda e prepara tabela de PIX simulado.
    */
   public static async prepararTabelasPagamento(requisicao: Request, resposta: Response): Promise<Response> {
-    const ambienteTeste = process.env.NODE_ENV === 'test';
+    const ambienteTeste = process.env.NODE_ENV === 'test' || process.env.ENABLE_TEST_DB_SWITCH === 'true';
     if (!ambienteTeste) {
       return RespostaPadrao.enviarErro(
         resposta,
@@ -186,7 +186,7 @@ export class ControladorTestesAdmin {
 
       // Inserir status de venda AGUARDANDO PAGAMENTO
       await db.executar(
-        `INSERT INTO livraria_comercial.status_venda (stv_descricao) VALUES ('AGUARDANDO PAGAMENTO') ON CONFLICT (stv_descricao) DO NOTHING`,
+        `INSERT INTO livraria_comercial.status_venda (stv_descricao) VALUES ('AGUARDANDO_PAGAMENTO') ON CONFLICT (stv_descricao) DO NOTHING`,
       );
 
       // Preparar tabela de PIX simulado
@@ -207,7 +207,7 @@ export class ControladorTestesAdmin {
    * Usado para criar cupons de troca vinculados a clientes específicos.
    */
   public static async obterClienteIdPorEmail(requisicao: Request, resposta: Response): Promise<Response> {
-    const ambienteTeste = process.env.NODE_ENV === 'test';
+    const ambienteTeste = process.env.NODE_ENV === 'test' || process.env.ENABLE_TEST_DB_SWITCH === 'true';
     if (!ambienteTeste) {
       return RespostaPadrao.enviarErro(
         resposta,

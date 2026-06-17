@@ -18,7 +18,7 @@ export class RepositorioRefreshTokenPostgres implements IRepositorioRefreshToken
   }
 
   async criar(dto: ICriarRefreshTokenDto): Promise<IRefreshToken> {
-    const loj_id = ContextoRequisicao.obterLojId();
+    const loj_id = dto.lojId || ContextoRequisicao.obterLojId();
     const tokenHash = this.hashToken(dto.token);
 
     const query = `
@@ -27,7 +27,7 @@ export class RepositorioRefreshTokenPostgres implements IRepositorioRefreshToken
         rft_expira_em, loj_id
       )
       VALUES ($1, $2, $3, $4, $5, $6)
-      RETURNING 
+      RETURNING
         rft_id as id,
         rft_uuid as uuid,
         usu_id as "usuarioId",
@@ -68,7 +68,7 @@ export class RepositorioRefreshTokenPostgres implements IRepositorioRefreshToken
         rft_revocado_em as "revocadoEm",
         rft_criado_em as "criadoEm",
         loj_id as "lojId"
-      FROM l
+      FROM livraria_gestao.refresh_tokens
       WHERE rft_token_hash = $1
         AND loj_id = $2
       LIMIT 1
@@ -93,7 +93,7 @@ export class RepositorioRefreshTokenPostgres implements IRepositorioRefreshToken
         rft_revocado_em as "revocadoEm",
         rft_criado_em as "criadoEm",
         loj_id as "lojId"
-      FROM l
+      FROM livraria_gestao.refresh_tokens
       WHERE usu_id = $1
         AND loj_id = $2
         AND rft_revocado_em IS NULL
@@ -103,6 +103,17 @@ export class RepositorioRefreshTokenPostgres implements IRepositorioRefreshToken
 
     const rows = await this.db.executar(query, [usuarioId, loj_id]);
     return rows as IRefreshToken[];
+  }
+
+  async revogarPorTokenPlano(token: string): Promise<void> {
+    const tokenHash = this.hashToken(token);
+    const query = `
+      UPDATE livraria_gestao.refresh_tokens
+      SET rft_revocado_em = NOW()
+      WHERE rft_token_hash = $1
+        AND rft_revocado_em IS NULL
+    `;
+    await this.db.executar(query, [tokenHash]);
   }
 
   async revogar(uuid: string): Promise<void> {

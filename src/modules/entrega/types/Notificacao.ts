@@ -6,7 +6,7 @@ export interface INotificacao {
   uuid?: string;
   usuarioUuid: string;
   vendaUuid?: string;
-  tipo: 'RASTREIO' | 'TROCA_AUTORIZADA' | 'TROCA_FINALIZADA' | 'TROCA_REJEITADA' | 'RECONFIRMACAO_ENDERECO';
+  tipo: 'RASTREIO' | 'TROCA_AUTORIZADA' | 'TROCA_FINALIZADA' | 'TROCA_REJEITADA' | 'RECONFIRMACAO_ENDERECO' | 'RESERVA_EXPIRADA' | 'EXPIRACAO_RESERVA';
   titulo: string;
   mensagem: string;
   codigoRastreio?: string;

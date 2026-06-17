@@ -7,6 +7,7 @@ import type {
 import { montarPartesSqlCatalogo } from '@/modules/livros/repositorioLivrosCatalogoSql';
 import type { IConexaoBanco, DbParametro } from '../../shared/infrastructure/database/IConexaoBanco';
 import { ContextoRequisicao } from '@/shared/infrastructure/contexto/ContextoRequisicao';
+import { MENSAGENS_ERRO } from '@/shared/constants/mensagens-erro.constants';
 
 type RowLivro = {
   liv_uuid: string;
@@ -18,9 +19,16 @@ type RowLivro = {
   etq_preco_venda: number;
   etq_quantidade_disponivel: number;
   liv_ativo: boolean;
+  liv_numero_paginas?: number | null;
+  liv_ano?: number | null;
+  categorias_agregadas?: string | null;
 };
 
 function mapRow(r: RowLivro): ILivroCatalogoDto {
+  const categoriasLista =
+    r.categorias_agregadas?.split('|').map((c) => c.trim()).filter(Boolean) ?? [];
+  const categoriaPrincipal = categoriasLista[0];
+
   return {
     uuid: r.liv_uuid,
     titulo: r.liv_titulo,
@@ -33,6 +41,12 @@ function mapRow(r: RowLivro): ILivroCatalogoDto {
     sinopse: r.liv_sinopse ?? undefined,
     status: r.liv_ativo ? 'Ativo' : 'Inativo',
     estrelas: 5,
+    categoria: categoriaPrincipal,
+    categorias: categoriasLista.length > 0 ? categoriasLista : undefined,
+    numeroPaginas: r.liv_numero_paginas ?? undefined,
+    anoPublicacao: r.liv_ano ?? undefined,
+    idioma: 'português',
+    tags: categoriasLista.map((c) => c.toLowerCase().replace(/\s+/g, '_')),
   };
 }
 
@@ -40,14 +54,14 @@ export class RepositorioLivrosPostgres {
   constructor(private readonly db: IConexaoBanco) {}
 
   /**
-   * Obtém o loj_id do contexto de requisição.
+   * Obtém o loj_uuid do contexto de requisição.
    * Se não houver contexto, retorna undefined (compatibilidade com código legado).
    * 
-   * NOTA: O middleware contextoLojaMiddleware converte loj_uuid para loj_id
-   * e armazena ambos no contexto. Repositórios usam loj_id para performance.
+   * NOTA: Usamos loja_uuid para consistência com a API pública.
+   * Internamente, fazemos JOIN com a tabela lojas para obter loj_id.
    */
-  private obterLojId(): number | undefined {
-    return ContextoRequisicao.obterLojId();
+  private obterLojaUuid(): string | undefined {
+    return ContextoRequisicao.obterLojUuid();
   }
 
   async listarCategoriasComLivrosNoCatalogo(): Promise<ICategoriaMenuDto[]> {
@@ -75,7 +89,7 @@ export class RepositorioLivrosPostgres {
     ordenacao: OrdenacaoCatalogo;
   }): Promise<IListagemCatalogoLivros> {
     const { pagina, itensPorPagina } = opcoes;
-    const loj_id = this.obterLojId();
+    const lojaUuid = this.obterLojaUuid();
 
     const {
       filtroCategoria,
@@ -87,15 +101,16 @@ export class RepositorioLivrosPostgres {
       offset,
     } = montarPartesSqlCatalogo(opcoes);
 
-    const filtroLoja = loj_id ? ` AND e.loj_id = $${paramsCount.length + 1}` : '';
-    const filtroLojaList = loj_id ? ` AND e.loj_id = $${paramsList.length + 1}` : '';
-    const paramsCountLoja = loj_id ? [...paramsCount, loj_id] : paramsCount;
-    const paramsListLoja = loj_id ? [...paramsList, loj_id] : paramsList;
+    const filtroLoja = lojaUuid ? ` AND lj.loj_uuid = $${paramsCount.length + 1}` : '';
+    const filtroLojaList = lojaUuid ? ` AND lj.loj_uuid = $${paramsList.length + 1}` : '';
+    const paramsCountLoja = lojaUuid ? [...paramsCount, lojaUuid] : paramsCount;
+    const paramsListLoja = lojaUuid ? [...paramsList, lojaUuid] : paramsList;
 
     const sqlCount = `
       SELECT COUNT(DISTINCT l.liv_id)::text AS c
       FROM livraria_comercial.livros l
       INNER JOIN livraria_comercial.estoques e ON e.liv_id = l.liv_id
+      INNER JOIN livraria_gestao.lojas lj ON e.loj_id = lj.loj_id
       WHERE l.liv_ativo = TRUE AND e.etq_ativo = TRUE AND e.etq_quantidade_disponivel > 0
       ${filtroCategoria}
       ${filtroLoja}
@@ -117,6 +132,7 @@ export class RepositorioLivrosPostgres {
       FROM livraria_comercial.livros l
       INNER JOIN livraria_comercial.autores a ON l.aut_id = a.aut_id
       INNER JOIN livraria_comercial.estoques e ON e.liv_id = l.liv_id
+      INNER JOIN livraria_gestao.lojas lj ON e.loj_id = lj.loj_id
       ${joinVendas}
       WHERE l.liv_ativo = TRUE AND e.etq_ativo = TRUE AND e.etq_quantidade_disponivel > 0
       ${filtroCategoria}
@@ -136,7 +152,7 @@ export class RepositorioLivrosPostgres {
   }
 
   async obterPorUuid(livUuid: string): Promise<ILivroCatalogoDto | null> {
-    const loj_id = this.obterLojId();
+    const lojaUuid = this.obterLojaUuid();
     
     let sql = `
       SELECT
@@ -152,17 +168,18 @@ export class RepositorioLivrosPostgres {
       FROM livraria_comercial.livros l
       INNER JOIN livraria_comercial.autores a ON l.aut_id = a.aut_id
       INNER JOIN livraria_comercial.estoques e ON e.liv_id = l.liv_id
+      INNER JOIN livraria_gestao.lojas lj ON e.loj_id = lj.loj_id
       WHERE l.liv_uuid = $1 AND e.etq_ativo = TRUE
     `;
     
     const parametros: DbParametro[] = [livUuid];
 
-    // Se multi-tenancy estiver habilitado, filtrar por loj_id no estoque
-    if (loj_id) {
-      sql += ` AND e.loj_id = $2`;
-      parametros.push(loj_id);
+    // Se multi-tenancy estiver habilitado, filtrar por loja_uuid
+    if (lojaUuid) {
+      sql += ` AND lj.loj_uuid = $2`;
+      parametros.push(lojaUuid);
     } else {
-      // Se não há loj_id, ordenar por loj_id DESC para pegar o registro mais recente
+      // Se não há loja_uuid, ordenar por loj_id DESC para pegar o registro mais recente
       sql += ` ORDER BY e.loj_id DESC`;
     }
 
@@ -172,7 +189,7 @@ export class RepositorioLivrosPostgres {
   }
 
   async listarTodosAdmin(limite: number): Promise<ILivroCatalogoDto[]> {
-    const loj_id = this.obterLojId();
+    const lojaUuid = this.obterLojaUuid();
     
     let sql = `
       SELECT
@@ -184,20 +201,29 @@ export class RepositorioLivrosPostgres {
         a.aut_nome,
         e.etq_preco_venda,
         e.etq_quantidade_disponivel,
-        l.liv_ativo
+        l.liv_ativo,
+        l.liv_numero_paginas,
+        l.liv_ano,
+        (
+          SELECT string_agg(DISTINCT c.cat_nome, '|' ORDER BY c.cat_nome)
+          FROM livraria_comercial.livro_categorias lc
+          INNER JOIN livraria_comercial.categorias c ON lc.cat_id = c.cat_id AND c.cat_ativo = TRUE
+          WHERE lc.liv_id = l.liv_id
+        ) AS categorias_agregadas
       FROM livraria_comercial.livros l
       INNER JOIN livraria_comercial.autores a ON l.aut_id = a.aut_id
       INNER JOIN livraria_comercial.estoques e ON e.liv_id = l.liv_id
+      INNER JOIN livraria_gestao.lojas lj ON e.loj_id = lj.loj_id
       WHERE e.etq_ativo = TRUE
     `;
     
     const parametros: DbParametro[] = [];
 
-    // Se multi-tenancy estiver habilitado, filtrar por loj_id no estoque
+    // Se multi-tenancy estiver habilitado, filtrar por loja_uuid
     // Admin vê apenas livros com estoque na loja dele
-    if (loj_id) {
-      sql += ` AND e.loj_id = $1`;
-      parametros.push(loj_id);
+    if (lojaUuid) {
+      sql += ` AND lj.loj_uuid = $1`;
+      parametros.push(lojaUuid);
     }
 
     sql += ` ORDER BY l.liv_titulo ASC`;
@@ -210,19 +236,68 @@ export class RepositorioLivrosPostgres {
     return rows.map(mapRow);
   }
 
+  /**
+   * Lista todos os livros do catálogo global sem filtro de loja.
+   * Usado para indexação no ChromaDB (IA de recomendação).
+   * Clientes podem comprar de qualquer loja, então a IA precisa
+   * ter acesso ao catálogo completo.
+   */
+  async listarCatalogoGlobal(limite: number): Promise<ILivroCatalogoDto[]> {
+    const sql = `
+      WITH livro_categorias AS (
+        SELECT
+          lc.liv_id,
+          string_agg(DISTINCT c.cat_nome, '|' ORDER BY c.cat_nome) AS categorias_agregadas
+        FROM livraria_comercial.livro_categorias lc
+        INNER JOIN livraria_comercial.categorias c ON lc.cat_id = c.cat_id AND c.cat_ativo = TRUE
+        GROUP BY lc.liv_id
+      )
+      SELECT
+        l.liv_uuid,
+        l.liv_titulo,
+        l.liv_isbn,
+        l.liv_sinopse,
+        l.liv_imagem_url,
+        a.aut_nome,
+        MIN(e.etq_preco_venda) as etq_preco_venda,
+        SUM(e.etq_quantidade_disponivel) as etq_quantidade_disponivel,
+        l.liv_ativo,
+        l.liv_numero_paginas,
+        l.liv_ano,
+        COALESCE(lc.categorias_agregadas, '') AS categorias_agregadas
+      FROM livraria_comercial.livros l
+      INNER JOIN livraria_comercial.autores a ON l.aut_id = a.aut_id
+      INNER JOIN livraria_comercial.estoques e ON e.liv_id = l.liv_id
+      LEFT JOIN livro_categorias lc ON l.liv_id = lc.liv_id
+      WHERE l.liv_ativo = TRUE AND e.etq_ativo = TRUE
+      GROUP BY l.liv_uuid, l.liv_titulo, l.liv_isbn, l.liv_sinopse, l.liv_imagem_url, a.aut_nome, l.liv_ativo, l.liv_numero_paginas, l.liv_ano, lc.categorias_agregadas
+      HAVING SUM(e.etq_quantidade_disponivel) > 0
+      ORDER BY l.liv_titulo ASC
+      LIMIT $1
+    `;
+
+    const rows = await this.db.executar<RowLivro>(sql, [limite]);
+    return rows.map(mapRow);
+  }
+
   async obterEstoqueDisponivelPorLivId(livId: number): Promise<number | null> {
-    const loj_id = this.obterLojId();
+    const lojaUuid = this.obterLojaUuid();
     
-    let sql = `SELECT etq_quantidade_disponivel FROM livraria_comercial.estoques WHERE liv_id = $1 AND etq_ativo = TRUE`;
+    let sql = `
+      SELECT e.etq_quantidade_disponivel 
+      FROM livraria_comercial.estoques e
+      INNER JOIN livraria_gestao.lojas lj ON e.loj_id = lj.loj_id
+      WHERE e.liv_id = $1 AND e.etq_ativo = TRUE
+    `;
     const parametros: DbParametro[] = [livId];
 
-    // Se multi-tenancy estiver habilitado, filtrar por loj_id no estoque
-    if (loj_id) {
-      sql += ` AND loj_id = $2`;
-      parametros.push(loj_id);
+    // Se multi-tenancy estiver habilitado, filtrar por loja_uuid
+    if (lojaUuid) {
+      sql += ` AND lj.loj_uuid = $2`;
+      parametros.push(lojaUuid);
     }
 
-    sql += ` ORDER BY etq_id LIMIT 1`;
+    sql += ` ORDER BY e.etq_id LIMIT 1`;
 
     const rows = await this.db.executar<{ etq_quantidade_disponivel: number }>(sql, parametros);
     return rows.length ? rows[0].etq_quantidade_disponivel : null;
@@ -254,7 +329,7 @@ export class RepositorioLivrosPostgres {
   }): Promise<ILivroCatalogoDto> {
     const livId = await this.obterLivIdPorUuid(livUuid);
     if (!livId) {
-      throw new Error('Livro não encontrado.');
+      throw new Error(MENSAGENS_ERRO.LIVRO_NAO_ENCONTRADO);
     }
 
     // Construir SET dinâmico com parâmetros independentes por tabela (livros vs estoques)
@@ -320,7 +395,7 @@ export class RepositorioLivrosPostgres {
       valoresEstoque.push(dados.precoVenda);
     }
     if (dados.valorCusto !== undefined) {
-      camposEstoque.push(`etq_valor_custo = $${contadorEstoque++}`);
+      camposEstoque.push(`etq_valor_custo_atual = $${contadorEstoque++}`);
       valoresEstoque.push(dados.valorCusto);
     }
 
@@ -354,12 +429,23 @@ export class RepositorioLivrosPostgres {
       }
     }
 
-    // Retornar livro atualizado
-    const livroAtualizado = await this.obterPorUuid(livUuid);
-    if (!livroAtualizado) {
+    // Retornar livro atualizado sem filtro de loja (contexto interno de escrita)
+    const sqlRetorno = `
+      SELECT
+        l.liv_uuid, l.liv_titulo, l.liv_isbn, l.liv_sinopse, l.liv_imagem_url,
+        a.aut_nome, e.etq_preco_venda, e.etq_quantidade_disponivel, l.liv_ativo
+      FROM livraria_comercial.livros l
+      INNER JOIN livraria_comercial.autores a ON l.aut_id = a.aut_id
+      INNER JOIN livraria_comercial.estoques e ON e.liv_id = l.liv_id AND e.etq_ativo = TRUE
+      WHERE l.liv_uuid = $1
+      ORDER BY e.loj_id DESC
+      LIMIT 1
+    `;
+    const rows = await this.db.executar<RowLivro>(sqlRetorno, [livUuid] as DbParametro[]);
+    if (!rows.length) {
       throw new Error('Erro ao carregar livro atualizado.');
     }
-    return livroAtualizado;
+    return mapRow(rows[0]);
   }
 
   async inativarLivro(uuid: string): Promise<void> {
@@ -378,5 +464,67 @@ export class RepositorioLivrosPostgres {
       WHERE liv_uuid = $1
     `;
     await this.db.executar(sql, [uuid]);
+  }
+
+  async listarLivrosSemEstoqueAbaixoValorMinimo(
+    valorMinimo: number,
+  ): Promise<Array<{ uuid: string; titulo: string; preco: number }>> {
+    const sql = `
+      SELECT l.liv_uuid AS uuid, l.liv_titulo AS titulo, e.etq_preco_venda AS preco
+      FROM livraria_comercial.livros l
+      INNER JOIN livraria_comercial.estoques e ON e.liv_id = l.liv_id AND e.etq_ativo = TRUE
+      WHERE l.liv_ativo = TRUE
+        AND l.liv_status_mercado = 'ATIVO'
+        AND e.etq_quantidade_disponivel = 0
+        AND e.etq_preco_venda < $1
+    `;
+    const rows = await this.db.executar<{ uuid: string; titulo: string; preco: number }>(sql, [valorMinimo] as DbParametro[]);
+    return rows.map((r) => ({ uuid: r.uuid, titulo: r.titulo, preco: Number(r.preco) }));
+  }
+
+  async marcarForaDeMercado(uuids: string[]): Promise<number> {
+    if (uuids.length === 0) return 0;
+    const sql = `
+      UPDATE livraria_comercial.livros
+      SET liv_ativo = FALSE,
+          liv_status_mercado = 'FORA_DE_MERCADO',
+          liv_atualizado_em = CURRENT_TIMESTAMP
+      WHERE liv_uuid = ANY($1::uuid[])
+    `;
+    await this.db.executar(sql, [uuids] as DbParametro[]);
+    return uuids.length;
+  }
+
+  async obterGrupoPrecificacaoPorLivroUuid(
+    livUuid: string,
+  ): Promise<{ margemLucroPercentual: number; descricao: string } | null> {
+    const sql = `
+      SELECT gpr.gpr_margem_lucro_percentual AS margem, gpr.gpr_descricao AS descricao
+      FROM livraria_comercial.livros l
+      INNER JOIN livraria_comercial.grupos_precificacao gpr ON l.gpr_id = gpr.gpr_id
+      WHERE l.liv_uuid = $1
+    `;
+    const rows = await this.db.executar<{ margem: number; descricao: string }>(sql, [livUuid] as DbParametro[]);
+    if (!rows.length) return null;
+    return { margemLucroPercentual: Number(rows[0].margem), descricao: rows[0].descricao };
+  }
+
+  async obterValorCustoAtualPorLivroUuid(livUuid: string): Promise<number | null> {
+    const lojaUuid = this.obterLojaUuid();
+    let sql = `
+      SELECT e.etq_valor_custo_atual
+      FROM livraria_comercial.livros l
+      INNER JOIN livraria_comercial.estoques e ON e.liv_id = l.liv_id AND e.etq_ativo = TRUE
+      INNER JOIN livraria_gestao.lojas lj ON e.loj_id = lj.loj_id
+      WHERE l.liv_uuid = $1
+    `;
+    const params: DbParametro[] = [livUuid];
+    if (lojaUuid) {
+      sql += ` AND lj.loj_uuid = $2`;
+      params.push(lojaUuid);
+    }
+    sql += ` LIMIT 1`;
+    const rows = await this.db.executar<{ etq_valor_custo_atual: number }>(sql, params);
+    return rows.length ? Number(rows[0].etq_valor_custo_atual) : null;
   }
 }

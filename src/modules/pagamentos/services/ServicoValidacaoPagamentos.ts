@@ -61,10 +61,11 @@ export class ServicoValidacaoPagamentos {
   }
 
   private static validarCupomPromocional(codigo: string, valor: number): boolean {
-    return codigo === 'DESCONTO10' && valor > 0;
+    // Validação básica - validação completa será feita no repositório
+    return !!codigo && valor > 0;
   }
 
   private static validarCupomTroca(codigo: string, valor: number): boolean {
-    return codigo === 'TROCA50' && valor <= 50;
+    return !!codigo && valor > 0;
   }
 }
